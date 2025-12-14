@@ -70,7 +70,8 @@ RUN apk update && apk add --no-cache \
 RUN pip3 install --no-cache-dir --break-system-packages \
     hypothesis \
     pytest-cov \
-    pytest-xdist
+    pytest-xdist \
+    pyyaml
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
