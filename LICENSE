@@ -1,0 +1,106 @@
+# Kimigayo OS License Information
+
+Kimigayo OS is a Linux distribution composed of various software components,
+each with its own license. This file provides an overview of the licensing
+structure, following the approach of Alpine Linux.
+
+## License Overview
+
+Kimigayo OS follows Alpine Linux's licensing philosophy: each component
+maintains its original license, and we clearly document all licenses used.
+
+## Component Licenses
+
+### Core Operating System Components
+
+| Component | License | Location |
+|-----------|---------|----------|
+| Linux Kernel | GPL-2.0 | LICENSES/GPL-2.0.txt |
+| musl libc | MIT | LICENSES/MIT.txt |
+| BusyBox | GPL-2.0 | LICENSES/GPL-2.0.txt |
+| OpenRC (Init System) | BSD-2-Clause | LICENSES/BSD-2-Clause.txt |
+
+### Kimigayo OS Original Components
+
+| Component | License | Location |
+|-----------|---------|----------|
+| isn (Package Manager) | MIT | LICENSES/MIT.txt |
+| Build System | MIT | LICENSES/MIT.txt |
+| Documentation | MIT | LICENSES/MIT.txt |
+| Test Framework | MIT | LICENSES/MIT.txt |
+
+## Directory-Specific Licenses
+
+```
+src/
+├── kernel/        # GPL-2.0 (Linux Kernel configurations)
+├── init/          # BSD-2-Clause (OpenRC-based)
+├── pkg/           # MIT (isn - original implementation)
+├── utils/         # GPL-2.0 (BusyBox configurations)
+└── build/         # MIT (Build utilities)
+
+tests/             # MIT
+scripts/           # MIT
+docs/              # MIT
+```
+
+## Third-Party Components
+
+When you install packages using `isn`, each package maintains its own
+license. You can check package licenses using:
+
+```bash
+isn info <package-name>
+```
+
+## License Identification
+
+Kimigayo OS uses SPDX short identifiers for license identification,
+following Alpine Linux's convention.
+
+Common SPDX identifiers used:
+- GPL-2.0: GNU General Public License v2.0
+- MIT: MIT License
+- BSD-2-Clause: BSD 2-Clause "Simplified" License
+
+## Compliance
+
+### Using Kimigayo OS
+
+You are free to:
+- Use Kimigayo OS for any purpose (commercial or non-commercial)
+- Modify and distribute Kimigayo OS
+- Create derivative works
+
+Subject to the terms of the individual component licenses.
+
+### Contributing to Kimigayo OS
+
+By contributing to Kimigayo OS, you agree that:
+- Your contributions to original components (build system, isn, etc.) will be licensed under MIT
+- Your contributions to existing components will be licensed under their respective licenses
+- You have the right to submit the contributions under these licenses
+
+## Full License Texts
+
+Full license texts are available in the `LICENSES/` directory:
+- `LICENSES/GPL-2.0.txt` - GNU General Public License v2.0
+- `LICENSES/MIT.txt` - MIT License
+- `LICENSES/BSD-2-Clause.txt` - BSD 2-Clause License
+
+## Additional Information
+
+For complete license texts and more information:
+- GPL-2.0: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+- MIT: https://opensource.org/licenses/MIT
+- BSD-2-Clause: https://opensource.org/licenses/BSD-2-Clause
+
+## Questions
+
+If you have questions about licensing, please:
+- Open an issue: https://github.com/Kazuki-0731/Kimigayo/issues
+- Contact: (to be determined)
+
+---
+
+Last Updated: 2025-12-14

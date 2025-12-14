@@ -171,10 +171,18 @@ Kimigayo OSはオープンソースプロジェクトです。バグ報告、機
 
 ### 📄 ライセンス
 
-- **OSコア**: GPLv2（Linuxカーネルに準拠）
-- **ユーザーランドツール**: MIT/BSD/GPL（各コンポーネントによる）
+Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライセンスを持ちます：
 
-詳細は [LICENSE](LICENSE)（作成予定）を参照してください。
+| コンポーネント | ライセンス |
+|---------------|-----------|
+| Linuxカーネル | GPL-2.0 |
+| musl libc | MIT |
+| BusyBox | GPL-2.0 |
+| OpenRC | BSD-2-Clause |
+| isn (パッケージマネージャ) | MIT |
+| ビルドシステム | MIT |
+
+詳細は [LICENSE](LICENSE) を参照してください。
 
 ### 🌟 Alpine Linuxとの違い
 
@@ -255,8 +263,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ### 📄 License
 
-- **OS Core**: GPLv2 (following Linux kernel)
-- **Userland Tools**: MIT/BSD/GPL (depending on components)
+Like Alpine Linux, Kimigayo OS components have individual licenses:
+
+| Component | License |
+|-----------|---------|
+| Linux Kernel | GPL-2.0 |
+| musl libc | MIT |
+| BusyBox | GPL-2.0 |
+| OpenRC | BSD-2-Clause |
+| isn (Package Manager) | MIT |
+| Build System | MIT |
+
+See [LICENSE](LICENSE) for details.
 
 ### 📚 Documentation
 
