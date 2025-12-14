@@ -75,7 +75,7 @@ docker-compose run --rm kimigayo-build make kernel-config
 docker-compose run --rm kimigayo-build make kernel
 ```
 
-#### Phase 3以降: コアユーティリティとライブラリ（計画中）
+#### Phase 3以降: コアユーティリティとライブラリ
 
 ```bash
 # 完全なOSイメージのビルド

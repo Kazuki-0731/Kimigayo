@@ -90,7 +90,7 @@ docker-compose build
 # ビルドシステムをテスト
 docker-compose run --rm kimigayo-build make info
 
-# OSをビルド（Phase 2以降で実装予定）
+# OSをビルド
 docker-compose run --rm kimigayo-build make build
 ```
 
