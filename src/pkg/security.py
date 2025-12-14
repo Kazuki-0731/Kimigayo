@@ -2,7 +2,8 @@
 Security Verification Module for Kimigayo OS Package Manager
 
 Provides cryptographic verification of packages:
-- GPG signature verification
+- Ed25519 signature verification (primary)
+- GPG signature verification (legacy)
 - SHA-256 hash verification
 """
 
@@ -12,6 +13,13 @@ from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.exceptions import InvalidSignature
+    ED25519_AVAILABLE = True
+except ImportError:
+    ED25519_AVAILABLE = False
 
 
 class VerificationResult(Enum):
@@ -74,6 +82,132 @@ class HashVerifier:
         """
         actual_hash = HashVerifier.calculate_sha256(file_path)
         return actual_hash.lower() == expected_hash.lower()
+
+
+class Ed25519Verifier:
+    """Ed25519 signature verification (modern, lightweight)"""
+
+    def __init__(self, trusted_keys: Optional[dict] = None):
+        """
+        Initialize Ed25519 verifier.
+
+        Args:
+            trusted_keys: Dict mapping key ID to public key (hex string)
+                         Format: {"key_id": "hex_encoded_public_key"}
+        """
+        if not ED25519_AVAILABLE:
+            raise RuntimeError("cryptography library not installed. Install with: pip install cryptography")
+
+        self.trusted_keys = trusted_keys or {}
+
+    def add_trusted_key(self, key_id: str, public_key_hex: str):
+        """
+        Add a trusted public key.
+
+        Args:
+            key_id: Identifier for this key
+            public_key_hex: Public key as hex string (64 chars)
+        """
+        self.trusted_keys[key_id] = public_key_hex
+
+    def verify_signature(
+        self,
+        file_path: Path,
+        signature_hex: str,
+        public_key_hex: str
+    ) -> Tuple[bool, str]:
+        """
+        Verify Ed25519 signature of a file.
+
+        Args:
+            file_path: Path to file to verify
+            signature_hex: Signature as hex string (128 chars)
+            public_key_hex: Public key as hex string (64 chars)
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        try:
+            # Convert hex strings to bytes
+            try:
+                signature = bytes.fromhex(signature_hex)
+                public_key_bytes = bytes.fromhex(public_key_hex)
+            except ValueError as e:
+                return False, f"Invalid hex encoding: {str(e)}"
+
+            # Validate lengths
+            if len(signature) != 64:
+                return False, f"Invalid signature length: {len(signature)} (expected 64)"
+            if len(public_key_bytes) != 32:
+                return False, f"Invalid public key length: {len(public_key_bytes)} (expected 32)"
+
+            # Read file content
+            with open(file_path, 'rb') as f:
+                message = f.read()
+
+            # Create public key and verify
+            try:
+                public_key = Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                public_key.verify(signature, message)
+                return True, ""
+            except InvalidSignature:
+                return False, "Invalid Ed25519 signature"
+
+        except FileNotFoundError:
+            return False, f"File not found: {file_path}"
+        except Exception as e:
+            return False, f"Ed25519 verification error: {str(e)}"
+
+    def verify_with_trusted_key(
+        self,
+        file_path: Path,
+        signature_hex: str,
+        key_id: str
+    ) -> Tuple[bool, str]:
+        """
+        Verify signature using a trusted key from the keyring.
+
+        Args:
+            file_path: Path to file to verify
+            signature_hex: Signature as hex string
+            key_id: ID of trusted key to use
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if key_id not in self.trusted_keys:
+            return False, f"Trusted key not found: {key_id}"
+
+        public_key_hex = self.trusted_keys[key_id]
+        return self.verify_signature(file_path, signature_hex, public_key_hex)
+
+    def load_public_key_from_file(self, key_path: Path) -> Tuple[Optional[str], str]:
+        """
+        Load public key from file.
+
+        Args:
+            key_path: Path to public key file (hex encoded)
+
+        Returns:
+            Tuple of (public_key_hex or None, error_message)
+        """
+        try:
+            with open(key_path, 'r') as f:
+                key_hex = f.read().strip()
+
+            # Validate hex encoding
+            try:
+                key_bytes = bytes.fromhex(key_hex)
+                if len(key_bytes) != 32:
+                    return None, f"Invalid key length: {len(key_bytes)} (expected 32)"
+                return key_hex, ""
+            except ValueError:
+                return None, "Invalid hex encoding in key file"
+
+        except FileNotFoundError:
+            return None, f"Key file not found: {key_path}"
+        except Exception as e:
+            return None, f"Error loading key: {str(e)}"
 
 
 class GPGVerifier:
@@ -186,15 +320,29 @@ class GPGVerifier:
 class PackageVerifier:
     """Complete package verification (hash + signature)"""
 
-    def __init__(self, keyring_path: Optional[Path] = None):
+    def __init__(
+        self,
+        keyring_path: Optional[Path] = None,
+        ed25519_keys: Optional[dict] = None,
+        prefer_ed25519: bool = True
+    ):
         """
         Initialize package verifier.
 
         Args:
-            keyring_path: Path to GPG keyring
+            keyring_path: Path to GPG keyring (for legacy support)
+            ed25519_keys: Dict of trusted Ed25519 keys
+            prefer_ed25519: Prefer Ed25519 over GPG when both available
         """
         self.hash_verifier = HashVerifier()
         self.gpg_verifier = GPGVerifier(keyring_path)
+        self.prefer_ed25519 = prefer_ed25519
+
+        # Initialize Ed25519 verifier if cryptography is available
+        if ED25519_AVAILABLE:
+            self.ed25519_verifier = Ed25519Verifier(ed25519_keys)
+        else:
+            self.ed25519_verifier = None
 
     def verify_package(
         self,
@@ -293,3 +441,65 @@ class PackageVerifier:
             signature_path,
             require_signature=False  # For now, don't require signature
         )
+
+    def verify_package_ed25519(
+        self,
+        package_path: Path,
+        expected_hash: str,
+        signature_hex: str,
+        public_key_hex: str,
+        require_signature: bool = True
+    ) -> VerificationReport:
+        """
+        Verify package with Ed25519 signature.
+
+        Args:
+            package_path: Path to package file
+            expected_hash: Expected SHA-256 hash
+            signature_hex: Ed25519 signature (hex string)
+            public_key_hex: Public key (hex string)
+            require_signature: Whether to require valid signature
+
+        Returns:
+            Verification report
+        """
+        report = VerificationReport(result=VerificationResult.SUCCESS)
+
+        # Check if Ed25519 is available
+        if not self.ed25519_verifier:
+            report.result = VerificationResult.VERIFICATION_ERROR
+            report.error_message = "Ed25519 support not available (install PyNaCl)"
+            return report
+
+        # Verify hash first
+        hash_valid = self.hash_verifier.verify_hash(package_path, expected_hash)
+        report.hash_verified = hash_valid
+
+        if not hash_valid:
+            report.result = VerificationResult.HASH_MISMATCH
+            report.error_message = "Package hash does not match expected value"
+            return report
+
+        # Verify Ed25519 signature
+        if require_signature:
+            sig_valid, error = self.ed25519_verifier.verify_signature(
+                package_path,
+                signature_hex,
+                public_key_hex
+            )
+            report.signature_verified = sig_valid
+
+            if not sig_valid:
+                if "not found" in error.lower():
+                    report.result = VerificationResult.KEY_NOT_FOUND
+                elif "invalid" in error.lower():
+                    report.result = VerificationResult.SIGNATURE_INVALID
+                else:
+                    report.result = VerificationResult.VERIFICATION_ERROR
+
+                report.error_message = error
+                return report
+
+        # All checks passed
+        report.result = VerificationResult.SUCCESS
+        return report
