@@ -52,7 +52,7 @@ def test_reproducible_build_consistency(config, tmp_path):
     """
     # Perform first build
     build_dir_1 = tmp_path / "build_1"
-    build_dir_1.mkdir()
+    build_dir_1.mkdir(exist_ok=True)
     artifact_1 = perform_reproducible_build(
         config=config,
         output_dir=build_dir_1,
@@ -61,7 +61,7 @@ def test_reproducible_build_consistency(config, tmp_path):
 
     # Perform second build
     build_dir_2 = tmp_path / "build_2"
-    build_dir_2.mkdir()
+    build_dir_2.mkdir(exist_ok=True)
     artifact_2 = perform_reproducible_build(
         config=config,
         output_dir=build_dir_2,
