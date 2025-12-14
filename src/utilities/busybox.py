@@ -270,7 +270,8 @@ class BusyBoxBuilder:
 
         # Create mock binary with size based on configuration
         estimated_size = self.config.get_estimated_size()
-        mock_data = b"BUSYBOX" * (estimated_size // 7)
+        # Ensure we have enough data to fill the estimated size
+        mock_data = b"BUSYBOX" * ((estimated_size // 7) + 1)
         binary_path.write_bytes(mock_data[:estimated_size])
 
         # Calculate checksum
