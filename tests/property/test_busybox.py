@@ -239,19 +239,21 @@ def test_utility_add_remove(config, tmp_path):
     """
     Verify that utilities can be added and removed (except essential ones)
     """
-    # Get an optional utility
-    optional = OPTIONAL_UTILITIES[0]
+    # Find an optional utility that's not in the current config
+    optional = None
+    for util in OPTIONAL_UTILITIES:
+        if util not in config.utilities:
+            optional = util
+            break
 
-    # Add utility
-    initial_count = len(config.utilities)
-    config.add_utility(optional)
+    if optional is not None:
+        # Add utility
+        initial_count = len(config.utilities)
+        result = config.add_utility(optional)
 
-    if optional not in config.utilities:
-        # Was already present, count should be same
-        assert len(config.utilities) == initial_count
-    else:
-        # Should be added
+        assert result is True, "add_utility should return True for new utility"
         assert len(config.utilities) == initial_count + 1
+        assert optional in config.utilities
 
     # Try to remove essential utility (should fail)
     essential = ESSENTIAL_UTILITIES[0]
