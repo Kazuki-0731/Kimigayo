@@ -5,7 +5,7 @@ Tests validate that builds are deterministic and reproducible.
 """
 
 import pytest
-from hypothesis import given, strategies as st, settings, assume
+from hypothesis import given, strategies as st, settings, assume, HealthCheck
 from pathlib import Path
 
 from src.build.config import BuildConfig, Architecture, SecurityLevel, ImageType
@@ -44,7 +44,7 @@ def reproducible_build_configs(draw):
 @pytest.mark.property
 @pytest.mark.slow
 @given(config=reproducible_build_configs())
-@settings(max_examples=50)  # Reduced for slower reproducible builds
+@settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_reproducible_build_consistency(config, tmp_path):
     """
     任意のソースコードに対して、Build_Systemは複数回のビルドで
@@ -92,7 +92,7 @@ def test_reproducible_build_consistency(config, tmp_path):
 @pytest.mark.property
 @pytest.mark.slow
 @given(config=reproducible_build_configs())
-@settings(max_examples=30)
+@settings(max_examples=30, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_environment_independent_build(config, tmp_path):
     """
     任意のソースコードに対して、Build_Systemは異なるビルド環境で
@@ -124,6 +124,7 @@ def test_environment_independent_build(config, tmp_path):
     arch=st.sampled_from(Architecture),
     image_type=st.sampled_from(ImageType),
 )
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_reproducible_metadata_consistency(arch, image_type, tmp_path, monkeypatch):
     """
     Verify that build metadata is consistent for reproducible builds
@@ -151,6 +152,7 @@ def test_reproducible_metadata_consistency(arch, image_type, tmp_path, monkeypat
 
 @pytest.mark.property
 @given(config=reproducible_build_configs())
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_non_reproducible_flag_difference(config, tmp_path):
     """
     Verify that non-reproducible builds may have different checksums
@@ -173,7 +175,7 @@ def test_non_reproducible_flag_difference(config, tmp_path):
 
 @pytest.mark.property
 @given(config=reproducible_build_configs())
-@settings(max_examples=50)
+@settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_reproducible_build_size_consistency(config, tmp_path):
     """
     Verify that reproducible builds produce identical file sizes

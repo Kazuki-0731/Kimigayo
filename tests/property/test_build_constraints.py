@@ -5,7 +5,7 @@ Tests validate the correctness properties defined in the design specification.
 """
 
 import pytest
-from hypothesis import given, strategies as st, assume, settings
+from hypothesis import given, strategies as st, assume, settings, HealthCheck
 from pathlib import Path
 
 from src.build.config import (
@@ -45,7 +45,7 @@ def build_configurations(draw):
 # **検証対象: 要件 1.1**
 @pytest.mark.property
 @given(build_config=build_configurations())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_build_size_constraint(build_config, tmp_path):
     """
     任意のビルド設定に対して、生成されるBase_Imageのサイズは
