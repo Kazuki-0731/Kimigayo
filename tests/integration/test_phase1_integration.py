@@ -10,10 +10,10 @@ Tests the integration of:
 import pytest
 from pathlib import Path
 
-from src.kernel.build import KernelConfig, Architecture as KernelArch, build_kernel
+from src.kernel.build import KernelConfig, build_kernel
 from src.libc.musl import MuslConfig, LinkMode, build_musl
 from src.utilities.busybox import BusyBoxConfig, ImageProfile, build_busybox
-from src.toolchain.cross_compile import Architecture as ToolchainArch, setup_toolchain
+from src.toolchain.cross_compile import Architecture, setup_toolchain
 
 
 @pytest.mark.integration
@@ -277,7 +277,7 @@ def test_toolchain_integration(tmp_path):
     """
     Test that toolchain integrates with all components
     """
-    arch = ToolchainArch.X86_64
+    arch = Architecture.X86_64
 
     # Setup toolchain
     compiler = setup_toolchain(arch, tmp_path / "toolchain")
