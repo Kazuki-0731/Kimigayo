@@ -211,6 +211,13 @@ Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライ
 
 ### 📚 ドキュメント
 
+#### ユーザー向け
+- [インストールガイド](docs/user/INSTALLATION.md) - Docker、仮想化環境、ベアメタルへのインストール方法
+- [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
+- [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isnパッケージマネージャの詳細ガイド
+- [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティの設定
+
+#### 開発者向け
 - [仕様書](SPECIFICATION.md)
 - [設計書](.kiro/specs/kimigayo-os-core/design.md)
 - [実装計画](.kiro/specs/kimigayo-os-core/tasks.md)
@@ -295,6 +302,13 @@ See [LICENSE](LICENSE) for details.
 
 ### 📚 Documentation
 
+#### For Users
+- [Installation Guide](docs/user/INSTALLATION.md) - Install on Docker, virtualization, and bare metal
+- [Quick Start Guide](docs/user/QUICKSTART.md) - Basic operations and usage
+- [Package Manager Guide](docs/user/PACKAGE_MANAGER.md) - Detailed isn package manager guide
+- [Configuration Guide](docs/user/CONFIGURATION.md) - Network, services, and security configuration
+
+#### For Developers
 - [Specification](SPECIFICATION.md)
 - [Design Document](.kiro/specs/kimigayo-os-core/design.md)
 - [Development Guide](DEVELOPMENT.md)
