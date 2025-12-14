@@ -112,7 +112,11 @@ build: kernel init pkg utils rootfs
 kernel:
 	@echo "[BUILD] Linux Kernel ($(ARCH))"
 	$(Q)mkdir -p $(BUILD_DIR)/kernel
-	@echo "  Kernel build will be implemented in Phase 2"
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)bash $(SCRIPTS_DIR)/download-kernel.sh
+	$(Q)bash $(SCRIPTS_DIR)/apply-kernel-patches.sh
+	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
+	@echo "[BUILD] Kernel build completed for $(ARCH)"
 
 # Init system build
 init:
