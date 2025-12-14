@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  kimigayo-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kimigayo-os-build:latest
+    container_name: kimigayo-build-env
+    volumes:
+      # ソースコードをマウント
+      - .:/build/kimigayo:rw
+      # ビルド出力を永続化
+      - kimigayo-output:/output
+      # Dockerソケットをマウント（テスト用）
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    working_dir: /build/kimigayo
+    stdin_open: true
+    tty: true
+    environment:
+      - KIMIGAYO_VERSION=0.1.0
+      - ARCH=x86_64
+      - SECURITY_HARDENING=full
+    # リソース制限（開発環境の目標値を反映）
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '4'
+        reservations:
+          memory: 512M
+          cpus: '2'
+
+volumes:
+  kimigayo-output:
+    driver: local
