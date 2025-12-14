@@ -10,8 +10,9 @@ import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Any
 import hashlib
+import json
 
 
 class RunLevel(Enum):
@@ -54,6 +55,8 @@ class ServiceConfig:
     # Security settings
     enable_namespace_isolation: bool = False
     enable_seccomp: bool = False
+    seccomp_profile: Optional[str] = None  # Path to seccomp profile or profile name
+    namespace_config: Optional[Dict[str, Any]] = None  # Namespace configuration
 
     # Recovery settings
     restart_on_failure: bool = False
