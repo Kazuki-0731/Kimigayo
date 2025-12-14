@@ -18,25 +18,25 @@
 
 ### 概要
 
-Kimigayo OSは、Alpine Linuxの設計思想を受け継いだ軽量・高速・セキュアなオペレーティングシステムです。最小限のリソースで動作し、コンテナ環境、組み込みデバイス、サーバー環境などで高いパフォーマンスを発揮することを目指します。
+Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速・セキュアなオペレーティングシステムです。最小限のリソースで動作し、コンテナ環境、組み込みデバイス、サーバー環境などで高いパフォーマンスを発揮することを目指します。
 
 ### ✨ 主な特徴
 
-- 🪶 **軽量性**: ベースイメージ5MB以下の極小フットプリント
-- ⚡ **高速性**: 10秒以下での起動時間、低メモリ消費（128MB最小要件）
+- 🪶 **軽量性**: ベースイメージ 5MB 以下の極小フットプリント
+- ⚡ **高速性**: 10 秒以下での起動時間、低メモリ消費（128MB 最小要件）
 - 🔒 **セキュリティ**: セキュアバイデフォルトの設計、コンパイル時・実行時の包括的なセキュリティ強化
-- 🧩 **モジュラー性**: 必要な機能のみを選択可能、GUIモジュールの追加も可能
+- 🧩 **モジュラー性**: 必要な機能のみを選択可能、GUI モジュールの追加も可能
 - 🔄 **再現可能ビルド**: ビット同一の出力を保証する再現可能なビルドシステム
-- 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート（将来的にRISC-Vにも対応予定）
+- 🌐 **マルチアーキテクチャ**: x86_64 と ARM64 をサポート（将来的に RISC-V にも対応予定）
 
 ### 🎯 設計目標
 
-| 項目 | 目標値 |
-|------|--------|
+| 項目                 | 目標値          |
+| -------------------- | --------------- |
 | ベースイメージサイズ | < 5MB (Minimal) |
-| 起動時間 | < 10秒 |
-| 最小RAM要件 | 128MB |
-| 最小ストレージ要件 | 512MB |
+| 起動時間             | < 10 秒         |
+| 最小 RAM 要件        | 128MB           |
+| 最小ストレージ要件   | 512MB           |
 
 ### 🏗️ アーキテクチャ
 
@@ -60,12 +60,12 @@ Kimigayo OSは、Alpine Linuxの設計思想を受け継いだ軽量・高速・
 
 ### 🔧 主要コンポーネント
 
-- **カーネル**: セキュリティ強化されたLinuxカーネル（ASLR, DEP, PIE等）
-- **Cライブラリ**: musl libc（軽量・高速・セキュア）
-- **コアユーティリティ**: BusyBox（単一バイナリで多数のUnixコマンドを提供）
-- **Initシステム**: OpenRCベース（systemdより軽量でシンプル）
+- **カーネル**: セキュリティ強化された Linux カーネル（ASLR, DEP, PIE 等）
+- **C ライブラリ**: musl libc（軽量・高速・セキュア）
+- **コアユーティリティ**: BusyBox（単一バイナリで多数の Unix コマンドを提供）
+- **Init システム**: OpenRC ベース（systemd より軽量でシンプル）
 - **パッケージマネージャ**: isn（高速・セキュア・アトミック操作）
-  - Ed25519署名検証による高速な署名チェック
+  - Ed25519 署名検証による高速な署名チェック
   - 依存関係の自動解決
   - アトミックなインストール/アップデート操作
 
@@ -75,7 +75,7 @@ Kimigayo OSは、Alpine Linuxの設計思想を受け継いだ軽量・高速・
 
 - Docker & Docker Compose
 - Git
-- 最低2GB RAM（推奨4GB）
+- 最低 2GB RAM（推奨 4GB）
 
 #### ビルド手順
 
@@ -109,83 +109,89 @@ docker-compose run --rm kimigayo-build pytest tests/unit/ -v
 
 ### 📦 イメージバリエーション
 
-| イメージタイプ | サイズ | 用途 |
-|---------------|--------|------|
-| Minimal | < 5MB | コンテナ、最小限の環境 |
-| Standard | < 15MB | 一般的なサーバー環境 |
-| Extended | < 50MB | 開発環境、豊富なツール |
+| イメージタイプ | サイズ | 用途                   |
+| -------------- | ------ | ---------------------- |
+| Minimal        | < 5MB  | コンテナ、最小限の環境 |
+| Standard       | < 15MB | 一般的なサーバー環境   |
+| Extended       | < 50MB | 開発環境、豊富なツール |
 
 ### 🔐 セキュリティ機能
 
 #### コンパイル時
+
 - PIE (Position Independent Executables)
 - Stack-smashing protection
 - FORTIFY_SOURCE
 - RELRO (Relocation Read-Only)
 
 #### ランタイム
+
 - ASLR (Address Space Layout Randomization)
 - DEP (Data Execution Prevention)
 - Seccomp-BPF
 - Namespace isolation
 
 #### パッケージ署名検証
-Kimigayo OSは、パッケージの真正性と完全性を保証するために、二重の署名検証方式を採用しています。
 
-**Ed25519署名検証（推奨）**
-- 🚀 **高速**: RSAより署名生成・検証が高速
-- 💾 **軽量**: 署名64バイト、公開鍵32バイト
-- 🔒 **高セキュリティ**: 128ビットセキュリティレベル
+Kimigayo OS は、パッケージの真正性と完全性を保証するために、二重の署名検証方式を採用しています。
+
+**Ed25519 署名検証（推奨）**
+
+- 🚀 **高速**: RSA より署名生成・検証が高速
+- 💾 **軽量**: 署名 64 バイト、公開鍵 32 バイト
+- 🔒 **高セキュリティ**: 128 ビットセキュリティレベル
 - 🎯 **組み込み最適**: リソース制約環境に最適
 - ⚡ **決定論的**: ランダム性不要で実装が簡潔
 
 **レガシーサポート**
-- GPG署名検証（既存パッケージとの互換性）
+
+- GPG 署名検証（既存パッケージとの互換性）
 
 **追加のセキュリティ層**
-- SHA-256ハッシュ検証（改ざん検出）
+
+- SHA-256 ハッシュ検証（改ざん検出）
 - セキュリティアップデートの優先配信
 
 ### 🎯 ターゲット環境
 
 - **コンテナ環境**: Docker, Kubernetes, Podman
 - **仮想化環境**: KVM, VirtualBox, VMware
-- **ベアメタル**: サーバー, 組み込みデバイス, IoTデバイス
+- **ベアメタル**: サーバー, 組み込みデバイス, IoT デバイス
 
 ### 🗺️ ロードマップ
 
-現在の進捗: **Phase 0-6完了（インフラストラクチャ整備完了）** ✅
+現在の進捗: **Phase 0-6 完了（インフラストラクチャ整備完了）** ✅
 
 - [x] **Phase 0**: 開発環境のセットアップ
-  - Dockerビルド環境、CI/CD、開発ドキュメント
+  - Docker ビルド環境、CI/CD、開発ドキュメント
 - [x] **Phase 1**: プロジェクト構造とコアインターフェース
   - ディレクトリ構造、ビルドシステム、テストフレームワーク
 - [x] **Phase 2**: カーネル設定とビルドシステム
   - セキュリティ強化設定（ASLR、DEP、PIE）、クロスコンパイル環境
 - [x] **Phase 3**: コアユーティリティとライブラリの統合
-  - BusyBox設定、musl libc統合、サイズ最適化
-- [x] **Phase 4**: Initシステムの実装
-  - OpenRCベース、サービス管理、依存関係処理
+  - BusyBox 設定、musl libc 統合、サイズ最適化
+- [x] **Phase 4**: Init システムの実装
+  - OpenRC ベース、サービス管理、依存関係処理
 - [x] **Phase 5**: パッケージマネージャの設計と実装
-  - isn (Ed25519署名検証、依存関係解決、アトミック操作)
+  - isn (Ed25519 署名検証、依存関係解決、アトミック操作)
 - [x] **Phase 6**: システム最適化とテスト
-  - 再現可能ビルド、パフォーマンステスト、E2E統合テスト
+  - 再現可能ビルド、パフォーマンステスト、E2E 統合テスト
 - [x] **ドキュメント整備**: ユーザー・開発者・セキュリティドキュメント完備
-- [ ] **Phase 7**: 実際のOSイメージ生成（次のマイルストーン）
+- [ ] **Phase 7**: 実際の OS イメージ生成（次のマイルストーン）
   - カーネルビルド、ルートファイルシステム構築、ISO/コンテナイメージ生成
 - [ ] **Phase 8**: ベータリリースとエコシステム構築
 
-**v0.1.0リリース完了** - コアインフラストラクチャとテストフレームワークが整備されました
+**v0.1.0 リリース完了** - コアインフラストラクチャとテストフレームワークが整備されました
 
 詳細は [実装計画](.kiro/specs/kimigayo-os-core/tasks.md) および [リリースノート](RELEASE_NOTES.md) を参照してください。
 
 ### 🤝 コントリビューション
 
-Kimigayo OSはオープンソースプロジェクトです。バグ報告、機能リクエスト、プルリクエストを歓迎します！
+Kimigayo OS はオープンソースプロジェクトです。バグ報告、機能リクエスト、プルリクエストを歓迎します！
 
 - [貢献ガイド](CONTRIBUTING.md)
 - [開発ガイド](DEVELOPMENT.md)
-- [行動規範](CODE_OF_CONDUCT.md)（作成予定）
+- [行動規範](CODE_OF_CONDUCT.md)
 
 #### コントリビューションの種類
 
@@ -198,22 +204,22 @@ Kimigayo OSはオープンソースプロジェクトです。バグ報告、機
 
 ### 📄 ライセンス
 
-Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライセンスを持ちます：
+Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のライセンスを持ちます：
 
-| コンポーネント | ライセンス |
-|---------------|-----------|
-| Linuxカーネル | GPL-2.0 |
-| musl libc | MIT |
-| BusyBox | GPL-2.0 |
-| OpenRC | BSD-2-Clause |
-| isn (パッケージマネージャ) | MIT |
-| ビルドシステム | MIT |
+| コンポーネント             | ライセンス   |
+| -------------------------- | ------------ |
+| Linux カーネル             | GPL-2.0      |
+| musl libc                  | MIT          |
+| BusyBox                    | GPL-2.0      |
+| OpenRC                     | BSD-2-Clause |
+| isn (パッケージマネージャ) | MIT          |
+| ビルドシステム             | MIT          |
 
 詳細は [LICENSE](LICENSE) を参照してください。
 
-### 🌟 Alpine Linuxとの違い
+### 🌟 Alpine Linux との違い
 
-- **Ed25519署名検証**: 軽量・高速な現代的な署名方式（Alpine LinuxはRSA/GPG）
+- **Ed25519 署名検証**: 軽量・高速な現代的な署名方式（Alpine Linux は RSA/GPG）
 - より充実した日本語ドキュメント
 - 東アジア圏のミラーサーバー最適化
 - 独自のパッケージマネージャ（isn）による高速化
@@ -224,15 +230,17 @@ Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライ
 ### 📚 ドキュメント
 
 #### ユーザー向け
+
 - [インストールガイド](docs/user/INSTALLATION.md) - Docker、仮想化環境、ベアメタルへのインストール方法
 - [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
-- [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isnパッケージマネージャの詳細ガイド
+- [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isn パッケージマネージャの詳細ガイド
 - [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティの設定
 
 #### 開発者向け
+
 - [ビルドガイド](docs/developer/BUILD_GUIDE.md) - ビルド手順とカスタマイズ
 - [アーキテクチャドキュメント](docs/developer/ARCHITECTURE.md) - システム設計と内部構造
-- [APIリファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネルAPI
+- [API リファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネル API
 - [開発ガイド](DEVELOPMENT.md) - 開発環境セットアップ
 - [貢献ガイド](CONTRIBUTING.md) - コントリビューション方法
 - [仕様書](SPECIFICATION.md) - プロジェクト仕様
@@ -240,12 +248,14 @@ Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライ
 - [実装計画](.kiro/specs/kimigayo-os-core/tasks.md) - タスク管理
 
 #### セキュリティ
+
 - [セキュリティポリシー](docs/security/SECURITY_POLICY.md) - セキュリティ方針と脆弱性報告
 - [セキュリティガイド](docs/security/SECURITY_GUIDE.md) - セキュリティ機能と運用ガイド
 - [脆弱性報告手順](docs/security/VULNERABILITY_REPORTING.md) - 責任ある開示プロセス
-- [セキュリティ強化ガイド](docs/security/HARDENING_GUIDE.md) - システム強化設定（3段階）
+- [セキュリティ強化ガイド](docs/security/HARDENING_GUIDE.md) - システム強化設定（3 段階）
 
 #### リリース情報
+
 - [リリースノート](RELEASE_NOTES.md) - バージョン履歴と変更点
 
 ### 💬 コミュニティ
@@ -256,12 +266,12 @@ Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライ
 
 ### 🙏 謝辞
 
-Kimigayo OSは以下のプロジェクトにインスパイアされ、技術的な基盤を提供していただいています：
+Kimigayo OS は以下のプロジェクトにインスパイアされ、技術的な基盤を提供していただいています：
 
 - [Alpine Linux](https://alpinelinux.org/) - 設計思想とインスピレーション
-- [musl libc](https://musl.libc.org/) - 軽量なCライブラリ
-- [BusyBox](https://busybox.net/) - Unixユーティリティ
-- [OpenRC](https://github.com/OpenRC/openrc) - Initシステム
+- [musl libc](https://musl.libc.org/) - 軽量な C ライブラリ
+- [BusyBox](https://busybox.net/) - Unix ユーティリティ
+- [OpenRC](https://github.com/OpenRC/openrc) - Init システム
 
 ---
 
@@ -282,12 +292,12 @@ Kimigayo OS is a lightweight, fast, and secure operating system that inherits th
 
 ### 🎯 Design Goals
 
-| Item | Target |
-|------|--------|
+| Item            | Target          |
+| --------------- | --------------- |
 | Base Image Size | < 5MB (Minimal) |
-| Boot Time | < 10 seconds |
-| Minimum RAM | 128MB |
-| Minimum Storage | 512MB |
+| Boot Time       | < 10 seconds    |
+| Minimum RAM     | 128MB           |
+| Minimum Storage | 512MB           |
 
 ### 🚀 Quick Start
 
@@ -313,26 +323,28 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Like Alpine Linux, Kimigayo OS components have individual licenses:
 
-| Component | License |
-|-----------|---------|
-| Linux Kernel | GPL-2.0 |
-| musl libc | MIT |
-| BusyBox | GPL-2.0 |
-| OpenRC | BSD-2-Clause |
-| isn (Package Manager) | MIT |
-| Build System | MIT |
+| Component             | License      |
+| --------------------- | ------------ |
+| Linux Kernel          | GPL-2.0      |
+| musl libc             | MIT          |
+| BusyBox               | GPL-2.0      |
+| OpenRC                | BSD-2-Clause |
+| isn (Package Manager) | MIT          |
+| Build System          | MIT          |
 
 See [LICENSE](LICENSE) for details.
 
 ### 📚 Documentation
 
 #### For Users
+
 - [Installation Guide](docs/user/INSTALLATION.md) - Install on Docker, virtualization, and bare metal
 - [Quick Start Guide](docs/user/QUICKSTART.md) - Basic operations and usage
 - [Package Manager Guide](docs/user/PACKAGE_MANAGER.md) - Detailed isn package manager guide
 - [Configuration Guide](docs/user/CONFIGURATION.md) - Network, services, and security configuration
 
 #### For Developers
+
 - [Specification](SPECIFICATION.md)
 - [Design Document](.kiro/specs/kimigayo-os-core/design.md)
 - [Development Guide](DEVELOPMENT.md)
