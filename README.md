@@ -218,11 +218,23 @@ Kimigayo OSはAlpine Linuxと同様、各コンポーネントが個別のライ
 - [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティの設定
 
 #### 開発者向け
-- [仕様書](SPECIFICATION.md)
-- [設計書](.kiro/specs/kimigayo-os-core/design.md)
-- [実装計画](.kiro/specs/kimigayo-os-core/tasks.md)
-- [開発ガイド](DEVELOPMENT.md)
-- [貢献ガイド](CONTRIBUTING.md)
+- [ビルドガイド](docs/developer/BUILD_GUIDE.md) - ビルド手順とカスタマイズ
+- [アーキテクチャドキュメント](docs/developer/ARCHITECTURE.md) - システム設計と内部構造
+- [APIリファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネルAPI
+- [開発ガイド](DEVELOPMENT.md) - 開発環境セットアップ
+- [貢献ガイド](CONTRIBUTING.md) - コントリビューション方法
+- [仕様書](SPECIFICATION.md) - プロジェクト仕様
+- [設計書](.kiro/specs/kimigayo-os-core/design.md) - 詳細設計
+- [実装計画](.kiro/specs/kimigayo-os-core/tasks.md) - タスク管理
+
+#### セキュリティ
+- [セキュリティポリシー](docs/security/SECURITY_POLICY.md) - セキュリティ方針と脆弱性報告
+- [セキュリティガイド](docs/security/SECURITY_GUIDE.md) - セキュリティ機能と運用ガイド
+- [脆弱性報告手順](docs/security/VULNERABILITY_REPORTING.md) - 責任ある開示プロセス
+- [セキュリティ強化ガイド](docs/security/HARDENING_GUIDE.md) - システム強化設定（3段階）
+
+#### リリース情報
+- [リリースノート](RELEASE_NOTES.md) - バージョン履歴と変更点
 
 ### 💬 コミュニティ
 
