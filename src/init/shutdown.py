@@ -116,7 +116,9 @@ class FilesystemManager:
 
     def get_mount(self, mount_point: str) -> Optional[FilesystemMount]:
         """Get mount by mount point"""
-        return self.mounts.get(mount_point)
+        # Normalize the mount point path
+        normalized = str(Path(mount_point))
+        return self.mounts.get(normalized)
 
     def unmount(self, mount_point: str, force: bool = False) -> bool:
         """
@@ -129,7 +131,9 @@ class FilesystemManager:
         Returns:
             True if unmounted successfully
         """
-        mount = self.mounts.get(mount_point)
+        # Normalize the mount point path
+        normalized = str(Path(mount_point))
+        mount = self.mounts.get(normalized)
         if not mount:
             return False
 
@@ -139,7 +143,7 @@ class FilesystemManager:
         # - If force=True and normal fails, try lazy unmount (-l) or force (-f)
 
         # Remove from tracking
-        del self.mounts[mount_point]
+        del self.mounts[normalized]
         return True
 
     def unmount_all(
@@ -160,6 +164,9 @@ class FilesystemManager:
         if exclude is None:
             exclude = set()
 
+        # Normalize exclude paths
+        normalized_exclude = {str(Path(p)) for p in exclude}
+
         success = []
         failed = []
 
@@ -174,7 +181,7 @@ class FilesystemManager:
             mount_point = str(mount.mount_point)
 
             # Skip excluded mounts
-            if mount_point in exclude:
+            if mount_point in normalized_exclude:
                 continue
 
             # Try to unmount
