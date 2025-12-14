@@ -52,14 +52,9 @@ def test_kernel_musl_busybox_integration_x86_64(tmp_path):
     assert busybox_result.binary_path.exists()
 
     # Verify security features are enabled in all components
-    kernel_builder = kernel_result
-    assert len(kernel_builder.config.kernel_modules) >= 0  # Has modules configured
-
-    musl_builder = musl_result
-    assert musl_builder.config.enable_security_hardening
-
-    busybox_builder = busybox_result
-    assert busybox_builder.config.enable_security_hardening
+    assert kernel_config.enable_hardening
+    assert musl_config.enable_security_hardening
+    assert busybox_config.enable_security_hardening
 
     # Calculate total system size
     total_size = (
