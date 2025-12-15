@@ -75,9 +75,13 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 
 # ARM64 クロスコンパイラのインストール (musl.cc)
 RUN cd /tmp && \
-    wget -q https://musl.cc/aarch64-linux-musl-cross.tgz && \
+    echo "Downloading aarch64-linux-musl-cross toolchain..." && \
+    wget --timeout=30 --tries=3 -O aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz && \
+    echo "Extracting toolchain..." && \
     tar -xzf aarch64-linux-musl-cross.tgz -C /opt && \
-    rm aarch64-linux-musl-cross.tgz
+    echo "Cleaning up..." && \
+    rm aarch64-linux-musl-cross.tgz && \
+    echo "ARM64 cross-compiler installed successfully"
 
 # クロスコンパイラをPATHに追加
 ENV PATH="/opt/aarch64-linux-musl-cross/bin:${PATH}"
