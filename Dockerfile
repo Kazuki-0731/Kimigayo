@@ -73,18 +73,13 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pytest-xdist \
     pyyaml
 
-# ARM64 クロスコンパイラのインストール (musl.cc)
-RUN cd /tmp && \
-    echo "Downloading aarch64-linux-musl-cross toolchain..." && \
-    wget --timeout=30 --tries=3 -O aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz && \
-    echo "Extracting toolchain..." && \
-    tar -xzf aarch64-linux-musl-cross.tgz -C /opt && \
-    echo "Cleaning up..." && \
-    rm aarch64-linux-musl-cross.tgz && \
-    echo "ARM64 cross-compiler installed successfully"
-
-# クロスコンパイラをPATHに追加
-ENV PATH="/opt/aarch64-linux-musl-cross/bin:${PATH}"
+# ARM64 クロスコンパイラのインストール
+# PostmarketOSリポジトリを使用してgcc-aarch64をインストール
+RUN echo "@pmos https://mirror.postmarketos.org/postmarketos/master" >> /etc/apk/repositories && \
+    wget -q -O /etc/apk/keys/postmarketos.rsa.pub https://mirror.postmarketos.org/postmarketos/master/x86_64/postmarketos.rsa.pub && \
+    apk update && \
+    apk add --no-cache gcc-aarch64@pmos || \
+    echo "Warning: Failed to install gcc-aarch64 from PostmarketOS, ARM64 builds may fail"
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
