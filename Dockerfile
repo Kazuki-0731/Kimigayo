@@ -74,12 +74,17 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pyyaml
 
 # ARM64 クロスコンパイラのインストール
-# PostmarketOSリポジトリを使用してgcc-aarch64をインストール
-RUN echo "@pmos https://mirror.postmarketos.org/postmarketos/master" >> /etc/apk/repositories && \
-    wget -q -O /etc/apk/keys/postmarketos.rsa.pub https://mirror.postmarketos.org/postmarketos/master/x86_64/postmarketos.rsa.pub && \
-    apk update && \
-    apk add --no-cache gcc-aarch64@pmos || \
-    echo "Warning: Failed to install gcc-aarch64 from PostmarketOS, ARM64 builds may fail"
+# Clangを使用したクロスコンパイル環境のセットアップ
+RUN apk add --no-cache clang llvm lld
+
+# ARM64ターゲット用のGCCラッパースクリプトを作成
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+    chmod +x /usr/bin/aarch64-linux-musl-gcc && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    chmod +x /usr/bin/aarch64-linux-musl-g++ && \
+    ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
+    ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
+    ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}

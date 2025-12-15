@@ -53,7 +53,17 @@ setup_arch() {
         arm64|aarch64)
             TARGET="aarch64-linux-musl"
             CFLAGS_ARCH=""
-            export CC="${CC:-aarch64-linux-musl-gcc}"
+            # ARM64クロスコンパイラの検出
+            if command -v aarch64-linux-musl-gcc &> /dev/null; then
+                export CC="${CC:-aarch64-linux-musl-gcc}"
+            elif command -v aarch64-alpine-linux-musl-gcc &> /dev/null; then
+                export CC="${CC:-aarch64-alpine-linux-musl-gcc}"
+            else
+                log_error "ARM64 cross-compiler not found"
+                log_error "Please install aarch64-linux-musl-gcc or set CC environment variable"
+                log_error "For now, skipping ARM64 build (only x86_64 is supported)"
+                exit 1
+            fi
             ;;
         *)
             log_error "Unsupported architecture: $ARCH"
