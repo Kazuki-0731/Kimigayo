@@ -73,9 +73,9 @@ endif
 
 # Phony targets
 .PHONY: all build clean help test docker-build docker-test \
-        kernel init pkg utils rootfs iso docker-image \
+        kernel musl init pkg utils rootfs iso docker-image \
         security-scan dependency-check qemu-test \
-        install uninstall
+        install uninstall test-unit test-property test-integration
 
 # Default target
 all: build
@@ -105,8 +105,17 @@ help:
 	@echo "  make iso ARCH=arm64"
 
 # Build target
-build: kernel init pkg utils rootfs
+build: musl kernel init pkg utils rootfs
 	@echo "Build completed for $(ARCH)"
+
+# musl libc build
+musl:
+	@echo "[BUILD] musl libc ($(ARCH))"
+	$(Q)mkdir -p $(BUILD_DIR)/musl-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)bash $(SCRIPTS_DIR)/download-musl.sh
+	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-musl.sh
+	@echo "[BUILD] musl libc build completed for $(ARCH)"
 
 # Kernel build
 kernel:
