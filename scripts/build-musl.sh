@@ -3,6 +3,7 @@
 # Builds musl libc with optimization and security hardening
 
 set -e
+set -o pipefail
 
 # Configuration
 MUSL_VERSION="${MUSL_VERSION:-1.2.4}"
@@ -95,12 +96,33 @@ check_prerequisites() {
     fi
 
     # Check for required tools
-    local required_tools=("make" "gcc")
+    local required_tools=("make")
     for tool in "${required_tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
-            log_warn "$tool not found (may be required for musl build)"
+            log_error "$tool not found (required for musl build)"
+            exit 1
         fi
     done
+
+    # Check if C compiler is available and working
+    if [ -n "$CC" ]; then
+        log_info "Testing C compiler: $CC"
+        if ! command -v "$CC" &> /dev/null; then
+            log_error "C compiler not found: $CC"
+            log_error "Please install the required cross-compiler for $ARCH"
+            exit 1
+        fi
+
+        # Test if compiler can create executables
+        if ! echo 'int main(){return 0;}' | $CC -x c - -o /tmp/test_cc_$$ 2>/dev/null; then
+            log_error "C compiler cannot create executables: $CC"
+            log_error "Please check your cross-compiler installation"
+            rm -f /tmp/test_cc_$$
+            exit 1
+        fi
+        rm -f /tmp/test_cc_$$
+        log_info "C compiler check: OK"
+    fi
 
     log_info "Prerequisites check completed"
 }
