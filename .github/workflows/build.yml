@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64, arm64]
+        # TODO: Enable ARM64 build once cross-compiler toolchain is properly configured
+        # arch: [x86_64, arm64]
+        arch: [x86_64]
 
     steps:
     - name: Checkout code
