@@ -50,6 +50,8 @@ setup_arch() {
         x86_64)
             TARGET="x86_64-linux-musl"
             CFLAGS_ARCH="-m64"
+            # x86_64ではシステムのgccを使用
+            export CC="${CC:-gcc}"
             ;;
         arm64|aarch64)
             TARGET="aarch64-linux-musl"
@@ -105,24 +107,24 @@ check_prerequisites() {
     done
 
     # Check if C compiler is available and working
-    if [ -n "$CC" ]; then
-        log_info "Testing C compiler: $CC"
-        if ! command -v "$CC" &> /dev/null; then
-            log_error "C compiler not found: $CC"
-            log_error "Please install the required cross-compiler for $ARCH"
-            exit 1
-        fi
+    local compiler="${CC:-gcc}"
+    log_info "Testing C compiler: $compiler"
 
-        # Test if compiler can create executables
-        if ! echo 'int main(){return 0;}' | $CC -x c - -o /tmp/test_cc_$$ 2>/dev/null; then
-            log_error "C compiler cannot create executables: $CC"
-            log_error "Please check your cross-compiler installation"
-            rm -f /tmp/test_cc_$$
-            exit 1
-        fi
-        rm -f /tmp/test_cc_$$
-        log_info "C compiler check: OK"
+    if ! command -v "$compiler" &> /dev/null; then
+        log_error "C compiler not found: $compiler"
+        log_error "Please install gcc or set CC environment variable"
+        exit 1
     fi
+
+    # Test if compiler can create executables
+    if ! echo 'int main(){return 0;}' | $compiler -x c - -o /tmp/test_cc_$$ 2>/dev/null; then
+        log_error "C compiler cannot create executables: $compiler"
+        log_error "Please check your compiler installation"
+        rm -f /tmp/test_cc_$$
+        exit 1
+    fi
+    rm -f /tmp/test_cc_$$
+    log_info "C compiler check: OK ($compiler)"
 
     log_info "Prerequisites check completed"
 }
