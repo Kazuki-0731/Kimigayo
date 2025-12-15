@@ -73,6 +73,15 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pytest-xdist \
     pyyaml
 
+# ARM64 クロスコンパイラのインストール (musl.cc)
+RUN cd /tmp && \
+    wget -q https://musl.cc/aarch64-linux-musl-cross.tgz && \
+    tar -xzf aarch64-linux-musl-cross.tgz -C /opt && \
+    rm aarch64-linux-musl-cross.tgz
+
+# クロスコンパイラをPATHに追加
+ENV PATH="/opt/aarch64-linux-musl-cross/bin:${PATH}"
+
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
 
