@@ -50,8 +50,11 @@ setup_arch() {
         x86_64)
             TARGET="x86_64-linux-musl"
             CFLAGS_ARCH="-m64"
-            # x86_64ではシステムのgccを使用
+            # x86_64ではシステムのツールを使用（ネイティブビルド）
             export CC="${CC:-gcc}"
+            export AR="${AR:-ar}"
+            export RANLIB="${RANLIB:-ranlib}"
+            export STRIP="${STRIP:-strip}"
             ;;
         arm64|aarch64)
             TARGET="aarch64-linux-musl"
@@ -59,8 +62,14 @@ setup_arch() {
             # ARM64クロスコンパイラの検出
             if command -v aarch64-linux-musl-gcc &> /dev/null; then
                 export CC="${CC:-aarch64-linux-musl-gcc}"
+                export AR="${AR:-aarch64-linux-musl-ar}"
+                export RANLIB="${RANLIB:-aarch64-linux-musl-ranlib}"
+                export STRIP="${STRIP:-aarch64-linux-musl-strip}"
             elif command -v aarch64-alpine-linux-musl-gcc &> /dev/null; then
                 export CC="${CC:-aarch64-alpine-linux-musl-gcc}"
+                export AR="${AR:-aarch64-alpine-linux-musl-ar}"
+                export RANLIB="${RANLIB:-aarch64-alpine-linux-musl-ranlib}"
+                export STRIP="${STRIP:-aarch64-alpine-linux-musl-strip}"
             else
                 log_error "ARM64 cross-compiler not found"
                 log_error "Please install aarch64-linux-musl-gcc or set CC environment variable"
