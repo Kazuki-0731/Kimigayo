@@ -213,13 +213,31 @@ install_musl() {
 verify_installation() {
     log_info "Verifying musl libc installation"
 
-    local libc_path="${MUSL_INSTALL_DIR}/lib/libc.so"
+    # muslは複数の場所にlibc.soを配置する可能性がある
+    local libc_paths=(
+        "${MUSL_INSTALL_DIR}/lib/libc.so"
+        "${MUSL_INSTALL_DIR}/usr/lib/libc.so"
+    )
+
+    local libc_path=""
+    for path in "${libc_paths[@]}"; do
+        if [ -f "$path" ]; then
+            libc_path="$path"
+            break
+        fi
+    done
 
     # Check for libc.so
-    if [ -f "$libc_path" ]; then
+    if [ -n "$libc_path" ]; then
         log_info "✓ libc.so found: $libc_path"
     else
-        log_error "✗ libc.so not found: $libc_path"
+        log_error "✗ libc.so not found in expected locations"
+        log_error "Searched paths:"
+        for path in "${libc_paths[@]}"; do
+            log_error "  - $path"
+        done
+        log_info "Installed files:"
+        find "$MUSL_INSTALL_DIR" -type f | head -20
         return 1
     fi
 
