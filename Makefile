@@ -75,7 +75,7 @@ endif
 .PHONY: all build clean help test docker-build docker-test \
         kernel musl init pkg utils rootfs iso docker-image \
         security-scan dependency-check qemu-test \
-        install uninstall test-unit test-property test-integration
+        install uninstall test-unit test-property test-integration test-musl
 
 # Default target
 all: build
@@ -179,6 +179,10 @@ test-property:
 test-integration:
 	@echo "[TEST] Integration tests"
 	$(Q)pytest $(TESTS_DIR)/integration/ -v
+
+test-musl:
+	@echo "[TEST] musl libc integration tests"
+	$(Q)bash $(SCRIPTS_DIR)/test-musl-integration.sh
 
 # Security
 security-scan:
