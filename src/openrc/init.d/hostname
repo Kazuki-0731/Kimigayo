@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="Hostname"
+description="Set system hostname"
+
+depend() {
+    before net
+    keyword -lxc -openvz -prefix -systemd-nspawn -uml -vserver -xenu
+}
+
+start() {
+    local hostname_file="/etc/hostname"
+    local hostname_value
+
+    if [ -f "$hostname_file" ]; then
+        hostname_value=$(cat "$hostname_file" | head -n 1)
+    else
+        hostname_value="${HOSTNAME:-kimigayo}"
+    fi
+
+    ebegin "Setting hostname to $hostname_value"
+    hostname "$hostname_value"
+    eend $?
+}

@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="Cron Daemon"
+description="BusyBox crond scheduling service"
+
+command="/usr/sbin/crond"
+command_args="${CROND_OPTS:--f -l 8}"
+command_background=true
+pidfile="/var/run/crond.pid"
+
+depend() {
+    need localmount
+    use logger
+    after bootmisc
+}
+
+start_pre() {
+    # Create crontab directories if they don't exist
+    checkpath --directory --mode 0755 /etc/crontabs
+    checkpath --directory --mode 0755 /var/spool/cron/crontabs
+}

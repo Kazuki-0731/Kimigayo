@@ -1,0 +1,14 @@
+# syslogd configuration for Kimigayo OS
+# Options for BusyBox syslogd
+
+# Default options:
+# -n: Run in foreground (for OpenRC supervision)
+# -O: Log file location
+# -S: Smaller output
+# -l 7: Local and remote logging at level 7 (debug)
+SYSLOGD_OPTS="-n -O /var/log/messages -S"
+
+# Additional options:
+# -L: Log locally and via network
+# -R HOST[:PORT]: Log to remote syslog server
+# -C[size_kb]: Log to shared mem buffer (for logread)

@@ -1,0 +1,55 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="Boot Miscellaneous"
+description="Miscellaneous boot-time tasks"
+
+depend() {
+    need localmount
+    before logger
+}
+
+start() {
+    ebegin "Performing miscellaneous boot tasks"
+
+    # Clean /tmp
+    if [ -d /tmp ]; then
+        eindent
+        einfo "Cleaning /tmp directory"
+        rm -rf /tmp/* /tmp/.* 2>/dev/null || true
+        eoutdent
+    fi
+
+    # Create /run if it doesn't exist
+    if [ ! -d /run ]; then
+        eindent
+        einfo "Creating /run directory"
+        mkdir -p /run
+        chmod 755 /run
+        eoutdent
+    fi
+
+    # Create /var/run symlink if needed
+    if [ ! -L /var/run ] && [ ! -d /var/run ]; then
+        eindent
+        einfo "Creating /var/run symlink"
+        ln -s /run /var/run
+        eoutdent
+    fi
+
+    # Set up /var/lock
+    if [ ! -L /var/lock ] && [ ! -d /var/lock ]; then
+        eindent
+        einfo "Creating /var/lock symlink"
+        mkdir -p /run/lock
+        ln -s /run/lock /var/lock
+        eoutdent
+    fi
+
+    # Create necessary runtime directories
+    checkpath --directory --mode 0755 /run/lock
+    checkpath --directory --mode 1777 /tmp
+
+    eend 0
+}

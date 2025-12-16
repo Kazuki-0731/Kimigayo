@@ -1,0 +1,11 @@
+# crond configuration for Kimigayo OS
+# Options for BusyBox crond
+
+# Default options:
+# -f: Run in foreground (for OpenRC supervision)
+# -l 8: Set log level (0-8, higher = more verbose)
+CROND_OPTS="-f -l 8"
+
+# Additional options:
+# -d N: Set debug level
+# -L logfile: Log to file instead of syslog

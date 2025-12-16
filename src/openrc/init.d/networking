@@ -1,0 +1,44 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="Network Interface Management"
+description="Configure network interfaces"
+
+depend() {
+    need localmount
+    after bootmisc
+    provide net
+}
+
+start() {
+    ebegin "Starting network interfaces"
+
+    # Bring up loopback interface
+    if ! ip link show lo | grep -q "state UP"; then
+        ip link set lo up
+        ip addr add 127.0.0.1/8 dev lo
+    fi
+
+    # Configure interfaces from /etc/network/interfaces if it exists
+    if [ -f /etc/network/interfaces ]; then
+        # Parse and configure interfaces
+        # This is a simplified version - production would use ifup
+        eindent
+        einfo "Configuring network interfaces from /etc/network/interfaces"
+        eoutdent
+    fi
+
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping network interfaces"
+
+    # Keep loopback up, bring down other interfaces
+    for iface in $(ip link show | grep -oP '^\d+: \K[^:]+' | grep -v lo); do
+        ip link set "$iface" down 2>/dev/null
+    done
+
+    eend $?
+}

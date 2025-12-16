@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="Kernel Logger"
+description="BusyBox klogd kernel logging service"
+
+command="/sbin/klogd"
+command_args="${KLOGD_OPTS:--n}"
+command_background=true
+pidfile="/var/run/klogd.pid"
+
+depend() {
+    need syslog
+    use clock
+    provide kernel-logger
+}

@@ -1,0 +1,9 @@
+# klogd configuration for Kimigayo OS
+# Options for BusyBox klogd
+
+# Default options:
+# -n: Run in foreground (for OpenRC supervision)
+KLOGD_OPTS="-n"
+
+# Additional options:
+# -c N: Set console log level (1-8)

@@ -1,0 +1,4 @@
+# Hostname configuration for Kimigayo OS
+
+# Default hostname if /etc/hostname is not present
+HOSTNAME="kimigayo"

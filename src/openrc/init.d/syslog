@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# Copyright (c) 2025 Kimigayo OS
+# Distributed under the terms of the MIT License
+
+name="System Logger"
+description="BusyBox syslogd system logging service"
+
+command="/sbin/syslogd"
+command_args="${SYSLOGD_OPTS:--n -O /var/log/messages}"
+command_background=true
+pidfile="/var/run/syslogd.pid"
+
+depend() {
+    need localmount
+    use clock
+    before net
+    provide logger
+}
+
+start_pre() {
+    # Create log directory if it doesn't exist
+    checkpath --directory --mode 0755 /var/log
+}
