@@ -259,12 +259,15 @@ verify_installation() {
 
     # List installed files
     log_info "Installed files summary:"
-    find "$MUSL_INSTALL_DIR" -type f | head -10 | while read -r file; do
+    # Disable pipefail temporarily to avoid SIGPIPE errors with head
+    set +o pipefail
+    find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | head -10 | while read -r file; do
         log_info "  - ${file#$MUSL_INSTALL_DIR}"
     done
 
-    local file_count=$(find "$MUSL_INSTALL_DIR" -type f | wc -l | tr -d ' ')
+    local file_count=$(find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
     log_info "Total files installed: $file_count"
+    set -o pipefail
 
     return 0
 }
