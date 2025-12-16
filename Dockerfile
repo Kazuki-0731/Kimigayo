@@ -59,6 +59,7 @@ RUN apk update && apk add --no-cache \
     # セキュリティツール
     gnupg \
     openssl \
+    openssl-dev \
     # ドキュメントツール
     vim \
     nano \
