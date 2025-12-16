@@ -105,7 +105,7 @@ help:
 	@echo "  make iso ARCH=arm64"
 
 # Build target
-build: musl kernel init pkg utils rootfs
+build: musl kernel busybox init pkg rootfs
 	@echo "Build completed for $(ARCH)"
 
 # musl libc build
@@ -139,11 +139,14 @@ pkg:
 	$(Q)mkdir -p $(BUILD_DIR)/pkg
 	@echo "  Package manager build will be implemented in Phase 6"
 
-# Utilities build
-utils:
-	@echo "[BUILD] Core Utilities (BusyBox)"
-	$(Q)mkdir -p $(BUILD_DIR)/utils
-	@echo "  Utilities build will be implemented in Phase 3"
+# BusyBox build
+busybox:
+	@echo "[BUILD] BusyBox ($(ARCH)) - $(IMAGE_TYPE) image"
+	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)bash $(SCRIPTS_DIR)/download-busybox.sh
+	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
+	@echo "[BUILD] BusyBox build completed for $(ARCH)"
 
 # Root filesystem
 rootfs:
@@ -183,6 +186,10 @@ test-integration:
 test-musl:
 	@echo "[TEST] musl libc integration tests"
 	$(Q)bash $(SCRIPTS_DIR)/test-musl-integration.sh
+
+test-busybox:
+	@echo "[TEST] BusyBox integration tests"
+	$(Q)bash $(SCRIPTS_DIR)/test-busybox-integration.sh
 
 # Security
 security-scan:
