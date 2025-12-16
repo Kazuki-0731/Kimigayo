@@ -127,11 +127,14 @@ kernel:
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
 	@echo "[BUILD] Kernel build completed for $(ARCH)"
 
-# Init system build
+# Init system build (OpenRC)
 init:
-	@echo "[BUILD] Init System (OpenRC)"
-	$(Q)mkdir -p $(BUILD_DIR)/init
-	@echo "  Init system build will be implemented in Phase 5"
+	@echo "[BUILD] Init System (OpenRC) - $(ARCH)"
+	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
+	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
+	@echo "[BUILD] OpenRC build completed for $(ARCH)"
 
 # Package manager build
 pkg:
@@ -190,6 +193,10 @@ test-musl:
 test-busybox:
 	@echo "[TEST] BusyBox integration tests"
 	$(Q)bash $(SCRIPTS_DIR)/test-busybox-integration.sh
+
+test-openrc:
+	@echo "[TEST] OpenRC integration tests"
+	$(Q)bash $(SCRIPTS_DIR)/test-openrc-integration.sh
 
 # Security
 security-scan:
