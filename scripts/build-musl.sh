@@ -273,6 +273,14 @@ verify_installation() {
 create_musl_gcc_wrapper() {
     log_info "Creating musl-gcc wrapper"
 
+    # Check if musl-gcc.specs exists
+    local specs_file="${MUSL_INSTALL_DIR}/usr/lib/musl-gcc.specs"
+    if [ ! -f "$specs_file" ]; then
+        log_warn "musl-gcc.specs not found at $specs_file"
+        log_warn "Skipping musl-gcc wrapper creation"
+        return 0
+    fi
+
     local wrapper_dir="${PROJECT_ROOT}/build/musl-tools-${ARCH}/bin"
     mkdir -p "$wrapper_dir"
 
@@ -281,7 +289,7 @@ create_musl_gcc_wrapper() {
     cat > "$musl_gcc" << EOF
 #!/bin/sh
 exec gcc \\
-    -specs "${MUSL_INSTALL_DIR}/usr/lib/musl-gcc.specs" \\
+    -specs "${specs_file}" \\
     "\$@"
 EOF
 
@@ -301,9 +309,18 @@ show_summary() {
     log_info "============================================"
     log_info "Installation Directory: $MUSL_INSTALL_DIR"
 
-    if [ -f "${MUSL_INSTALL_DIR}/lib/libc.so" ]; then
-        local size=$(stat -f%z "${MUSL_INSTALL_DIR}/lib/libc.so" 2>/dev/null || \
-                     stat -c%s "${MUSL_INSTALL_DIR}/lib/libc.so" 2>/dev/null || echo 0)
+    # Find libc.so in possible locations
+    local libc_so_path=""
+    for path in "${MUSL_INSTALL_DIR}/lib/libc.so" "${MUSL_INSTALL_DIR}/usr/lib/libc.so"; do
+        if [ -f "$path" ]; then
+            libc_so_path="$path"
+            break
+        fi
+    done
+
+    if [ -n "$libc_so_path" ]; then
+        local size=$(stat -f%z "$libc_so_path" 2>/dev/null || \
+                     stat -c%s "$libc_so_path" 2>/dev/null || echo 0)
         local size_kb=$((size / 1024))
         log_info "libc.so Size: ${size_kb}KB"
     fi
