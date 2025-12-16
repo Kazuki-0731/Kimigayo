@@ -394,7 +394,7 @@
   - 起動可能性の検証（QEMU）
   - セキュリティ機能の有効性確認
 
-- [ ] 17. musl libcのビルドと統合
+- [x] 17. musl libcのビルドと統合
   - musl libcソースコードの取得
   - x86_64向けmusl libcビルド
   - ARM64向けmusl libcビルド
