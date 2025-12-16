@@ -30,10 +30,13 @@ RUN apk update && apk add --no-cache \
     musl-utils \
     # カーネルビルド用
     linux-headers \
+    elfutils-dev \
     perl \
     bison \
     flex \
     bc \
+    gawk \
+    diffutils \
     # クロスコンパイル
     binutils \
     # BusyBox
