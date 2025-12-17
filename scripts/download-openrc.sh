@@ -55,16 +55,32 @@ if [ -f "$tarball_path" ]; then
     log_warning "OpenRC tarball already exists: $tarball_path"
     log_info "Verifying existing tarball..."
 else
-    # Download OpenRC
+    # Download OpenRC with mirror fallback
     log_info "Downloading OpenRC ${OPENRC_VERSION}..."
-    url="${OPENRC_BASE_URL}/${OPENRC_VERSION}/${tarball_filename}"
 
-    if ! curl -fSL -o "$tarball_path" "$url"; then
-        log_error "Failed to download OpenRC from $url"
+    # Multiple mirror URLs for redundancy
+    urls=(
+        "${OPENRC_BASE_URL}/${OPENRC_VERSION}/${tarball_filename}"
+        "https://github.com/OpenRC/openrc/archive/refs/tags/${OPENRC_VERSION}.tar.gz"
+    )
+
+    download_success=false
+    for url in "${urls[@]}"; do
+        log_info "Trying: $url"
+        if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
+            download_success=true
+            log_success "Downloaded from: $url"
+            break
+        else
+            log_warning "Failed to download from: $url"
+        fi
+    done
+
+    if [ "$download_success" = false ]; then
+        log_error "Failed to download OpenRC from all mirrors"
+        log_error "Tried ${#urls[@]} different URLs"
         exit 1
     fi
-
-    log_success "Downloaded OpenRC tarball"
 fi
 
 # Note: OpenRC releases don't have published SHA-256 checksums on their GitHub releases

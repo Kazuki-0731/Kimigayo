@@ -40,17 +40,36 @@ mkdir -p "$MUSL_SRC_DIR"
 
 # Download musl libc tarball
 download_musl() {
-    local url="${MUSL_BASE_URL}/${MUSL_TARBALL}"
     local tarball_path="${DOWNLOAD_DIR}/${MUSL_TARBALL}"
 
     if [ -f "$tarball_path" ]; then
         log_info "musl libc tarball already exists: $tarball_path"
     else
-        log_info "Downloading musl libc from $url"
-        curl -fSL -o "$tarball_path" "$url" || {
-            log_error "Failed to download musl libc tarball"
+        log_info "Downloading musl libc ${MUSL_VERSION}..."
+
+        # Multiple mirror URLs for redundancy
+        local urls=(
+            "${MUSL_BASE_URL}/${MUSL_TARBALL}"
+            "https://www.musl-libc.org/releases/${MUSL_TARBALL}"
+            "https://git.musl-libc.org/cgit/musl/snapshot/${MUSL_TARBALL}"
+        )
+
+        local download_success=false
+        for url in "${urls[@]}"; do
+            log_info "Trying: $url"
+            if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
+                download_success=true
+                log_success "Downloaded from: $url"
+                break
+            else
+                log_warn "Failed to download from: $url"
+            fi
+        done
+
+        if [ "$download_success" = false ]; then
+            log_error "Failed to download musl libc from all mirrors"
             return 1
-        }
+        fi
     fi
 }
 

@@ -42,27 +42,46 @@ mkdir -p "$KERNEL_SRC_DIR"
 
 # Download kernel tarball if not exists
 download_kernel() {
-    local url="${KERNEL_BASE_URL}/${KERNEL_TARBALL}"
-    local sign_url="${KERNEL_BASE_URL}/${KERNEL_TARBALL_SIGN}"
     local tarball_path="${DOWNLOAD_DIR}/${KERNEL_TARBALL}"
     local sign_path="${DOWNLOAD_DIR}/${KERNEL_TARBALL_SIGN}"
 
     if [ -f "$tarball_path" ]; then
         log_info "Kernel tarball already exists: $tarball_path"
     else
-        log_info "Downloading kernel tarball from $url"
-        curl -fSL -o "$tarball_path" "$url" || {
-            log_error "Failed to download kernel tarball"
+        log_info "Downloading kernel tarball (Linux ${KERNEL_VERSION})..."
+
+        # Multiple mirror URLs for redundancy
+        local urls=(
+            "${KERNEL_BASE_URL}/${KERNEL_TARBALL}"
+            "https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/${KERNEL_TARBALL}"
+            "https://mirrors.edge.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/${KERNEL_TARBALL}"
+        )
+
+        local download_success=false
+        for url in "${urls[@]}"; do
+            log_info "Trying: $url"
+            if curl -fSL --connect-timeout 30 --max-time 600 -o "$tarball_path" "$url"; then
+                download_success=true
+                log_success "Downloaded from: $url"
+                break
+            else
+                log_warn "Failed to download from: $url"
+            fi
+        done
+
+        if [ "$download_success" = false ]; then
+            log_error "Failed to download kernel from all mirrors"
             return 1
-        }
+        fi
     fi
 
     # Download signature file for verification
     if [ -f "$sign_path" ]; then
         log_info "Kernel signature already exists: $sign_path"
     else
-        log_info "Downloading kernel signature from $sign_url"
-        curl -fSL -o "$sign_path" "$sign_url" || {
+        log_info "Downloading kernel signature..."
+        local sign_url="${KERNEL_BASE_URL}/${KERNEL_TARBALL_SIGN}"
+        curl -fSL --connect-timeout 30 --max-time 120 -o "$sign_path" "$sign_url" || {
             log_warn "Failed to download kernel signature (optional)"
         }
     fi

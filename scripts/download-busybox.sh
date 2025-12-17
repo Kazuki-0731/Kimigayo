@@ -55,16 +55,33 @@ if [ -f "$tarball_path" ]; then
     log_warning "BusyBox tarball already exists: $tarball_path"
     log_info "Verifying existing tarball..."
 else
-    # Download BusyBox
+    # Download BusyBox with mirror fallback
     log_info "Downloading BusyBox ${BUSYBOX_VERSION}..."
-    url="${BUSYBOX_BASE_URL}/${tarball_filename}"
 
-    if ! curl -fSL -o "$tarball_path" "$url"; then
-        log_error "Failed to download BusyBox from $url"
+    # Multiple mirror URLs for redundancy
+    urls=(
+        "${BUSYBOX_BASE_URL}/${tarball_filename}"
+        "https://www.busybox.net/downloads/${tarball_filename}"
+        "https://git.busybox.net/busybox/snapshot/busybox-${BUSYBOX_VERSION}.tar.bz2"
+    )
+
+    download_success=false
+    for url in "${urls[@]}"; do
+        log_info "Trying: $url"
+        if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
+            download_success=true
+            log_success "Downloaded from: $url"
+            break
+        else
+            log_warning "Failed to download from: $url"
+        fi
+    done
+
+    if [ "$download_success" = false ]; then
+        log_error "Failed to download BusyBox from all mirrors"
+        log_error "Tried ${#urls[@]} different URLs"
         exit 1
     fi
-
-    log_success "Downloaded BusyBox tarball"
 fi
 
 # Verify checksum
