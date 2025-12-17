@@ -6,6 +6,9 @@
 
 set -euo pipefail
 
+# Save project root directory
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # Configuration
 BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
 BUILD_DIR="${BUILD_DIR:-./build}"
@@ -97,17 +100,17 @@ log_info "  CC: ${CC}"
 log_info "  AR: ${AR}"
 log_info "  Cross-compile prefix: ${CROSS_COMPILE:-none}"
 
-# Select configuration file
+# Select configuration file (absolute path)
 config_file=""
 case "$IMAGE_TYPE" in
     minimal)
-        config_file="src/busybox/config/minimal.config"
+        config_file="${PROJECT_ROOT}/src/busybox/config/minimal.config"
         ;;
     standard)
-        config_file="src/busybox/config/standard.config"
+        config_file="${PROJECT_ROOT}/src/busybox/config/standard.config"
         ;;
     extended)
-        config_file="src/busybox/config/extended.config"
+        config_file="${PROJECT_ROOT}/src/busybox/config/extended.config"
         ;;
     *)
         log_error "Unknown image type: $IMAGE_TYPE"
@@ -132,7 +135,7 @@ cd "$BUSYBOX_BUILD_DIR"
 
 # Apply configuration
 log_info "Applying BusyBox configuration..."
-cp "../../../${config_file}" .config
+cp "$config_file" .config
 
 # Update configuration with musl paths
 log_info "Updating configuration for musl libc..."
