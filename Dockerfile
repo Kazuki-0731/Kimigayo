@@ -33,12 +33,14 @@ RUN apk update && apk add --no-cache \
     # カーネルビルド用
     linux-headers \
     elfutils-dev \
+    ncurses-dev \
     perl \
     bison \
     flex \
     bc \
     gawk \
     diffutils \
+    kmod \
     # クロスコンパイル
     binutils \
     # BusyBox
@@ -50,10 +52,14 @@ RUN apk update && apk add --no-cache \
     bzip2 \
     xz \
     tar \
+    cpio \
     # デバッグツール
     gdb \
     strace \
     ltrace \
+    # QEMUテスト環境
+    qemu-system-x86_64 \
+    qemu-system-aarch64 \
     # テストフレームワーク
     python3 \
     py3-pip \
@@ -67,10 +73,15 @@ RUN apk update && apk add --no-cache \
     nano \
     curl \
     wget \
+    # ファイル操作・同期ツール
+    rsync \
+    file \
+    patch \
     # その他
     bash \
     coreutils \
-    findutils
+    findutils \
+    util-linux
 
 # Pythonテストフレームワークのインストール
 RUN pip3 install --no-cache-dir --break-system-packages \
