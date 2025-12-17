@@ -152,9 +152,11 @@ sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
 install_prefix="${BUSYBOX_INSTALL_DIR}"
 sed -i "s|CONFIG_PREFIX=.*|CONFIG_PREFIX=\"${install_prefix}\"|" .config
 
-# Apply oldconfig to resolve any dependencies
-log_info "Running make oldconfig..."
-make oldconfig > /dev/null 2>&1 || true
+# Apply olddefconfig to resolve any dependencies (non-interactive)
+log_info "Running make olddefconfig..."
+# Use olddefconfig instead of oldconfig to avoid interactive prompts
+# This will use default values for any new or changed options
+make olddefconfig 2>&1 | grep -v "^#" || true
 
 # Build BusyBox
 log_info "Building BusyBox..."
