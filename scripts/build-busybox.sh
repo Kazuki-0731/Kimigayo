@@ -140,13 +140,18 @@ cp "$config_file" .config
 # Update configuration with musl paths
 log_info "Updating configuration for musl libc..."
 
-# Set cross-compiler prefix
-if [ -n "$CROSS_COMPILE" ]; then
-    sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"${CROSS_COMPILE}\"|" .config
+# Set cross-compiler prefix (only for ARM64)
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    if [ -n "$CROSS_COMPILE" ]; then
+        sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"${CROSS_COMPILE}\"|" .config
+    fi
+    # Set sysroot for musl (for cross-compilation)
+    sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
+else
+    # For x86_64, clear cross-compiler settings and use system musl
+    sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
+    sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"\"|" .config
 fi
-
-# Set sysroot for musl
-sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
 
 # Set install prefix
 install_prefix="${BUSYBOX_INSTALL_DIR}"
@@ -162,9 +167,14 @@ yes "" | make oldconfig > /dev/null 2>&1 || true
 log_info "Building BusyBox..."
 log_info "This may take several minutes..."
 
-# Set compiler flags for musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -I${MUSL_INSTALL_DIR}/usr/include"
-export LDFLAGS="-static -L${MUSL_INSTALL_DIR}/usr/lib -Wl,-z,relro -Wl,-z,now"
+# Set compiler flags for static musl build
+# Alpine Linux's gcc is already configured to use musl
+export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -static"
+export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+
+# Ensure we're using the correct compiler
+log_info "Compiler: ${CC}"
+log_info "CFLAGS: ${CFLAGS}"
 
 # Build with verbose output
 if ! make -j"$(nproc)" SKIP_STRIP=y; then
