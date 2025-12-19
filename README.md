@@ -112,16 +112,16 @@ docker-compose run --rm kimigayo-build pytest tests/unit/ -v
 GitHub Actionsで実行されているビルドとテストをローカルで再現できます：
 
 ```bash
-# CI/CDと同じビルド（Docker環境）
+# プロジェクトroot直下のMakefileで簡単コマンド実行
+make help         # 利用可能なコマンド一覧を表示
+make build-os     # Kimigayo OSをビルド
+make test         # テストを実行
+make shell        # コンテナにログイン
+make clean-all    # すべて削除
+
+# 詳細なビルドオプション（従来の方法）
 docker-compose run --rm kimigayo-build make build
-
-# CI/CDと同じテスト
-docker-compose run --rm kimigayo-build make test
-
-# 特定のアーキテクチャでビルド
 docker-compose run --rm kimigayo-build make build ARCH=x86_64
-
-# 詳細ログ付きでビルド
 docker-compose run --rm kimigayo-build make build V=1
 ```
 
@@ -130,15 +130,13 @@ docker-compose run --rm kimigayo-build make build V=1
 ローカルビルドでは、ダウンロードしたソースコード（カーネル、musl、BusyBox、OpenRC）がDocker Volumeにキャッシュされます。2回目以降のビルドは大幅に高速化されます。
 
 ```bash
-# キャッシュの確認
-docker volume ls | grep kimigayo
+# 簡単コマンド（プロジェクトroot直下のMakefile）
+make clean-cache  # キャッシュをクリア
+make clean-all    # すべてクリア
 
-# キャッシュをクリア（完全にクリーンビルドしたい場合）
-# 注意: コンテナが起動している場合は先に停止してください
+# 従来の方法
 docker compose down
 docker volume rm kimigayo_kimigayo-downloads
-
-# すべてのキャッシュとビルド成果物をクリア（推奨）
 docker compose down -v
 ```
 
@@ -147,23 +145,17 @@ docker compose down -v
 ビルド中のログをリアルタイムで確認できます：
 
 ```bash
-# コンテナにログイン
-docker compose run --rm kimigayo-build bash
+# 簡単コマンド（プロジェクトroot直下のMakefile）
+make log-kernel   # カーネルビルドログ（最新100行）
+make log-musl     # musl libcビルドログ（最新100行）
+make log-openrc   # OpenRCビルドログ（最新100行）
 
-# カーネルビルドログをリアルタイム監視
+# コンテナにログインして詳細確認
+make shell
+# コンテナ内で以下を実行
 tail -f /build/kimigayo/build/logs/kernel-build.log
-
-# musl libcビルドログを確認
-tail -f /build/kimigayo/build/logs/musl-build.log
-
-# OpenRCビルドログを確認
-tail -f /build/kimigayo/build/logs/openrc-build.log
-
-# 最新100行を表示
-tail -n 100 /build/kimigayo/build/logs/kernel-build.log
-
-# ログ全体を表示
-cat /build/kimigayo/build/logs/kernel-build.log
+tail -n 100 /build/kimigayo/build/logs/musl-build.log
+cat /build/kimigayo/build/logs/openrc-build.log
 ```
 
 ### 📦 イメージバリエーション

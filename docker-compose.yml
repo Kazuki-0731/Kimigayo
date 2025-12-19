@@ -16,7 +16,7 @@ services:
       - kimigayo-downloads:/build/kimigayo/build/downloads
       # Dockerソケットをマウント（テスト用）
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    working_dir: /build/kimigayo
+    working_dir: /build/kimigayo/build-system
     stdin_open: true
     tty: true
     environment:
