@@ -109,6 +109,13 @@ generate_kernel_config() {
 
     cd "$KERNEL_SRC_DIR" || exit 1
 
+    # Clean the source tree if it's dirty
+    if [ -f .config ] || [ -d include/config ]; then
+        log_info "Cleaning kernel source tree..."
+        make ARCH="$KERNEL_ARCH" mrproper > /dev/null 2>&1 || true
+        log_info "Source tree cleaned"
+    fi
+
     # Use custom config if available, otherwise use default
     local custom_config="${KERNEL_CONFIG_DIR}/${ARCH}.config"
     if [ -f "$custom_config" ] && [ -s "$custom_config" ] && ! grep -q "^# This is a placeholder" "$custom_config"; then
@@ -118,15 +125,10 @@ generate_kernel_config() {
         make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
     else
         log_info "Using default kernel config: $KERNEL_CONFIG"
-        make ARCH="$KERNEL_ARCH" "$KERNEL_CONFIG" O="$KERNEL_BUILD_DIR" || {
+        make ARCH="$KERNEL_ARCH" "$KERNEL_CONFIG" || {
             log_error "Failed to generate default config"
             exit 1
         }
-
-        # Copy generated config to build dir
-        if [ -f "$KERNEL_BUILD_DIR/.config" ]; then
-            cp "$KERNEL_BUILD_DIR/.config" .config
-        fi
 
         # Create default custom config template
         log_info "Creating default config template: $custom_config"
