@@ -62,7 +62,6 @@ else
     urls=(
         "${BUSYBOX_BASE_URL}/${tarball_filename}"
         "https://www.busybox.net/downloads/${tarball_filename}"
-        "https://git.busybox.net/busybox/snapshot/busybox-${BUSYBOX_VERSION}.tar.bz2"
     )
 
     download_success=false
