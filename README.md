@@ -18,7 +18,7 @@
 
 ### 概要
 
-Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速・セキュアなオペレーティングシステムです。最小限のリソースで動作し、コンテナ環境、組み込みデバイス、サーバー環境などで高いパフォーマンスを発揮することを目指します。
+Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。Docker イメージとして実行されることを前提に設計され、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスを発揮することを目指します。
 
 ### ✨ 主な特徴
 
@@ -197,7 +197,7 @@ Kimigayo OS は、パッケージの真正性と完全性を保証するため�
 - 🚀 **高速**: RSA より署名生成・検証が高速
 - 💾 **軽量**: 署名 64 バイト、公開鍵 32 バイト
 - 🔒 **高セキュリティ**: 128 ビットセキュリティレベル
-- 🎯 **組み込み最適**: リソース制約環境に最適
+- 🐳 **コンテナ最適**: 最小限のリソースで動作
 - ⚡ **決定論的**: ランダム性不要で実装が簡潔
 
 **レガシーサポート**
@@ -286,7 +286,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 #### ユーザー向け
 
-- [インストールガイド](docs/user/INSTALLATION.md) - Docker、仮想化環境、ベアメタルへのインストール方法
+- [インストールガイド](docs/user/INSTALLATION.md) - Docker、Kubernetes、Podman でのインストール方法
 - [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
 - [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isn パッケージマネージャの詳細ガイド
 - [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティの設定
@@ -334,7 +334,7 @@ Kimigayo OS は以下のプロジェクトにインスパイアされ、技術�
 
 ### Overview
 
-Kimigayo OS is a lightweight, fast, and secure operating system that inherits the design philosophy of Alpine Linux. It aims to operate with minimal resources and deliver high performance in container environments, embedded devices, and server environments.
+Kimigayo OS is a lightweight, fast, and secure container-focused operating system that inherits the design philosophy of Alpine Linux. Designed to run as Docker images, it aims to operate with minimal resources and deliver high performance in container environments and microservice architectures.
 
 ### ✨ Key Features
 

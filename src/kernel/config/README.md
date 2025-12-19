@@ -18,7 +18,7 @@
 **主な用途**:
 - Docker コンテナ
 - 軽量 VM
-- 組み込みシステム
+- マイクロサービス
 
 **セキュリティ機能**:
 - ✅ ASLR (CONFIG_RANDOMIZE_BASE, CONFIG_RANDOMIZE_MEMORY)
