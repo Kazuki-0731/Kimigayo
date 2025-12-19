@@ -1,7 +1,7 @@
 # Kimigayo OS - Docker Management Makefile
 # プロジェクト管理用の簡易コマンド集
 
-.PHONY: help up down build clean logs shell test build-os clean-cache clean-all
+.PHONY: help up down build rebuild clean logs shell test build-os clean-cache clean-all
 
 # デフォルトターゲット
 help:
@@ -10,14 +10,20 @@ help:
 	@echo "Docker管理コマンド:"
 	@echo "  make up           - コンテナを起動"
 	@echo "  make down         - コンテナを停止・削除"
-	@echo "  make build        - Dockerイメージをビルド"
-	@echo "  make rebuild      - Dockerイメージを再ビルド（キャッシュなし）"
 	@echo "  make shell        - コンテナにログイン（bash）"
 	@echo "  make logs         - コンテナのログを表示"
 	@echo ""
+	@echo "Dockerイメージビルド:"
+	@echo "  make docker-build - Dockerイメージをビルド"
+	@echo "  make docker-rebuild - Dockerイメージを再ビルド（キャッシュなし）"
+	@echo ""
 	@echo "OSビルドコマンド:"
-	@echo "  make build-os     - Kimigayo OSをビルド"
+	@echo "  make build        - Kimigayo OSをビルド"
 	@echo "  make test         - テストを実行"
+	@echo ""
+	@echo "オプション付きビルド（直接docker composeを使用）:"
+	@echo "  docker compose run --rm kimigayo-build make build ARCH=x86_64"
+	@echo "  docker compose run --rm kimigayo-build make build V=1"
 	@echo ""
 	@echo "クリーンアップコマンド:"
 	@echo "  make clean        - ビルド成果物を削除"
@@ -38,11 +44,11 @@ down:
 	@echo "コンテナを停止・削除..."
 	docker compose down
 
-build:
+docker-build:
 	@echo "Dockerイメージをビルド..."
 	docker compose build
 
-rebuild:
+docker-rebuild:
 	@echo "Dockerイメージを再ビルド（キャッシュなし）..."
 	docker compose build --no-cache
 
@@ -55,7 +61,7 @@ logs:
 	docker compose logs -f
 
 # OSビルド
-build-os:
+build:
 	@echo "Kimigayo OSをビルド..."
 	docker compose run --rm kimigayo-build make build
 

@@ -114,15 +114,14 @@ GitHub Actionsで実行されているビルドとテストをローカルで再
 ```bash
 # プロジェクトroot直下のMakefileで簡単コマンド実行
 make help         # 利用可能なコマンド一覧を表示
-make build-os     # Kimigayo OSをビルド
+make build        # Kimigayo OSをビルド
 make test         # テストを実行
 make shell        # コンテナにログイン
 make clean-all    # すべて削除
 
-# 詳細なビルドオプション（従来の方法）
-docker-compose run --rm kimigayo-build make build
-docker-compose run --rm kimigayo-build make build ARCH=x86_64
-docker-compose run --rm kimigayo-build make build V=1
+# 詳細なビルドオプション（アーキテクチャ指定など）
+docker compose run --rm kimigayo-build make build ARCH=x86_64
+docker compose run --rm kimigayo-build make build V=1
 ```
 
 **ダウンロードキャッシュについて：**
