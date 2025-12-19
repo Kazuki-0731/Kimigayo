@@ -142,6 +142,30 @@ docker volume rm kimigayo_kimigayo-downloads
 docker compose down -v
 ```
 
+**ビルドログの確認：**
+
+ビルド中のログをリアルタイムで確認できます：
+
+```bash
+# コンテナにログイン
+docker compose run --rm kimigayo-build bash
+
+# カーネルビルドログをリアルタイム監視
+tail -f /build/kimigayo/build/logs/kernel-build.log
+
+# musl libcビルドログを確認
+tail -f /build/kimigayo/build/logs/musl-build.log
+
+# OpenRCビルドログを確認
+tail -f /build/kimigayo/build/logs/openrc-build.log
+
+# 最新100行を表示
+tail -n 100 /build/kimigayo/build/logs/kernel-build.log
+
+# ログ全体を表示
+cat /build/kimigayo/build/logs/kernel-build.log
+```
+
 ### 📦 イメージバリエーション
 
 | イメージタイプ | サイズ | 用途                   |
