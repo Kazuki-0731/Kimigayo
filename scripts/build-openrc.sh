@@ -170,7 +170,7 @@ log_success "OpenRC installed successfully"
 # Verify installation
 log_info "Verifying OpenRC installation..."
 
-# Check both possible locations (sbin and usr/sbin)
+# Check possible locations (bin, sbin, usr/bin, usr/sbin)
 essential_binaries=(
     "rc"
     "rc-status"
@@ -185,18 +185,20 @@ essential_binaries=(
 all_found=true
 for binary in "${essential_binaries[@]}"; do
     found=false
-    # Check /sbin first
-    if [ -f "${OPENRC_INSTALL_DIR}/sbin/${binary}" ]; then
-        log_success "  ✓ sbin/${binary}"
-        found=true
-    # Then check /usr/sbin
-    elif [ -f "${OPENRC_INSTALL_DIR}/usr/sbin/${binary}" ]; then
-        log_success "  ✓ usr/sbin/${binary}"
-        found=true
-    fi
+    location=""
+
+    # Check multiple possible locations
+    for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
+        if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
+            location="${dir}/${binary}"
+            log_success "  ✓ ${location}"
+            found=true
+            break
+        fi
+    done
 
     if [ "$found" = false ]; then
-        log_error "  ✗ ${binary} not found in sbin/ or usr/sbin/"
+        log_error "  ✗ ${binary} not found"
         all_found=false
     fi
 done

@@ -197,11 +197,21 @@ build_kernel() {
     log_info "Starting kernel compilation..."
     log_info "This may take 5-30 minutes depending on CPU cores and configuration..."
     log_info "Progress will be shown below:"
+    log_info "Log file: $BUILD_LOG"
     echo "=========================================="
-    make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" V=1 2>&1 | tee -a "$BUILD_LOG" || {
+
+    # Run make with unbuffered output for real-time display in GitHub Actions
+    # stdbuf disables buffering to show output immediately
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" V=1 2>&1 | \
+        while IFS= read -r line; do
+            echo "$line"
+            echo "$line" >> "$BUILD_LOG"
+        done || {
         log_error "Kernel build failed"
+        log_error "Check log file: $BUILD_LOG"
         exit 1
     }
+
     echo "=========================================="
 
     log_info "Kernel build completed successfully"

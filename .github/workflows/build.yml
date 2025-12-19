@@ -44,6 +44,14 @@ jobs:
         path: output/*
         retention-days: 7
 
+    - name: Upload build logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-logs-${{ matrix.arch }}
+        path: build/logs/*.log
+        retention-days: 7
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
