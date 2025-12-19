@@ -164,6 +164,25 @@ tail -n 100 /build/kimigayo/build/logs/musl-build.log
 cat /build/kimigayo/build/logs/openrc-build.log
 ```
 
+**トラブルシューティング：**
+
+ビルドが失敗する場合や、途中で止まる場合は以下を試してください：
+
+```bash
+# カーネルソースツリーのクリーニング
+# ビルドスクリプトが自動で実行しますが、手動でも可能
+make shell
+cd /build/kimigayo/build/kernel-src/linux-6.6.11
+make mrproper
+
+# 完全クリーンビルド（すべてリセット）
+make clean-all
+make docker-build
+make build
+```
+
+**注意:** カーネルビルド中に "The source tree is not clean" エラーが出る場合、ビルドスクリプトが自動的に`make mrproper`を実行してクリーニングします。
+
 ### 📦 イメージバリエーション
 
 | イメージタイプ | サイズ | 用途                   |
