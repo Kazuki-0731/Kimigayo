@@ -128,10 +128,18 @@ verify_kernel() {
 # Extract kernel tarball
 extract_kernel() {
     local tarball_path="${DOWNLOAD_DIR}/${KERNEL_TARBALL}"
+    local kernel_dir="${KERNEL_SRC_DIR}/linux-${KERNEL_VERSION}"
 
-    if [ -d "${KERNEL_SRC_DIR}/linux-${KERNEL_VERSION}" ]; then
-        log_info "Kernel source already extracted: ${KERNEL_SRC_DIR}/linux-${KERNEL_VERSION}"
+    # Check if kernel source is properly extracted (Makefile must exist)
+    if [ -f "${kernel_dir}/Makefile" ]; then
+        log_info "Kernel source already extracted: ${kernel_dir}"
         return 0
+    fi
+
+    # Remove incomplete extraction if exists
+    if [ -d "${kernel_dir}" ]; then
+        log_warn "Removing incomplete kernel source directory"
+        rm -rf "${kernel_dir}"
     fi
 
     log_info "Extracting kernel tarball to ${KERNEL_SRC_DIR}"
@@ -139,6 +147,12 @@ extract_kernel() {
         log_error "Failed to extract kernel tarball"
         return 1
     }
+
+    # Verify extraction
+    if [ ! -f "${kernel_dir}/Makefile" ]; then
+        log_error "Kernel extraction incomplete: Makefile not found"
+        return 1
+    fi
 
     log_info "Kernel extracted successfully"
 }
