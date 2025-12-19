@@ -165,30 +165,41 @@ log_success "OpenRC installed successfully"
 # Verify installation
 log_info "Verifying OpenRC installation..."
 
-essential_files=(
-    "sbin/rc"
-    "sbin/rc-status"
-    "sbin/rc-service"
-    "sbin/rc-update"
-    "sbin/openrc"
-    "sbin/openrc-init"
-    "sbin/openrc-run"
-    "sbin/openrc-shutdown"
+# Check both possible locations (sbin and usr/sbin)
+essential_binaries=(
+    "rc"
+    "rc-status"
+    "rc-service"
+    "rc-update"
+    "openrc"
+    "openrc-init"
+    "openrc-run"
+    "openrc-shutdown"
 )
 
 all_found=true
-for file in "${essential_files[@]}"; do
-    full_path="${OPENRC_INSTALL_DIR}/${file}"
-    if [ -f "$full_path" ]; then
-        log_success "  ✓ ${file}"
-    else
-        log_error "  ✗ ${file} not found"
+for binary in "${essential_binaries[@]}"; do
+    found=false
+    # Check /sbin first
+    if [ -f "${OPENRC_INSTALL_DIR}/sbin/${binary}" ]; then
+        log_success "  ✓ sbin/${binary}"
+        found=true
+    # Then check /usr/sbin
+    elif [ -f "${OPENRC_INSTALL_DIR}/usr/sbin/${binary}" ]; then
+        log_success "  ✓ usr/sbin/${binary}"
+        found=true
+    fi
+
+    if [ "$found" = false ]; then
+        log_error "  ✗ ${binary} not found in sbin/ or usr/sbin/"
         all_found=false
     fi
 done
 
 if [ "$all_found" = false ]; then
     log_error "Some essential files are missing"
+    log_info "Checking actual installation contents:"
+    find "${OPENRC_INSTALL_DIR}" -name "openrc" -o -name "rc" 2>/dev/null | head -10
     exit 1
 fi
 
@@ -222,8 +233,12 @@ log_info "  Installation directory: ${OPENRC_INSTALL_DIR}"
 # List installed binaries
 log_info "Installed OpenRC binaries:"
 set +o pipefail
-find "${OPENRC_INSTALL_DIR}/sbin" -type f -o -type l 2>/dev/null | while read -r binary; do
-    log_info "  - ${binary#${OPENRC_INSTALL_DIR}/}"
+for dir in "${OPENRC_INSTALL_DIR}/sbin" "${OPENRC_INSTALL_DIR}/usr/sbin"; do
+    if [ -d "$dir" ]; then
+        find "$dir" -type f -o -type l 2>/dev/null | while read -r binary; do
+            log_info "  - ${binary#${OPENRC_INSTALL_DIR}/}"
+        done
+    fi
 done
 set -o pipefail
 
