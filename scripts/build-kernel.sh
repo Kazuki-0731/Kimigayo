@@ -111,9 +111,11 @@ generate_kernel_config() {
 
     # Use custom config if available, otherwise use default
     local custom_config="${KERNEL_CONFIG_DIR}/${ARCH}.config"
-    if [ -f "$custom_config" ]; then
+    if [ -f "$custom_config" ] && [ -s "$custom_config" ] && ! grep -q "^# This is a placeholder" "$custom_config"; then
         log_info "Using custom kernel config: $custom_config"
         cp "$custom_config" .config
+        # Apply old config to update for current kernel version without prompts
+        make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
     else
         log_info "Using default kernel config: $KERNEL_CONFIG"
         make ARCH="$KERNEL_ARCH" "$KERNEL_CONFIG" O="$KERNEL_BUILD_DIR" || {
@@ -184,6 +186,11 @@ apply_security_hardening() {
     else
         log_warn "scripts/config not found, skipping config modifications"
     fi
+
+    # Update config without interactive prompts
+    log_info "Finalizing kernel configuration..."
+    make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
+    log_info "Kernel configuration finalized"
 }
 
 # Build kernel
@@ -200,12 +207,20 @@ build_kernel() {
     log_info "Log file: $BUILD_LOG"
     echo "=========================================="
 
-    # Run make with unbuffered output for real-time display in GitHub Actions
-    # stdbuf disables buffering to show output immediately
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" V=1 2>&1 | \
+    # Run make with unbuffered output for real-time display
+    # Show only important messages and progress indicators
+    local line_count=0
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" 2>&1 | \
         while IFS= read -r line; do
-            echo "$line"
             echo "$line" >> "$BUILD_LOG"
+
+            # Show compilation progress every 100 lines or for important messages
+            line_count=$((line_count + 1))
+            if [[ "$line" =~ ^[[:space:]]*CC|^[[:space:]]*LD|^[[:space:]]*AR ]] && (( line_count % 100 == 0 )); then
+                echo "[Building...] $line"
+            elif [[ "$line" =~ (Setup|Kernel|vmlinux|bzImage|Image) ]]; then
+                echo "$line"
+            fi
         done || {
         log_error "Kernel build failed"
         log_error "Check log file: $BUILD_LOG"
