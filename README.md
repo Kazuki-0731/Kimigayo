@@ -134,9 +134,11 @@ docker-compose run --rm kimigayo-build make build V=1
 docker volume ls | grep kimigayo
 
 # キャッシュをクリア（完全にクリーンビルドしたい場合）
-docker volume rm kimigayo-downloads
+# 注意: コンテナが起動している場合は先に停止してください
+docker compose down
+docker volume rm kimigayo_kimigayo-downloads
 
-# すべてのキャッシュとビルド成果物をクリア
+# すべてのキャッシュとビルド成果物をクリア（推奨）
 docker compose down -v
 ```
 
