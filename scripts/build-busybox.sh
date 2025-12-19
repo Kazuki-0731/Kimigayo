@@ -169,12 +169,14 @@ log_info "This may take several minutes..."
 
 # Set compiler flags for static musl build
 # Alpine Linux's gcc is already configured to use musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -static"
+# Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
+export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
 # Ensure we're using the correct compiler
 log_info "Compiler: ${CC}"
 log_info "CFLAGS: ${CFLAGS}"
+log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
 if ! make -j"$(nproc)" SKIP_STRIP=y; then
