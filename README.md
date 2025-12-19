@@ -85,43 +85,55 @@ git clone https://github.com/Kazuki-0731/Kimigayo.git
 cd Kimigayo
 
 # Docker環境を構築
-docker-compose build
+make docker-build
 
-# ビルドシステムをテスト
-docker-compose run --rm kimigayo-build make info
+# ビルド情報を確認
+make info
 
 # OSをビルド
-docker-compose run --rm kimigayo-build make build
+make build
+
+# テスト実行
+make test
 ```
 
-#### テスト実行
+#### よく使うコマンド
 
 ```bash
-# 全テスト実行（CI/CDと同じ）
-docker-compose run --rm kimigayo-build make test
+# ヘルプ表示
+make help
 
-# プロパティテストのみ
-docker-compose run --rm kimigayo-build pytest tests/property/ -v
+# コンテナにログイン
+make shell
 
-# 単体テストのみ
-docker-compose run --rm kimigayo-build pytest tests/unit/ -v
+# ビルド成果物をクリーンアップ
+make clean
+
+# すべてクリーンアップ（コンテナ+volume）
+make clean-all
+
+# ビルドログを確認
+make log-kernel
+make log-musl
+make log-openrc
 ```
 
-#### ローカルでCI/CDと同じビルドを実行
+#### 詳細なビルドオプション
 
-GitHub Actionsで実行されているビルドとテストをローカルで再現できます：
+アーキテクチャ指定や詳細ログが必要な場合：
 
 ```bash
-# プロジェクトroot直下のMakefileで簡単コマンド実行
-make help         # 利用可能なコマンド一覧を表示
-make build        # Kimigayo OSをビルド
-make test         # テストを実行
-make shell        # コンテナにログイン
-make clean-all    # すべて削除
-
-# 詳細なビルドオプション（アーキテクチャ指定など）
+# 特定のアーキテクチャでビルド
 docker compose run --rm kimigayo-build make build ARCH=x86_64
+
+# 詳細ログ付きでビルド
 docker compose run --rm kimigayo-build make build V=1
+
+# プロパティテストのみ実行
+docker compose run --rm kimigayo-build pytest tests/property/ -v
+
+# 単体テストのみ実行
+docker compose run --rm kimigayo-build pytest tests/unit/ -v
 ```
 
 **ダウンロードキャッシュについて：**
