@@ -198,7 +198,20 @@ done
 if [ "$all_found" = false ]; then
     log_error "Some essential files are missing"
     log_info "Checking actual installation contents:"
-    find "${OPENRC_INSTALL_DIR}" -name "openrc" -o -name "rc" 2>/dev/null | head -10
+    log_info "Searching for OpenRC binaries in ${OPENRC_INSTALL_DIR}..."
+    find "${OPENRC_INSTALL_DIR}" -type f -name "openrc*" -o -name "rc-*" -o -name "rc" 2>/dev/null | while read -r file; do
+        log_info "  Found: ${file#${OPENRC_INSTALL_DIR}/}"
+    done
+    log_info "Directory structure:"
+    ls -la "${OPENRC_INSTALL_DIR}/" 2>/dev/null || true
+    if [ -d "${OPENRC_INSTALL_DIR}/usr" ]; then
+        log_info "Contents of usr/:"
+        ls -la "${OPENRC_INSTALL_DIR}/usr/" 2>/dev/null || true
+        if [ -d "${OPENRC_INSTALL_DIR}/usr/sbin" ]; then
+            log_info "Contents of usr/sbin/:"
+            ls -la "${OPENRC_INSTALL_DIR}/usr/sbin/" 2>/dev/null || true
+        fi
+    fi
     exit 1
 fi
 
