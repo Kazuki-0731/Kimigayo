@@ -125,7 +125,7 @@ meson_options=(
     "-Dselinux=disabled"
     "-Daudit=disabled"
     "-Dnewnet=false"
-    "-Dbranding='Kimigayo OS'"
+    '-Dbranding="Kimigayo OS"'
 )
 
 log_info "Meson options:"
