@@ -103,8 +103,9 @@ if ! command -v ninja &> /dev/null; then
 fi
 
 # Set compiler flags for musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -I${MUSL_INSTALL_DIR}/usr/include"
-export LDFLAGS="-L${MUSL_INSTALL_DIR}/usr/lib -Wl,-z,relro -Wl,-z,now"
+# Alpine Linux's gcc is already configured to use musl
+export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 
 # Configure with meson
 log_info "Configuring OpenRC with meson..."
@@ -120,7 +121,6 @@ meson_options=(
     "-Db_pie=true"
     "-Db_staticpic=true"
     "-Dos=Linux"
-    "-Dpkg-config=true"
     "-Dpam=false"
     "-Dselinux=disabled"
     "-Daudit=disabled"
