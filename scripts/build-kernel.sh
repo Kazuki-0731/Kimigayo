@@ -208,26 +208,72 @@ build_kernel() {
     log_info "Progress will be shown below:"
     log_info "Log file: $BUILD_LOG"
     echo "=========================================="
+    echo "[INFO] Kernel build started at $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "[INFO] Compiling with ${JOBS} parallel jobs..."
+    echo "[INFO] Initializing build system (this may take 10-30 seconds)..."
+    echo -n "[INFO] Waiting for first output"
 
     # Run make with unbuffered output for real-time display
     # Show only important messages and progress indicators
     local line_count=0
+    local last_update=0
+    local dots_count=0
+
+    # Background process to show dots while waiting
+    (
+        while true; do
+            sleep 2
+            echo -n "." >&2
+            dots_count=$((dots_count + 1))
+            if (( dots_count > 30 )); then
+                echo "" >&2
+                echo "[INFO] Still initializing... (check log if this continues)" >&2
+                echo -n "[INFO] Progress"
+                dots_count=0
+            fi
+        done
+    ) &
+    local dots_pid=$!
+
     stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" 2>&1 | \
         while IFS= read -r line; do
             echo "$line" >> "$BUILD_LOG"
 
-            # Show compilation progress every 100 lines or for important messages
+            # Show compilation progress every 50 lines or for important messages
             line_count=$((line_count + 1))
-            if [[ "$line" =~ ^[[:space:]]*CC|^[[:space:]]*LD|^[[:space:]]*AR ]] && (( line_count % 100 == 0 )); then
-                echo "[Building...] $line"
-            elif [[ "$line" =~ (Setup|Kernel|vmlinux|bzImage|Image) ]]; then
-                echo "$line"
+
+            # Show first message immediately and stop dots
+            if (( line_count == 1 )); then
+                kill $dots_pid 2>/dev/null || true
+                wait $dots_pid 2>/dev/null || true
+                echo "" >&2
+                echo "[Building...] Build system initialized!" >&2
+                echo "[Building...] First output: $line" >&2
+            fi
+
+            # Show progress every 50 lines
+            if (( line_count - last_update >= 50 )); then
+                if [[ "$line" =~ ^[[:space:]]*(CC|LD|AR) ]]; then
+                    echo "[Progress] Compiled $line_count files..." >&2
+                    last_update=$line_count
+                fi
+            fi
+
+            # Show important messages
+            if [[ "$line" =~ (CHK|UPD|CALL|GEN|Setup|Kernel|vmlinux|bzImage|Image) ]]; then
+                echo "$line" >&2
             fi
         done || {
+        kill $dots_pid 2>/dev/null || true
+        wait $dots_pid 2>/dev/null || true
         log_error "Kernel build failed"
         log_error "Check log file: $BUILD_LOG"
         exit 1
     }
+
+    # Ensure dots process is stopped
+    kill $dots_pid 2>/dev/null || true
+    wait $dots_pid 2>/dev/null || true
 
     echo "=========================================="
 
