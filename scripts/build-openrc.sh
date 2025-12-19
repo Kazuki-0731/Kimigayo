@@ -212,14 +212,17 @@ if [ "$all_found" = false ]; then
     done
     log_info "Directory structure:"
     ls -la "${OPENRC_INSTALL_DIR}/" 2>/dev/null || true
-    if [ -d "${OPENRC_INSTALL_DIR}/usr" ]; then
-        log_info "Contents of usr/:"
-        ls -la "${OPENRC_INSTALL_DIR}/usr/" 2>/dev/null || true
-        if [ -d "${OPENRC_INSTALL_DIR}/usr/sbin" ]; then
-            log_info "Contents of usr/sbin/:"
-            ls -la "${OPENRC_INSTALL_DIR}/usr/sbin/" 2>/dev/null || true
+
+    # Check all possible binary directories
+    for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
+        if [ -d "${OPENRC_INSTALL_DIR}/${dir}" ]; then
+            log_info "Contents of ${dir}/:"
+            ls -la "${OPENRC_INSTALL_DIR}/${dir}/" 2>/dev/null || true
+        else
+            log_info "${dir}/ does not exist"
         fi
-    fi
+    done
+
     exit 1
 fi
 
