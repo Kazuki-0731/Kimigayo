@@ -11,7 +11,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Configuration
 BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
-BUILD_DIR="${BUILD_DIR:-./build}"
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 IMAGE_TYPE="${IMAGE_TYPE:-standard}"
 ARCH="${ARCH:-x86_64}"
 

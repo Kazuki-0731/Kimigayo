@@ -6,11 +6,14 @@
 
 set -euo pipefail
 
+# Save project root directory
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # Configuration
 OPENRC_VERSION="${OPENRC_VERSION:-0.52.1}"
 OPENRC_BASE_URL="https://github.com/OpenRC/openrc/releases/download"
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-./downloads}"
-BUILD_DIR="${BUILD_DIR:-./build}"
+DOWNLOAD_DIR="${DOWNLOAD_DIR:-${PROJECT_ROOT}/build/downloads}"
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 
 # Colors for output
 RED='\033[0;31m'

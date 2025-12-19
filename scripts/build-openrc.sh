@@ -6,9 +6,12 @@
 
 set -euo pipefail
 
+# Save project root directory
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # Configuration
 OPENRC_VERSION="${OPENRC_VERSION:-0.52.1}"
-BUILD_DIR="${BUILD_DIR:-./build}"
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 ARCH="${ARCH:-x86_64}"
 
 OPENRC_SRC_DIR="${BUILD_DIR}/openrc-${OPENRC_VERSION}"
