@@ -479,9 +479,9 @@ sha256 = abcdef1234567890...
 │  - Kernel hardening                     │
 │  - Seccomp-BPF                          │
 ├─────────────────────────────────────────┤
-│  Layer 1: ハードウェア層                │
-│  - Secure Boot (将来)                   │
-│  - TPM 2.0 (将来)                       │
+│  Layer 1: コンテナランタイム層          │
+│  - Docker/Podman/Kubernetes             │
+│  - ホストカーネル                       │
 └─────────────────────────────────────────┘
 ```
 
@@ -519,35 +519,30 @@ sha256 = abcdef1234567890...
 ### 起動シーケンス
 
 ```
-1. BIOS/UEFI
-   ├── ハードウェア初期化
-   └── ブートローダーのロード
+1. コンテナランタイム (Docker/Podman/Kubernetes)
+   ├── コンテナ初期化
+   └── rootfsマウント
        │
-2. Bootloader (GRUB)
-   ├── カーネルのロード
-   └── initrdのロード
-       │
-3. Linuxカーネル
-   ├── ハードウェア検出
-   ├── ファイルシステムマウント
+2. Linuxカーネル (ホストカーネル使用)
+   ├── ネームスペース作成
+   ├── cgroup設定
    └── /sbin/init (OpenRC) 起動
        │
-4. OpenRC - sysinit
+3. OpenRC - sysinit
    ├── /proc, /sys, /dev マウント
    ├── ホスト名設定
    └── システムクロック設定
        │
-5. OpenRC - boot
+4. OpenRC - boot
    ├── ファイルシステムチェック
    ├── ネットワーク初期化
    └── 必須サービス起動
        │
-6. OpenRC - default
+5. OpenRC - default
    ├── ユーザーサービス起動
-   │   ├── sshd
-   │   ├── nginx
+   │   ├── アプリケーションサービス
    │   └── その他
-   └── ログインプロンプト表示
+   └── アプリケーション実行準備完了
 ```
 
 ### 起動時間最適化

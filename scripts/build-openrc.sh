@@ -104,7 +104,7 @@ fi
 
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
 export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 
 # Configure with meson
@@ -125,7 +125,6 @@ meson_options=(
     "-Dselinux=disabled"
     "-Daudit=disabled"
     "-Dnewnet=false"
-    "-Dbranding=Kimigayo"
 )
 
 log_info "Meson options:"
