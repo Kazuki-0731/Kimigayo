@@ -1,5 +1,6 @@
 services:
   kimigayo-build:
+    platform: linux/amd64  # x86_64アーキテクチャを強制（Apple Siliconでも動作）
     build:
       context: .
       dockerfile: Dockerfile
