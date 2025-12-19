@@ -10,6 +10,9 @@ services:
       - .:/build/kimigayo:rw
       # ビルド出力を永続化
       - kimigayo-output:/output
+      # ダウンロードキャッシュを永続化（ローカルビルド高速化）
+      # カーネル、musl、BusyBox、OpenRCのソースtarballをキャッシュ
+      - kimigayo-downloads:/build/kimigayo/build/downloads
       # Dockerソケットをマウント（テスト用）
       - /var/run/docker.sock:/var/run/docker.sock:ro
     working_dir: /build/kimigayo
@@ -31,4 +34,7 @@ services:
 
 volumes:
   kimigayo-output:
+    driver: local
+  # ダウンロードしたソースコードを永続化（再ビルド時にダウンロードをスキップ）
+  kimigayo-downloads:
     driver: local

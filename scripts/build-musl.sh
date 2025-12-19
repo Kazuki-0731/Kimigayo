@@ -49,7 +49,8 @@ setup_arch() {
     case "$ARCH" in
         x86_64)
             TARGET="x86_64-linux-musl"
-            CFLAGS_ARCH="-m64"
+            # Alpine Linuxのgccはmusl用にビルドされており、-m64は不要
+            CFLAGS_ARCH=""
             # x86_64ではシステムのツールを使用（ネイティブビルド）
             export CC="${CC:-gcc}"
             export AR="${AR:-ar}"

@@ -125,6 +125,21 @@ docker-compose run --rm kimigayo-build make build ARCH=x86_64
 docker-compose run --rm kimigayo-build make build V=1
 ```
 
+**ダウンロードキャッシュについて：**
+
+ローカルビルドでは、ダウンロードしたソースコード（カーネル、musl、BusyBox、OpenRC）がDocker Volumeにキャッシュされます。2回目以降のビルドは大幅に高速化されます。
+
+```bash
+# キャッシュの確認
+docker volume ls | grep kimigayo
+
+# キャッシュをクリア（完全にクリーンビルドしたい場合）
+docker volume rm kimigayo-downloads
+
+# すべてのキャッシュとビルド成果物をクリア
+docker compose down -v
+```
+
 **ローカル環境で直接実行（Docker不要）:**
 
 前提条件: Alpine Linux環境または必要なツールがインストール済み
