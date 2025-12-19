@@ -97,7 +97,7 @@ docker-compose run --rm kimigayo-build make build
 #### テスト実行
 
 ```bash
-# 全テスト実行
+# 全テスト実行（CI/CDと同じ）
 docker-compose run --rm kimigayo-build make test
 
 # プロパティテストのみ
@@ -105,6 +105,42 @@ docker-compose run --rm kimigayo-build pytest tests/property/ -v
 
 # 単体テストのみ
 docker-compose run --rm kimigayo-build pytest tests/unit/ -v
+```
+
+#### ローカルでCI/CDと同じビルドを実行
+
+GitHub Actionsで実行されているビルドとテストをローカルで再現できます：
+
+```bash
+# CI/CDと同じビルド（Docker環境）
+docker-compose run --rm kimigayo-build make build
+
+# CI/CDと同じテスト
+docker-compose run --rm kimigayo-build make test
+
+# 特定のアーキテクチャでビルド
+docker-compose run --rm kimigayo-build make build ARCH=x86_64
+
+# 詳細ログ付きでビルド
+docker-compose run --rm kimigayo-build make build V=1
+```
+
+**ローカル環境で直接実行（Docker不要）:**
+
+前提条件: Alpine Linux環境または必要なツールがインストール済み
+
+```bash
+# ビルド
+make build
+
+# テスト
+make test
+
+# ヘルプ表示
+make help
+
+# ビルド情報確認
+make info
 ```
 
 ### 📦 イメージバリエーション

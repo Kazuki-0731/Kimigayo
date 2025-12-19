@@ -1,6 +1,15 @@
 # Kimigayo OS Build System
 # Main Makefile
 
+# Check if running on Linux (required for musl libc build)
+UNAME_S := $(shell uname -s)
+ifneq ($(UNAME_S),Linux)
+    $(warning ⚠️  Warning: You are running on $(UNAME_S), not Linux)
+    $(warning ⚠️  Kimigayo OS must be built in a Linux environment (Alpine Linux))
+    $(warning ⚠️  Please use Docker: docker compose run --rm kimigayo-build make build)
+    $(warning ⚠️  See README.md for details)
+endif
+
 # Project information
 PROJECT_NAME := Kimigayo OS
 VERSION := 0.1.0
