@@ -236,8 +236,9 @@ docker-test:
 # Clean
 clean:
 	@echo "[CLEAN] Removing build artifacts"
-	$(Q)rm -rf $(BUILD_DIR)/*
-	$(Q)rm -rf $(OUTPUT_DIR)/*
+	@echo "[INFO] Keeping downloads cache (use 'make clean-cache' to remove)"
+	$(Q)find $(BUILD_DIR) -mindepth 1 -maxdepth 1 ! -name 'downloads' -exec rm -rf {} + 2>/dev/null || true
+	$(Q)rm -rf $(OUTPUT_DIR)/* 2>/dev/null || true
 	@echo "Clean completed"
 
 clean-all: clean
