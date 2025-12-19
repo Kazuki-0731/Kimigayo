@@ -145,19 +145,24 @@ EOF
 verify_patched_kernel() {
     log_info "Verifying patched kernel source"
 
-    cd "$KERNEL_SRC_DIR" || return 1
+    # Check if kernel source directory exists
+    if [ ! -d "$KERNEL_SRC_DIR" ]; then
+        log_error "Kernel source directory not found: $KERNEL_SRC_DIR"
+        return 1
+    fi
 
-    # Check critical files exist
+    # Check critical files exist (using absolute paths)
     local critical_files=(
-        "Makefile"
-        "arch/x86/Makefile"
-        "arch/arm64/Makefile"
-        "kernel/Makefile"
+        "${KERNEL_SRC_DIR}/Makefile"
+        "${KERNEL_SRC_DIR}/arch/x86/Makefile"
+        "${KERNEL_SRC_DIR}/kernel/Makefile"
     )
 
     for file in "${critical_files[@]}"; do
         if [ ! -f "$file" ]; then
             log_error "Critical file missing after patching: $file"
+            log_info "Directory listing:"
+            ls -la "$KERNEL_SRC_DIR" | head -20 || true
             return 1
         fi
     done
