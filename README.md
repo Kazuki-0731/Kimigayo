@@ -144,11 +144,6 @@ docker compose run --rm kimigayo-build pytest tests/unit/ -v
 # 簡単コマンド（プロジェクトroot直下のMakefile）
 make clean-cache  # キャッシュをクリア
 make clean-all    # すべてクリア
-
-# 従来の方法
-docker compose down
-docker volume rm kimigayo_kimigayo-downloads
-docker compose down -v
 ```
 
 **ビルドログの確認：**
