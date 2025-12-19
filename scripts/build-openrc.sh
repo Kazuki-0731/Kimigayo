@@ -115,7 +115,7 @@ meson_options=(
     "--prefix=/usr"
     "--sysconfdir=/etc"
     "--libdir=/usr/lib"
-    "--sbindir=/sbin"
+    "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
     "-Db_pie=true"
@@ -125,7 +125,7 @@ meson_options=(
     "-Dselinux=disabled"
     "-Daudit=disabled"
     "-Dnewnet=false"
-    '-Dbranding="Kimigayo OS"'
+    "-Dbranding=Kimigayo OS"
 )
 
 log_info "Meson options:"
