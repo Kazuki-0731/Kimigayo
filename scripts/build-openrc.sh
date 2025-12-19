@@ -154,8 +154,14 @@ log_success "OpenRC build completed"
 # Install to staging directory
 log_info "Installing OpenRC to ${OPENRC_INSTALL_DIR}..."
 
-if ! DESTDIR="$OPENRC_INSTALL_DIR" ninja -C "$OPENRC_BUILD_DIR" install; then
+# Use meson install with DESTDIR (absolute path required)
+OPENRC_INSTALL_DIR_ABS="$(cd "$(dirname "$OPENRC_INSTALL_DIR")" && pwd)/$(basename "$OPENRC_INSTALL_DIR")"
+log_info "Absolute install path: ${OPENRC_INSTALL_DIR_ABS}"
+
+if ! DESTDIR="$OPENRC_INSTALL_DIR_ABS" meson install -C "$OPENRC_BUILD_DIR"; then
     log_error "OpenRC installation failed"
+    log_info "Trying to check meson install output..."
+    meson install -C "$OPENRC_BUILD_DIR" --dry-run || true
     exit 1
 fi
 
