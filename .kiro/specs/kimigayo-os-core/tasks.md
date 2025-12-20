@@ -457,7 +457,7 @@
   - サービス起動/停止テスト
   - 依存関係解決の検証
 
-- [ ] 20. rootfsの構築
+- [x] 20. rootfsの構築
   - ディレクトリ構造の作成（/bin, /sbin, /etc, /usr, /var, etc.）
   - カーネル、musl libc、BusyBox、OpenRCの配置
   - 設定ファイルの配置（/etc/passwd, /etc/group, /etc/fstab, etc.）
