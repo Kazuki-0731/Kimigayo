@@ -476,7 +476,7 @@
   - /etc/inittab（init設定）
   - /etc/network/interfaces（ネットワーク設定）
 
-- [ ] 20.3 rootfsサイズ最適化
+- [x] 20.3 rootfsサイズ最適化
   - 不要なファイルの削除
   - シンボリックリンクの活用
   - 圧縮可能なファイルの圧縮

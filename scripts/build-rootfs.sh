@@ -50,6 +50,10 @@ log_info() {
     echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] INFO:${NC} $*" | tee -a "$LOG_FILE"
 }
 
+log_success() {
+    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] SUCCESS:${NC} $*" | tee -a "$LOG_FILE"
+}
+
 # Create FHS-compliant directory structure
 create_directory_structure() {
     log "Creating FHS-compliant directory structure..."
@@ -238,6 +242,166 @@ set_permissions() {
     chmod 755 "$ROOTFS_DIR/run"
 
     log "✅ Permissions set successfully"
+}
+
+# Optimize rootfs size
+optimize_rootfs() {
+    log ""
+    log "=========================================="
+    log "🔧 Optimizing rootfs size..."
+    log "=========================================="
+
+    local size_before=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
+    log_info "Size before optimization: $size_before"
+
+    # 1. Strip all binaries and shared libraries
+    log_info "Step 1: Stripping binaries and libraries..."
+    local stripped_count=0
+
+    # Temporarily disable exit on error for strip commands
+    set +e
+
+    # Strip all ELF binaries
+    find "$ROOTFS_DIR" -type f -executable 2>/dev/null | while read -r file; do
+        if file "$file" 2>/dev/null | grep -q "not stripped"; then
+            if strip --strip-all "$file" 2>/dev/null; then
+                stripped_count=$((stripped_count + 1))
+            fi
+        fi
+    done
+
+    # Strip shared libraries
+    find "$ROOTFS_DIR" -type f -name "*.so*" 2>/dev/null | while read -r file; do
+        if file "$file" 2>/dev/null | grep -q "not stripped"; then
+            if strip --strip-unneeded "$file" 2>/dev/null; then
+                stripped_count=$((stripped_count + 1))
+            fi
+        fi
+    done
+
+    # Re-enable exit on error
+    set -e
+
+    log_success "  ✓ Stripped binaries and libraries"
+
+    # 2. Remove unnecessary files
+    log_info "Step 2: Removing unnecessary files..."
+    local removed_count=0
+
+    # Remove man pages (documentation not needed in minimal OS)
+    if [ -d "$ROOTFS_DIR/usr/share/man" ]; then
+        rm -rf "$ROOTFS_DIR/usr/share/man"
+        log_success "  ✓ Removed man pages"
+        ((removed_count++))
+    fi
+
+    # Remove example init scripts (not needed in production)
+    if [ -d "$ROOTFS_DIR/usr/share/openrc/support/init.d.examples" ]; then
+        rm -rf "$ROOTFS_DIR/usr/share/openrc/support/init.d.examples"
+        log_success "  ✓ Removed example init scripts"
+        ((removed_count++))
+    fi
+
+    # Remove static libraries (.a files) if any
+    local a_files=$(find "$ROOTFS_DIR" -type f -name "*.a" 2>/dev/null | wc -l)
+    if [ "$a_files" -gt 0 ]; then
+        find "$ROOTFS_DIR" -type f -name "*.a" -delete 2>/dev/null || true
+        removed_count=$((removed_count + a_files))
+    fi
+
+    # Remove libtool archives (.la files) if any
+    local la_files=$(find "$ROOTFS_DIR" -type f -name "*.la" 2>/dev/null | wc -l)
+    if [ "$la_files" -gt 0 ]; then
+        find "$ROOTFS_DIR" -type f -name "*.la" -delete 2>/dev/null || true
+        removed_count=$((removed_count + la_files))
+    fi
+
+    if [ $removed_count -gt 0 ]; then
+        log_success "  ✓ Removed $removed_count unnecessary files/directories"
+    else
+        log_info "  ✓ No unnecessary files found"
+    fi
+
+    # 3. Create symbolic links for duplicate OpenRC binaries
+    log_info "Step 3: Creating symbolic links for duplicate binaries..."
+    local symlink_count=0
+
+    # Many einfo-related binaries are hardlinks to the same binary
+    # Convert them to symlinks to save space
+    if [ -d "$ROOTFS_DIR/lib/rc/rc/bin" ]; then
+        local einfo_bins=(ebegin eend eerror eerrorn eindent einfo einfon eoutdent ewarn ewarnn ewend)
+        local base_bin="$ROOTFS_DIR/lib/rc/rc/bin/einfo"
+
+        if [ -f "$base_bin" ]; then
+            for bin in "${einfo_bins[@]}"; do
+                local target="$ROOTFS_DIR/lib/rc/rc/bin/$bin"
+                if [ -f "$target" ] && [ "$target" != "$base_bin" ]; then
+                    # Check if they are identical
+                    if cmp -s "$base_bin" "$target"; then
+                        rm -f "$target"
+                        ln -s "einfo" "$target"
+                        ((symlink_count++))
+                    fi
+                fi
+            done
+        fi
+    fi
+
+    if [ $symlink_count -gt 0 ]; then
+        log_success "  ✓ Created $symlink_count symbolic links"
+    else
+        log_info "  ✓ No duplicate binaries found"
+    fi
+
+    # 4. Compress compressible files
+    log_info "Step 4: Compressing configuration files..."
+    local compressed_count=0
+
+    # Temporarily disable exit on error for compression
+    set +e
+
+    # Compress large text files (> 1KB) in /usr/share
+    if [ -d "$ROOTFS_DIR/usr/share" ]; then
+        find "$ROOTFS_DIR/usr/share" -type f -size +1k 2>/dev/null | while read -r file; do
+            if file "$file" 2>/dev/null | grep -q "text"; then
+                if gzip -9 "$file" 2>/dev/null; then
+                    compressed_count=$((compressed_count + 1))
+                fi
+            fi
+        done
+    fi
+
+    # Re-enable exit on error
+    set -e
+
+    if [ -d "$ROOTFS_DIR/usr/share" ]; then
+        local gz_files=$(find "$ROOTFS_DIR/usr/share" -type f -name "*.gz" 2>/dev/null | wc -l)
+        if [ "$gz_files" -gt 0 ]; then
+            log_success "  ✓ Compressed $gz_files files"
+        else
+            log_info "  ✓ No large text files to compress"
+        fi
+    else
+        log_info "  ✓ No large text files to compress"
+    fi
+
+    # Clean up empty directories
+    find "$ROOTFS_DIR" -type d -empty -delete 2>/dev/null || true
+
+    local size_after=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
+    log_info "Size after optimization: $size_after"
+
+    log ""
+    log "=========================================="
+    log "✅ Rootfs optimization completed!"
+    log "=========================================="
+    log_success "Summary:"
+    log_success "  - Stripped binaries/libraries: $stripped_count"
+    log_success "  - Removed files: $removed_count"
+    log_success "  - Created symlinks: $symlink_count"
+    log_success "  - Compressed files: $compressed_count"
+    log_success "  - Size: $size_before → $size_after"
+    log ""
 }
 
 # Copy built components to rootfs
@@ -560,6 +724,7 @@ main() {
     copy_components
     create_config_files
     set_permissions
+    optimize_rootfs
     generate_metadata
     calculate_size
 
