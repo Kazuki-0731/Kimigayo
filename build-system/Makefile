@@ -130,6 +130,7 @@ help:
 	@echo "  security-scan    - Run security analysis"
 	@echo "  qemu-test        - Test in QEMU"
 	@echo "  info             - Show build information"
+	@echo "  status           - Show build status for each component"
 	@echo ""
 	@echo "Log Targets:"
 	@echo "  log-kernel       - Show kernel build log (last 100 lines)"
@@ -344,6 +345,10 @@ info:
 	@echo "Debug: $(DEBUG)"
 	@echo "CFLAGS: $(CFLAGS)"
 	@echo "LDFLAGS: $(LDFLAGS)"
+
+# Build status
+status:
+	@bash $(SCRIPTS_DIR)/build-status.sh show
 
 # Version
 version:

@@ -282,3 +282,6 @@ log_info "  Binary size (stripped): ${stripped_size_kb} KB"
 log_info "  Target size: ${target_size} KB"
 log_info "  Applets installed: ${applet_count}"
 log_info "  Installation directory: ${install_prefix}"
+
+# Record build success
+"${PROJECT_ROOT}/scripts/build-status.sh" record busybox 2>/dev/null || true

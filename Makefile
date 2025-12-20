@@ -18,6 +18,7 @@ help:
 	@echo "🔧 OSビルドコマンド:"
 	@echo "  make build        - Kimigayo OSをビルド [1/6]～[6/6]"
 	@echo "  make test         - テストを実行"
+	@echo "  make status       - ビルド状態を表示（どこまで完了したか確認）"
 	@echo "  make info         - ビルド設定情報を表示"
 	@echo ""
 	@echo "🐳 Docker管理:"
@@ -96,6 +97,10 @@ test:
 info:
 	@echo "ビルド情報を表示..."
 	docker compose run --rm kimigayo-build make info
+
+status:
+	@echo "ビルド状態を表示..."
+	docker compose run --rm kimigayo-build make status
 
 # クリーンアップ
 clean:

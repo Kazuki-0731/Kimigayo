@@ -365,6 +365,9 @@ main() {
     show_summary
 
     log_info "musl libc build completed successfully!"
+
+    # Record build success
+    "${PROJECT_ROOT}/scripts/build-status.sh" record musl 2>/dev/null || true
 }
 
 main "$@"

@@ -380,6 +380,9 @@ main() {
     show_summary
 
     log_info "Kernel build completed successfully!"
+
+    # Record build success
+    "${PROJECT_ROOT}/scripts/build-status.sh" record kernel 2>/dev/null || true
 }
 
 main "$@"

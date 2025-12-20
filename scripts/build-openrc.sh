@@ -282,3 +282,6 @@ done
 set -o pipefail
 
 log_success "OpenRC is ready for integration"
+
+# Record build success
+"${PROJECT_ROOT}/scripts/build-status.sh" record openrc 2>/dev/null || true

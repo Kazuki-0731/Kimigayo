@@ -575,6 +575,9 @@ main() {
     log_info "  1. Review the rootfs: ls -la $ROOTFS_DIR"
     log_info "  2. Create an image: make iso or make docker-image"
     log_info "  3. Test in QEMU: make qemu-test"
+
+    # Record build success
+    "${PROJECT_ROOT}/scripts/build-status.sh" record rootfs 2>/dev/null || true
 }
 
 # Run main function
