@@ -27,24 +27,24 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging functions with timestamp
+# Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_warn() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_error() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_build() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${CYAN}[BUILD]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 

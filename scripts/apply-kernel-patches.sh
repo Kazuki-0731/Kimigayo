@@ -21,24 +21,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging functions with timestamp
+# Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_warn() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_error() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_patch() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${BLUE}[PATCH]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 

@@ -22,24 +22,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging functions with timestamp
+# Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${BLUE}[INFO]${NC} ${timestamp} $*"
 }
 
 log_success() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[SUCCESS]${NC} ${timestamp} $*"
 }
 
 log_warning() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARNING]${NC} ${timestamp} $*"
 }
 
 log_error() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR]${NC} ${timestamp} $*"
 }
 
@@ -69,52 +69,18 @@ else
     urls=(
         "${BUSYBOX_BASE_URL}/${tarball_filename}"
         "https://www.busybox.net/downloads/${tarball_filename}"
-        "https://github.com/mirror/busybox/archive/refs/tags/${BUSYBOX_VERSION}.tar.gz"
     )
-
-    # GitHub tarball has different naming, handle separately
-    github_url="https://github.com/mirror/busybox/archive/refs/tags/${BUSYBOX_VERSION}.tar.gz"
-    github_tarball="${DOWNLOAD_DIR}/busybox-${BUSYBOX_VERSION}-github.tar.gz"
 
     download_success=false
     for url in "${urls[@]}"; do
         log_info "Trying: $url"
 
-        # Special handling for GitHub mirror
-        if [[ "$url" == *"github.com"* ]]; then
-            if curl -fSL --connect-timeout 30 --max-time 300 -o "$github_tarball" "$url"; then
-                log_info "Converting GitHub tarball to standard format..."
-                # GitHub tarball extracts to busybox-VERSION/ instead of busybox-VERSION/
-                # We need to repackage it
-                temp_extract="${DOWNLOAD_DIR}/temp_github_extract"
-                mkdir -p "$temp_extract"
-                tar -xzf "$github_tarball" -C "$temp_extract"
-
-                # Find the extracted directory
-                extracted_dir=$(find "$temp_extract" -maxdepth 1 -type d -name "busybox-*" | head -n 1)
-                if [ -n "$extracted_dir" ]; then
-                    # Repackage as .tar.bz2
-                    tar -cjf "$tarball_path" -C "$temp_extract" "$(basename "$extracted_dir")"
-                    rm -rf "$temp_extract" "$github_tarball"
-                    download_success=true
-                    log_success "Downloaded and converted from: $url"
-                    break
-                else
-                    log_warning "Failed to extract GitHub tarball"
-                    rm -rf "$temp_extract" "$github_tarball"
-                fi
-            else
-                log_warning "Failed to download from: $url"
-            fi
+        if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
+            download_success=true
+            log_success "Downloaded from: $url"
+            break
         else
-            # Standard download
-            if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
-                download_success=true
-                log_success "Downloaded from: $url"
-                break
-            else
-                log_warning "Failed to download from: $url"
-            fi
+            log_warning "Failed to download from: $url"
         fi
     done
 
