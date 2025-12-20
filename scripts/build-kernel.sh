@@ -248,7 +248,8 @@ build_kernel() {
 
     stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" 2>&1 | \
         while IFS= read -r line; do
-            echo "$line" >> "$BUILD_LOG"
+            # Write to log file immediately with tee (unbuffered)
+            echo "$line" | tee -a "$BUILD_LOG" > /dev/null
 
             # Show compilation progress every 50 lines or for important messages
             line_count=$((line_count + 1))
