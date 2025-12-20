@@ -237,9 +237,17 @@ docker-test:
 clean:
 	@echo "[CLEAN] Removing build artifacts"
 	@echo "[INFO] Keeping downloads cache (use 'make clean-cache' to remove)"
-	$(Q)find $(BUILD_DIR) -mindepth 1 -maxdepth 1 ! -name 'downloads' -exec rm -rf {} + 2>/dev/null || true
+	@echo "[CLEAN] Removing kernel build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/kernel-build-* 2>/dev/null || true
+	@echo "[CLEAN] Removing musl build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/musl-build-* $(BUILD_DIR)/musl-install-* $(BUILD_DIR)/musl-tools-* 2>/dev/null || true
+	@echo "[CLEAN] Removing BusyBox build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/busybox-build-* $(BUILD_DIR)/busybox-install-* 2>/dev/null || true
+	@echo "[CLEAN] Removing OpenRC build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* 2>/dev/null || true
+	@echo "[CLEAN] Removing output directory..."
 	$(Q)rm -rf $(OUTPUT_DIR)/* 2>/dev/null || true
-	@echo "Clean completed"
+	@echo "[SUCCESS] Clean completed"
 
 clean-all: clean
 	@echo "[CLEAN] Removing all generated files"
