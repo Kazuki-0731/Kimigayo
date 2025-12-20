@@ -200,6 +200,33 @@ tail -n 100 /build/kimigayo/build/logs/kernel-build.log
 cat /build/kimigayo/build/logs/musl-build.log
 ```
 
+**バックグラウンドビルド（tmux使用）：**
+
+カーネルビルドなど時間のかかるビルドをバックグラウンドで実行し、完了時に通知を受け取れます：
+
+```bash
+# Dockerビルド環境に入る
+make shell
+
+# tmuxセッションを開始
+tmux new -s build
+
+# ビルド実行（完了したら通知メッセージを表示）
+make build && echo "✅ Build Success" || echo "❌ Build Failed"
+
+# Ctrl+B を押してから D を押してデタッチ（バックグラウンド実行）
+# ビルドはバックグラウンドで継続される
+
+# 後で状態を確認する場合
+tmux attach -t build
+
+# tmuxセッション一覧を確認
+tmux ls
+
+# セッションを終了する場合
+tmux kill-session -t build
+```
+
 **トラブルシューティング：**
 
 ビルドが失敗する場合や、途中で止まる場合は以下を試してください：
