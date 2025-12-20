@@ -292,14 +292,14 @@ optimize_rootfs() {
     if [ -d "$ROOTFS_DIR/usr/share/man" ]; then
         rm -rf "$ROOTFS_DIR/usr/share/man"
         log_success "  ✓ Removed man pages"
-        ((removed_count++))
+        removed_count=$((removed_count + 1))
     fi
 
     # Remove example init scripts (not needed in production)
     if [ -d "$ROOTFS_DIR/usr/share/openrc/support/init.d.examples" ]; then
         rm -rf "$ROOTFS_DIR/usr/share/openrc/support/init.d.examples"
         log_success "  ✓ Removed example init scripts"
-        ((removed_count++))
+        removed_count=$((removed_count + 1))
     fi
 
     # Remove static libraries (.a files) if any
@@ -340,7 +340,7 @@ optimize_rootfs() {
                     if cmp -s "$base_bin" "$target"; then
                         rm -f "$target"
                         ln -s "einfo" "$target"
-                        ((symlink_count++))
+                        symlink_count=$((symlink_count + 1))
                     fi
                 fi
             done
