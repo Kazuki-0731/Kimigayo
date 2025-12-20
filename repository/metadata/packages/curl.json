@@ -1,0 +1,37 @@
+{
+  "name": "curl",
+  "version": "8.5.0",
+  "arch": "x86_64",
+  "description": "Command line tool for transferring data with URL syntax",
+  "long_description": "curl is a command line tool for transferring data with URL syntax, supporting HTTP, HTTPS, FTP, and many other protocols. Built with SSL support and compiled statically with musl libc for Kimigayo OS.",
+  "homepage": "https://curl.se/",
+  "license": "curl",
+  "maintainer": "Kimigayo OS Team <team@kimigayo.org>",
+  "category": "network",
+  "depends": ["openssl>=3.0", "zlib>=1.2"],
+  "makedepends": ["musl", "gcc", "openssl-dev", "zlib-dev"],
+  "provides": ["curl", "libcurl"],
+  "conflicts": [],
+  "replaces": [],
+  "size": 524288,
+  "installed_size": 1048576,
+  "checksum": {
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "placeholder_public_key",
+    "signature": "placeholder_signature"
+  },
+  "build_date": "2025-01-01T00:00:00Z",
+  "files": [
+    "/usr/bin/curl",
+    "/usr/lib/libcurl.so.4",
+    "/usr/share/man/man1/curl.1.gz",
+    "/usr/share/doc/curl/README.md"
+  ],
+  "source": {
+    "url": "https://github.com/curl/curl",
+    "commit": "curl-8_5_0"
+  }
+}

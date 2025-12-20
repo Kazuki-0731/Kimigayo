@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kimigayo.org/schemas/package-metadata-v1.json",
+  "title": "Kimigayo OS Package Metadata",
+  "description": "Metadata schema for Kimigayo OS packages",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "arch",
+    "description",
+    "license",
+    "maintainer",
+    "size",
+    "checksum"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Package name (lowercase, alphanumeric with hyphens)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z0-9]+)?$",
+      "description": "Semantic version (e.g., 1.0.0, 1.2.3-rc1)"
+    },
+    "arch": {
+      "type": "string",
+      "enum": ["x86_64", "aarch64", "any"],
+      "description": "Target architecture"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 200,
+      "description": "Short package description"
+    },
+    "long_description": {
+      "type": "string",
+      "description": "Detailed package description"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Project homepage URL"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier (e.g., MIT, GPL-3.0, Apache-2.0)"
+    },
+    "maintainer": {
+      "type": "string",
+      "pattern": "^.+ <.+@.+>$",
+      "description": "Package maintainer (Name <email>)"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["base", "devel", "network", "security", "system", "utils"],
+      "description": "Package category"
+    },
+    "depends": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+(>=|<=|=|>|<)?[0-9.]*$"
+      },
+      "description": "Runtime dependencies with optional version constraints"
+    },
+    "makedepends": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Build-time dependencies"
+    },
+    "provides": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Virtual packages or features provided"
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Conflicting packages"
+    },
+    "replaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Packages replaced by this package"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Package archive size in bytes"
+    },
+    "installed_size": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Installed size in bytes"
+    },
+    "checksum": {
+      "type": "object",
+      "required": ["sha256"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 checksum"
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "public_key", "signature"],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["ed25519"],
+          "description": "Signature algorithm"
+        },
+        "public_key": {
+          "type": "string",
+          "description": "Base64-encoded public key"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base64-encoded signature"
+        }
+      }
+    },
+    "build_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Package build timestamp (ISO 8601)"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^/"
+      },
+      "description": "List of installed files (absolute paths)"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Source code URL"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Git commit SHA"
+        }
+      }
+    }
+  }
+}
