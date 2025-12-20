@@ -465,12 +465,12 @@
   - 初期化スクリプトの配置
   - _要件: 1.1, 1.2, 1.5_
 
-- [ ] 20.1 rootfs構造スクリプトの実装
+- [x] 20.1 rootfs構造スクリプトの実装
   - FHS（Filesystem Hierarchy Standard）準拠のディレクトリ作成
   - 必須デバイスノード作成（/dev/null, /dev/zero, /dev/console, etc.）
   - パーミッション設定の自動化
 
-- [ ] 20.2 システム設定ファイルの生成
+- [x] 20.2 システム設定ファイルの生成
   - /etc/passwdとグループファイル
   - /etc/fstab（ファイルシステムマウント設定）
   - /etc/inittab（init設定）
