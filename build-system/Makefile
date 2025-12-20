@@ -256,22 +256,42 @@ docker-build:
 docker-test:
 	docker-compose run --rm kimigayo-build make test
 
-# Clean
-clean:
-	@echo "[CLEAN] Removing build artifacts"
-	@echo "[INFO] Keeping downloads cache (use 'make clean-cache' to remove)"
-	@echo "[CLEAN] Removing kernel build artifacts..."
-	$(Q)rm -rf $(BUILD_DIR)/kernel-build-* 2>/dev/null || true
+# Clean targets (individual components)
+clean-musl:
 	@echo "[CLEAN] Removing musl build artifacts..."
 	$(Q)rm -rf $(BUILD_DIR)/musl-build-* $(BUILD_DIR)/musl-install-* $(BUILD_DIR)/musl-tools-* 2>/dev/null || true
+	@echo "[SUCCESS] musl clean completed"
+
+clean-kernel:
+	@echo "[CLEAN] Removing kernel build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/kernel-build-* $(BUILD_DIR)/kernel/output 2>/dev/null || true
+	@echo "[SUCCESS] Kernel clean completed"
+
+clean-busybox:
 	@echo "[CLEAN] Removing BusyBox build artifacts..."
 	$(Q)rm -rf $(BUILD_DIR)/busybox-build-* $(BUILD_DIR)/busybox-install-* 2>/dev/null || true
+	@echo "[SUCCESS] BusyBox clean completed"
+
+clean-openrc:
 	@echo "[CLEAN] Removing OpenRC build artifacts..."
 	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* 2>/dev/null || true
+	@echo "[SUCCESS] OpenRC clean completed"
+
+clean-rootfs:
+	@echo "[CLEAN] Removing root filesystem artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/rootfs 2>/dev/null || true
+	@echo "[SUCCESS] Root filesystem clean completed"
+
+clean-output:
 	@echo "[CLEAN] Removing output directory..."
 	$(Q)rm -rf $(OUTPUT_DIR)/* 2>/dev/null || true
-	@echo "[SUCCESS] Clean completed"
+	@echo "[SUCCESS] Output clean completed"
 
+# Clean all build artifacts (keeps downloads cache)
+clean: clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output
+	@echo "[SUCCESS] All build artifacts cleaned"
+
+# Clean everything including downloads and Docker volumes
 clean-all: clean
 	@echo "[CLEAN] Removing all generated files"
 	$(Q)docker-compose down -v
