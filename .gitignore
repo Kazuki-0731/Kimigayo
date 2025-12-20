@@ -10,6 +10,11 @@
 *.img
 *.iso
 
+# Rust
+/target/
+Cargo.lock
+src/pkg/isn/target/
+
 # Editor files
 *.swp
 *.swo

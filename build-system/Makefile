@@ -109,6 +109,7 @@ help:
 	@echo "  clean-kernel     - Remove only kernel build artifacts"
 	@echo "  clean-busybox    - Remove only BusyBox build artifacts"
 	@echo "  clean-openrc     - Remove only OpenRC build artifacts"
+	@echo "  clean-pkg        - Remove only package manager build artifacts"
 	@echo "  clean-rootfs     - Remove only rootfs build artifacts"
 	@echo "  clean-output     - Remove only output directory"
 	@echo "  clean-all        - Remove everything (including downloads & Docker)"
@@ -212,7 +213,8 @@ pkg:
 	@echo "📦 [5/6] Building Package Manager (isn)"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/pkg
-	@echo "  Package manager build will be implemented in Phase 6"
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-isn.sh
 	@echo "✅ [5/6] Package manager build completed"
 
 # Root filesystem
@@ -313,6 +315,11 @@ clean-openrc:
 	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* 2>/dev/null || true
 	@echo "[SUCCESS] OpenRC clean completed"
 
+clean-pkg:
+	@echo "[CLEAN] Removing package manager build artifacts..."
+	$(Q)rm -rf $(BUILD_DIR)/pkg $(BUILD_DIR)/pkg-install-* 2>/dev/null || true
+	@echo "[SUCCESS] Package manager clean completed"
+
 clean-rootfs:
 	@echo "[CLEAN] Removing root filesystem artifacts..."
 	$(Q)rm -rf $(BUILD_DIR)/rootfs 2>/dev/null || true
@@ -324,7 +331,7 @@ clean-output:
 	@echo "[SUCCESS] Output clean completed"
 
 # Clean all build artifacts (keeps downloads cache)
-clean: clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output
+clean: clean-musl clean-kernel clean-busybox clean-openrc clean-pkg clean-rootfs clean-output
 	@echo "[SUCCESS] All build artifacts cleaned"
 
 # Clean everything including downloads and Docker volumes
