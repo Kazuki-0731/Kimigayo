@@ -24,22 +24,22 @@ NC='\033[0m' # No Color
 # Logging functions with timestamp (JST)
 log_info() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[INFO] ${timestamp} $*${NC}" | tee -a "$PATCH_LOG"
+    echo -e "${GREEN}[INFO] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_warn() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${YELLOW}[WARN] ${timestamp} $*${NC}" | tee -a "$PATCH_LOG"
+    echo -e "${YELLOW}[WARN] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_error() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[ERROR] ${timestamp} $*${NC}" | tee -a "$PATCH_LOG"
+    echo -e "${RED}[ERROR] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_patch() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[PATCH] ${timestamp} $*${NC}" | tee -a "$PATCH_LOG"
+    echo -e "${BLUE}[PATCH] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 # Check if kernel source exists

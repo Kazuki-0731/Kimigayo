@@ -29,22 +29,22 @@ NC='\033[0m' # No Color
 # Logging functions with timestamp (JST)
 log_info() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[INFO] ${timestamp} $*${NC}"
+    echo -e "${BLUE}[INFO] ${timestamp}${NC} $*"
 }
 
 log_success() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[SUCCESS] ${timestamp} $*${NC}"
+    echo -e "${GREEN}[SUCCESS] ${timestamp}${NC} $*"
 }
 
 log_warning() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${YELLOW}[WARNING] ${timestamp} $*${NC}"
+    echo -e "${YELLOW}[WARNING] ${timestamp}${NC} $*"
 }
 
 log_error() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[ERROR] ${timestamp} $*${NC}"
+    echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
 # Check if source directory exists
