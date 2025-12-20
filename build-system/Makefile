@@ -116,56 +116,79 @@ help:
 
 # Build target
 build: musl kernel busybox init pkg rootfs
-	@echo "Build completed for $(ARCH)"
+	@echo ""
+	@echo "=========================================="
+	@echo "✅ Build completed for $(ARCH)"
+	@echo "=========================================="
 
 # musl libc build
 musl:
-	@echo "[BUILD] musl libc ($(ARCH))"
+	@echo ""
+	@echo "=========================================="
+	@echo "📦 [1/6] Building musl libc ($(ARCH))"
+	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/musl-build-$(ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-musl.sh
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-musl.sh
-	@echo "[BUILD] musl libc build completed for $(ARCH)"
+	@echo "✅ [1/6] musl libc build completed"
 
 # Kernel build
 kernel:
-	@echo "[BUILD] Linux Kernel ($(ARCH))"
+	@echo ""
+	@echo "=========================================="
+	@echo "🐧 [2/6] Building Linux Kernel ($(ARCH))"
+	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/kernel
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-kernel.sh
 	$(Q)bash $(SCRIPTS_DIR)/apply-kernel-patches.sh
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
-	@echo "[BUILD] Kernel build completed for $(ARCH)"
-
-# Init system build (OpenRC)
-init:
-	@echo "[BUILD] Init System (OpenRC) - $(ARCH)"
-	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(ARCH)
-	$(Q)mkdir -p $(BUILD_DIR)/logs
-	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
-	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
-	@echo "[BUILD] OpenRC build completed for $(ARCH)"
-
-# Package manager build
-pkg:
-	@echo "[BUILD] Package Manager (isn)"
-	$(Q)mkdir -p $(BUILD_DIR)/pkg
-	@echo "  Package manager build will be implemented in Phase 6"
+	@echo "✅ [2/6] Kernel build completed"
 
 # BusyBox build
 busybox:
-	@echo "[BUILD] BusyBox ($(ARCH)) - $(IMAGE_TYPE) image"
+	@echo ""
+	@echo "=========================================="
+	@echo "🔧 [3/6] Building BusyBox ($(ARCH)) - $(IMAGE_TYPE)"
+	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-busybox.sh
 	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
-	@echo "[BUILD] BusyBox build completed for $(ARCH)"
+	@echo "✅ [3/6] BusyBox build completed"
+
+# Init system build (OpenRC)
+init:
+	@echo ""
+	@echo "=========================================="
+	@echo "⚙️  [4/6] Building OpenRC Init System ($(ARCH))"
+	@echo "=========================================="
+	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/logs
+	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
+	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
+	@echo "✅ [4/6] OpenRC build completed"
+
+# Package manager build
+pkg:
+	@echo ""
+	@echo "=========================================="
+	@echo "📦 [5/6] Building Package Manager (isn)"
+	@echo "=========================================="
+	$(Q)mkdir -p $(BUILD_DIR)/pkg
+	@echo "  Package manager build will be implemented in Phase 6"
+	@echo "✅ [5/6] Package manager build completed"
 
 # Root filesystem
 rootfs:
-	@echo "[BUILD] Root Filesystem"
+	@echo ""
+	@echo "=========================================="
+	@echo "📁 [6/6] Building Root Filesystem"
+	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/rootfs
 	@echo "  Root filesystem creation will be implemented in Phase 3"
+	@echo "✅ [6/6] Root filesystem build completed"
 
 # ISO image generation
 iso: build

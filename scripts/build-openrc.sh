@@ -203,15 +203,24 @@ for binary in "${essential_binaries[@]}"; do
     found=false
     location=""
 
-    # Check multiple possible locations
-    for dir in "bin" "sbin" "usr/bin" "usr/sbin" "lib/rc"; do
-        if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
-            location="${dir}/${binary}"
+    # Special handling for 'rc' binary which is at lib/rc/rc
+    if [ "$binary" = "rc" ]; then
+        if [ -f "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
+            location="lib/rc/rc"
             log_success "  ✓ ${location}"
             found=true
-            break
         fi
-    done
+    else
+        # Check multiple possible locations for other binaries
+        for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
+            if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
+                location="${dir}/${binary}"
+                log_success "  ✓ ${location}"
+                found=true
+                break
+            fi
+        done
+    fi
 
     if [ "$found" = false ]; then
         log_error "  ✗ ${binary} not found"
