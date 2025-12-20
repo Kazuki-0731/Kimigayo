@@ -21,17 +21,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions with timestamp
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR]${NC} ${timestamp} $*"
 }
 
 # Create directories

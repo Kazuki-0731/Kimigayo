@@ -26,21 +26,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions with timestamp
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${BLUE}[INFO]${NC} ${timestamp} $*"
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[SUCCESS]${NC} ${timestamp} $*"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARNING]${NC} ${timestamp} $*"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR]${NC} ${timestamp} $*"
 }
 
 # Check if source directory exists

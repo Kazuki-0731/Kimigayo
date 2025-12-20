@@ -27,21 +27,25 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions with timestamp
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_build() {
-    echo -e "${CYAN}[BUILD]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${CYAN}[BUILD]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 # Architecture-specific settings

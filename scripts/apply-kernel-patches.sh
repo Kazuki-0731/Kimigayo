@@ -21,21 +21,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions with timestamp
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*" | tee -a "$PATCH_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*" | tee -a "$PATCH_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" | tee -a "$PATCH_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 log_patch() {
-    echo -e "${BLUE}[PATCH]${NC} $*" | tee -a "$PATCH_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${BLUE}[PATCH]${NC} ${timestamp} $*" | tee -a "$PATCH_LOG"
 }
 
 # Check if kernel source exists
