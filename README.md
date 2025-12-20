@@ -79,6 +79,8 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 
 #### ビルド手順
 
+**推奨方法（リアルタイム出力）：**
+
 ```bash
 # リポジトリをクローン
 git clone https://github.com/Kazuki-0731/Kimigayo.git
@@ -87,53 +89,87 @@ cd Kimigayo
 # Docker環境を構築
 make docker-build
 
-# ビルド情報を確認
-make info
+# Dockerビルド環境に入る
+make shell
 
-# OSをビルド
+# コンテナ内でビルド実行（リアルタイム出力で確認できる）
 make build
 
-# テスト実行
+# テスト実行（コンテナ内）
+make test
+```
+
+**簡単コマンド（ホストOSから）：**
+
+```bash
+# ホストOSから直接ビルド（ログは完了後に表示）
+make build
+
+# ホストOSから直接テスト実行
 make test
 ```
 
 #### よく使うコマンド
 
+**ホストOSから実行：**
+
 ```bash
 # ヘルプ表示
 make help
 
-# コンテナにログイン
+# Dockerビルド環境にログイン
 make shell
 
-# ビルド成果物をクリーンアップ
+# ビルド（簡単だがログは完了後）
+make build
+
+# クリーンアップ
 make clean
 
 # すべてクリーンアップ（コンテナ+volume）
 make clean-all
 
-# ビルドログを確認
+# ビルドログを確認（最新100行）
 make log-kernel
 make log-musl
 make log-openrc
 ```
 
-#### 詳細なビルドオプション
-
-アーキテクチャ指定や詳細ログが必要な場合：
+**コンテナ内で実行（リアルタイム出力）：**
 
 ```bash
-# 特定のアーキテクチャでビルド
-docker compose run --rm kimigayo-build make build ARCH=x86_64
+# まずコンテナに入る
+make shell
 
-# 詳細ログ付きでビルド
-docker compose run --rm kimigayo-build make build V=1
+# ビルド（リアルタイムで出力確認可能）
+make build
 
-# プロパティテストのみ実行
-docker compose run --rm kimigayo-build pytest tests/property/ -v
+# クリーンアップ
+make clean
 
-# 単体テストのみ実行
-docker compose run --rm kimigayo-build pytest tests/unit/ -v
+# テスト実行
+make test
+```
+
+#### 詳細なビルドオプション
+
+Dockerビルド環境内で実行することで、リアルタイムなビルド出力が確認できます：
+
+```bash
+# Dockerビルド環境に入る
+make shell
+
+# コンテナ内で特定のアーキテクチャでビルド
+make build ARCH=x86_64
+
+# コンテナ内で詳細ログ付きでビルド
+make build V=1
+
+# コンテナ内でプロパティテストのみ実行
+pytest tests/property/ -v
+
+# コンテナ内で単体テストのみ実行
+pytest tests/unit/ -v
 ```
 
 **ダウンロードキャッシュについて：**
@@ -141,27 +177,27 @@ docker compose run --rm kimigayo-build pytest tests/unit/ -v
 ローカルビルドでは、ダウンロードしたソースコード（カーネル、musl、BusyBox、OpenRC）がDocker Volumeにキャッシュされます。2回目以降のビルドは大幅に高速化されます。
 
 ```bash
-# 簡単コマンド（プロジェクトroot直下のMakefile）
+# ホストOSから実行
 make clean-cache  # キャッシュをクリア
 make clean-all    # すべてクリア
 ```
 
 **ビルドログの確認：**
 
-ビルド中のログをリアルタイムで確認できます：
+Dockerビルド環境内でビルドを実行すると、リアルタイムでビルド出力を確認できます：
 
 ```bash
-# 簡単コマンド（プロジェクトroot直下のMakefile）
-make log-kernel   # カーネルビルドログ（最新100行）
-make log-musl     # musl libcビルドログ（最新100行）
-make log-openrc   # OpenRCビルドログ（最新100行）
-
-# コンテナにログインして詳細確認
+# Dockerビルド環境に入る
 make shell
-# コンテナ内で以下を実行
-tail -f /build/kimigayo/build/logs/kernel-build.log
-tail -n 100 /build/kimigayo/build/logs/musl-build.log
-cat /build/kimigayo/build/logs/openrc-build.log
+
+# コンテナ内でビルドログをリアルタイム確認
+tail -f /build/kimigayo/build/logs/kernel-build.log   # カーネルビルドログ
+tail -f /build/kimigayo/build/logs/musl-build.log     # musl libcビルドログ
+tail -f /build/kimigayo/build/logs/openrc-build.log   # OpenRCビルドログ
+
+# コンテナ内で過去のログを確認
+tail -n 100 /build/kimigayo/build/logs/kernel-build.log
+cat /build/kimigayo/build/logs/musl-build.log
 ```
 
 **トラブルシューティング：**
@@ -169,16 +205,20 @@ cat /build/kimigayo/build/logs/openrc-build.log
 ビルドが失敗する場合や、途中で止まる場合は以下を試してください：
 
 ```bash
-# カーネルソースツリーのクリーニング
-# ビルドスクリプトが自動で実行しますが、手動でも可能
+# Dockerビルド環境に入る
 make shell
+
+# コンテナ内でカーネルソースツリーのクリーニング
+# ビルドスクリプトが自動で実行しますが、手動でも可能
 cd /build/kimigayo/build/kernel-src/linux-6.6.11
 make mrproper
 
-# 完全クリーンビルド（すべてリセット）
+# コンテナから出て完全クリーンビルド（すべてリセット）
+exit
 make clean-all
 make docker-build
-make build
+make shell  # 再度コンテナに入る
+make build  # コンテナ内でビルド
 ```
 
 **注意:** カーネルビルド中に "The source tree is not clean" エラーが出る場合、ビルドスクリプトが自動的に`make mrproper`を実行してクリーニングします。
