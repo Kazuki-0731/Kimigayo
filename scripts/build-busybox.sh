@@ -48,6 +48,14 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
+# Check if BusyBox is already built
+if [ -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
+    log_info "BusyBox already built and installed: ${BUSYBOX_INSTALL_DIR}"
+    log_info "Skipping build (use 'make clean' to rebuild)"
+    log_info "BusyBox build check completed!"
+    exit 0
+fi
+
 # Check if source directory exists
 if [ ! -d "$BUSYBOX_SRC_DIR" ]; then
     log_error "BusyBox source directory not found: $BUSYBOX_SRC_DIR"

@@ -345,6 +345,15 @@ main() {
     log_info "Build Type: ${BUILD_TYPE}"
     log_info ""
 
+    # Check if musl is already built and installed
+    if [ -f "${MUSL_INSTALL_DIR}/lib/libc.so" ] && [ -f "${MUSL_INSTALL_DIR}/bin/musl-gcc" ]; then
+        log_info "musl libc already built and installed: ${MUSL_INSTALL_DIR}"
+        log_info "Skipping build (use 'make clean' to rebuild)"
+        show_summary
+        log_info "musl libc build check completed!"
+        exit 0
+    fi
+
     setup_arch
     init_build_dirs
     check_prerequisites

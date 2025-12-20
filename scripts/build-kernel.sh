@@ -360,6 +360,15 @@ main() {
     log_info "Build Type: ${BUILD_TYPE}"
     log_info ""
 
+    # Check if kernel is already built
+    if [ -f "$KERNEL_OUTPUT_DIR/vmlinuz-${KERNEL_VERSION}-${ARCH}" ]; then
+        log_info "Kernel already built: $KERNEL_OUTPUT_DIR/vmlinuz-${KERNEL_VERSION}-${ARCH}"
+        log_info "Skipping build (use 'make clean' to rebuild)"
+        show_summary
+        log_info "Kernel build check completed!"
+        exit 0
+    fi
+
     setup_arch
     init_build_dirs
     check_prerequisites

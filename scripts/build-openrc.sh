@@ -47,6 +47,15 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
+# Check if OpenRC is already built
+if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -f "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
+    log_info "OpenRC already built and installed: ${OPENRC_INSTALL_DIR}"
+    log_info "Skipping build (use 'make clean' to rebuild)"
+    log_success "All essential binaries verified"
+    log_info "OpenRC build check completed!"
+    exit 0
+fi
+
 # Check if source directory exists
 if [ ! -d "$OPENRC_SRC_DIR" ]; then
     log_error "OpenRC source directory not found: $OPENRC_SRC_DIR"
