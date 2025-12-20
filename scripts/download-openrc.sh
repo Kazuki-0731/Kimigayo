@@ -25,22 +25,22 @@ NC='\033[0m' # No Color
 # Logging functions with timestamp (JST)
 log_info() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[INFO]${NC} ${timestamp} $*"
+    echo -e "${BLUE}[INFO] ${timestamp} $*${NC}"
 }
 
 log_success() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[SUCCESS]${NC} ${timestamp} $*"
+    echo -e "${GREEN}[SUCCESS] ${timestamp} $*${NC}"
 }
 
 log_warning() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${YELLOW}[WARNING]${NC} ${timestamp} $*"
+    echo -e "${YELLOW}[WARNING] ${timestamp} $*${NC}"
 }
 
 log_error() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[ERROR]${NC} ${timestamp} $*"
+    echo -e "${RED}[ERROR] ${timestamp} $*${NC}"
 }
 
 # Create directories

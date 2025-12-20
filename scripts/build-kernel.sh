@@ -32,22 +32,22 @@ NC='\033[0m' # No Color
 # Logging functions with timestamp (JST)
 log_info() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
+    echo -e "${GREEN}[INFO] ${timestamp} $*${NC}" | tee -a "$BUILD_LOG"
 }
 
 log_warn() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
+    echo -e "${YELLOW}[WARN] ${timestamp} $*${NC}" | tee -a "$BUILD_LOG"
 }
 
 log_error() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
+    echo -e "${RED}[ERROR] ${timestamp} $*${NC}" | tee -a "$BUILD_LOG"
 }
 
 log_build() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${CYAN}[BUILD]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
+    echo -e "${CYAN}[BUILD] ${timestamp} $*${NC}" | tee -a "$BUILD_LOG"
 }
 
 # Architecture-specific settings
@@ -220,10 +220,8 @@ build_kernel() {
     log_info "This may take 5-30 minutes depending on CPU cores and configuration..."
     log_info "Progress will be shown below:"
     log_info "Log file: $BUILD_LOG"
-    echo "=========================================="
-    echo "[INFO] Kernel build started at $(date '+%Y-%m-%d %H:%M:%S')"
-    echo "[INFO] Compiling with ${JOBS} parallel jobs..."
-    echo "[INFO] Initializing build system (this may take 10-30 seconds)..."
+    log_info "=========================================="
+    log_info "Initializing build system (this may take 10-30 seconds)..."
     echo -n "[INFO] Waiting for first output"
 
     # Run make with unbuffered output for real-time display
@@ -288,8 +286,7 @@ build_kernel() {
     kill $dots_pid 2>/dev/null || true
     wait $dots_pid 2>/dev/null || true
 
-    echo "=========================================="
-
+    log_info "=========================================="
     log_info "Kernel build completed successfully"
 }
 
@@ -361,7 +358,7 @@ main() {
     log_info "Kernel Version: ${KERNEL_VERSION}"
     log_info "Target Architecture: ${ARCH}"
     log_info "Build Type: ${BUILD_TYPE}"
-    echo "" | tee -a "$BUILD_LOG"
+    log_info ""
 
     setup_arch
     init_build_dirs

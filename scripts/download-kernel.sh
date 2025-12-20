@@ -26,17 +26,17 @@ NC='\033[0m' # No Color
 # Logging functions with timestamp (JST)
 log_info() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*"
+    echo -e "${GREEN}[INFO] ${timestamp} $*${NC}"
 }
 
 log_warn() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*"
+    echo -e "${YELLOW}[WARN] ${timestamp} $*${NC}"
 }
 
 log_error() {
     local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[ERROR]${NC} ${timestamp} $*"
+    echo -e "${RED}[ERROR] ${timestamp} $*${NC}"
 }
 
 # Create directories
@@ -182,7 +182,7 @@ main() {
     log_info "Kernel Version: ${KERNEL_VERSION}"
     log_info "Download Directory: ${DOWNLOAD_DIR}"
     log_info "Source Directory: ${KERNEL_SRC_DIR}"
-    echo ""
+    log_info ""
 
     download_kernel || exit 1
     show_checksum
