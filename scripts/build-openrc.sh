@@ -195,7 +195,7 @@ for binary in "${essential_binaries[@]}"; do
     location=""
 
     # Check multiple possible locations
-    for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
+    for dir in "bin" "sbin" "usr/bin" "usr/sbin" "lib/rc"; do
         if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
             location="${dir}/${binary}"
             log_success "  ✓ ${location}"
