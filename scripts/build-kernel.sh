@@ -29,21 +29,25 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions with timestamp
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[INFO]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARN]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 log_build() {
-    echo -e "${CYAN}[BUILD]${NC} $*" | tee -a "$BUILD_LOG"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${CYAN}[BUILD]${NC} ${timestamp} $*" | tee -a "$BUILD_LOG"
 }
 
 # Architecture-specific settings
@@ -184,7 +188,16 @@ apply_security_hardening() {
         scripts/config --enable PANIC_ON_OOPS
         scripts/config --set-val PANIC_TIMEOUT 10
 
+        # Disable netfilter/iptables (not needed for minimal container OS)
+        scripts/config --disable NETFILTER
+        scripts/config --disable NETFILTER_ADVANCED
+        scripts/config --disable NETFILTER_XTABLES
+        scripts/config --disable IP_NF_IPTABLES
+        scripts/config --disable IP6_NF_IPTABLES
+        scripts/config --disable BRIDGE_NETFILTER
+
         log_info "Security hardening applied to kernel config"
+        log_info "Netfilter/iptables disabled (minimal container OS)"
     else
         log_warn "scripts/config not found, skipping config modifications"
     fi
