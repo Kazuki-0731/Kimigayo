@@ -48,7 +48,7 @@ log_error() {
 }
 
 # Check if OpenRC is already built
-if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -f "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
+if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -d "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
     log_info "OpenRC already built and installed: ${OPENRC_INSTALL_DIR}"
     log_info "Skipping build (use 'make clean' to rebuild)"
     log_success "All essential binaries verified"
@@ -187,8 +187,8 @@ log_success "OpenRC installed successfully"
 log_info "Verifying OpenRC installation..."
 
 # Check possible locations (bin, sbin, usr/bin, usr/sbin)
+# Note: 'rc' is not a standalone binary, it's a directory (lib/rc/rc/)
 essential_binaries=(
-    "rc"
     "rc-status"
     "rc-service"
     "rc-update"
@@ -203,24 +203,15 @@ for binary in "${essential_binaries[@]}"; do
     found=false
     location=""
 
-    # Special handling for 'rc' binary which is at lib/rc/rc
-    if [ "$binary" = "rc" ]; then
-        if [ -f "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
-            location="lib/rc/rc"
+    # Check multiple possible locations for binaries
+    for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
+        if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
+            location="${dir}/${binary}"
             log_success "  ✓ ${location}"
             found=true
+            break
         fi
-    else
-        # Check multiple possible locations for other binaries
-        for dir in "bin" "sbin" "usr/bin" "usr/sbin"; do
-            if [ -f "${OPENRC_INSTALL_DIR}/${dir}/${binary}" ]; then
-                location="${dir}/${binary}"
-                log_success "  ✓ ${location}"
-                found=true
-                break
-            fi
-        done
-    fi
+    done
 
     if [ "$found" = false ]; then
         log_error "  ✗ ${binary} not found"
