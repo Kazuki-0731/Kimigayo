@@ -8,6 +8,17 @@ LABEL maintainer="Kimigayo OS Development Team"
 LABEL description="Build environment for Kimigayo OS"
 LABEL version="0.1.0"
 
+# OpenContainer Initiative (OCI) Labels
+LABEL org.opencontainers.image.title="Kimigayo OS Build Environment"
+LABEL org.opencontainers.image.description="Alpine Linux-based build environment for Kimigayo OS"
+LABEL org.opencontainers.image.authors="Kimigayo OS Team"
+LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
+LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.licenses="GPL-2.0"
+LABEL org.opencontainers.image.base.name="alpine:3.19"
+
 # 環境変数の設定
 ENV KIMIGAYO_BUILD_DIR=/build
 ENV KIMIGAYO_OUTPUT_DIR=/output

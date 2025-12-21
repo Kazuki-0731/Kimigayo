@@ -22,13 +22,18 @@ FROM scratch
 LABEL maintainer="Kimigayo OS Development Team"
 LABEL description="Kimigayo OS - Lightweight Container Operating System"
 LABEL version="0.1.0"
+
+# OpenContainer Initiative (OCI) Labels
 LABEL org.opencontainers.image.title="Kimigayo OS"
-LABEL org.opencontainers.image.description="Alpine Linux-inspired lightweight container OS"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.description="Alpine Linux-inspired lightweight, fast, and secure container OS"
 LABEL org.opencontainers.image.authors="Kimigayo OS Team"
 LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.licenses="GPL-2.0"
+LABEL org.opencontainers.image.vendor="Kimigayo OS Project"
+LABEL org.opencontainers.image.base.name="scratch"
 
 # Copy the complete rootfs from extractor stage
 COPY --from=extractor /rootfs/ /

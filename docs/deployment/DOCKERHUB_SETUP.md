@@ -3,8 +3,9 @@
 ## リポジトリ情報
 
 ### アカウント詳細
-- **組織名/ユーザー名**: kimigayo-os（作成予定）
+- **組織名/ユーザー名**: IshinoKazuki
 - **リポジトリ名**: kimigayo-os
+- **リポジトリ**: ishinokazuki/kimigayo-os
 - **公開範囲**: Public
 - **説明**: Alpine Linuxにインスパイアされた軽量・高速・セキュアなコンテナ向けOS
 
@@ -129,9 +130,7 @@ kimigayo-os:edge                # 最新開発ビルド（不安定版）
 #### Overviewタブ
 - 上記の完全な説明を追加
 - 以下のリンクを追加:
-  - GitHubリポジトリ: `https://github.com/kimigayo-os/kimigayo`
-  - ドキュメント: `https://docs.kimigayo-os.org`（作成予定）
-  - Issues: `https://github.com/kimigayo-os/kimigayo/issues`
+  - GitHubリポジトリ: `https://github.com/Kazuki-0731/Kimigayo`
 
 #### Buildsタブ（将来のCI/CD統合用）
 - GitHub Actionsで設定予定
