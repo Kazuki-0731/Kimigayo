@@ -93,7 +93,13 @@ jobs:
           # Create output directory and package rootfs
           mkdir -p output
           cd build/rootfs
-          tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz .
+          # macOSのリソースフォーク（._*）とその他の不要ファイルを除外
+          tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz \
+            --exclude='._*' \
+            --exclude='.DS_Store' \
+            --exclude='.AppleDouble' \
+            --exclude='.LSOverride' \
+            .
           cd ../..
 
           # Verify tarball was created and check its contents

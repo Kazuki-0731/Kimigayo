@@ -211,7 +211,13 @@ package-rootfs: build-rootfs
 	@echo ""
 	@echo "=== Packaging rootfs into tarball ==="
 	@mkdir -p output
-	@cd build/rootfs && tar czf ../../output/$(TARBALL_NAME) .
+	@# macOSのリソースフォーク（._*）とその他の不要ファイルを除外
+	@cd build/rootfs && tar czf ../../output/$(TARBALL_NAME) \
+		--exclude='._*' \
+		--exclude='.DS_Store' \
+		--exclude='.AppleDouble' \
+		--exclude='.LSOverride' \
+		.
 	@echo ""
 	@echo "=== Tarball created ==="
 	@ls -lh output/
