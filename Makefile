@@ -4,6 +4,7 @@
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
+.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-all
 
 # デフォルトターゲット
 help:
@@ -70,6 +71,12 @@ help:
 	@echo "  make version      - バージョン番号を取得"
 	@echo "  make show-version - バージョン情報を表示"
 	@echo "  make changelog    - CHANGELOG.mdを生成"
+	@echo ""
+	@echo "⚡ ベンチマーク:"
+	@echo "  make benchmark         - 全ベンチマーク実行"
+	@echo "  make benchmark-startup - 起動時間測定"
+	@echo "  make benchmark-memory  - メモリ使用量測定"
+	@echo "  make benchmark-size    - ディスクサイズ比較"
 	@echo ""
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
@@ -429,3 +436,26 @@ show-version:
 # CHANGELOG.mdを生成
 changelog:
 	@bash scripts/generate-changelog.sh
+
+# ════════════════════════════════════════════════════════════════════════
+# ベンチマーク
+# ════════════════════════════════════════════════════════════════════════
+
+# 起動時間ベンチマーク
+benchmark-startup:
+	@bash scripts/benchmark-startup.sh
+
+# メモリ使用量ベンチマーク
+benchmark-memory:
+	@bash scripts/benchmark-memory.sh
+
+# ディスクサイズベンチマーク
+benchmark-size:
+	@bash scripts/benchmark-size.sh
+
+# 全ベンチマーク実行
+benchmark-all:
+	@bash scripts/benchmark-all.sh
+
+# デフォルトベンチマーク（全て実行）
+benchmark: benchmark-all
