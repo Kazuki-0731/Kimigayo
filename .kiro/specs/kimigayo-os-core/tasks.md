@@ -550,7 +550,7 @@
 
 ## Phase 8: Docker Hub公開とCI/CD構築
 
-- [ ] 25. Docker Hub公開準備
+- [x] 25. Docker Hub公開準備
   - Docker Hubアカウントとリポジトリの設定
   - イメージタグ戦略の策定（latest, stable, version番号）
   - マルチアーキテクチャ対応の検討（x86_64, arm64）
