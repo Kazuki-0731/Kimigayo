@@ -45,31 +45,33 @@ Dockerを使用したインストールが最も簡単です。
 
 ```bash
 # Kimigayo OS Minimalイメージをpull
-docker pull kimigayo/kimigayo-os:minimal
+docker pull ishinokazuki/kimigayo-os:latest-minimal
 
 # コンテナを起動
-docker run -it kimigayo/kimigayo-os:minimal
+docker run -it ishinokazuki/kimigayo-os:latest-minimal
 ```
 
-#### Standardイメージ（15MB以下）
+#### Standardイメージ（推奨）
 
 ```bash
 # Kimigayo OS Standardイメージをpull
-docker pull kimigayo/kimigayo-os:standard
+docker pull ishinokazuki/kimigayo-os:latest
 
 # コンテナを起動
-docker run -it kimigayo/kimigayo-os:standard
+docker run -it ishinokazuki/kimigayo-os:latest
 ```
 
-#### Extendedイメージ（50MB以下）
+#### Extendedイメージ
 
 ```bash
 # Kimigayo OS Extendedイメージをpull
-docker pull kimigayo/kimigayo-os:extended
+docker pull ishinokazuki/kimigayo-os:latest-extended
 
 # コンテナを起動
-docker run -it kimigayo/kimigayo-os:extended
+docker run -it ishinokazuki/kimigayo-os:latest-extended
 ```
+
+**注意:** Docker Hubのリポジトリは `ishinokazuki/kimigayo-os` です。
 
 #### 永続的なデータボリュームを使用
 

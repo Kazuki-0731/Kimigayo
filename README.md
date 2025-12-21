@@ -71,13 +71,29 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 
 ### 🚀 クイックスタート
 
-#### 前提条件
+#### Docker Hubから使用する（最も簡単）
+
+```bash
+# Standardバリアント（推奨）
+docker pull ishinokazuki/kimigayo-os:latest
+docker run -it ishinokazuki/kimigayo-os:latest
+
+# Minimalバリアント（最小サイズ）
+docker pull ishinokazuki/kimigayo-os:latest-minimal
+docker run -it ishinokazuki/kimigayo-os:latest-minimal
+```
+
+詳細は [Docker使用ガイド](docs/user/DOCKER_USAGE.md) を参照してください。
+
+#### ソースからビルドする
+
+##### 前提条件
 
 - Docker & Docker Compose
 - Git
 - 最低 2GB RAM（推奨 4GB）
 
-#### ビルド手順
+##### ビルド手順
 
 **推奨方法（リアルタイム出力）：**
 
@@ -373,6 +389,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 #### ユーザー向け
 
+- [Docker使用ガイド](docs/user/DOCKER_USAGE.md) - Dockerイメージの使い方、ユースケース別サンプル
 - [インストールガイド](docs/user/INSTALLATION.md) - Docker、Kubernetes、Podman でのインストール方法
 - [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
 - [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isn パッケージマネージャの詳細ガイド
