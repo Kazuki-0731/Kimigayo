@@ -569,7 +569,7 @@
   - 使用例とクイックスタートガイド
   - ライセンス情報の明記
 
-- [ ] 26. GitHub Actions CI/CD構築
+- [x] 26. GitHub Actions CI/CD構築
   - Docker Hubへの自動プッシュパイプライン構築
   - タグベースのバージョニング自動化
   - マルチアーキテクチャビルド（buildx）
