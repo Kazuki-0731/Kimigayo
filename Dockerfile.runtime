@@ -30,10 +30,16 @@ FROM scratch
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
+# Version information (can be overridden at build time)
+ARG VERSION=0.1.0
+ARG BUILD_DATE
+ARG VCS_REF
+ARG IMAGE_VARIANT=minimal
+
 # Metadata
 LABEL maintainer="Kimigayo OS Development Team"
 LABEL description="Kimigayo OS - Lightweight Container Operating System"
-LABEL version="0.1.0"
+LABEL version="${VERSION}"
 
 # OpenContainer Initiative (OCI) Labels
 LABEL org.opencontainers.image.title="Kimigayo OS"
@@ -42,18 +48,26 @@ LABEL org.opencontainers.image.authors="Kimigayo OS Team"
 LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.licenses="GPL-2.0"
 LABEL org.opencontainers.image.vendor="Kimigayo OS Project"
 LABEL org.opencontainers.image.base.name="scratch"
+
+# Kimigayo-specific labels
+LABEL io.kimigayo.version="${VERSION}"
+LABEL io.kimigayo.variant="${IMAGE_VARIANT}"
+LABEL io.kimigayo.architecture="${TARGETARCH}"
 
 # Copy the complete rootfs from extractor stage
 COPY --from=extractor /rootfs/ /
 
 # Set environment variables
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV KIMIGAYO_VERSION=0.1.0
-ENV KIMIGAYO_BUILD_TYPE=minimal
+ENV KIMIGAYO_VERSION=${VERSION}
+ENV KIMIGAYO_BUILD_TYPE=${IMAGE_VARIANT}
+ENV KIMIGAYO_ARCH=${TARGETARCH}
 
 # Set working directory
 WORKDIR /root

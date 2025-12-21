@@ -198,6 +198,11 @@ jobs:
           platforms: linux/${{ steps.meta.outputs.docker_arch }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+            IMAGE_VARIANT=${{ matrix.variant }}
           labels: |
             org.opencontainers.image.title=Kimigayo OS
             org.opencontainers.image.description=Alpine Linux-inspired lightweight, fast, and secure container OS

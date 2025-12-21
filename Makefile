@@ -3,7 +3,7 @@
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
-.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan
+.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version
 
 # デフォルトターゲット
 help:
@@ -65,6 +65,10 @@ help:
 	@echo "  make clean        - ビルド成果物のみ削除（ダウンロードキャッシュ保持）"
 	@echo "  make clean-cache  - ダウンロードキャッシュを削除"
 	@echo "  make clean-all    - すべて削除（推奨：完全リセット）"
+	@echo ""
+	@echo "📌 バージョン管理:"
+	@echo "  make version      - バージョン番号を取得"
+	@echo "  make show-version - バージョン情報を表示"
 	@echo ""
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
@@ -408,3 +412,15 @@ security-scan: trivy-scan trivy-fs-scan shellcheck-scan
 	@echo ""
 	@echo "📊 スキャン結果は上記を確認してください"
 	@echo ""
+
+# ════════════════════════════════════════════════════════════════════════
+# バージョン管理
+# ════════════════════════════════════════════════════════════════════════
+
+# バージョン番号を取得
+version:
+	@bash scripts/get-version.sh
+
+# バージョン情報を表示
+show-version:
+	@bash scripts/show-version.sh
