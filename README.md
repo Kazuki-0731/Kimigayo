@@ -394,6 +394,8 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [セキュリティガイド](docs/security/SECURITY_GUIDE.md) - セキュリティ機能と運用ガイド
 - [脆弱性報告手順](docs/security/VULNERABILITY_REPORTING.md) - 責任ある開示プロセス
 - [セキュリティ強化ガイド](docs/security/HARDENING_GUIDE.md) - システム強化設定（3 段階）
+- [セキュリティ監査ガイドライン](docs/security/SECURITY_AUDIT.md) - 監査プロセスと手順
+- [ペネトレーションテストガイド](docs/security/PENETRATION_TEST.md) - 侵入テスト実施方法
 
 #### リリース情報
 
