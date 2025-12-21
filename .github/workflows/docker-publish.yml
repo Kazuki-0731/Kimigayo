@@ -83,7 +83,12 @@ jobs:
           bash scripts/build-rootfs.sh
 
           # Verify build output exists
-          ls -lh build/rootfs/
+          echo "=== Contents of build/rootfs ==="
+          ls -lah build/rootfs/ | head -20
+
+          echo "=== Checking for essential files ==="
+          ls -l build/rootfs/bin/sh 2>/dev/null || echo "WARNING: /bin/sh not found"
+          ls -l build/rootfs/bin/busybox 2>/dev/null || echo "WARNING: /bin/busybox not found"
 
           # Create output directory and package rootfs
           mkdir -p output
@@ -91,8 +96,12 @@ jobs:
           tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz .
           cd ../..
 
-          # Verify tarball was created
+          # Verify tarball was created and check its contents
+          echo "=== Tarball created ==="
           ls -lh output/
+
+          echo "=== Contents of tarball ==="
+          tar tzf output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz | head -20
 
       - name: Run integration tests
         run: |
@@ -123,7 +132,12 @@ jobs:
       - name: Test Docker image (smoke test)
         run: |
           # Build test image locally
+          echo "=== Building Docker image ==="
           docker build -f Dockerfile.runtime -t test-image:${{ matrix.variant }}-${{ matrix.arch }} .
+
+          # Inspect the built image
+          echo "=== Inspecting built image ==="
+          docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} ls -la / || echo "Failed to list root directory"
 
           # Run basic smoke tests
           echo "Running smoke tests..."
