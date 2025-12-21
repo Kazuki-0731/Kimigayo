@@ -2,6 +2,30 @@
 
 軽量・高速・セキュアなコンテナ向けOS
 
+## 主な特徴
+
+- 🪶 **超軽量**: ベースイメージ5MB未満
+- ⚡ **高速起動**: 10秒以内のシステム起動
+- 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
+- 📦 **パッケージマネージャ**: Ed25519署名検証を備えた`isn`パッケージマネージャを内蔵
+- 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
+- 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
+- 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
+
+## 基盤技術
+
+- Linuxカーネル（強化版）
+- musl libc
+- BusyBox
+- OpenRC initシステム
+
+## ドキュメント
+
+- [インストールガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/INSTALLATION.md)
+- [クイックスタートガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/QUICKSTART.md)
+- [パッケージマネージャガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/PACKAGE_MANAGER.md)
+- [セキュリティガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
+
 ## クイックスタート
 
 ### イメージの取得
@@ -79,30 +103,6 @@ kimigayo-os:latest-extended     # 最新安定版Extendedバリアント
 kimigayo-os:stable              # 最新安定版リリース（latestのエイリアス）
 kimigayo-os:edge                # 最新開発ビルド（不安定版）
 ```
-
-## 主な特徴
-
-- 🪶 **超軽量**: ベースイメージ5MB未満
-- ⚡ **高速起動**: 10秒以内のシステム起動
-- 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
-- 📦 **パッケージマネージャ**: Ed25519署名検証を備えた`isn`パッケージマネージャを内蔵
-- 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
-- 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
-- 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
-
-## 基盤技術
-
-- Linuxカーネル（強化版）
-- musl libc
-- BusyBox
-- OpenRC initシステム
-
-## ドキュメント
-
-- [インストールガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/INSTALLATION.md)
-- [クイックスタートガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/QUICKSTART.md)
-- [パッケージマネージャガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/PACKAGE_MANAGER.md)
-- [セキュリティガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
 
 ## セキュリティ
 
