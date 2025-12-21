@@ -1,256 +1,256 @@
-# Docker Hub Repository Setup
+# Docker Hub リポジトリ設定
 
-## Repository Information
+## リポジトリ情報
 
-### Account Details
-- **Organization/Username**: kimigayo-os (to be created)
-- **Repository Name**: kimigayo-os
-- **Visibility**: Public
-- **Description**: Lightweight, fast, and secure container-focused operating system inspired by Alpine Linux
+### アカウント詳細
+- **組織名/ユーザー名**: kimigayo-os（作成予定）
+- **リポジトリ名**: kimigayo-os
+- **公開範囲**: Public
+- **説明**: Alpine Linuxにインスパイアされた軽量・高速・セキュアなコンテナ向けOS
 
-### Repository Description
+### リポジトリ説明文
 
-Kimigayo OS is a lightweight, fast, and secure container-focused operating system designed for Docker environments. Built with security-first principles and minimal footprint, it provides an excellent foundation for containerized applications and microservices.
+Kimigayo OSは、Docker環境向けに設計された軽量・高速・セキュアなコンテナ向けOSです。セキュリティファーストの原則と最小限のフットプリントで構築され、コンテナ化されたアプリケーションとマイクロサービスの優れた基盤を提供します。
 
-**Key Features:**
-- 🪶 **Ultra Lightweight**: Base image under 5MB
-- ⚡ **Fast Boot**: System startup in under 10 seconds
-- 🔒 **Security Hardened**: ASLR, DEP, PIE, and seccomp-BPF enabled by default
-- 📦 **Package Manager**: Built-in `isn` package manager with Ed25519 signature verification
-- 🏗️ **Modular Design**: Choose only the components you need
-- 🔁 **Reproducible Builds**: Bit-identical build outputs for verification
-- 🌐 **Multi-Architecture**: Supports x86_64 and ARM64
+**主な特徴:**
+- 🪶 **超軽量**: ベースイメージ5MB未満
+- ⚡ **高速起動**: 10秒以内のシステム起動
+- 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
+- 📦 **パッケージマネージャ**: Ed25519署名検証を備えた`isn`パッケージマネージャを内蔵
+- 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
+- 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
+- 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
 
-**Based on:**
-- Linux Kernel (hardened)
+**基盤技術:**
+- Linuxカーネル（強化版）
 - musl libc
 - BusyBox
-- OpenRC init system
+- OpenRC initシステム
 
-## Tagging Strategy
+## タグ戦略
 
-### Version Tags
+### バージョンタグ
 
-We follow **Semantic Versioning (SemVer)** for all releases:
+すべてのリリースで**セマンティックバージョニング（SemVer）**に従います:
 
-#### Format
-- `MAJOR.MINOR.PATCH` (e.g., `1.0.0`)
-  - **MAJOR**: Incompatible API changes
-  - **MINOR**: Backward-compatible new functionality
-  - **PATCH**: Backward-compatible bug fixes
+#### フォーマット
+- `MAJOR.MINOR.PATCH`（例: `1.0.0`）
+  - **MAJOR**: 互換性のないAPI変更
+  - **MINOR**: 後方互換性のある新機能
+  - **PATCH**: 後方互換性のあるバグ修正
 
-#### Image Variants
+#### イメージバリアント
 
-Each version comes in three variants based on image size and included features:
+各バージョンは、イメージサイズと含まれる機能に基づいて3つのバリアントで提供されます:
 
-1. **Minimal** (`-minimal` suffix)
-   - Size: < 5MB
-   - Contains: Kernel + musl libc + minimal BusyBox
-   - Use case: Absolute minimal footprint for specialized containers
+1. **Minimal**（`-minimal`接尾辞）
+   - サイズ: < 5MB
+   - 含まれるもの: カーネル + musl libc + 最小限のBusyBox
+   - 用途: 特化したコンテナ向けの絶対最小フットプリント
 
-2. **Standard** (no suffix, default)
-   - Size: < 15MB
-   - Contains: Minimal + common utilities + isn package manager
-   - Use case: General-purpose container base image
+2. **Standard**（接尾辞なし、デフォルト）
+   - サイズ: < 15MB
+   - 含まれるもの: Minimal + 一般的なユーティリティ + isnパッケージマネージャ
+   - 用途: 汎用コンテナベースイメージ
 
-3. **Extended** (`-extended` suffix)
-   - Size: < 50MB
-   - Contains: Standard + development tools + additional utilities
-   - Use case: Development environments and feature-rich containers
+3. **Extended**（`-extended`接尾辞）
+   - サイズ: < 50MB
+   - 含まれるもの: Standard + 開発ツール + 追加ユーティリティ
+   - 用途: 開発環境と機能豊富なコンテナ
 
-#### Tag Examples
+#### タグの例
 
 ```
-# Version-specific tags
-kimigayo-os:0.1.0               # Standard variant, version 0.1.0
-kimigayo-os:0.1.0-minimal       # Minimal variant, version 0.1.0
-kimigayo-os:0.1.0-extended      # Extended variant, version 0.1.0
+# バージョン指定タグ
+kimigayo-os:0.1.0               # Standardバリアント、バージョン0.1.0
+kimigayo-os:0.1.0-minimal       # Minimalバリアント、バージョン0.1.0
+kimigayo-os:0.1.0-extended      # Extendedバリアント、バージョン0.1.0
 
-# Architecture-specific tags
-kimigayo-os:0.1.0-amd64         # x86_64 architecture
-kimigayo-os:0.1.0-arm64         # ARM64 architecture
+# アーキテクチャ指定タグ
+kimigayo-os:0.1.0-amd64         # x86_64アーキテクチャ
+kimigayo-os:0.1.0-arm64         # ARM64アーキテクチャ
 
-# Combined variant and architecture
+# バリアントとアーキテクチャの組み合わせ
 kimigayo-os:0.1.0-minimal-amd64
 kimigayo-os:0.1.0-extended-arm64
 
-# Rolling tags (auto-updated)
-kimigayo-os:latest              # Latest stable standard variant
-kimigayo-os:latest-minimal      # Latest stable minimal variant
-kimigayo-os:latest-extended     # Latest stable extended variant
-kimigayo-os:stable              # Latest stable release (alias for latest)
-kimigayo-os:edge                # Latest development build (unstable)
+# ローリングタグ（自動更新）
+kimigayo-os:latest              # 最新安定版Standardバリアント
+kimigayo-os:latest-minimal      # 最新安定版Minimalバリアント
+kimigayo-os:latest-extended     # 最新安定版Extendedバリアント
+kimigayo-os:stable              # 最新安定版リリース（latestのエイリアス）
+kimigayo-os:edge                # 最新開発ビルド（不安定版）
 ```
 
-### Tagging Workflow
+### タグ付けワークフロー
 
-1. **Development Builds** (`edge` tag)
-   - Pushed on every commit to `main` branch
-   - Not recommended for production use
-   - Format: `edge`, `edge-minimal`, `edge-extended`
+1. **開発ビルド**（`edge`タグ）
+   - `main`ブランチへのコミット毎にプッシュ
+   - 本番環境での使用は非推奨
+   - フォーマット: `edge`、`edge-minimal`、`edge-extended`
 
-2. **Beta/RC Releases**
-   - Pre-release versions for testing
-   - Format: `0.1.0-beta.1`, `1.0.0-rc.2`
+2. **ベータ/RCリリース**
+   - テスト用のプレリリースバージョン
+   - フォーマット: `0.1.0-beta.1`、`1.0.0-rc.2`
 
-3. **Stable Releases**
-   - Production-ready versions
-   - Format: `0.1.0`, `1.0.0`
-   - Also tagged as `latest` and `stable`
+3. **安定版リリース**
+   - 本番環境対応バージョン
+   - フォーマット: `0.1.0`、`1.0.0`
+   - `latest`および`stable`としてもタグ付け
 
-4. **Patch Updates**
-   - Bug fixes and security patches
-   - Format: `1.0.1`, `1.0.2`
-   - Automatically update `latest` tag
+4. **パッチアップデート**
+   - バグ修正とセキュリティパッチ
+   - フォーマット: `1.0.1`、`1.0.2`
+   - `latest`タグを自動更新
 
-## Repository Setup Instructions
+## リポジトリセットアップ手順
 
-### Step 1: Create Docker Hub Account
+### ステップ1: Docker Hubアカウント作成
 
-1. Visit https://hub.docker.com/signup
-2. Register account with username: `kimigayo-os`
-3. Verify email address
-4. Complete profile setup
+1. https://hub.docker.com/signup にアクセス
+2. ユーザー名`kimigayo-os`でアカウント登録
+3. メールアドレスを検証
+4. プロフィール設定を完了
 
-### Step 2: Create Repository
+### ステップ2: リポジトリ作成
 
-1. Log in to Docker Hub
-2. Click "Create Repository"
-3. Fill in repository details:
-   - **Name**: `kimigayo-os`
-   - **Description**: (Use description from above)
-   - **Visibility**: Public
-4. Click "Create"
+1. Docker Hubにログイン
+2. "Create Repository"をクリック
+3. リポジトリ詳細を入力:
+   - **名前**: `kimigayo-os`
+   - **説明**: （上記の説明を使用）
+   - **公開範囲**: Public
+4. "Create"をクリック
 
-### Step 3: Repository Settings
+### ステップ3: リポジトリ設定
 
-Configure the following settings:
+以下の設定を行います:
 
-#### Overview Tab
-- Add the full description from above
-- Add links to:
-  - GitHub repository: `https://github.com/kimigayo-os/kimigayo`
-  - Documentation: `https://docs.kimigayo-os.org` (to be created)
+#### Overviewタブ
+- 上記の完全な説明を追加
+- 以下のリンクを追加:
+  - GitHubリポジトリ: `https://github.com/kimigayo-os/kimigayo`
+  - ドキュメント: `https://docs.kimigayo-os.org`（作成予定）
   - Issues: `https://github.com/kimigayo-os/kimigayo/issues`
 
-#### Builds Tab (for future CI/CD integration)
-- Will be configured with GitHub Actions
-- Automated builds on tag push
-- Multi-architecture builds using buildx
+#### Buildsタブ（将来のCI/CD統合用）
+- GitHub Actionsで設定予定
+- タグプッシュ時の自動ビルド
+- buildxを使用したマルチアーキテクチャビルド
 
-#### Collaborators Tab
-- Add team members as needed
-- Set appropriate permission levels
+#### Collaboratorsタブ
+- 必要に応じてチームメンバーを追加
+- 適切な権限レベルを設定
 
-### Step 4: Docker Hub README
+### ステップ4: Docker Hub README
 
-The Docker Hub README should include:
+Docker Hub READMEには以下を含めます:
 
 ```markdown
 # Kimigayo OS
 
-Lightweight, fast, and secure container-focused operating system.
+軽量・高速・セキュアなコンテナ向けOS
 
-## Quick Start
+## クイックスタート
 
-### Pull the Image
+### イメージの取得
 
 ```bash
-# Standard variant (recommended)
+# Standardバリアント（推奨）
 docker pull kimigayo-os:latest
 
-# Minimal variant
+# Minimalバリアント
 docker pull kimigayo-os:latest-minimal
 
-# Extended variant
+# Extendedバリアント
 docker pull kimigayo-os:latest-extended
 ```
 
-### Run a Container
+### コンテナの実行
 
 ```bash
-# Interactive shell
+# 対話的シェル
 docker run -it kimigayo-os:latest /bin/sh
 
-# Run a command
+# コマンド実行
 docker run kimigayo-os:latest uname -a
 ```
 
-### Use as Base Image
+### ベースイメージとして使用
 
 ```dockerfile
 FROM kimigayo-os:latest
 
-# Install packages using isn
+# isnを使用してパッケージをインストール
 RUN isn install nginx
 
-# Your application setup
+# アプリケーションのセットアップ
 COPY . /app
 WORKDIR /app
 
 CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 ```
 
-## Image Variants
+## イメージバリアント
 
-- **kimigayo-os:latest** - Standard variant (< 15MB)
-- **kimigayo-os:latest-minimal** - Minimal variant (< 5MB)
-- **kimigayo-os:latest-extended** - Extended variant (< 50MB)
+- **kimigayo-os:latest** - Standardバリアント（< 15MB）
+- **kimigayo-os:latest-minimal** - Minimalバリアント（< 5MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（< 50MB）
 
-## Documentation
+## ドキュメント
 
-- [Installation Guide](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/INSTALLATION.md)
-- [Quick Start Guide](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/QUICKSTART.md)
-- [Package Manager Guide](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/PACKAGE_MANAGER.md)
-- [Security Guide](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
+- [インストールガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/INSTALLATION.md)
+- [クイックスタートガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/QUICKSTART.md)
+- [パッケージマネージャガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/PACKAGE_MANAGER.md)
+- [セキュリティガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
 
-## Features
+## 機能
 
-- ✅ Ultra-lightweight (< 5MB base image)
-- ✅ Fast boot time (< 10 seconds)
-- ✅ Security hardened by default
-- ✅ Reproducible builds
-- ✅ Multi-architecture support (x86_64, ARM64)
-- ✅ Built-in package manager (isn)
-- ✅ Based on proven technologies (musl libc, BusyBox, OpenRC)
+- ✅ 超軽量（< 5MBベースイメージ）
+- ✅ 高速起動（< 10秒）
+- ✅ デフォルトでセキュリティ強化
+- ✅ 再現可能ビルド
+- ✅ マルチアーキテクチャサポート（x86_64、ARM64）
+- ✅ 内蔵パッケージマネージャ（isn）
+- ✅ 実績ある技術に基づく（musl libc、BusyBox、OpenRC）
 
-## License
+## ライセンス
 
-See [LICENSE](https://github.com/kimigayo-os/kimigayo/blob/main/LICENSE) file.
+[LICENSE](https://github.com/kimigayo-os/kimigayo/blob/main/LICENSE)ファイルを参照してください。
 
-## Support
+## サポート
 
 - GitHub Issues: https://github.com/kimigayo-os/kimigayo/issues
-- Security Issues: See [SECURITY.md](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/VULNERABILITY_REPORTING.md)
+- セキュリティ問題: [SECURITY.md](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/VULNERABILITY_REPORTING.md)を参照
 ```
 
-## Security Considerations
+## セキュリティに関する考慮事項
 
-### Image Signing
+### イメージ署名
 
-All official images will be signed using:
-- Docker Content Trust (DCT)
-- Cosign for additional verification
+すべての公式イメージは以下を使用して署名されます:
+- Docker Content Trust（DCT）
+- 追加検証用のCosign
 
-### Vulnerability Scanning
+### 脆弱性スキャン
 
-Images will be automatically scanned with:
+イメージは以下で自動スキャンされます:
 - Trivy
-- Results published to GitHub Security tab
+- 結果はGitHub Securityタブに公開
 
-### Update Policy
+### 更新ポリシー
 
-- **Security patches**: Released within 24-48 hours of disclosure
-- **Bug fixes**: Included in regular patch releases
-- **Feature updates**: Follow SemVer minor version increments
+- **セキュリティパッチ**: 開示後24〜48時間以内にリリース
+- **バグ修正**: 定期的なパッチリリースに含める
+- **機能更新**: SemVerマイナーバージョン増分に従う
 
-## Metadata Labels
+## メタデータラベル
 
-All images include OpenContainer Initiative (OCI) labels:
+すべてのイメージにOpenContainer Initiative（OCI）ラベルを含めます:
 
 ```dockerfile
 LABEL org.opencontainers.image.title="Kimigayo OS"
-LABEL org.opencontainers.image.description="Lightweight, fast, and secure container-focused operating system"
+LABEL org.opencontainers.image.description="軽量・高速・セキュアなコンテナ向けOS"
 LABEL org.opencontainers.image.authors="Kimigayo OS Team"
 LABEL org.opencontainers.image.url="https://github.com/kimigayo-os/kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/kimigayo-os/kimigayo/tree/main/docs"
@@ -261,10 +261,10 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.licenses="GPL-2.0"
 ```
 
-## Next Steps
+## 次のステップ
 
-After repository setup:
-1. Configure GitHub Actions for automated builds (Task 26)
-2. Implement security scanning (Task 27)
-3. Set up multi-architecture builds (Task 28)
-4. Prepare first release (Task 29)
+リポジトリセットアップ後:
+1. 自動ビルド用のGitHub Actions設定（タスク26）
+2. セキュリティスキャンの実装（タスク27）
+3. マルチアーキテクチャビルドの設定（タスク28）
+4. 最初のリリース準備（タスク29）
