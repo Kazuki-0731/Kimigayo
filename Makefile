@@ -33,10 +33,15 @@ help:
 	@echo "  make test-smoke          - スモークテストを実行"
 	@echo "  make ci-build-all        - 全バリアントをビルド"
 	@echo ""
+	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
+	@echo "    1. .envファイルを作成: cp .env.example .env"
+	@echo "    2. .envを編集してデフォルト値を設定"
+	@echo "    3. コマンドライン引数で一時的に上書き可能"
+	@echo ""
 	@echo "  パラメータ例:"
+	@echo "    make ci-build-local                              # .envの設定を使用"
+	@echo "    VARIANT=minimal make ci-build-local              # .envを上書き"
 	@echo "    VARIANT=minimal ARCH=x86_64 VERSION=0.1.0 make ci-build-local"
-	@echo "    VARIANT=minimal make ci-build-local    # minimalバリアント"
-	@echo "    VARIANT=extended make ci-build-local   # extendedバリアント"
 	@echo ""
 	@echo "🐳 Docker管理:"
 	@echo "  make docker-build - ビルド環境イメージを構築"
@@ -161,10 +166,21 @@ log-openrc:
 # CI/CDローカル実行
 # ============================================================================
 
-# 設定変数
+# .envファイルが存在する場合は読み込む
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
+# 設定変数（.envで上書き可能、コマンドラインでさらに上書き可能）
 ARCH ?= x86_64
 VARIANT ?= standard
 VERSION ?= latest
+DOCKER_HUB_USERNAME ?= ishinokazuki
+IMAGE_NAME ?= kimigayo-os
+BUILD_JOBS ?= 4
+DEBUG ?= false
+
 TARBALL_NAME = kimigayo-$(VARIANT)-$(VERSION)-$(ARCH).tar.gz
 
 # rootfsビルド（GitHub Actionsの同等処理）

@@ -37,5 +37,8 @@ htmlcov/
 *.pyc
 __pycache__/
 
+# Environment variables
+.env
+
 # Docker
 # .dockerignore - now tracked for runtime image build
