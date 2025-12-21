@@ -3,7 +3,7 @@
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
-.PHONY: docker-hub-login push-image ci-build-push
+.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan
 
 # デフォルトターゲット
 help:
@@ -38,6 +38,10 @@ help:
 	@echo "🐳 Docker Hub連携:"
 	@echo "  make docker-hub-login    - Docker Hubにログイン"
 	@echo "  make push-image          - イメージをDocker Hubにプッシュ"
+	@echo ""
+	@echo "🔒 セキュリティスキャン:"
+	@echo "  make trivy-scan          - Trivyで脆弱性スキャン"
+	@echo "  make security-scan       - 総合セキュリティスキャン（Trivy）"
 	@echo ""
 	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
 	@echo "    1. .envファイルを作成: cp .env.example .env"
@@ -341,4 +345,37 @@ ci-build-push: ci-build-local push-image
 	@echo ""
 	@echo "🚀 イメージがDocker Hubにプッシュされました:"
 	@echo "   docker pull $(DOCKER_IMAGE_TAG)"
+	@echo ""
+
+# ============================================================================
+# セキュリティスキャン
+# ============================================================================
+
+# Trivyで脆弱性スキャン
+trivy-scan:
+	@echo "=== Running Trivy vulnerability scan ==="
+	@echo "Image: kimigayo-os:$(VARIANT)-$(ARCH)"
+	@echo ""
+	@if ! command -v trivy &> /dev/null; then \
+		echo "❌ Error: Trivy is not installed"; \
+		echo ""; \
+		echo "Install Trivy:"; \
+		echo "  macOS: brew install trivy"; \
+		echo "  Linux: https://aquasecurity.github.io/trivy/latest/getting-started/installation/"; \
+		exit 1; \
+	fi
+	@echo "Scanning for CRITICAL and HIGH vulnerabilities..."
+	@trivy image --severity CRITICAL,HIGH kimigayo-os:$(VARIANT)-$(ARCH) || true
+	@echo ""
+	@echo "Full vulnerability report:"
+	@trivy image kimigayo-os:$(VARIANT)-$(ARCH)
+
+# 総合セキュリティスキャン
+security-scan: trivy-scan
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║              ✅ セキュリティスキャン完了                         ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "📊 スキャン結果は上記を確認してください"
 	@echo ""
