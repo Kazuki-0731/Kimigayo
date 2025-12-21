@@ -4,11 +4,14 @@
 # Stage 1: Extract rootfs from tar.gz
 FROM alpine:3.19 AS extractor
 
+# Build argument for tarball path
+ARG TARBALL_PATH=output/*.tar.gz
+
 # Create directory for rootfs
 RUN mkdir -p /rootfs
 
 # Copy the built tar.gz image
-COPY output/kimigayo-minimal-0.1.0-x86_64.tar.gz /tmp/kimigayo.tar.gz
+COPY ${TARBALL_PATH} /tmp/kimigayo.tar.gz
 
 # Extract rootfs
 RUN cd /rootfs && \

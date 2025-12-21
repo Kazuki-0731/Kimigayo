@@ -82,7 +82,16 @@ jobs:
           # Build the rootfs using build script
           bash scripts/build-rootfs.sh
 
-          # Verify output exists
+          # Verify build output exists
+          ls -lh build/rootfs/
+
+          # Create output directory and package rootfs
+          mkdir -p output
+          cd build/rootfs
+          tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz .
+          cd ../..
+
+          # Verify tarball was created
           ls -lh output/
 
       - name: Run integration tests
