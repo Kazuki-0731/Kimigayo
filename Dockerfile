@@ -91,10 +91,14 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pyyaml
 
 # Rustツールチェインのインストール (isn package manager用)
-# Note: rust-std is not available in Alpine 3.19, only cargo and rust
-RUN apk add --no-cache \
-    cargo \
-    rust
+# Alpine 3.19のRust (1.76) は古すぎるため、rustupで最新版をインストール
+RUN apk add --no-cache curl && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal && \
+    . "$HOME/.cargo/env" && \
+    rustup target add x86_64-unknown-linux-musl
+
+# Rustのパスを追加
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
