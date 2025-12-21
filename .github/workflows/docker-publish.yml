@@ -108,11 +108,15 @@ jobs:
             python3 -m pytest tests/integration/test_phase1_integration.py -v || echo "Phase 1 tests not ready yet"
           fi
 
-          # Verify rootfs structure
-          if [ -f "output/kimigayo-${{ matrix.variant }}-*.tar.gz" ]; then
+          # Verify rootfs tarball exists
+          TARBALL_COUNT=$(ls -1 output/kimigayo-${{ matrix.variant }}-*.tar.gz 2>/dev/null | wc -l)
+          if [ "$TARBALL_COUNT" -gt 0 ]; then
             echo "✓ Rootfs tarball created successfully"
+            ls -lh output/kimigayo-${{ matrix.variant }}-*.tar.gz
           else
             echo "✗ Rootfs tarball not found"
+            echo "Contents of output directory:"
+            ls -lah output/ || echo "output/ directory does not exist"
             exit 1
           fi
 
