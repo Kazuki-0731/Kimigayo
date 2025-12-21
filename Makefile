@@ -2,7 +2,8 @@
 # プロジェクト管理用の簡易コマンド集
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
-.PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local
+.PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
+.PHONY: docker-hub-login push-image ci-build-push
 
 # デフォルトターゲット
 help:
@@ -26,6 +27,7 @@ help:
 	@echo ""
 	@echo "🚀 CI/CDローカル実行（GitHub Actions相当）:"
 	@echo "  make ci-build-local      - 完全なCI/CDビルド（rootfs→テスト→イメージ）"
+	@echo "  make ci-build-push       - ビルド＋Docker Hubへプッシュ"
 	@echo "  make build-rootfs        - rootfsのみビルド"
 	@echo "  make package-rootfs      - rootfsをtarballにパッケージ化"
 	@echo "  make test-integration    - 統合テストを実行"
@@ -33,15 +35,19 @@ help:
 	@echo "  make test-smoke          - スモークテストを実行"
 	@echo "  make ci-build-all        - 全バリアントをビルド"
 	@echo ""
+	@echo "🐳 Docker Hub連携:"
+	@echo "  make docker-hub-login    - Docker Hubにログイン"
+	@echo "  make push-image          - イメージをDocker Hubにプッシュ"
+	@echo ""
 	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
 	@echo "    1. .envファイルを作成: cp .env.example .env"
-	@echo "    2. .envを編集してデフォルト値を設定"
+	@echo "    2. .envを編集してデフォルト値を設定（DOCKER_HUB_ACCESS_TOKEN含む）"
 	@echo "    3. コマンドライン引数で一時的に上書き可能"
 	@echo ""
 	@echo "  パラメータ例:"
 	@echo "    make ci-build-local                              # .envの設定を使用"
 	@echo "    VARIANT=minimal make ci-build-local              # .envを上書き"
-	@echo "    VARIANT=minimal ARCH=x86_64 VERSION=0.1.0 make ci-build-local"
+	@echo "    make ci-build-push                               # ビルド＆プッシュ"
 	@echo ""
 	@echo "🐳 Docker管理:"
 	@echo "  make docker-build - ビルド環境イメージを構築"
@@ -180,8 +186,10 @@ DOCKER_HUB_USERNAME ?= ishinokazuki
 IMAGE_NAME ?= kimigayo-os
 BUILD_JOBS ?= 4
 DEBUG ?= false
+DOCKER_HUB_ACCESS_TOKEN ?=
 
 TARBALL_NAME = kimigayo-$(VARIANT)-$(VERSION)-$(ARCH).tar.gz
+DOCKER_IMAGE_TAG = $(DOCKER_HUB_USERNAME)/$(IMAGE_NAME):$(VARIANT)-$(ARCH)
 
 # rootfsビルド（GitHub Actionsの同等処理）
 build-rootfs:
@@ -239,9 +247,12 @@ build-image: package-rootfs
 	@echo "=== Building Docker image ==="
 	@docker build -f Dockerfile.runtime \
 		-t kimigayo-os:$(VARIANT)-$(ARCH) \
-		-t kimigayo-os:$(VERSION)-$(VARIANT)-$(ARCH) .
+		-t kimigayo-os:$(VERSION)-$(VARIANT)-$(ARCH) \
+		-t $(DOCKER_IMAGE_TAG) \
+		-t $(DOCKER_HUB_USERNAME)/$(IMAGE_NAME):$(VERSION)-$(VARIANT)-$(ARCH) .
 	@echo ""
 	@echo "✓ Docker image built: kimigayo-os:$(VARIANT)-$(ARCH)"
+	@echo "✓ Tagged for Docker Hub: $(DOCKER_IMAGE_TAG)"
 
 # スモークテスト
 test-smoke: build-image
@@ -286,3 +297,42 @@ ci-build-all:
 	@$(MAKE) ci-build-local VARIANT=extended ARCH=$(ARCH)
 	@echo ""
 	@echo "✅ All variants built successfully for $(ARCH)"
+
+# Docker Hubログイン
+docker-hub-login:
+	@echo "=== Logging in to Docker Hub ==="
+	@if [ -z "$(DOCKER_HUB_ACCESS_TOKEN)" ]; then \
+		echo "❌ Error: DOCKER_HUB_ACCESS_TOKEN is not set"; \
+		echo ""; \
+		echo "Please set it in one of the following ways:"; \
+		echo "  1. Add to .env file: DOCKER_HUB_ACCESS_TOKEN=dckr_pat_xxxxx"; \
+		echo "  2. Set environment variable: export DOCKER_HUB_ACCESS_TOKEN=dckr_pat_xxxxx"; \
+		echo "  3. Pass as argument: DOCKER_HUB_ACCESS_TOKEN=dckr_pat_xxxxx make docker-hub-login"; \
+		echo ""; \
+		echo "Get your token from: https://hub.docker.com/settings/security"; \
+		exit 1; \
+	fi
+	@echo "$(DOCKER_HUB_ACCESS_TOKEN)" | docker login -u $(DOCKER_HUB_USERNAME) --password-stdin
+	@echo "✓ Successfully logged in to Docker Hub as $(DOCKER_HUB_USERNAME)"
+
+# Docker Hubへプッシュ
+push-image: docker-hub-login
+	@echo ""
+	@echo "=== Pushing image to Docker Hub ==="
+	@docker push $(DOCKER_IMAGE_TAG)
+	@docker push $(DOCKER_HUB_USERNAME)/$(IMAGE_NAME):$(VERSION)-$(VARIANT)-$(ARCH)
+	@echo ""
+	@echo "✓ Successfully pushed to Docker Hub"
+	@echo "  - $(DOCKER_IMAGE_TAG)"
+	@echo "  - $(DOCKER_HUB_USERNAME)/$(IMAGE_NAME):$(VERSION)-$(VARIANT)-$(ARCH)"
+
+# 完全なCI/CDビルド（プッシュ含む）
+ci-build-push: ci-build-local push-image
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║         ✅ CI/CDビルド＆プッシュ完了                             ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "🚀 イメージがDocker Hubにプッシュされました:"
+	@echo "   docker pull $(DOCKER_IMAGE_TAG)"
+	@echo ""
