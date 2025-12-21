@@ -38,4 +38,4 @@ htmlcov/
 __pycache__/
 
 # Docker
-.dockerignore
+# .dockerignore - now tracked for runtime image build

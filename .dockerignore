@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Claude
+.claude
+
+# Build artifacts
+build/
+# output/ - needed for runtime Docker image build
+*.o
+*.a
+*.so
+*.img
+*.iso
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!SPECIFICATION.md
+!README.md

@@ -1,0 +1,45 @@
+# Kimigayo OS - Runtime Docker Image
+# Multi-stage build for minimal container image
+
+# Stage 1: Extract rootfs from tar.gz
+FROM alpine:3.19 AS extractor
+
+# Create directory for rootfs
+RUN mkdir -p /rootfs
+
+# Copy the built tar.gz image
+COPY output/kimigayo-minimal-0.1.0-x86_64.tar.gz /tmp/kimigayo.tar.gz
+
+# Extract rootfs
+RUN cd /rootfs && \
+    tar xzf /tmp/kimigayo.tar.gz && \
+    rm /tmp/kimigayo.tar.gz
+
+# Stage 2: Create minimal runtime image
+FROM scratch
+
+# Metadata
+LABEL maintainer="Kimigayo OS Development Team"
+LABEL description="Kimigayo OS - Lightweight Container Operating System"
+LABEL version="0.1.0"
+LABEL org.opencontainers.image.title="Kimigayo OS"
+LABEL org.opencontainers.image.description="Alpine Linux-inspired lightweight container OS"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.authors="Kimigayo OS Team"
+LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Copy the complete rootfs from extractor stage
+COPY --from=extractor /rootfs/ /
+
+# Set environment variables
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV KIMIGAYO_VERSION=0.1.0
+ENV KIMIGAYO_BUILD_TYPE=minimal
+
+# Set working directory
+WORKDIR /root
+
+# Default command (BusyBox shell)
+CMD ["/bin/sh"]
