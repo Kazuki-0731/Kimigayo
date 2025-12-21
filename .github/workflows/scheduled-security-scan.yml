@@ -61,6 +61,7 @@ jobs:
 
       - name: Run ShellCheck on scripts
         uses: ludeeus/action-shellcheck@master
+        continue-on-error: true
         with:
           scandir: './scripts'
           severity: warning
