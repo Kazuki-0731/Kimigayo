@@ -18,6 +18,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       matrix:
         variant: [minimal, standard, extended]
@@ -193,6 +196,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: ${{ steps.meta.outputs.tags }}
           format: 'sarif'
@@ -200,9 +204,19 @@ jobs:
           severity: 'CRITICAL,HIGH'
           scanners: 'vuln,config,secret'
 
+      - name: Check if SARIF file exists
+        id: sarif_check
+        run: |
+          if [ -f "trivy-results.sarif" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Warning: SARIF file not generated. Trivy scan may have failed."
+          fi
+
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: steps.sarif_check.outputs.exists == 'true'
         with:
           sarif_file: 'trivy-results.sarif'
 

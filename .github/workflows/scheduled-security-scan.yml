@@ -13,6 +13,9 @@ env:
 jobs:
   scan-images:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       matrix:
         variant: [minimal, standard, extended]
@@ -42,7 +45,7 @@ jobs:
           scanners: 'vuln,config,secret'
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results-${{ matrix.variant }}.sarif'
@@ -65,6 +68,9 @@ jobs:
 
   scan-filesystem:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout repository
@@ -81,7 +87,7 @@ jobs:
           scanners: 'vuln,config,secret,license'
 
       - name: Upload filesystem scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-fs-results.sarif'
