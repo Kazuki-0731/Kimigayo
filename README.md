@@ -6,6 +6,7 @@
 
 [![Build Status](https://github.com/Kazuki-0731/Kimigayo/workflows/Kimigayo%20OS%20Build/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions)
 [![License: GPL-2.0](https://img.shields.io/badge/License-GPL%202.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-ishinokazuki%2Fkimigayo--os-blue?logo=docker)](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 [English](#english) | [日本語](#japanese)
@@ -72,6 +73,8 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 ### 🚀 クイックスタート
 
 #### Docker Hubから使用する（最も簡単）
+
+**Docker Hub**: https://hub.docker.com/r/ishinokazuki/kimigayo-os
 
 ```bash
 # Standardバリアント（推奨）
