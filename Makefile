@@ -1,7 +1,7 @@
 # Kimigayo OS - Docker Management Makefile
 # プロジェクト管理用の簡易コマンド集
 
-.PHONY: help up down build rebuild clean logs shell test build-os clean-cache clean-all info
+.PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 
 # デフォルトターゲット
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "🔧 OSビルドコマンド:"
 	@echo "  make build        - Kimigayo OSをビルド [1/6]～[6/6]"
 	@echo "  make test         - テストを実行"
+	@echo "  make test-docker  - Dockerイメージ起動テストを実行"
 	@echo "  make status       - ビルド状態を表示（どこまで完了したか確認）"
 	@echo "  make info         - ビルド設定情報を表示"
 	@echo ""
@@ -95,6 +96,10 @@ build:
 test:
 	@echo "テストを実行..."
 	docker compose run --rm kimigayo-build make test
+
+test-docker:
+	@echo "Dockerイメージ起動テストを実行..."
+	bash tests/integration/test_docker_startup.sh
 
 info:
 	@echo "ビルド情報を表示..."
