@@ -4,6 +4,11 @@
 # Stage 1: Extract rootfs from tar.gz
 FROM alpine:3.19 AS extractor
 
+# Build arguments for multi-architecture support
+ARG TARGETARCH
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
 # Build argument for tarball path
 ARG TARBALL_PATH=output/*.tar.gz
 
@@ -20,6 +25,10 @@ RUN cd /rootfs && \
 
 # Stage 2: Create minimal runtime image
 FROM scratch
+
+# Build arguments for multi-architecture support (inherited)
+ARG TARGETARCH
+ARG TARGETPLATFORM
 
 # Metadata
 LABEL maintainer="Kimigayo OS Development Team"

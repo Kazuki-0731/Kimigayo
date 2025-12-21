@@ -225,6 +225,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
+        if: matrix.arch == 'x86_64'
         with:
           image-ref: ${{ steps.trivy_tag.outputs.tag }}
           format: 'sarif'
@@ -234,6 +235,7 @@ jobs:
 
       - name: Check if SARIF file exists
         id: sarif_check
+        if: matrix.arch == 'x86_64'
         run: |
           if [ -f "trivy-results.sarif" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
@@ -244,12 +246,13 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
-        if: steps.sarif_check.outputs.exists == 'true'
+        if: matrix.arch == 'x86_64' && steps.sarif_check.outputs.exists == 'true'
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run Trivy vulnerability scanner (table output)
         uses: aquasecurity/trivy-action@master
+        if: matrix.arch == 'x86_64'
         with:
           image-ref: ${{ steps.trivy_tag.outputs.tag }}
           format: 'table'

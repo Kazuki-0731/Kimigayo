@@ -16,10 +16,33 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Architecture detection
+detect_arch() {
+    if [ -n "${ARCH:-}" ]; then
+        echo "$ARCH"
+        return
+    fi
+
+    local host_arch
+    host_arch=$(uname -m)
+
+    case "$host_arch" in
+        x86_64|amd64)
+            echo "x86_64"
+            ;;
+        aarch64|arm64)
+            echo "arm64"
+            ;;
+        *)
+            echo "x86_64"  # Default to x86_64
+            ;;
+    esac
+}
+
 # Build configuration
 BUILD_DIR="${PROJECT_ROOT}/build"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
-ARCH="${ARCH:-x86_64}"
+ARCH="${ARCH:-$(detect_arch)}"
 IMAGE_TYPE="${IMAGE_TYPE:-minimal}"
 
 # Install directories for built components
