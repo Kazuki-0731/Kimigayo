@@ -90,6 +90,12 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pytest-xdist \
     pyyaml
 
+# Rustツールチェインのインストール (isn package manager用)
+RUN apk add --no-cache \
+    cargo \
+    rust \
+    rust-std
+
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
 RUN apk add --no-cache clang llvm lld
