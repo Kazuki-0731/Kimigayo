@@ -576,7 +576,7 @@
   - セキュリティスキャン統合
   - _要件: 全体_
 
-- [ ] 26.1 GitHub Actions ワークフロー作成
+- [x] 26.1 GitHub Actions ワークフロー作成
   - .github/workflows/docker-publish.yml 作成
   - トリガー設定（push on tags, manual dispatch）
   - Docker Hub認証情報の設定（Secrets）
