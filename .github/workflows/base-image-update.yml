@@ -1,0 +1,239 @@
+name: Base Image Update
+
+on:
+  schedule:
+    # Run weekly on Monday at 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if no updates detected'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+env:
+  DOCKER_HUB_USERNAME: ishinokazuki
+  IMAGE_NAME: kimigayo-os
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    outputs:
+      musl_update: ${{ steps.check.outputs.musl_update }}
+      busybox_update: ${{ steps.check.outputs.busybox_update }}
+      openrc_update: ${{ steps.check.outputs.openrc_update }}
+      should_rebuild: ${{ steps.check.outputs.should_rebuild }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for component updates
+        id: check
+        run: |
+          # Check musl libc
+          CURRENT_MUSL=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          LATEST_MUSL=$(curl -sL https://www.musl-libc.org/ | grep -oP 'musl-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "$CURRENT_MUSL")
+
+          echo "Current musl: $CURRENT_MUSL, Latest: $LATEST_MUSL"
+
+          if [ "$CURRENT_MUSL" != "$LATEST_MUSL" ]; then
+            echo "musl_update=true" >> $GITHUB_OUTPUT
+            echo "musl_current=$CURRENT_MUSL" >> $GITHUB_OUTPUT
+            echo "musl_latest=$LATEST_MUSL" >> $GITHUB_OUTPUT
+          else
+            echo "musl_update=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check BusyBox
+          CURRENT_BUSYBOX=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          LATEST_BUSYBOX=$(curl -sL https://busybox.net/downloads/ | grep -oP 'busybox-\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "$CURRENT_BUSYBOX")
+
+          echo "Current BusyBox: $CURRENT_BUSYBOX, Latest: $LATEST_BUSYBOX"
+
+          if [ "$CURRENT_BUSYBOX" != "$LATEST_BUSYBOX" ]; then
+            echo "busybox_update=true" >> $GITHUB_OUTPUT
+            echo "busybox_current=$CURRENT_BUSYBOX" >> $GITHUB_OUTPUT
+            echo "busybox_latest=$LATEST_BUSYBOX" >> $GITHUB_OUTPUT
+          else
+            echo "busybox_update=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check OpenRC (from Alpine packages)
+          CURRENT_OPENRC=$(grep 'OPENRC_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"' || echo "0.44")
+          # Note: OpenRC version check requires Alpine package index parsing
+          echo "openrc_update=false" >> $GITHUB_OUTPUT
+
+          # Determine if rebuild is needed
+          if [ "${{ github.event.inputs.force_rebuild }}" = "true" ] || \
+             [ "$CURRENT_MUSL" != "$LATEST_MUSL" ] || \
+             [ "$CURRENT_BUSYBOX" != "$LATEST_BUSYBOX" ]; then
+            echo "should_rebuild=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_rebuild=false" >> $GITHUB_OUTPUT
+          fi
+
+  create-update-pr:
+    needs: check-updates
+    if: needs.check-updates.outputs.should_rebuild == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update component versions
+        id: update
+        run: |
+          BRANCH_NAME="automated/base-image-update-$(date +%Y%m%d)"
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH_NAME"
+
+          # Update versions in build-rootfs.sh
+          if [ "${{ needs.check-updates.outputs.musl_update }}" = "true" ]; then
+            CURRENT_MUSL=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+            LATEST_MUSL="${{ needs.check-updates.outputs.musl_latest }}"
+            sed -i "s/MUSL_VERSION=\"$CURRENT_MUSL\"/MUSL_VERSION=\"$LATEST_MUSL\"/" scripts/build-rootfs.sh
+            echo "✅ Updated musl from $CURRENT_MUSL to $LATEST_MUSL"
+          fi
+
+          if [ "${{ needs.check-updates.outputs.busybox_update }}" = "true" ]; then
+            CURRENT_BUSYBOX=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+            LATEST_BUSYBOX="${{ needs.check-updates.outputs.busybox_latest }}"
+            sed -i "s/BUSYBOX_VERSION=\"$CURRENT_BUSYBOX\"/BUSYBOX_VERSION=\"$LATEST_BUSYBOX\"/" scripts/build-rootfs.sh
+            echo "✅ Updated BusyBox from $CURRENT_BUSYBOX to $LATEST_BUSYBOX"
+          fi
+
+          # Create changelog entry
+          cat > UPDATES.md << EOF
+          # Base Image Updates - $(date +%Y-%m-%d)
+
+          ## Updated Components
+
+          EOF
+
+          if [ "${{ needs.check-updates.outputs.musl_update }}" = "true" ]; then
+            echo "- **musl libc**: ${{ needs.check-updates.outputs.musl_current }} → ${{ needs.check-updates.outputs.musl_latest }}" >> UPDATES.md
+          fi
+
+          if [ "${{ needs.check-updates.outputs.busybox_update }}" = "true" ]; then
+            echo "- **BusyBox**: ${{ needs.check-updates.outputs.busybox_current }} → ${{ needs.check-updates.outputs.busybox_latest }}" >> UPDATES.md
+          fi
+
+          cat >> UPDATES.md << EOF
+
+          ## Testing Required
+
+          - [ ] Build all variants (minimal, standard, extended)
+          - [ ] Run integration tests
+          - [ ] Run security scans
+          - [ ] Verify Docker image functionality
+
+          ## Related Links
+
+          - musl libc releases: https://www.musl-libc.org/
+          - BusyBox releases: https://busybox.net/downloads/
+          EOF
+
+          cat UPDATES.md
+
+          git add scripts/build-rootfs.sh UPDATES.md
+          git commit -m "⬆️ Update base image components
+
+          $(cat UPDATES.md)
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+
+          git push -u origin "$BRANCH_NAME"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.update.outputs.branch }}
+          title: "⬆️ Update base image components - $(date +%Y-%m-%d)"
+          body: |
+            ## Automated Base Image Update
+
+            This PR updates core components to their latest versions.
+
+            ### Changes
+
+            ${{ steps.update.outputs.musl_update == 'true' && format('- musl libc: {0} → {1}', needs.check-updates.outputs.musl_current, needs.check-updates.outputs.musl_latest) || '' }}
+            ${{ steps.update.outputs.busybox_update == 'true' && format('- BusyBox: {0} → {1}', needs.check-updates.outputs.busybox_current, needs.check-updates.outputs.busybox_latest) || '' }}
+
+            ### Testing Checklist
+
+            - [ ] All variants build successfully (minimal, standard, extended)
+            - [ ] Integration tests pass
+            - [ ] Security scans pass (Trivy)
+            - [ ] Docker images functional
+            - [ ] No performance regressions
+
+            ### Notes
+
+            - This PR was automatically created by the base image update workflow
+            - Please review changelog and test thoroughly before merging
+            - Security scans will run automatically on this PR
+
+            🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          labels: |
+            dependencies
+            automated
+            base-image
+
+  rebuild-test:
+    needs: check-updates
+    if: needs.check-updates.outputs.should_rebuild == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [minimal, standard]
+        arch: [x86_64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and test
+        run: |
+          export ARCH=${{ matrix.arch }}
+          export IMAGE_TYPE=${{ matrix.variant }}
+
+          echo "Building $IMAGE_TYPE variant for $ARCH..."
+          bash scripts/build-rootfs.sh
+
+          # Verify build output
+          if [ ! -d "build/rootfs" ]; then
+            echo "❌ Build failed - rootfs directory not found"
+            exit 1
+          fi
+
+          echo "✅ Build completed successfully"
+          ls -lah build/rootfs/ | head -20
+
+      - name: Run basic tests
+        run: |
+          # Verify essential files exist
+          if [ ! -f "build/rootfs/bin/sh" ]; then
+            echo "❌ /bin/sh not found"
+            exit 1
+          fi
+
+          if [ ! -f "build/rootfs/bin/busybox" ]; then
+            echo "❌ /bin/busybox not found"
+            exit 1
+          fi
+
+          echo "✅ Basic file checks passed"

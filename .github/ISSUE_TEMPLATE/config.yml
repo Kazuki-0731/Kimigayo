@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/Kazuki-0731/Kimigayo/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🔒 Security Advisory
+    url: https://github.com/Kazuki-0731/Kimigayo/security/advisories/new
+    about: Report a security vulnerability privately (DO NOT use public issues!)
+  - name: 📖 Documentation
+    url: https://github.com/Kazuki-0731/Kimigayo/tree/main/docs
+    about: Browse the official documentation
+  - name: 🐳 Docker Hub
+    url: https://hub.docker.com/r/ishinokazuki/kimigayo-os
+    about: View Docker images and usage examples

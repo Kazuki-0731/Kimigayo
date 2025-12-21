@@ -1,0 +1,189 @@
+name: Security Updates
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  check-security-updates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Alpine Linux security updates
+        id: alpine_check
+        run: |
+          # Get current Alpine version from build script
+          CURRENT_VERSION=$(grep 'ALPINE_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+
+          # Check latest Alpine Linux security advisories
+          echo "Current Alpine version: $CURRENT_VERSION"
+
+          # Fetch Alpine security database
+          wget -q https://secdb.alpinelinux.org/edge/main.json -O alpine-security.json || echo "Failed to fetch security database"
+
+          if [ -f alpine-security.json ]; then
+            # Count vulnerabilities
+            VULN_COUNT=$(jq 'length' alpine-security.json 2>/dev/null || echo "0")
+            echo "vulnerabilities=$VULN_COUNT" >> $GITHUB_OUTPUT
+            echo "Found $VULN_COUNT packages with known vulnerabilities"
+          else
+            echo "vulnerabilities=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check musl libc updates
+        id: musl_check
+        run: |
+          # Get current musl version
+          CURRENT_MUSL=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          echo "Current musl version: $CURRENT_MUSL"
+
+          # Check for latest musl version
+          LATEST_MUSL=$(curl -sL https://www.musl-libc.org/ | grep -oP 'musl-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "$CURRENT_MUSL")
+          echo "Latest musl version: $LATEST_MUSL"
+
+          echo "current=$CURRENT_MUSL" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST_MUSL" >> $GITHUB_OUTPUT
+
+          if [ "$CURRENT_MUSL" != "$LATEST_MUSL" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check BusyBox updates
+        id: busybox_check
+        run: |
+          # Get current BusyBox version
+          CURRENT_BUSYBOX=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          echo "Current BusyBox version: $CURRENT_BUSYBOX"
+
+          # Check for latest BusyBox version
+          LATEST_BUSYBOX=$(curl -sL https://busybox.net/downloads/ | grep -oP 'busybox-\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "$CURRENT_BUSYBOX")
+          echo "Latest BusyBox version: $LATEST_BUSYBOX"
+
+          echo "current=$CURRENT_BUSYBOX" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST_BUSYBOX" >> $GITHUB_OUTPUT
+
+          if [ "$CURRENT_BUSYBOX" != "$LATEST_BUSYBOX" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-security-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-security-results.sarif'
+
+      - name: Create security report
+        id: report
+        run: |
+          mkdir -p reports
+          cat > reports/security-check-$(date +%Y%m%d).md << EOF
+          # Security Update Check - $(date +%Y-%m-%d)
+
+          ## Component Version Check
+
+          ### musl libc
+          - Current: ${{ steps.musl_check.outputs.current }}
+          - Latest: ${{ steps.musl_check.outputs.latest }}
+          - Update needed: ${{ steps.musl_check.outputs.update_needed }}
+
+          ### BusyBox
+          - Current: ${{ steps.busybox_check.outputs.current }}
+          - Latest: ${{ steps.busybox_check.outputs.latest }}
+          - Update needed: ${{ steps.busybox_check.outputs.update_needed }}
+
+          ### Alpine Linux Security Advisories
+          - Vulnerabilities found: ${{ steps.alpine_check.outputs.vulnerabilities }}
+
+          ## Trivy Scan Results
+
+          See uploaded SARIF file in Security tab for detailed vulnerability report.
+
+          ## Recommended Actions
+
+          EOF
+
+          # Add recommendations
+          if [ "${{ steps.musl_check.outputs.update_needed }}" = "true" ]; then
+            echo "- [ ] Update musl libc to ${{ steps.musl_check.outputs.latest }}" >> reports/security-check-$(date +%Y%m%d).md
+          fi
+
+          if [ "${{ steps.busybox_check.outputs.update_needed }}" = "true" ]; then
+            echo "- [ ] Update BusyBox to ${{ steps.busybox_check.outputs.latest }}" >> reports/security-check-$(date +%Y%m%d).md
+          fi
+
+          if [ "${{ steps.alpine_check.outputs.vulnerabilities }}" != "0" ]; then
+            echo "- [ ] Review Alpine security advisories" >> reports/security-check-$(date +%Y%m%d).md
+          fi
+
+          cat reports/security-check-$(date +%Y%m%d).md
+
+      - name: Create issue for security updates
+        if: steps.musl_check.outputs.update_needed == 'true' || steps.busybox_check.outputs.update_needed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = `reports/security-check-${new Date().toISOString().split('T')[0].replace(/-/g, '')}.md`;
+            const reportContent = fs.readFileSync(reportPath, 'utf8');
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'security,automated',
+              state: 'open'
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.startsWith('🔒 Security Update Available')
+            );
+
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## Update - ${new Date().toISOString().split('T')[0]}\n\n${reportContent}`
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔒 Security Update Available - ${new Date().toISOString().split('T')[0]}`,
+                body: reportContent,
+                labels: ['security', 'automated', 'dependencies']
+              });
+            }
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 90

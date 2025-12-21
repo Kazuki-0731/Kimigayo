@@ -1,0 +1,135 @@
+name: 📚 Documentation Improvement
+description: Suggest improvements to documentation
+title: "[Docs]: "
+labels: ["documentation", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation!
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation needs improvement?
+      options:
+        - User Guide
+        - Developer Guide
+        - API Documentation
+        - Installation Instructions
+        - Troubleshooting Guide
+        - Architecture Documentation
+        - Security Documentation
+        - Contributing Guide
+        - README
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Which file or section needs improvement?
+      placeholder: "e.g., docs/user/INSTALLATION.md, README.md section X"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing information
+        - Incorrect information
+        - Unclear or confusing
+        - Outdated information
+        - Broken link
+        - Typo or grammar
+        - Code example error
+        - Better organization needed
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Documentation
+      description: What does the current documentation say? (copy/paste or quote)
+      placeholder: Current text...
+    validations:
+      required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What is wrong or missing?
+      placeholder: Describe the problem...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should it be improved?
+      placeholder: Suggested text or approach...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this improvement needed? Who would benefit?
+      placeholder: |
+        As a new user, I found this confusing because...
+        This would help users who...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who is the primary audience for this documentation?
+      options:
+        - New users
+        - Experienced users
+        - Developers/Contributors
+        - System administrators
+        - Security researchers
+        - All users
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Willing to Contribute?
+      description: Can you submit a pull request with the fix?
+      options:
+        - "Yes, I can submit a PR"
+        - "Yes, with guidance"
+        - "No"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm
+      options:
+        - label: I have checked that this documentation exists
+          required: true
+        - label: I have searched for existing issues about this documentation
+          required: true
+        - label: I have clearly described the problem and suggested improvement
+          required: true

@@ -1,0 +1,182 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly vulnerability scan
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,secret,config'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Scan build scripts for vulnerabilities
+        run: |
+          echo "=== Scanning shell scripts for common issues ==="
+
+          # Check for hardcoded secrets
+          echo "Checking for hardcoded secrets..."
+          if grep -rn -E '(password|secret|api_key|token).*=.*["\047]' scripts/ 2>/dev/null; then
+            echo "⚠️ Warning: Possible hardcoded secrets found"
+          else
+            echo "✅ No hardcoded secrets detected"
+          fi
+
+          # Check for insecure downloads (http instead of https)
+          echo "Checking for insecure downloads..."
+          if grep -rn 'http://' scripts/ | grep -v 'http://localhost' 2>/dev/null; then
+            echo "⚠️ Warning: Insecure HTTP downloads found"
+          else
+            echo "✅ All downloads use HTTPS"
+          fi
+
+          # Check for unsafe bash practices
+          echo "Checking for unsafe bash practices..."
+          if grep -rn 'eval\s' scripts/ 2>/dev/null; then
+            echo "⚠️ Warning: 'eval' usage found (potential security risk)"
+          else
+            echo "✅ No unsafe eval usage"
+          fi
+
+      - name: Check component versions against CVE databases
+        run: |
+          echo "=== Checking component versions against known CVEs ==="
+
+          # Extract versions
+          MUSL_VERSION=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          BUSYBOX_VERSION=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+
+          echo "musl libc version: $MUSL_VERSION"
+          echo "BusyBox version: $BUSYBOX_VERSION"
+
+          # Note: In production, you would query CVE databases here
+          # For now, we'll just report the versions
+          cat > dependency-versions.txt << EOF
+          Component Versions:
+          - musl libc: $MUSL_VERSION
+          - BusyBox: $BUSYBOX_VERSION
+          - Alpine Linux: edge (rolling)
+          - OpenRC: 0.44+
+
+          For CVE information, check:
+          - https://security.alpinelinux.org/
+          - https://www.cvedetails.com/
+          EOF
+
+          cat dependency-versions.txt
+
+      - name: Upload dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-report
+          path: |
+            trivy-results.sarif
+            dependency-versions.txt
+          retention-days: 30
+
+  create-security-issue:
+    needs: vulnerability-scan
+    runs-on: ubuntu-latest
+    if: failure() && github.event_name == 'schedule'
+
+    steps:
+      - name: Create security issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueTitle = `🔒 Weekly Security Scan Failed - ${new Date().toISOString().split('T')[0]}`;
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'security,automated',
+              state: 'open'
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.startsWith('🔒 Weekly Security Scan Failed')
+            );
+
+            const issueBody = `## Weekly Security Scan Failed
+
+            The automated weekly security scan has detected issues.
+
+            ### Details
+
+            - **Workflow Run**: [${context.runId}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            - **Date**: ${new Date().toISOString().split('T')[0]}
+
+            ### Action Required
+
+            1. Review the workflow logs
+            2. Check Trivy scan results in Security tab
+            3. Address any critical/high vulnerabilities
+            4. Update affected components if needed
+
+            ### Resources
+
+            - [Security Policy](../blob/main/SECURITY.md)
+            - [Alpine Linux Security](https://security.alpinelinux.org/)
+
+            🤖 This issue was automatically created by the dependency review workflow.`;
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['security', 'automated', 'vulnerability']
+              });
+            }

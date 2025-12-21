@@ -1,0 +1,13 @@
+{
+  "benchmark": "startup_time",
+  "image": "ishinokazuki/kimigayo-os:latest",
+  "iterations": 5,
+  "timestamp": "2025-12-21T16:49:57Z",
+  "results": {
+    "average_ms": 5102,
+    "median_ms": 5471,
+    "min_ms": 3545,
+    "max_ms": 5524,
+    "all_times_ms": [5469,5524,5504,5471,3545]
+  }
+}

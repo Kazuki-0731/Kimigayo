@@ -1,0 +1,13 @@
+{
+  "benchmark": "memory_usage",
+  "image": "ishinokazuki/kimigayo-os:latest",
+  "duration_seconds": 10,
+  "timestamp": "2025-12-21T16:50:23Z",
+  "results": {
+    "average_mb": 4,
+    "median_mb": 2,
+    "min_mb": 2,
+    "max_mb": 11,
+    "samples": 10
+  }
+}
