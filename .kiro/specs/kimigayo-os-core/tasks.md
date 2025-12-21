@@ -654,7 +654,7 @@
   - GitHub Releasesの自動作成
   - リリースアセット添付（tar.gz, checksums, signatures）
 
-- [ ] 30. ドキュメント整備
+- [x] 30. ドキュメント整備
   - README.mdの充実（プロジェクト概要）
   - INSTALLATION.mdの作成（Docker Hub利用手順）
   - CONTRIBUTING.mdの作成（コントリビューターガイド）
