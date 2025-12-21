@@ -351,7 +351,7 @@ ci-build-push: ci-build-local push-image
 # セキュリティスキャン
 # ============================================================================
 
-# Trivyで脆弱性スキャン
+# Trivyで脆弱性スキャン（イメージ）
 trivy-scan:
 	@echo "=== Running Trivy vulnerability scan ==="
 	@echo "Image: kimigayo-os:$(VARIANT)-$(ARCH)"
@@ -365,13 +365,42 @@ trivy-scan:
 		exit 1; \
 	fi
 	@echo "Scanning for CRITICAL and HIGH vulnerabilities..."
-	@trivy image --severity CRITICAL,HIGH kimigayo-os:$(VARIANT)-$(ARCH) || true
+	@trivy image --severity CRITICAL,HIGH --scanners vuln,config,secret kimigayo-os:$(VARIANT)-$(ARCH) || true
 	@echo ""
 	@echo "Full vulnerability report:"
-	@trivy image kimigayo-os:$(VARIANT)-$(ARCH)
+	@trivy image --scanners vuln,config,secret kimigayo-os:$(VARIANT)-$(ARCH)
+
+# Trivyでファイルシステムスキャン
+trivy-fs-scan:
+	@echo "=== Running Trivy filesystem scan ==="
+	@echo "Scanning project directory..."
+	@echo ""
+	@if ! command -v trivy &> /dev/null; then \
+		echo "❌ Error: Trivy is not installed"; \
+		echo ""; \
+		echo "Install Trivy:"; \
+		echo "  macOS: brew install trivy"; \
+		echo "  Linux: https://aquasecurity.github.io/trivy/latest/getting-started/installation/"; \
+		exit 1; \
+	fi
+	@trivy fs --severity CRITICAL,HIGH,MEDIUM --scanners vuln,config,secret,license .
+
+# ShellCheckで静的解析
+shellcheck-scan:
+	@echo "=== Running ShellCheck on scripts ==="
+	@echo ""
+	@if ! command -v shellcheck &> /dev/null; then \
+		echo "❌ Error: ShellCheck is not installed"; \
+		echo ""; \
+		echo "Install ShellCheck:"; \
+		echo "  macOS: brew install shellcheck"; \
+		echo "  Linux: apt install shellcheck"; \
+		exit 1; \
+	fi
+	@find scripts -name "*.sh" -type f -exec echo "Checking: {}" \; -exec shellcheck {} \;
 
 # 総合セキュリティスキャン
-security-scan: trivy-scan
+security-scan: trivy-scan trivy-fs-scan shellcheck-scan
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════════╗"
 	@echo "║              ✅ セキュリティスキャン完了                         ║"
