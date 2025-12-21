@@ -340,7 +340,7 @@ push-image: docker-hub-login
 ci-build-push: ci-build-local push-image
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════════╗"
-	@echo "║         ✅ CI/CDビルド＆プッシュ完了                             ║"
+	@echo "║         ✅ CI/CDビルド＆プッシュ完了                            ║"
 	@echo "╚════════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "🚀 イメージがDocker Hubにプッシュされました:"
