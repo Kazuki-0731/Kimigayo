@@ -410,6 +410,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [仕様書](SPECIFICATION.md) - プロジェクト仕様
 - [設計書](.kiro/specs/kimigayo-os-core/design.md) - 詳細設計
 - [実装計画](.kiro/specs/kimigayo-os-core/tasks.md) - タスク管理
+- [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - Docker Hub公開状況と最終チェック
 
 #### セキュリティ
 
