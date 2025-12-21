@@ -1,0 +1,18 @@
+# Kimigayo OS - Optimized inittab for Containers
+# パフォーマンス最適化版
+
+# システム初期化
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+
+# メインシステム
+::wait:/sbin/openrc default
+
+# シャットダウン
+::shutdown:/sbin/openrc shutdown
+
+# コンソール（1つのみ、リソース節約）
+::respawn:/sbin/getty 38400 console
+
+# Ctrl+Alt+Del（コンテナでは無効化）
+# ::ctrlaltdel:/sbin/reboot

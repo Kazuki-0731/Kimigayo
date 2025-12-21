@@ -592,27 +592,25 @@ EOF
     chmod 644 "$ROOTFS_DIR/etc/fstab"
     log_info "  Created: /etc/fstab"
 
-    # /etc/inittab (for init system)
+    # /etc/inittab (for init system) - Optimized for containers
     cat > "$ROOTFS_DIR/etc/inittab" << 'EOF'
-# /etc/inittab - Kimigayo OS init configuration
+# /etc/inittab - Kimigayo OS init configuration (Optimized)
 
-# Default runlevel
-id:3:initdefault:
+# System initialization (simplified for containers)
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
 
-# System initialization
-si::sysinit:/sbin/openrc sysinit
-si::sysinit:/sbin/openrc boot
-si::wait:/sbin/openrc default
+# Main system
+::wait:/sbin/openrc default
 
-# Console
-c1:12345:respawn:/sbin/getty 38400 console
+# Console (single getty to save resources)
+::respawn:/sbin/getty 38400 console
 
 # Shutdown
-l0:0:wait:/sbin/openrc shutdown
-l6:6:wait:/sbin/reboot
+::shutdown:/sbin/openrc shutdown
 EOF
     chmod 644 "$ROOTFS_DIR/etc/inittab"
-    log_info "  Created: /etc/inittab"
+    log_info "  Created: /etc/inittab (optimized)"
 
     # /etc/profile
     cat > "$ROOTFS_DIR/etc/profile" << 'EOF'
@@ -687,6 +685,77 @@ EOF
 EOF
     chmod 644 "$ROOTFS_DIR/etc/motd"
     log_info "  Created: /etc/motd"
+
+    # /etc/rc.conf (OpenRC configuration) - Performance optimized
+    cat > "$ROOTFS_DIR/etc/rc.conf" << 'EOF'
+# Kimigayo OS - OpenRC Configuration (Performance Optimized)
+
+# Enable parallel startup (faster boot)
+rc_parallel="YES"
+
+# Logging configuration (reduce overhead)
+rc_logger="YES"
+rc_log_level="warn"
+
+# Timeout settings
+rc_timeout_stopsec=30
+
+# cgroup support (for containers)
+rc_cgroup_mode="hybrid"
+rc_controller_cgroups="YES"
+
+# Disable hotplug (not needed in containers)
+rc_hotplug="hwclock net.lo"
+
+# Relax dependency checking (faster startup)
+rc_depend_strict="NO"
+
+# Crash handling
+rc_crashed_stop="NO"
+rc_crashed_start="YES"
+
+# Console settings
+unicode="YES"
+EOF
+    chmod 644 "$ROOTFS_DIR/etc/rc.conf"
+    log_info "  Created: /etc/rc.conf (performance optimized)"
+
+    # /etc/sysctl.d/ directory for kernel parameters
+    mkdir -p "$ROOTFS_DIR/etc/sysctl.d"
+
+    # /etc/sysctl.d/99-kimigayo-performance.conf
+    cat > "$ROOTFS_DIR/etc/sysctl.d/99-kimigayo-performance.conf" << 'EOF'
+# Kimigayo OS - Kernel Performance Tuning
+
+# Memory management
+vm.swappiness = 0
+vm.dirty_ratio = 10
+vm.dirty_background_ratio = 5
+vm.overcommit_memory = 1
+
+# Network optimization
+net.core.rmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_default = 262144
+net.core.wmem_max = 16777216
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_syncookies = 1
+
+# File system
+fs.file-max = 65536
+vm.vfs_cache_pressure = 50
+
+# Kernel
+kernel.pid_max = 32768
+
+# Security
+kernel.randomize_va_space = 2
+fs.suid_dumpable = 0
+EOF
+    chmod 644 "$ROOTFS_DIR/etc/sysctl.d/99-kimigayo-performance.conf"
+    log_info "  Created: /etc/sysctl.d/99-kimigayo-performance.conf"
 
     log "✅ Configuration files created successfully"
 }

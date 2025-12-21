@@ -1,0 +1,35 @@
+# Kimigayo OS - Extended Service Configuration
+# フル機能コンテナ環境向けサービスリスト
+
+# === sysinit ランレベル ===
+devfs
+dmesg
+mdev
+udev
+
+# === boot ランレベル ===
+bootmisc
+fsck
+hostname
+hwclock
+loopback
+modules
+networking
+procfs
+root
+swap
+sysctl
+syslog
+urandom
+
+# === default ランレベル ===
+crond
+dbus
+iptables
+local
+sshd
+
+# === shutdown ランレベル ===
+killprocs
+mount-ro
+savecache

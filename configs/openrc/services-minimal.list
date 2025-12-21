@@ -1,0 +1,26 @@
+# Kimigayo OS - Minimal Service Configuration
+# コンテナ環境向け最小サービスリスト
+
+# === sysinit ランレベル ===
+# システム初期化に必須のサービスのみ
+devfs
+dmesg
+mdev
+
+# === boot ランレベル ===
+# 起動時に必要な最小限のサービス
+bootmisc
+hostname
+loopback
+sysctl
+urandom
+
+# === default ランレベル ===
+# デフォルトランレベルのサービス（最小構成）
+# 必要に応じてアプリケーション層で追加
+
+# === shutdown ランレベル ===
+# シャットダウン処理
+killprocs
+mount-ro
+savecache

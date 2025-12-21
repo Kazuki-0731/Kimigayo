@@ -1,0 +1,28 @@
+# Kimigayo OS - Standard Service Configuration
+# 標準的なコンテナ環境向けサービスリスト
+
+# === sysinit ランレベル ===
+devfs
+dmesg
+mdev
+
+# === boot ランレベル ===
+bootmisc
+hostname
+hwclock
+loopback
+modules
+networking
+swap
+sysctl
+syslog
+urandom
+
+# === default ランレベル ===
+crond
+local
+
+# === shutdown ランレベル ===
+killprocs
+mount-ro
+savecache

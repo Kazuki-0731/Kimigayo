@@ -401,6 +401,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [カスタムビルドガイド](docs/developer/CUSTOM_BUILD.md) - カスタムイメージの作成方法
 - [CI/CDガイド](docs/developer/CICD_GUIDE.md) - GitHub Actionsパイプラインの詳細
 - [パフォーマンス分析レポート](docs/developer/PERFORMANCE_ANALYSIS.md) - ベンチマーク結果と最適化ロードマップ
+- [パフォーマンスチューニング結果](docs/developer/PERFORMANCE_TUNING.md) - 実施した最適化と成果
 - [アーキテクチャドキュメント](docs/developer/ARCHITECTURE.md) - システム設計と内部構造
 - [API リファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネル API
 - [開発ガイド](DEVELOPMENT.md) - 開発環境セットアップ
