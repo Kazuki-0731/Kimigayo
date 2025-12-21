@@ -331,6 +331,7 @@ Kimigayo OS は、パッケージの真正性と完全性を保証するため�
 Kimigayo OS はオープンソースプロジェクトです。バグ報告、機能リクエスト、プルリクエストを歓迎します！
 
 - [貢献ガイド](CONTRIBUTING.md)
+- [コミットメッセージガイド](docs/developer/COMMIT_GUIDE.md)
 - [開発ガイド](DEVELOPMENT.md)
 - [行動規範](CODE_OF_CONDUCT.md)
 

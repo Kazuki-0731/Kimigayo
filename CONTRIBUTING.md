@@ -45,25 +45,79 @@ make test
 
 ### コミットメッセージ
 
-絵文字プレフィックスを使用してください:
+Kimigayo OSでは**Conventional Commits**形式と**絵文字プレフィックス**を組み合わせて使用しています。これにより、CHANGELOG.mdが自動生成されます。
 
-- 🎉 `:tada:` - 初回コミット
-- ✨ `:sparkles:` - 新機能
-- 🐛 `:bug:` - バグ修正
-- 🔒 `:lock:` - セキュリティ修正
-- 📝 `:memo:` - ドキュメント
-- ♻️ `:recycle:` - リファクタリング
-- ✅ `:white_check_mark:` - テスト追加
-- 🚀 `:rocket:` - パフォーマンス改善
+#### フォーマット
 
-例:
 ```
-✨ Add package manager dependency resolver
+<絵文字> <タイプ>: <概要>
 
-- Implement dependency graph resolution
-- Add conflict detection
-- Property test for requirement 4.2
+<詳細（オプション）>
+
+<フッター（オプション）>
 ```
+
+#### コミットタイプと絵文字
+
+コミットメッセージの**先頭**に以下のいずれかを使用してください:
+
+| 絵文字 | タイプ | 用途 | CHANGELOGセクション |
+|--------|--------|------|---------------------|
+| ✨ | `feat:` | 新機能追加 | **Added** |
+| 🐛 | `fix:` | バグ修正 | **Fixed** |
+| ♻️ | `refactor:` | リファクタリング | **Changed** |
+| 🔒 | `security:` | セキュリティ修正 | **Security** |
+| 📝 | `docs:` | ドキュメント | **Documentation** |
+| 🏗️ | `build:` | ビルドシステム変更 | **Build/CI** |
+| 👷 | `ci:` | CI/CD変更 | **Build/CI** |
+| 🔖 | `release:` | バージョンリリース | - |
+| ✅ | `test:` | テスト追加・修正 | - |
+| 🚀 | `perf:` | パフォーマンス改善 | **Changed** |
+| 🎉 | `init:` | 初回コミット | - |
+
+#### コミット例
+
+**新機能追加:**
+```
+✨ feat: パッケージマネージャの依存関係解決機能を追加
+
+- 依存グラフ解決アルゴリズムを実装
+- 競合検知機能を追加
+- 要件4.2に対応するプロパティテストを追加
+```
+
+**バグ修正:**
+```
+🐛 fix: rootfs最適化の算術式エラーを修正
+
+scripts/build-rootfs.sh:234でゼロ除算が発生していた問題を修正
+```
+
+**セキュリティ修正:**
+```
+🔒 security: パッケージ検証時のパストラバーサル脆弱性を修正
+
+CVE-2024-XXXXX: 相対パス処理の検証を強化
+```
+
+**ドキュメント:**
+```
+📝 docs: CONTRIBUTING.mdにコミットメッセージ規約を追加
+
+新規コントリビューター向けにConventional Commitsの説明を追加
+```
+
+#### CHANGELOG自動生成
+
+コミットメッセージが規約に従っていれば、以下のコマンドで自動的にCHANGELOG.mdが生成されます:
+
+```bash
+make changelog
+```
+
+生成されるCHANGELOGは[Keep a Changelog](https://keepachangelog.com/)形式に準拠し、各コミットタイプが対応するセクションに分類されます。
+
+**重要:** コミットメッセージの**先頭**に絵文字またはタイプキーワードを配置してください。そうしないとCHANGELOGに反映されません。
 
 ## コーディング規約
 
