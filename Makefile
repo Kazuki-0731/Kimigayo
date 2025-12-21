@@ -19,6 +19,7 @@ help:
 	@echo "  make build        - Kimigayo OSをビルド [1/6]～[6/6]"
 	@echo "  make test         - テストを実行"
 	@echo "  make test-docker  - Dockerイメージ起動テストを実行"
+	@echo "  make test-func    - 機能テストを実行 (BusyBox, Network, Package Manager)"
 	@echo "  make status       - ビルド状態を表示（どこまで完了したか確認）"
 	@echo "  make info         - ビルド設定情報を表示"
 	@echo ""
@@ -100,6 +101,10 @@ test:
 test-docker:
 	@echo "Dockerイメージ起動テストを実行..."
 	bash tests/integration/test_docker_startup.sh
+
+test-func:
+	@echo "機能テストを実行..."
+	bash tests/integration/test_functionality.sh
 
 info:
 	@echo "ビルド情報を表示..."
