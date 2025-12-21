@@ -112,8 +112,16 @@
 3. Docker Hubにログイン
 4. メタデータを抽出（バージョン、タグ等）
 5. Kimigayo OS rootfsをビルド
-6. Dockerイメージをビルド・プッシュ
-7. ビルド成果物をアップロード
+6. **統合テストを実行**
+   - Python環境のセットアップ
+   - Phase 1統合テストの実行
+   - rootfs構造の検証
+7. **Dockerイメージのスモークテスト**
+   - コンテナ起動テスト
+   - 基本コマンド動作確認
+   - BusyBox動作確認
+8. テスト成功後、Dockerイメージをビルド・プッシュ
+9. ビルド成果物をアップロード
 
 #### 2. create-manifest
 
@@ -122,6 +130,17 @@
 **ステップ:**
 1. Docker Hubにログイン
 2. 各バリアントのマルチアーキマニフェストを作成・プッシュ
+
+#### 3. create-github-release
+
+GitHub Releasesを作成し、ビルド成果物を添付します。
+
+**ステップ:**
+1. リポジトリをチェックアウト
+2. すべてのビルド成果物をダウンロード
+3. リリース用アセットを準備
+4. リリースノートを生成
+5. GitHub Releaseを作成し、成果物を添付
 
 ## 使用方法
 
@@ -136,8 +155,9 @@
 2. **GitHub Actionsで自動ビルドが開始**
    - リポジトリの **Actions** タブで進行状況を確認
 
-3. **ビルド完了後、Docker Hubで確認**
-   - https://hub.docker.com/r/ishinokazuki/kimigayo-os
+3. **ビルド完了後、以下を確認**
+   - Docker Hub: https://hub.docker.com/r/ishinokazuki/kimigayo-os
+   - GitHub Releases: リポジトリの **Releases** タブでビルド成果物を確認
 
 ### 手動実行
 
