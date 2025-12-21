@@ -331,9 +331,23 @@ jobs:
           # Copy all tar.gz files to release-assets
           find artifacts/ -name "*.tar.gz" -exec cp {} release-assets/ \;
 
+          # Generate checksums
+          cd release-assets
+          sha256sum *.tar.gz > SHA256SUMS
+          sha512sum *.tar.gz > SHA512SUMS
+          cd ..
+
           # List assets
           echo "Release assets:"
           ls -lh release-assets/
+
+          echo ""
+          echo "SHA256 Checksums:"
+          cat release-assets/SHA256SUMS
+
+          echo ""
+          echo "SHA512 Checksums:"
+          cat release-assets/SHA512SUMS
 
       - name: Generate release notes
         id: release_notes

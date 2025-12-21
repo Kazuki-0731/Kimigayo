@@ -649,7 +649,7 @@
   - Dockerイメージタグへの反映
   - バージョン情報のイメージメタデータ埋め込み
 
-- [ ] 29.2 リリースノート生成
+- [x] 29.2 リリースノート生成
   - CHANGELOG.mdの自動生成（conventional commits）
   - GitHub Releasesの自動作成
   - リリースアセット添付（tar.gz, checksums, signatures）

@@ -3,7 +3,7 @@
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
-.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version
+.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
 
 # デフォルトターゲット
 help:
@@ -69,6 +69,7 @@ help:
 	@echo "📌 バージョン管理:"
 	@echo "  make version      - バージョン番号を取得"
 	@echo "  make show-version - バージョン情報を表示"
+	@echo "  make changelog    - CHANGELOG.mdを生成"
 	@echo ""
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
@@ -424,3 +425,7 @@ version:
 # バージョン情報を表示
 show-version:
 	@bash scripts/show-version.sh
+
+# CHANGELOG.mdを生成
+changelog:
+	@bash scripts/generate-changelog.sh
