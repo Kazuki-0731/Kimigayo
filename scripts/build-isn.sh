@@ -95,10 +95,16 @@ esac
 log_info "Build configuration:"
 log_info "  Target: ${TARGET}"
 
-# Check if musl target is installed
-if ! rustup target list --installed | grep -q "$TARGET"; then
-    log_info "Installing Rust target: $TARGET"
-    rustup target add "$TARGET"
+# Check if rustup is available (for rustup-based installations)
+if command -v rustup &> /dev/null; then
+    # Check if musl target is installed
+    if ! rustup target list --installed | grep -q "$TARGET"; then
+        log_info "Installing Rust target: $TARGET"
+        rustup target add "$TARGET"
+    fi
+else
+    log_info "rustup not available (using system Rust from Alpine apk)"
+    log_info "Skipping target installation - using default target"
 fi
 
 # Build isn
