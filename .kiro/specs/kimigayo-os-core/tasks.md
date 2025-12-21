@@ -563,7 +563,7 @@
   - リポジトリ説明文の記載
   - タグ命名規則の決定（例: 0.1.0, 0.1.0-minimal, latest）
 
-- [ ] 25.2 Dockerイメージメタデータ整備
+- [x] 25.2 Dockerイメージメタデータ整備
   - Dockerfile LABELの追加（org.opencontainers.image.*）
   - Docker Hub README.mdの作成
   - 使用例とクイックスタートガイド
