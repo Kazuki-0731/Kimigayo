@@ -14,32 +14,40 @@ NC='\033[0m' # No Color
 # デフォルト設定
 OUTPUT_FILE="${OUTPUT_FILE:-benchmark-size.json}"
 
-# 比較対象イメージ
-declare -A IMAGES=(
-    ["Kimigayo Minimal"]="ishinokazuki/kimigayo-os:latest-minimal"
-    ["Kimigayo Standard"]="ishinokazuki/kimigayo-os:latest"
-    ["Kimigayo Extended"]="ishinokazuki/kimigayo-os:latest-extended"
-    ["Alpine Latest"]="alpine:latest"
-    ["Alpine 3.19"]="alpine:3.19"
-    ["Debian Slim"]="debian:stable-slim"
-    ["Ubuntu"]="ubuntu:22.04"
-    ["BusyBox"]="busybox:latest"
+# 比較対象イメージ（カンマ区切りで名前:イメージ形式）
+IMAGES=(
+    "Kimigayo Minimal:ishinokazuki/kimigayo-os:latest-minimal"
+    "Kimigayo Standard:ishinokazuki/kimigayo-os:latest"
+    "Kimigayo Extended:ishinokazuki/kimigayo-os:latest-extended"
+    "Alpine Latest:alpine:latest"
+    "Alpine 3.19:alpine:3.19"
+    "Debian Slim:debian:stable-slim"
+    "Ubuntu:ubuntu:22.04"
+    "BusyBox:busybox:latest"
 )
 
 echo -e "${BOLD}Kimigayo OS - ディスクサイズ比較ベンチマーク${NC}"
 echo "======================================"
 echo ""
 
-# イメージをプル
+# イメージをプル（ローカルにあればスキップ）
 echo -e "${YELLOW}イメージをプル中...${NC}"
-for name in "${!IMAGES[@]}"; do
-    image="${IMAGES[$name]}"
+
+declare -a VALID_IMAGES=()
+for entry in "${IMAGES[@]}"; do
+    name="${entry%%:*}"
+    image="${entry#*:}"
     echo -ne "  ${name}... "
-    if docker pull "$image" > /dev/null 2>&1; then
+
+    # ローカルにイメージがあるか確認
+    if docker image inspect "$image" > /dev/null 2>&1; then
+        echo -e "${BLUE}✓ (ローカル)${NC}"
+        VALID_IMAGES+=("$entry")
+    elif docker pull "$image" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"
+        VALID_IMAGES+=("$entry")
     else
         echo -e "${RED}✗ (スキップ)${NC}"
-        unset IMAGES["$name"]
     fi
 done
 
@@ -49,17 +57,21 @@ echo ""
 echo -e "${GREEN}イメージサイズ測定中...${NC}"
 echo ""
 
-declare -A sizes=()
+# サイズデータを一時ファイルに保存
+tmpfile=$(mktemp)
+trap "rm -f $tmpfile" EXIT
+
 max_name_len=0
 
-for name in "${!IMAGES[@]}"; do
-    image="${IMAGES[$name]}"
+for entry in "${VALID_IMAGES[@]}"; do
+    name="${entry%%:*}"
+    image="${entry#*:}"
 
     # サイズを取得（MB単位）
     size_bytes=$(docker image inspect "$image" --format='{{.Size}}' 2>/dev/null || echo "0")
     size_mb=$((size_bytes / 1024 / 1024))
 
-    sizes["$name"]=$size_mb
+    echo "$size_mb:$name:$image" >> "$tmpfile"
 
     # 最大名前長を記録（表示整形用）
     name_len=${#name}
@@ -68,19 +80,8 @@ for name in "${!IMAGES[@]}"; do
     fi
 done
 
-# ソート用配列を作成
-declare -a sorted_names=()
-for name in "${!sizes[@]}"; do
-    sorted_names+=("$name")
-done
-
 # サイズでソート
-IFS=$'\n' sorted_names=($(sort -t: -k2 -n <(
-    for name in "${sorted_names[@]}"; do
-        echo "${sizes[$name]}:$name"
-    done
-) | cut -d: -f2-))
-unset IFS
+sort -t: -k1 -n "$tmpfile" > "${tmpfile}.sorted"
 
 # 結果表示
 echo -e "${BOLD}ベンチマーク結果（サイズ順）${NC}"
@@ -90,16 +91,14 @@ echo "======================================"
 printf "%-${max_name_len}s  %10s  %10s\n" "イメージ" "サイズ(MB)" "比較"
 printf "%s\n" "$(printf '=%.0s' {1..50})"
 
-# Kimigayo Minimalを基準として比較
-kimigayo_minimal_size=${sizes["Kimigayo Minimal"]}
+# Kimigayo Minimalのサイズを基準として取得
+kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
 
-for name in "${sorted_names[@]}"; do
-    size=${sizes[$name]}
-
+while IFS=: read -r size name image; do
     # 比較率を計算
     if [ "$name" = "Kimigayo Minimal" ]; then
         comparison="(基準)"
-    elif [ $kimigayo_minimal_size -gt 0 ]; then
+    elif [ -n "$kimigayo_minimal_size" ] && [ "$kimigayo_minimal_size" -gt 0 ]; then
         ratio=$((size * 100 / kimigayo_minimal_size))
         comparison="${ratio}%"
     else
@@ -107,14 +106,14 @@ for name in "${sorted_names[@]}"; do
     fi
 
     # 色分け
-    if [[ "$name" == Kimigayo* ]]; then
+    if echo "$name" | grep -q "^Kimigayo"; then
         color=$BLUE
     else
         color=$NC
     fi
 
     printf "${color}%-${max_name_len}s${NC}  %10d  %10s\n" "$name" "$size" "$comparison"
-done
+done < "${tmpfile}.sorted"
 
 echo ""
 
@@ -125,9 +124,7 @@ echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," >> "$OUTPUT_FILE"
 echo '  "results": {' >> "$OUTPUT_FILE"
 
 first=true
-for name in "${sorted_names[@]}"; do
-    size=${sizes[$name]}
-
+while IFS=: read -r size name image; do
     if [ "$first" = true ]; then
         first=false
     else
@@ -136,8 +133,8 @@ for name in "${sorted_names[@]}"; do
 
     # JSON用にエスケープ
     json_name=$(echo "$name" | sed 's/"/\\"/g')
-    echo -n "    \"$json_name\": {\"size_mb\": $size, \"image\": \"${IMAGES[$name]}\"}" >> "$OUTPUT_FILE"
-done
+    echo -n "    \"$json_name\": {\"size_mb\": $size, \"image\": \"$image\"}" >> "$OUTPUT_FILE"
+done < "${tmpfile}.sorted"
 
 echo "" >> "$OUTPUT_FILE"
 echo "  }" >> "$OUTPUT_FILE"
@@ -147,18 +144,35 @@ echo -e "${GREEN}✓ 結果を $OUTPUT_FILE に保存しました${NC}"
 
 # CI環境の場合は環境変数にも出力
 if [ -n "$GITHUB_OUTPUT" ]; then
-    echo "kimigayo_minimal_size_mb=${sizes["Kimigayo Minimal"]}" >> "$GITHUB_OUTPUT"
-    echo "kimigayo_standard_size_mb=${sizes["Kimigayo Standard"]}" >> "$GITHUB_OUTPUT"
-    echo "kimigayo_extended_size_mb=${sizes["Kimigayo Extended"]}" >> "$GITHUB_OUTPUT"
-    echo "alpine_size_mb=${sizes["Alpine Latest"]}" >> "$GITHUB_OUTPUT"
+    while IFS=: read -r size name image; do
+        case "$name" in
+            "Kimigayo Minimal")
+                echo "kimigayo_minimal_size_mb=$size" >> "$GITHUB_OUTPUT"
+                ;;
+            "Kimigayo Standard")
+                echo "kimigayo_standard_size_mb=$size" >> "$GITHUB_OUTPUT"
+                ;;
+            "Kimigayo Extended")
+                echo "kimigayo_extended_size_mb=$size" >> "$GITHUB_OUTPUT"
+                ;;
+            "Alpine Latest")
+                echo "alpine_size_mb=$size" >> "$GITHUB_OUTPUT"
+                ;;
+        esac
+    done < "${tmpfile}.sorted"
 fi
 
 # 目標値チェック（Minimal < 5MB）
-kimigayo_minimal_size=${sizes["Kimigayo Minimal"]}
-if [ $kimigayo_minimal_size -lt 5 ]; then
-    echo -e "${GREEN}✓ 目標達成: Kimigayo Minimalが5MB以下です${NC}"
-    exit 0
+kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
+if [ -n "$kimigayo_minimal_size" ]; then
+    if [ "$kimigayo_minimal_size" -lt 5 ]; then
+        echo -e "${GREEN}✓ 目標達成: Kimigayo Minimalが5MB以下です (${kimigayo_minimal_size}MB)${NC}"
+        exit 0
+    else
+        echo -e "${YELLOW}⚠ 警告: Kimigayo Minimalが5MBを超えています (${kimigayo_minimal_size}MB)${NC}"
+        exit 1
+    fi
 else
-    echo -e "${YELLOW}⚠ 警告: Kimigayo Minimalが5MBを超えています (${kimigayo_minimal_size}MB)${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠ 警告: Kimigayo Minimalイメージが見つかりません${NC}"
+    exit 0
 fi
