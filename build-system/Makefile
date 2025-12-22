@@ -83,7 +83,7 @@ endif
 
 # Phony targets
 .PHONY: all build clean help test docker-build docker-test \
-        kernel musl init pkg utils rootfs iso docker-image \
+        kernel musl init utils rootfs iso docker-image \
         security-scan dependency-check qemu-test \
         install uninstall test-unit test-property test-integration test-musl
 
@@ -95,13 +95,12 @@ help:
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  all              - Build everything (default)"
-	@echo "  build            - Build all OS components [1/6] to [6/6]"
-	@echo "  musl             - Build musl libc [1/6]"
-	@echo "  kernel           - Build Linux kernel [2/6]"
-	@echo "  busybox          - Build BusyBox [3/6]"
-	@echo "  init             - Build OpenRC init system [4/6]"
-	@echo "  pkg              - Build package manager [5/6]"
-	@echo "  rootfs           - Build root filesystem [6/6]"
+	@echo "  build            - Build all OS components [1/4] to [4/4]"
+	@echo "  musl             - Build musl libc [1/4]"
+	@echo "  kernel           - Build Linux kernel [2/4]"
+	@echo "  busybox          - Build BusyBox [3/4]"
+	@echo "  init             - Build OpenRC init system [4/4]"
+	@echo "  rootfs           - Build root filesystem"
 	@echo ""
 	@echo "Clean Targets:"
 	@echo "  clean            - Remove all build artifacts (keeps downloads)"
@@ -109,7 +108,6 @@ help:
 	@echo "  clean-kernel     - Remove only kernel build artifacts"
 	@echo "  clean-busybox    - Remove only BusyBox build artifacts"
 	@echo "  clean-openrc     - Remove only OpenRC build artifacts"
-	@echo "  clean-pkg        - Remove only package manager build artifacts"
 	@echo "  clean-rootfs     - Remove only rootfs build artifacts"
 	@echo "  clean-output     - Remove only output directory"
 	@echo "  clean-all        - Remove everything (including downloads & Docker)"
@@ -151,7 +149,7 @@ help:
 	@echo "  make test V=1"
 
 # Build target
-build: musl kernel busybox init pkg rootfs
+build: musl kernel busybox init rootfs
 	@echo ""
 	@echo "=========================================="
 	@echo "✅ Build completed for $(ARCH)"
@@ -161,72 +159,61 @@ build: musl kernel busybox init pkg rootfs
 musl:
 	@echo ""
 	@echo "=========================================="
-	@echo "📦 [1/6] Building musl libc ($(ARCH))"
+	@echo "📦 [1/4] Building musl libc ($(ARCH))"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/musl-build-$(ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-musl.sh
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-musl.sh
-	@echo "✅ [1/6] musl libc build completed"
+	@echo "✅ [1/4] musl libc build completed"
 
 # Kernel build
 kernel:
 	@echo ""
 	@echo "=========================================="
-	@echo "🐧 [2/6] Building Linux Kernel ($(ARCH))"
+	@echo "🐧 [2/4] Building Linux Kernel ($(ARCH))"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/kernel
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-kernel.sh
 	$(Q)bash $(SCRIPTS_DIR)/apply-kernel-patches.sh
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
-	@echo "✅ [2/6] Kernel build completed"
+	@echo "✅ [2/4] Kernel build completed"
 
 # BusyBox build
 busybox:
 	@echo ""
 	@echo "=========================================="
-	@echo "🔧 [3/6] Building BusyBox ($(ARCH)) - $(IMAGE_TYPE)"
+	@echo "🔧 [3/4] Building BusyBox ($(ARCH)) - $(IMAGE_TYPE)"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-busybox.sh
 	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
-	@echo "✅ [3/6] BusyBox build completed"
+	@echo "✅ [3/4] BusyBox build completed"
 
 # Init system build (OpenRC)
 init:
 	@echo ""
 	@echo "=========================================="
-	@echo "⚙️  [4/6] Building OpenRC Init System ($(ARCH))"
+	@echo "⚙️  [4/4] Building OpenRC Init System ($(ARCH))"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
 	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
-	@echo "✅ [4/6] OpenRC build completed"
-
-# Package manager build
-pkg:
-	@echo ""
-	@echo "=========================================="
-	@echo "📦 [5/6] Building Package Manager (isn)"
-	@echo "=========================================="
-	$(Q)mkdir -p $(BUILD_DIR)/pkg
-	$(Q)mkdir -p $(BUILD_DIR)/logs
-	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-isn.sh
-	@echo "✅ [5/6] Package manager build completed"
+	@echo "✅ [4/4] OpenRC build completed"
 
 # Root filesystem
 rootfs:
 	@echo ""
 	@echo "=========================================="
-	@echo "📁 [6/6] Building Root Filesystem"
+	@echo "📁 Building Root Filesystem"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/rootfs
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-rootfs.sh
-	@echo "✅ [6/6] Root filesystem build completed"
+	@echo "✅ Root filesystem build completed"
 
 # ISO image generation
 iso: build
@@ -315,11 +302,6 @@ clean-openrc:
 	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* 2>/dev/null || true
 	@echo "[SUCCESS] OpenRC clean completed"
 
-clean-pkg:
-	@echo "[CLEAN] Removing package manager build artifacts..."
-	$(Q)rm -rf $(BUILD_DIR)/pkg $(BUILD_DIR)/pkg-install-* 2>/dev/null || true
-	@echo "[SUCCESS] Package manager clean completed"
-
 clean-rootfs:
 	@echo "[CLEAN] Removing root filesystem artifacts..."
 	$(Q)rm -rf $(BUILD_DIR)/rootfs 2>/dev/null || true
@@ -331,7 +313,7 @@ clean-output:
 	@echo "[SUCCESS] Output clean completed"
 
 # Clean all build artifacts (keeps downloads cache)
-clean: clean-musl clean-kernel clean-busybox clean-openrc clean-pkg clean-rootfs clean-output
+clean: clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output
 	@echo "[SUCCESS] All build artifacts cleaned"
 
 # Clean everything including downloads and Docker volumes
