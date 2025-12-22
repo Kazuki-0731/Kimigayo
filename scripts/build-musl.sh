@@ -11,6 +11,11 @@ ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
+# Normalize arm64 to aarch64 early (musl uses aarch64 internally)
+if [ "$ARCH" = "arm64" ]; then
+    ARCH="aarch64"
+fi
+
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -53,11 +58,6 @@ log_build() {
 
 # Architecture-specific settings
 setup_arch() {
-    # Normalize arm64 to aarch64 (musl uses aarch64 internally)
-    if [ "$ARCH" = "arm64" ]; then
-        ARCH="aarch64"
-    fi
-
     case "$ARCH" in
         x86_64)
             TARGET="x86_64-linux-musl"
