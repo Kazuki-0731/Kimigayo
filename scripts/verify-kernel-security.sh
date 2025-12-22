@@ -321,7 +321,8 @@ check_panic_on_oops() {
     if is_enabled "CONFIG_PANIC_ON_OOPS"; then
         log_enabled "CONFIG_PANIC_ON_OOPS enabled"
 
-        local timeout=$(get_value "CONFIG_PANIC_TIMEOUT")
+        local timeout
+        timeout=$(get_value "CONFIG_PANIC_TIMEOUT")
         if [ -n "$timeout" ]; then
             log_info "PANIC_TIMEOUT set to: $timeout seconds"
         fi
