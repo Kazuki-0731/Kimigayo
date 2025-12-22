@@ -193,47 +193,5 @@ jobs:
             automated
             base-image
 
-  rebuild-test:
-    needs: check-updates
-    if: needs.check-updates.outputs.should_rebuild == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        variant: [minimal, standard]
-        arch: [x86_64]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build and test
-        run: |
-          export ARCH=${{ matrix.arch }}
-          export IMAGE_TYPE=${{ matrix.variant }}
-
-          echo "Building $IMAGE_TYPE variant for $ARCH..."
-          bash scripts/build-rootfs.sh
-
-          # Verify build output
-          if [ ! -d "build/rootfs" ]; then
-            echo "❌ Build failed - rootfs directory not found"
-            exit 1
-          fi
-
-          echo "✅ Build completed successfully"
-          ls -lah build/rootfs/ | head -20
-
-      - name: Run basic tests
-        run: |
-          # Verify essential files exist
-          if [ ! -f "build/rootfs/bin/sh" ]; then
-            echo "❌ /bin/sh not found"
-            exit 1
-          fi
-
-          if [ ! -f "build/rootfs/bin/busybox" ]; then
-            echo "❌ /bin/busybox not found"
-            exit 1
-          fi
-
-          echo "✅ Basic file checks passed"
+  # Note: Full build testing is done in the PR's CI/CD pipeline
+  # This workflow only creates the update PR
