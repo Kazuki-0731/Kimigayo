@@ -205,7 +205,7 @@ jobs:
           gh pr create \
             --title "⬆️ Update base image components - $(date +%Y-%m-%d)" \
             --body "$PR_BODY" \
-            --label "dependencies,automated,base-image" \
+            --label "dependencies,automated" \
             --base main
 
   # Note: Full build testing is done in the PR's CI/CD pipeline
