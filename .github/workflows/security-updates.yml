@@ -10,6 +10,7 @@ permissions:
   contents: write
   pull-requests: write
   security-events: write
+  issues: write
 
 jobs:
   check-security-updates:
