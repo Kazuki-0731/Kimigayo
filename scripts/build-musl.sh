@@ -11,6 +11,11 @@ ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
+# Normalize arm64 to aarch64 early (musl uses aarch64 internally)
+if [ "$ARCH" = "arm64" ]; then
+    ARCH="aarch64"
+fi
+
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -53,11 +58,6 @@ log_build() {
 
 # Architecture-specific settings
 setup_arch() {
-    # Normalize arm64 to aarch64 (musl uses aarch64 internally)
-    if [ "$ARCH" = "arm64" ]; then
-        ARCH="aarch64"
-    fi
-
     case "$ARCH" in
         x86_64)
             TARGET="x86_64-linux-musl"
@@ -278,7 +278,8 @@ verify_installation() {
 
     # Check library size
     if [ -f "$libc_path" ]; then
-        local size=$(stat -f%z "$libc_path" 2>/dev/null || stat -c%s "$libc_path" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$libc_path" 2>/dev/null || stat -c%s "$libc_path" 2>/dev/null || echo 0)
         local size_kb=$((size / 1024))
         log_info "libc.so size: ${size_kb}KB"
     fi
@@ -291,7 +292,8 @@ verify_installation() {
         log_info "  - ${file#$MUSL_INSTALL_DIR}"
     done
 
-    local file_count=$(find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+    local file_count
+    file_count=$(find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
     log_info "Total files installed: $file_count"
     set -o pipefail
 
@@ -348,8 +350,9 @@ show_summary() {
     done
 
     if [ -n "$libc_so_path" ]; then
-        local size=$(stat -f%z "$libc_so_path" 2>/dev/null || \
-                     stat -c%s "$libc_so_path" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$libc_so_path" 2>/dev/null || \
+               stat -c%s "$libc_so_path" 2>/dev/null || echo 0)
         local size_kb=$((size / 1024))
         log_info "libc.so Size: ${size_kb}KB"
     fi
