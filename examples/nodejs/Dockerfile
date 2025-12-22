@@ -7,8 +7,8 @@ LABEL maintainer="Kimigayo OS Team"
 LABEL description="Node.js runtime on Kimigayo OS"
 LABEL version="1.0.0"
 
-# Install Node.js and npm using Alpine packages temporarily
-# (In future, this will use 'isn install nodejs npm')
+# Install Node.js and npm using Alpine packages
+# Note: Kimigayo OS follows distroless design (no package manager)
 RUN apk add --no-cache \
     nodejs \
     npm

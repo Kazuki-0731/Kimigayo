@@ -193,14 +193,19 @@ adduser username
 adduser username wheel
 ```
 
-### パッケージマネージャ（isn）の初期化
+### 追加ソフトウェアのインストール
+
+Kimigayo OSはdistroless設計を採用しており、パッケージマネージャは含まれていません。追加ソフトウェアが必要な場合は、マルチステージビルドを使用してください。
 
 ```bash
-# パッケージリポジトリの更新
-isn update
+# マルチステージビルドの例
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache vim curl wget
 
-# 基本パッケージのインストール
-isn install vim curl wget
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /usr/bin/vim /usr/bin/vim
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+COPY --from=builder /usr/bin/wget /usr/bin/wget
 ```
 
 ### ネットワーク設定
@@ -249,17 +254,13 @@ docker network ls
 docker network inspect bridge
 ```
 
-### パッケージマネージャが動作しない
+### ソフトウェアのインストール方法
+
+Kimigayo OSはdistroless設計のため、パッケージマネージャは含まれていません。
 
 ```bash
-# リポジトリの確認
-cat /etc/isn/repositories.conf
-
-# キャッシュのクリア
-isn cache clean
-
-# リポジトリの再同期
-isn update --force
+# 必要なソフトウェアはマルチステージビルドで追加
+# Dockerfileを参照してください
 ```
 
 ### イメージのpullが失敗する
@@ -326,6 +327,5 @@ docker run -it --user 1000:1000 kimigayo/kimigayo-os:standard
 インストールが完了したら、以下のドキュメントを参照してください：
 
 - [クイックスタートガイド](QUICKSTART.md)
-- [パッケージマネージャ使用方法](PACKAGE_MANAGER.md)
 - [システム設定ガイド](CONFIGURATION.md)
 - [セキュリティガイド](../security/SECURITY_GUIDE.md)

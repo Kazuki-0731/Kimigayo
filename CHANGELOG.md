@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-12-21
 
 ### Added
-- isnパッケージマネージャの基礎実装
 - rootfsサイズ最適化を実装
 - 個別コンポーネントのクリーンターゲットを追加
 - ビルドマイルストーン表示とOpenRC検証修正

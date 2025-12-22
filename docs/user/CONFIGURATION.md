@@ -143,10 +143,9 @@ nameserver 1.1.1.1
 
 ### 無線LAN設定
 
-```bash
-# 無線LANツールのインストール
-isn install wireless-tools wpa_supplicant
+無線LAN機能が必要な場合は、マルチステージビルドで必要なツールを組み込んでください。
 
+```bash
 # 無線インターフェースの確認
 iwconfig
 
@@ -257,9 +256,6 @@ rc-service myservice start
 ### ファイアウォールの設定
 
 ```bash
-# iptablesのインストール
-isn install iptables
-
 # 基本的なファイアウォールルール
 # すべてをブロック
 iptables -P INPUT DROP
@@ -289,9 +285,6 @@ rc-update add iptables default
 ### SSH設定
 
 ```bash
-# SSHサーバーのインストール
-isn install openssh
-
 # SSH設定ファイルの編集
 vi /etc/ssh/sshd_config
 ```
@@ -337,21 +330,6 @@ vi /etc/sudoers
 %wheel ALL=(ALL) ALL
 ```
 
-### セキュリティアップデートの自動適用
-
-```bash
-# セキュリティアップデートの自動適用を有効化
-isn config set auto-security-updates true
-
-# cronジョブで定期的にチェック
-crontab -e
-```
-
-以下を追加：
-```
-0 2 * * * isn update && isn upgrade --security-only -y
-```
-
 ## システム最適化
 
 ### メモリ最適化
@@ -389,9 +367,6 @@ find / -type f -size +10M -exec ls -lh {} \;
 
 # ログローテーションの設定
 vi /etc/logrotate.conf
-
-# パッケージキャッシュのクリア
-isn cache clean --all
 
 # tmpfsを使用して一時ファイルをRAMに保存
 echo "tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0" >> /etc/fstab
@@ -507,14 +482,11 @@ tail -f /var/log/<service-name>.log
 # システムリソースのリアルタイム監視
 top
 
-# または
-htop  # 要インストール: isn install htop
+# ディスクI/Oの監視（必要に応じてマルチステージビルドで組み込み）
+# iostat
 
-# ディスクI/Oの監視
-iostat  # 要インストール: isn install sysstat
-
-# ネットワーク監視
-iftop  # 要インストール: isn install iftop
+# ネットワーク監視（必要に応じてマルチステージビルドで組み込み）
+# iftop
 ```
 
 ## バックアップと復元

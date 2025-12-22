@@ -133,7 +133,7 @@ make build-extended
 | イメージ | サイズ | 含まれるコンポーネント |
 |---------|--------|---------------------|
 | **Minimal** | < 5MB | カーネル、BusyBox、musl libc、OpenRC（最小構成） |
-| **Standard** | < 15MB | Minimal + isn、基本的なネットワークツール、SSH |
+| **Standard** | < 15MB | Minimal + 基本的なネットワークツール、SSH |
 | **Extended** | < 50MB | Standard + 開発ツール、追加ユーティリティ |
 
 #### アーキテクチャ別ビルド
@@ -227,7 +227,6 @@ packages:
   - busybox
   - musl
   - openrc
-  - isn
   - nginx
   - postgresql
 

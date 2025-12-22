@@ -61,14 +61,7 @@ Kimigayo OS Phase 1の開発が完了しました。Googleのdistrolessと同様
 - ✅ ログ記録機能
 - ✅ 回復メカニズム
 
-### 4. パッケージマネージャ
-
-**設計方針変更**: Distroless的アプローチを採用し、パッケージマネージャーを意図的に排除
-- ✅ 最小攻撃面の実現
-- ✅ 不変インフラの徹底
-- ✅ マルチステージビルドでの利用を推奨
-
-### 5. ビルドシステム
+### 4. ビルドシステム
 
 #### 再現可能ビルド
 - ✅ ビット同一出力の保証
@@ -174,13 +167,12 @@ Kimigayo OS Phase 1の開発が完了しました。Googleのdistrolessと同様
 ### ユーザー向け
 - ✅ [インストールガイド](docs/user/INSTALLATION.md) - Docker、仮想化環境、ベアメタルへのインストール
 - ✅ [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
-- ✅ [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isnの詳細ガイド
 - ✅ [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティ設定
 
 ### 開発者向け
 - ✅ [ビルドガイド](docs/developer/BUILD_GUIDE.md) - ビルド手順とカスタマイズ
 - ✅ [アーキテクチャドキュメント](docs/developer/ARCHITECTURE.md) - システム設計
-- ✅ [APIリファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネルAPI
+- ✅ [APIリファレンス](docs/developer/API_REFERENCE.md) - Init、カーネルAPI
 - ✅ [開発ガイド](DEVELOPMENT.md) - 開発環境セットアップ
 - ✅ [コントリビューションガイド](CONTRIBUTING.md) - 貢献方法
 
@@ -206,18 +198,8 @@ Kimigayo OS Phase 1の開発が完了しました。Googleのdistrolessと同様
 
 ## 🔒 セキュリティ機能
 
-### Ed25519署名検証
-Kimigayo OSは、軽量で高速なEd25519署名アルゴリズムをパッケージ署名に採用しています。
-
-**利点**:
-- 🚀 高速: RSAより署名検証が高速
-- 💾 軽量: 署名64バイト、公開鍵32バイト
-- 🔒 高セキュリティ: 128ビットセキュリティレベル
-- 🐳 コンテナ最適: 最小限のリソースで動作
-
 ### 多層防御（Defense in Depth）
 - アプリケーション層: Seccomp-BPF、Namespace isolation
-- パッケージ層: Ed25519/GPG署名検証、SHA-256ハッシュ
 - システム層: iptables、SSH強化
 - ランタイム層: ASLR、DEP、Stack canaries
 - コンパイル層: PIE、RELRO、FORTIFY_SOURCE
@@ -238,11 +220,6 @@ Kimigayo OSは、軽量で高速なEd25519署名アルゴリズムをパッケ�
 - Minimal/Standard/Extendedイメージの実際の生成
 - ブータブルISOイメージの作成
 - Dockerイメージの最適化
-
-#### パッケージエコシステム
-- パッケージリポジトリの構築
-- メインパッケージの移植
-- コミュニティパッケージの受け入れ
 
 #### GUI機能（オプション）
 - Waylandサポート
@@ -274,7 +251,6 @@ Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
 ### Phase 1の制限
 - 実際のOSイメージはまだ生成されていません（インフラストラクチャのみ）
-- パッケージリポジトリは未構築
 - GUIサポートなし
 - 一部のテストで環境依存の問題
 

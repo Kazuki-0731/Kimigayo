@@ -207,7 +207,6 @@ New Issue Created
 ### Component Labels
 
 - `core` - Core OS functionality
-- `package-manager` - isn package manager
 - `init-system` - OpenRC/init system
 - `networking` - Network-related
 - `security-hardening` - Security features

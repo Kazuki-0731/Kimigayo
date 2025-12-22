@@ -119,59 +119,25 @@ wget https://example.com
 curl https://example.com
 ```
 
-## パッケージの管理
+## ソフトウェアの追加
 
-Kimigayo OSでは`isn`パッケージマネージャを使用します。
+Kimigayo OSはdistroless的アプローチを採用しており、パッケージマネージャーを含みません。
+必要なソフトウェアは、マルチステージビルドを使用してイメージに組み込んでください。
 
-### 基本的な操作
+### マルチステージビルドの例
 
-```bash
-# リポジトリの更新
-isn update
+```dockerfile
+# ビルドステージで必要なソフトウェアを準備
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache vim curl wget
 
-# パッケージの検索
-isn search <package-name>
+# Kimigayo OSで最小ランタイムを構築
+FROM kimigayo-os:latest
+COPY --from=builder /usr/bin/vim /usr/bin/vim
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+COPY --from=builder /usr/bin/wget /usr/bin/wget
 
-# パッケージのインストール
-isn install <package-name>
-
-# パッケージの削除
-isn remove <package-name>
-
-# インストール済みパッケージの一覧
-isn list
-
-# パッケージ情報の表示
-isn info <package-name>
-```
-
-### よく使うパッケージ
-
-```bash
-# 開発ツール
-isn install gcc make git
-
-# ネットワークツール
-isn install curl wget openssh
-
-# テキストエディタ
-isn install vim nano
-
-# システムツール
-isn install htop tmux
-```
-
-### パッケージのアップデート
-
-```bash
-# 利用可能なアップデートの確認
-isn upgrade --check
-
-# すべてのパッケージをアップデート
-isn upgrade
-
-# 特定のパッケージをアップデート
-isn upgrade <package-name>
+CMD ["/bin/sh"]
 ```
 
 ## システムの設定
@@ -349,20 +315,13 @@ vi /etc/ssh/sshd_config
 # ファイアウォールの設定
 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 iptables -A INPUT -j DROP
-
-# パッケージの定期的なアップデート
-isn update && isn upgrade
 ```
 
 ## トラブルシューティング
 
 ### コマンドが見つからない
 
-```bash
-# パッケージを検索してインストール
-isn search <command-name>
-isn install <package-name>
-```
+必要なコマンドは、マルチステージビルドでイメージに組み込んでください。
 
 ### ディスク容量不足
 
@@ -372,9 +331,6 @@ df -h
 
 # 大きなファイルの検索
 find / -type f -size +10M -exec ls -lh {} \;
-
-# 不要なパッケージキャッシュの削除
-isn cache clean
 ```
 
 ### ネットワーク接続の問題
@@ -394,7 +350,6 @@ cat /etc/resolv.conf
 
 基本的な操作に慣れたら、以下のドキュメントも参照してください：
 
-- [パッケージマネージャ詳細ガイド](PACKAGE_MANAGER.md)
 - [システム設定ガイド](CONFIGURATION.md)
 - [セキュリティガイド](../security/SECURITY_GUIDE.md)
 
