@@ -1,0 +1,23 @@
+{
+  "name": "kimigayo-nodejs-app",
+  "version": "1.0.0",
+  "description": "Sample Node.js application for Kimigayo OS",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "keywords": [
+    "kimigayo",
+    "nodejs",
+    "container",
+    "lightweight"
+  ],
+  "author": "Kimigayo OS Team",
+  "license": "GPL-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+  }
+}
