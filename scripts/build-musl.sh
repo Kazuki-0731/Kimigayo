@@ -134,14 +134,27 @@ check_prerequisites() {
     fi
 
     # Test if compiler can create executables
-    if ! echo 'int main(){return 0;}' | $compiler -x c - -o /tmp/test_cc_$$ 2>/dev/null; then
-        log_error "C compiler cannot create executables: $compiler"
-        log_error "Please check your compiler installation"
-        rm -f /tmp/test_cc_$$
-        exit 1
+    # Use a temporary file for better compatibility with cross-compilers
+    local test_file="/tmp/test_cc_$$.c"
+    local test_out="/tmp/test_cc_$$"
+
+    echo 'int main(){return 0;}' > "$test_file"
+
+    if $compiler "$test_file" -o "$test_out" 2>/dev/null; then
+        log_info "C compiler check: OK ($compiler)"
+    else
+        # For cross-compilers, just check if they can compile (not necessarily execute)
+        if $compiler -c "$test_file" -o "${test_out}.o" 2>/dev/null; then
+            log_info "C compiler check: OK ($compiler - cross-compile mode)"
+        else
+            log_error "C compiler cannot compile: $compiler"
+            log_error "Please check your compiler installation"
+            rm -f "$test_file" "$test_out" "${test_out}.o"
+            exit 1
+        fi
     fi
-    rm -f /tmp/test_cc_$$
-    log_info "C compiler check: OK ($compiler)"
+
+    rm -f "$test_file" "$test_out" "${test_out}.o"
 
     log_info "Prerequisites check completed"
 }
