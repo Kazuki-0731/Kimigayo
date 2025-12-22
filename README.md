@@ -170,6 +170,95 @@ make clean
 make test
 ```
 
+#### ビルド成果物
+
+`make build` を実行すると、以下の場所にビルド成果物が生成されます：
+
+##### 1. **rootfs（ルートファイルシステム）**
+
+OSの実体となるファイルシステム構造が生成されます。
+
+```bash
+build/rootfs/
+├── bin/          # 実行可能ファイル (sh, busybox, etc.)
+├── etc/          # 設定ファイル
+├── lib/          # 共有ライブラリ
+├── sbin/         # システム管理コマンド
+├── usr/          # ユーザープログラム
+└── var/          # 可変データ
+```
+
+**確認方法:**
+```bash
+ls -la build/rootfs/
+```
+
+##### 2. **tarballイメージ**
+
+配布用のtar.gzアーカイブファイルが生成されます。
+
+```bash
+output/
+├── kimigayo-minimal-0.1.0-x86_64.tar.gz      # Minimal版 (約400KB)
+├── kimigayo-standard-latest-x86_64.tar.gz    # Standard版 (約1.3MB)
+├── kimigayo-minimal-0.1.0-x86_64.sha256      # SHA256チェックサム
+└── kimigayo-minimal-0.1.0-x86_64.sig         # Ed25519署名
+```
+
+**使用方法:**
+```bash
+# tarballからDockerイメージを作成
+docker import output/kimigayo-standard-latest-x86_64.tar.gz kimigayo:test
+
+# 起動
+docker run -it kimigayo:test /bin/sh
+```
+
+##### 3. **Dockerイメージ**
+
+完全なCI/CDビルド (`make ci-build-local`) を実行するとDockerイメージが生成されます。
+
+```bash
+# 完全ビルド（rootfs + tarball + Dockerイメージ）
+make ci-build-local
+
+# 全バリアントビルド
+make ci-build-all
+```
+
+**生成されるイメージ:**
+```bash
+# イメージ一覧表示
+docker images | grep kimigayo
+
+# 主要イメージ
+kimigayo-os:standard-x86_64    # Standard版 (約3MB)
+kimigayo-os:minimal-x86_64     # Minimal版 (約1.6MB)
+kimigayo-os:extended-x86_64    # Extended版 (約3.2MB)
+```
+
+**使用方法:**
+```bash
+# ローカルビルドイメージを起動
+docker run -it kimigayo-os:standard-x86_64 /bin/sh
+```
+
+##### ビルド成果物の関係
+
+```
+make build
+    ↓
+build/rootfs/ (ファイルシステム)
+    ↓
+make package-rootfs
+    ↓
+output/*.tar.gz (配布用アーカイブ)
+    ↓
+make build-image
+    ↓
+Dockerイメージ (コンテナ実行用)
+```
+
 #### 詳細なビルドオプション
 
 Dockerビルド環境内で実行することで、リアルタイムなビルド出力が確認できます：
