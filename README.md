@@ -45,8 +45,6 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 ┌─────────────────────────────────────────┐
 │         ユーザーアプリケーション          │
 ├─────────────────────────────────────────┤
-│    パッケージマネージャ (isn)            │
-├─────────────────────────────────────────┤
 │    コアユーティリティ (BusyBox)          │
 ├─────────────────────────────────────────┤
 │    Initシステム (OpenRC)                 │
@@ -65,10 +63,6 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 - **C ライブラリ**: musl libc（軽量・高速・セキュア）
 - **コアユーティリティ**: BusyBox（単一バイナリで多数の Unix コマンドを提供）
 - **Init システム**: OpenRC ベース（systemd より軽量でシンプル）
-- **パッケージマネージャ**: isn（高速・セキュア・アトミック操作）
-  - Ed25519 署名検証による高速な署名チェック
-  - 依存関係の自動解決
-  - アトミックなインストール/アップデート操作
 
 ### 🚀 クイックスタート
 
@@ -421,8 +415,8 @@ Kimigayo OS は、パッケージの真正性と完全性を保証するため�
   - BusyBox 設定、musl libc 統合、サイズ最適化
 - [x] **Phase 4**: Init システムの実装
   - OpenRC ベース、サービス管理、依存関係処理
-- [x] **Phase 5**: パッケージマネージャの設計と実装
-  - isn (Ed25519 署名検証、依存関係解決、アトミック操作)
+- [ ] **Phase 5**: パッケージマネージャの設計と実装（Issue #12, #13）
+  - ネイティブパッケージ管理システムは将来実装予定
 - [x] **Phase 6**: システム最適化とテスト
   - 再現可能ビルド、パフォーマンステスト、E2E 統合テスト
 - [x] **ドキュメント整備**: ユーザー・開発者・セキュリティドキュメント完備
@@ -462,20 +456,18 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 | musl libc                  | MIT          |
 | BusyBox                    | GPL-2.0      |
 | OpenRC                     | BSD-2-Clause |
-| isn (パッケージマネージャ) | MIT          |
 | ビルドシステム             | MIT          |
 
 詳細は [LICENSE](LICENSE) を参照してください。
 
 ### 🌟 Alpine Linux との違い
 
-- **Ed25519 署名検証**: 軽量・高速な現代的な署名方式（Alpine Linux は RSA/GPG）
 - より充実した日本語ドキュメント
-- 東アジア圏のミラーサーバー最適化
-- 独自のパッケージマネージャ（isn）による高速化
+- 東アジア圏のミラーサーバー最適化（将来予定）
 - モダンなツールチェインの積極採用
 - プロパティベーステストによる品質保証
 - 再現可能ビルドの徹底
+- 最小構成を追求したイメージサイズ
 
 ### 📚 ドキュメント
 
@@ -484,7 +476,6 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [Docker使用ガイド](docs/user/DOCKER_USAGE.md) - Dockerイメージの使い方、ユースケース別サンプル
 - [インストールガイド](docs/user/INSTALLATION.md) - Docker、Kubernetes、Podman でのインストール方法
 - [クイックスタートガイド](docs/user/QUICKSTART.md) - 基本的な操作と使い方
-- [パッケージマネージャ使用方法](docs/user/PACKAGE_MANAGER.md) - isn パッケージマネージャの詳細ガイド
 - [システム設定ガイド](docs/user/CONFIGURATION.md) - ネットワーク、サービス、セキュリティの設定
 
 #### 開発者向け
@@ -589,7 +580,6 @@ Like Alpine Linux, Kimigayo OS components have individual licenses:
 | musl libc             | MIT          |
 | BusyBox               | GPL-2.0      |
 | OpenRC                | BSD-2-Clause |
-| isn (Package Manager) | MIT          |
 | Build System          | MIT          |
 
 See [LICENSE](LICENSE) for details.
@@ -600,7 +590,6 @@ See [LICENSE](LICENSE) for details.
 
 - [Installation Guide](docs/user/INSTALLATION.md) - Install on Docker, virtualization, and bare metal
 - [Quick Start Guide](docs/user/QUICKSTART.md) - Basic operations and usage
-- [Package Manager Guide](docs/user/PACKAGE_MANAGER.md) - Detailed isn package manager guide
 - [Configuration Guide](docs/user/CONFIGURATION.md) - Network, services, and security configuration
 
 #### For Developers

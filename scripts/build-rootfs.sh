@@ -528,30 +528,8 @@ copy_components() {
         log_warn "OpenRC installation directory not found: $OPENRC_INSTALL_DIR"
     fi
 
-    # Copy isn package manager
-    if [ -d "$PKG_INSTALL_DIR" ]; then
-        log_info "Copying isn package manager..."
-
-        # Copy isn binary
-        if [ -f "$PKG_INSTALL_DIR/bin/isn" ]; then
-            cp -a "$PKG_INSTALL_DIR/bin/isn" "$ROOTFS_DIR/usr/bin/" 2>/dev/null || true
-            chmod 755 "$ROOTFS_DIR/usr/bin/isn"
-        fi
-
-        # Copy isn libraries if they exist
-        if [ -d "$PKG_INSTALL_DIR/lib" ]; then
-            cp -a "$PKG_INSTALL_DIR/lib"/* "$ROOTFS_DIR/usr/lib/" 2>/dev/null || true
-        fi
-
-        # Create isn directories
-        mkdir -p "$ROOTFS_DIR/var/lib/isn/packages"
-        mkdir -p "$ROOTFS_DIR/var/cache/isn"
-        mkdir -p "$ROOTFS_DIR/etc/isn"
-
-        log_info "  ✓ isn package manager copied"
-    else
-        log_warn "Package manager installation directory not found: $PKG_INSTALL_DIR"
-    fi
+    # isn package manager removed - see issue #13
+    # Package management will be available in future versions
 
     log "✅ Components copied successfully"
 }
