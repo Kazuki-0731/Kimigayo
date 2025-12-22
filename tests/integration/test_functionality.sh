@@ -203,55 +203,18 @@ else
 fi
 
 # ===================================================================
-# Test 4: Package Manager Test (isn)
+# Test 4: Package Manager Test (removed - distroless approach)
 # ===================================================================
 section "Test 4: Package Manager Test"
+info "Package manager intentionally excluded (distroless approach)"
+pass "No package manager verification needed"
 
-# Check if isn binary exists in build directory
-ISN_BINARY="${PROJECT_ROOT}/src/pkg/isn/target/release/isn"
-if [ ! -f "$ISN_BINARY" ]; then
-    ISN_BINARY="${PROJECT_ROOT}/src/pkg/isn/target/debug/isn"
-fi
-
-if [ -f "$ISN_BINARY" ]; then
-    pass "isn binary found: $ISN_BINARY"
-
-    # Test isn commands (outside container)
-    if "$ISN_BINARY" --version >/dev/null 2>&1; then
-        pass "isn --version works"
-    else
-        fail "isn --version failed"
-    fi
-
-    # Test search command
-    if "$ISN_BINARY" search test >/dev/null 2>&1; then
-        pass "isn search works"
-    else
-        info "isn search returned error (placeholder implementation)"
-    fi
-else
-    info "isn binary not found (will be built in Phase 6)"
-    pass "isn verification skipped (Phase 5 placeholder)"
-fi
-
-# Check package repository structure
+# Package repository removed (distroless approach)
 REPO_DIR="${PROJECT_ROOT}/repository"
 if [ -d "$REPO_DIR" ]; then
-    pass "Package repository directory exists"
-
-    if [ -f "$REPO_DIR/metadata/index.json" ]; then
-        pass "Package repository index exists"
-    else
-        fail "Package repository index not found"
-    fi
-
-    if [ -f "$REPO_DIR/mirrors/mirrors.toml" ]; then
-        pass "Mirror configuration exists"
-    else
-        fail "Mirror configuration not found"
-    fi
+    fail "Package repository directory should not exist (distroless approach)"
 else
-    fail "Package repository not found"
+    pass "Package repository correctly removed"
 fi
 
 # ===================================================================

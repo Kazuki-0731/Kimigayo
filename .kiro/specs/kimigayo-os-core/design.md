@@ -17,16 +17,16 @@ Kimigayo OSは、Alpine Linuxの設計思想を受け継いだ軽量・高速・
 
 ```mermaid
 graph TB
-    A[ユーザーアプリケーション] --> B[パッケージマネージャ isn]
-    B --> C[コアユーティリティ BusyBox]
+    A[ユーザーアプリケーション] --> C[コアユーティリティ BusyBox]
     C --> D[Initシステム OpenRC]
     D --> E[Cライブラリ musl libc]
     E --> F[強化されたLinuxカーネル]
     F --> G[ハードウェア]
-    
+
     H[ビルドシステム] --> I[クロスコンパイル環境]
     H --> J[セキュリティ強化]
     H --> K[再現可能ビルド]
+    H --> L[マルチステージビルド]
 ```
 
 ### レイヤー構成
@@ -78,32 +78,32 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-musl-
 - ビルド検証機能
 - メタデータ生成
 
-### 2. パッケージマネージャ（isn）
+### 2. パッケージ管理（Distroless的アプローチ）
 
-**責任範囲:**
-- パッケージのインストール・削除・更新
-- 依存関係の自動解決
-- セキュリティ検証
-- アトミック操作
+**設計方針:**
+- パッケージマネージャーを意図的に排除
+- マルチステージビルドでビルド時に依存関係を解決
+- 不変インフラの実現
 
-**主要インターフェース:**
-```bash
-# パッケージ操作
-isn install <package>
-isn remove <package>
-isn update
-isn search <query>
+**推奨パターン:**
+```dockerfile
+# ビルドステージ
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache python3 py3-pip
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# セキュリティ
-isn verify <package>
-isn security-update
+# ランタイムステージ
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /usr/lib/python3.11 /usr/lib/python3.11
+COPY app.py .
+CMD ["python3", "app.py"]
 ```
 
-**内部アーキテクチャ:**
-- パッケージデータベース（SQLite）
-- 依存関係解決エンジン
-- 暗号化検証モジュール
-- ダウンロードマネージャー
+**利点:**
+- 最小攻撃面
+- 予測可能な動作
+- イメージサイズの最小化
 
 ### 3. Initシステム（OpenRCベース）
 
