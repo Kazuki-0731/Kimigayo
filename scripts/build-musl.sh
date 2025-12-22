@@ -278,7 +278,8 @@ verify_installation() {
 
     # Check library size
     if [ -f "$libc_path" ]; then
-        local size=$(stat -f%z "$libc_path" 2>/dev/null || stat -c%s "$libc_path" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$libc_path" 2>/dev/null || stat -c%s "$libc_path" 2>/dev/null || echo 0)
         local size_kb=$((size / 1024))
         log_info "libc.so size: ${size_kb}KB"
     fi
@@ -291,7 +292,8 @@ verify_installation() {
         log_info "  - ${file#$MUSL_INSTALL_DIR}"
     done
 
-    local file_count=$(find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+    local file_count
+    file_count=$(find "$MUSL_INSTALL_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
     log_info "Total files installed: $file_count"
     set -o pipefail
 
@@ -348,8 +350,9 @@ show_summary() {
     done
 
     if [ -n "$libc_so_path" ]; then
-        local size=$(stat -f%z "$libc_so_path" 2>/dev/null || \
-                     stat -c%s "$libc_so_path" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$libc_so_path" 2>/dev/null || \
+               stat -c%s "$libc_so_path" 2>/dev/null || echo 0)
         local size_kb=$((size / 1024))
         log_info "libc.so Size: ${size_kb}KB"
     fi
