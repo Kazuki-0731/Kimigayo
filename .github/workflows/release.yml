@@ -220,7 +220,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}
           path: output/*.tar.gz
