@@ -249,7 +249,21 @@ build_kernel() {
     ) &
     local dots_pid=$!
 
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" 2>&1 | \
+    # Determine build target based on architecture
+    local MAKE_TARGET=""
+    case "$ARCH" in
+        x86_64)
+            MAKE_TARGET="bzImage"
+            ;;
+        arm64)
+            MAKE_TARGET="Image"
+            ;;
+        *)
+            MAKE_TARGET="all"
+            ;;
+    esac
+
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
