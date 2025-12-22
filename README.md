@@ -64,6 +64,35 @@ Kimigayo OS は、Alpine Linux の設計思想を受け継いだ軽量・高速�
 - **コアユーティリティ**: BusyBox（単一バイナリで多数の Unix コマンドを提供）
 - **Init システム**: OpenRC ベース（systemd より軽量でシンプル）
 
+### 🎯 設計思想: Distroless的アプローチ
+
+Kimigayo OS は、Googleの[distroless](https://github.com/GoogleContainerTools/distroless)と同様の設計思想を採用しています：
+
+**パッケージマネージャーを意図的に排除**することで、以下を実現：
+
+- ✅ **最小攻撃面**: パッケージインストール機能がないため、実行時の脆弱性リスクを大幅に削減
+- ✅ **超軽量**: 1-3MBの極小イメージサイズ
+- ✅ **不変インフラ**: コンテナ時代の「Build once, run anywhere」思想に完全準拠
+- ✅ **予測可能性**: ランタイムでの変更が不可能なため、動作が完全に予測可能
+
+**推奨される使用パターン:**
+
+```dockerfile
+# マルチステージビルドで必要なものを全てビルド時に準備
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache python3 py3-pip
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# Kimigayo OSで最小ランタイム環境を構築
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /usr/lib/python3.11 /usr/lib/python3.11
+COPY app.py .
+CMD ["python3", "app.py"]
+```
+
+このアプローチにより、**開発の柔軟性**と**本番環境のセキュリティ**を両立します。
+
 ### 🚀 クイックスタート
 
 #### Docker Hubから使用する（最も簡単）
@@ -460,14 +489,20 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 詳細は [LICENSE](LICENSE) を参照してください。
 
-### 🌟 Alpine Linux との違い
+### 🌟 Alpine Linux / distroless との違い
 
+#### vs Alpine Linux
+- **パッケージマネージャーなし**: セキュリティ優先の設計（Alpine は apk を含む）
 - より充実した日本語ドキュメント
-- 東アジア圏のミラーサーバー最適化（将来予定）
 - モダンなツールチェインの積極採用
 - プロパティベーステストによる品質保証
 - 再現可能ビルドの徹底
-- 最小構成を追求したイメージサイズ
+
+#### vs distroless
+- **シェルとユーティリティを含む**: デバッグが容易（distroless はシェルなし）
+- BusyBox により基本的なUnixコマンドが利用可能
+- OpenRC による柔軟なサービス管理
+- より汎用的なコンテナ用途に対応
 
 ### 📚 ドキュメント
 
