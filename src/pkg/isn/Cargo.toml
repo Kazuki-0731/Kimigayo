@@ -18,6 +18,7 @@ sha2 = "0.10"
 ed25519-dalek = "2.0"
 anyhow = "1.0"
 thiserror = "1.0"
+libc = "0.2"
 
 [profile.release]
 opt-level = "z"     # Optimize for size
