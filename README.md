@@ -531,6 +531,21 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - Docker Hub公開状況と最終チェック
 - [v1.0.0リリース計画](docs/V1_RELEASE_PLAN.md) - 正式版リリースに向けたロードマップ
 
+#### GitHub Actions ワークフロー
+
+プロジェクトでは以下の自動化ワークフローが設定されています：
+
+| ワークフロー | トリガー | 目的 | 処理内容 |
+|------------|---------|------|---------|
+| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck<br>• ビルド（minimal/x86_64のみ）<br>• テスト（unit, property）<br>• セキュリティスキャン |
+| **release.yml** | タグpush (v*.*.*) | リリース成果物生成 | • 全variant × 全archビルド<br>• Docker Hubへpush<br>• GitHub Release作成 |
+| **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• アーティファクトアップロード |
+| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • バージョンチェック（日次）<br>• Trivyスキャン（日次）<br>• イメージスキャン（週次・日曜） |
+| **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox バージョンチェック<br>• 更新があればPR自動作成 |
+| **dependency-review.yml** | PR時 | 依存関係レビュー | • 依存関係の変更を検証 |
+
+**注意**: これらのワークフローは自動的に実行されます。GitHub Actions の使用量にご注意ください。
+
 #### セキュリティ
 
 - [セキュリティポリシー](docs/security/SECURITY_POLICY.md) - セキュリティ方針と脆弱性報告
