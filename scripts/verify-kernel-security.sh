@@ -18,7 +18,6 @@ KERNEL_CONFIG="${KERNEL_OUTPUT_DIR}/config-${KERNEL_VERSION}-${ARCH}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Counters
@@ -40,7 +39,7 @@ log_error() {
 }
 
 log_check() {
-    echo -e "${BLUE}[CHECK]${NC} $*"
+    echo -e "${GREEN}[CHECK]${NC} $*"
 }
 
 log_enabled() {

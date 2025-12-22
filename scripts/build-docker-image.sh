@@ -9,7 +9,6 @@ set -u  # Exit on undefined variable
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Script directory
@@ -51,14 +50,12 @@ log_info() {
 }
 
 # Banner
-echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════╗
 ║   Kimigayo OS - Docker Image Build   ║
 ║   Task 22.2: Docker Image Generation  ║
 ╚═══════════════════════════════════════╝
 EOF
-echo -e "${NC}"
 
 # Check if tar.gz exists
 TAR_FILE="${OUTPUT_DIR}/kimigayo-${IMAGE_TYPE}-${VERSION}-${ARCH}.tar.gz"

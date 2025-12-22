@@ -23,28 +23,31 @@ BUILD_LOG="${PROJECT_ROOT}/build/logs/musl-build.log"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[INFO] ${timestamp}${NC} $*" | tee -a "$BUILD_LOG"
 }
 
 log_warn() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARN] ${timestamp}${NC} $*" | tee -a "$BUILD_LOG"
 }
 
 log_error() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*" | tee -a "$BUILD_LOG"
 }
 
 log_build() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${CYAN}[BUILD] ${timestamp}${NC} $*" | tee -a "$BUILD_LOG"
 }
 

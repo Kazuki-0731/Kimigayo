@@ -4,9 +4,7 @@
 set -e
 
 # Colors
-BOLD='\033[1m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
@@ -15,10 +13,10 @@ ITERATIONS="${ITERATIONS:-10}"
 IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest}"
 OUTPUT_FILE="${OUTPUT_FILE:-benchmark-startup.json}"
 
-echo -e "${BOLD}Kimigayo OS - 起動時間ベンチマーク${NC}"
+echo "Kimigayo OS - 起動時間ベンチマーク"
 echo "======================================"
-echo -e "${BLUE}イメージ:${NC} $IMAGE"
-echo -e "${BLUE}測定回数:${NC} $ITERATIONS"
+echo "イメージ: $IMAGE"
+echo "測定回数: $ITERATIONS"
 echo ""
 
 # 起動時間を測定する関数
@@ -26,14 +24,16 @@ measure_startup_time() {
     local container_name="benchmark-startup-$$"
 
     # コンテナ起動時間を測定
-    local start_time=$(date +%s%N)
+    local start_time
+    start_time=$(date +%s%N)
 
     docker run --name "$container_name" --rm -d "$IMAGE" sleep 5 > /dev/null 2>&1
 
     # コンテナが起動するまで待機
     docker wait "$container_name" > /dev/null 2>&1 || true
 
-    local end_time=$(date +%s%N)
+    local end_time
+    end_time=$(date +%s%N)
 
     # ナノ秒からミリ秒に変換
     local duration=$(( (end_time - start_time) / 1000000 ))
@@ -54,11 +54,11 @@ echo ""
 declare -a times=()
 total=0
 
-for i in $(seq 1 $ITERATIONS); do
+for i in $(seq 1 "$ITERATIONS"); do
     echo -ne "  測定 $i/$ITERATIONS... "
 
     time=$(measure_startup_time)
-    times+=($time)
+    times+=("$time")
     total=$((total + time))
 
     echo -e "${GREEN}${time}ms${NC}"
@@ -73,8 +73,7 @@ echo ""
 avg=$((total / ITERATIONS))
 
 # 中央値計算（ソート）
-IFS=$'\n' sorted=($(sort -n <<<"${times[*]}"))
-unset IFS
+mapfile -t sorted < <(printf '%s\n' "${times[@]}" | sort -n)
 
 if [ $((ITERATIONS % 2)) -eq 0 ]; then
     idx1=$((ITERATIONS / 2 - 1))
@@ -89,12 +88,12 @@ min=${sorted[0]}
 max=${sorted[$((ITERATIONS - 1))]}
 
 # 結果表示
-echo -e "${BOLD}ベンチマーク結果${NC}"
+echo "ベンチマーク結果"
 echo "======================================"
-echo -e "${BLUE}平均:${NC}   ${avg}ms"
-echo -e "${BLUE}中央値:${NC} ${median}ms"
-echo -e "${BLUE}最小:${NC}   ${min}ms"
-echo -e "${BLUE}最大:${NC}   ${max}ms"
+echo "平均:   ${avg}ms"
+echo "中央値: ${median}ms"
+echo "最小:   ${min}ms"
+echo "最大:   ${max}ms"
 echo ""
 
 # JSON形式で保存

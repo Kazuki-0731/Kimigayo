@@ -20,7 +20,6 @@ TEST_LOG_DIR="${PROJECT_ROOT}/build/logs"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
@@ -38,7 +37,7 @@ log_error() {
 }
 
 log_test() {
-    echo -e "${BLUE}[TEST]${NC} $*"
+    echo -e "${GREEN}[TEST]${NC} $*"
 }
 
 log_qemu() {
@@ -85,7 +84,8 @@ check_kernel() {
 
     if [ -f "$kernel_image" ]; then
         log_info "Kernel image found: $kernel_image"
-        local size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
         local size_mb=$((size / 1024 / 1024))
         log_info "Kernel size: ${size_mb}MB"
         return 0

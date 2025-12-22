@@ -23,22 +23,26 @@ NC='\033[0m' # No Color
 
 # Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[INFO] ${timestamp}${NC} $*"
 }
 
 log_success() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[SUCCESS] ${timestamp}${NC} $*"
 }
 
 log_warn() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARN] ${timestamp}${NC} $*"
 }
 
 log_error() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
@@ -102,12 +106,13 @@ verify_checksum() {
     local tarball_path="${DOWNLOAD_DIR}/${MUSL_TARBALL}"
 
     # Known SHA-256 checksums for musl versions
+    local expected=""
     case "$MUSL_VERSION" in
         1.2.4)
-            local expected="7a35eae33d5372a7c0da1188de798726f68825513b7ae3ebe97aaaa52114f039"
+            expected="7a35eae33d5372a7c0da1188de798726f68825513b7ae3ebe97aaaa52114f039"
             ;;
         1.2.3)
-            local expected="7d5b0b6062521e4627e099e4c9dc8248d32a30285e959b7eecaa780cf8cfd4a4"
+            expected="7d5b0b6062521e4627e099e4c9dc8248d32a30285e959b7eecaa780cf8cfd4a4"
             ;;
         *)
             log_warn "No known checksum for musl version $MUSL_VERSION"
@@ -117,7 +122,8 @@ verify_checksum() {
 
     if [ -n "$expected" ]; then
         log_info "Verifying checksum..."
-        local actual=$(cat "${tarball_path}.sha256" 2>/dev/null || echo "")
+        local actual
+        actual=$(cat "${tarball_path}.sha256" 2>/dev/null || echo "")
 
         if [ "$actual" = "$expected" ]; then
             log_info "Checksum verification: OK"

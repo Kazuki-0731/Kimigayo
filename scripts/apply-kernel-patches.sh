@@ -18,28 +18,31 @@ PATCH_LOG="${PROJECT_ROOT}/build/kernel-patches.log"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[INFO] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_warn() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARN] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_error() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 log_patch() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[PATCH] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[PATCH] ${timestamp}${NC} $*" | tee -a "$PATCH_LOG"
 }
 
 # Check if kernel source exists
@@ -155,8 +158,9 @@ verify_patched_kernel() {
         return 1
     fi
 
-    # Check critical files exist (using absolute paths)
-    local critical_files=(
+    # Check critical files exist
+    local critical_files
+    critical_files=(
         "${KERNEL_SRC_DIR}/Makefile"
         "${KERNEL_SRC_DIR}/arch/x86/Makefile"
         "${KERNEL_SRC_DIR}/kernel/Makefile"

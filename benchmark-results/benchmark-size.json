@@ -1,11 +1,11 @@
 {
   "benchmark": "image_size",
-  "timestamp": "2025-12-21T16:49:20Z",
+  "timestamp": "2025-12-22T14:23:43Z",
   "results": {
-    "Kimigayo Minimal": {"size_mb": 1, "image": "ishinokazuki/kimigayo-os:latest-minimal"},
-    "Kimigayo Standard": {"size_mb": 2, "image": "ishinokazuki/kimigayo-os:latest"},
+    "Kimigayo Extended": {"size_mb": 0, "image": "ishinokazuki/kimigayo-os:latest-extended"},
+    "Kimigayo Minimal": {"size_mb": 0, "image": "ishinokazuki/kimigayo-os:latest-minimal"},
+    "Kimigayo Standard": {"size_mb": 0, "image": "ishinokazuki/kimigayo-os:latest"},
     "BusyBox": {"size_mb": 3, "image": "busybox:latest"},
-    "Kimigayo Extended": {"size_mb": 3, "image": "ishinokazuki/kimigayo-os:latest-extended"},
     "Alpine 3.19": {"size_mb": 7, "image": "alpine:3.19"},
     "Alpine Latest": {"size_mb": 8, "image": "alpine:latest"},
     "Ubuntu": {"size_mb": 66, "image": "ubuntu:22.04"},
