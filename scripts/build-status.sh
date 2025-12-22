@@ -58,9 +58,8 @@ record_success() {
 
     # Update or add component status
     if grep -q "^${component}:" "$STATUS_FILE" 2>/dev/null; then
-        # Update existing entry
-        sed -i.bak "s/^${component}:.*/${component}:built:${timestamp}/" "$STATUS_FILE"
-        rm -f "${STATUS_FILE}.bak"
+        # Update existing entry (Linux-compatible sed)
+        sed -i "s/^${component}:.*/${component}:built:${timestamp}/" "$STATUS_FILE"
     else
         # Add new entry
         echo "${component}:built:${timestamp}" >> "$STATUS_FILE"
