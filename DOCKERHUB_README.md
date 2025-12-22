@@ -72,7 +72,7 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 ## イメージバリアント
 
 - **kimigayo-os:latest** - Standardバリアント（< 15MB）
-  - 一般的なユーティリティとisnパッケージマネージャを含む
+  - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
 - **kimigayo-os:latest-minimal** - Minimalバリアント（< 5MB）

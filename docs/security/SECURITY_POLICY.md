@@ -71,21 +71,6 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
 
 ## セキュリティアップデート
 
-### 自動セキュリティアップデート
-
-Kimigayo OSでは、セキュリティアップデートの自動適用をサポートしています。
-
-```bash
-# 自動セキュリティアップデートを有効化
-isn config set auto-security-updates true
-
-# セキュリティアップデートのみ手動適用
-isn upgrade --security-only
-
-# セキュリティアップデートの確認
-isn security check
-```
-
 ### セキュリティアドバイザリの購読
 
 - **メーリングリスト**: security-announce@kimigayo-os.org
@@ -120,7 +105,7 @@ checksec /bin/busybox
 | **Seccomp-BPF** | システムコールフィルタリング | ⚠️ アプリケーション依存 |
 | **Namespaces** | プロセス隔離 | ✅ サポート |
 
-確認方法：
+確認方法:
 ```bash
 # ASLRの状態確認
 cat /proc/sys/kernel/randomize_va_space
@@ -129,40 +114,6 @@ cat /proc/sys/kernel/randomize_va_space
 # カーネルセキュリティ設定の確認
 sysctl -a | grep kernel
 ```
-
-### パッケージセキュリティ
-
-#### Ed25519署名検証（推奨）
-
-Kimigayo OSは、軽量で高速なEd25519署名アルゴリズムを採用しています。
-
-```bash
-# Ed25519署名検証を有効化（デフォルト）
-isn config set verify-signatures true
-isn config set signature-method ed25519
-
-# 署名検証なしでインストール（非推奨）
-isn install --no-verify <package>
-```
-
-**Ed25519の利点**:
-- 🚀 **高速**: RSAの署名検証より高速
-- 💾 **軽量**: 署名64バイト、公開鍵32バイト
-- 🔒 **高セキュリティ**: 128ビットセキュリティレベル
-- 🐳 **コンテナ最適**: 最小限のリソースで動作
-
-#### GPG署名検証（レガシーサポート）
-
-既存パッケージとの互換性のため、GPG署名もサポートしています。
-
-```bash
-# GPG署名検証に切り替え
-isn config set signature-method gpg
-```
-
-#### SHA-256ハッシュ検証
-
-すべてのパッケージは、SHA-256ハッシュで完全性が検証されます。
 
 ## セキュリティ監査
 
@@ -185,14 +136,11 @@ Kimigayo OSは定期的に内部セキュリティ監査を実施しています
 ### システム管理者向け
 
 ```bash
-# 1. システムを最新に保つ
-isn update && isn upgrade
-
-# 2. 不要なサービスを無効化
+# 1. 不要なサービスを無効化
 rc-update show default
 rc-update del <unnecessary-service> default
 
-# 3. ファイアウォールを設定
+# 2. ファイアウォールを設定
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT ACCEPT
@@ -200,13 +148,13 @@ iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 rc-service iptables save
 
-# 4. SSHを強化
+# 3. SSHを強化
 vi /etc/ssh/sshd_config
 # PermitRootLogin no
 # PasswordAuthentication no
 # PubkeyAuthentication yes
 
-# 5. システムログを監視
+# 4. システムログを監視
 tail -f /var/log/messages
 ```
 
@@ -219,9 +167,6 @@ LDFLAGS="-Wl,-z,relro,-z,now -pie"
 
 # 静的解析ツールの使用
 make static-analysis
-
-# 依存関係の脆弱性スキャン
-isn audit
 ```
 
 ## 既知の制限事項

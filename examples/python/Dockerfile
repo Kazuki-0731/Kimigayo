@@ -7,8 +7,8 @@ LABEL maintainer="Kimigayo OS Team"
 LABEL description="Python runtime on Kimigayo OS"
 LABEL version="1.0.0"
 
-# Install Python and pip using Alpine packages temporarily
-# (In future, this will use 'isn install python3 py3-pip')
+# Install Python and pip using Alpine packages
+# Note: Kimigayo OS follows distroless design (no package manager)
 RUN apk add --no-cache \
     python3 \
     py3-pip \

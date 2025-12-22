@@ -28,24 +28,18 @@ Kimigayo OSでは、セキュリティ要件に応じて3つの強化レベル�
 または手動で設定：
 
 ```bash
-# 1. システムの更新
-isn update && isn upgrade
-
-# 2. 不要なサービスの無効化
+# 1. 不要なサービスの無効化
 rc-update del telnet default
 rc-update del ftp default
 
-# 3. ファイアウォールの有効化
+# 2. ファイアウォールの有効化
 rc-update add iptables default
 rc-service iptables start
 
-# 4. SSH強化
+# 3. SSH強化
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 rc-service sshd restart
-
-# 5. 自動セキュリティアップデート
-isn config set auto-security-updates true
 ```
 
 ### レベル2: 中程度の強化（サーバー環境推奨）
@@ -75,11 +69,6 @@ sysctl -p
 # ファイルシステムの強化
 echo "tmpfs /tmp tmpfs defaults,nodev,nosuid,noexec 0 0" >> /etc/fstab
 echo "tmpfs /var/tmp tmpfs defaults,nodev,nosuid,noexec 0 0" >> /etc/fstab
-
-# 監査ログの有効化
-isn install auditd
-rc-update add auditd default
-rc-service auditd start
 ```
 
 ### レベル3: 最大強化（高セキュリティ環境）
@@ -104,18 +93,6 @@ fs.protected_regular = 2
 EOF
 sysctl -p
 
-# SELinux/AppArmorの有効化（将来のバージョン）
-# isn install apparmor
-# rc-update add apparmor default
-
-# 侵入検知システム（IDS）
-isn install aide
-aide --init
-mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-
-# ファイルシステムの完全性監視
-isn install tripwire
-tripwire --init
 ```
 
 ## カーネル強化
@@ -417,20 +394,6 @@ chmod 640 /var/log/auth.log
 
 ## アプリケーション強化
 
-### コンパイラの制限
-
-開発環境でない場合、コンパイラへのアクセスを制限します。
-
-```bash
-# コンパイラの削除（本番環境）
-isn remove gcc g++ make
-
-# または実行権限の制限
-chmod 700 /usr/bin/gcc
-chmod 700 /usr/bin/g++
-chmod 700 /usr/bin/make
-```
-
 ### Seccomp-BPFの使用
 
 システムコールをフィルタリングして、アプリケーションのセキュリティを強化します。
@@ -502,10 +465,9 @@ docker run -d \
 
 ### 監査ログの設定
 
-```bash
-# auditdのインストール
-isn install audit
+監査機能が必要な場合は、マルチステージビルドで組み込んでください。
 
+```bash
 # 監査ルールの設定
 vi /etc/audit/rules.d/audit.rules
 ```
@@ -578,14 +540,11 @@ find / -perm -4000 -type f -ls
 ### 脆弱性スキャン
 
 ```bash
-# パッケージの脆弱性スキャン
-isn audit
-
-# ファイルシステムの完全性チェック（AIDE）
-aide --check
-
 # ポートスキャン（外部から）
 # nmap -sS -O <your-ip>
+
+# システムの脆弱性確認
+cat /etc/os-release
 ```
 
 ## 参考リソース

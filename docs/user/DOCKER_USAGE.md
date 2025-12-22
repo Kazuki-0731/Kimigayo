@@ -415,11 +415,15 @@ docker images | grep kimigayo-os
 
 ### Q2: パッケージを追加できますか？
 
-**A:** 現在開発中のパッケージマネージャ`isn`を使用します:
+**A:** Kimigayo OSはdistroless設計を採用しており、パッケージマネージャは含まれていません。必要なソフトウェアは、マルチステージビルドでコンパイルしてから、Kimigayo OSイメージにコピーすることを推奨します。
 
 ```bash
-# パッケージをインストール（開発中）
-docker run -it ishinokazuki/kimigayo-os:latest /bin/sh -c "isn install curl"
+# マルチステージビルドの例
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache curl
+
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /usr/bin/curl /usr/bin/curl
 ```
 
 ---
@@ -485,7 +489,6 @@ docker run -it \
 - [インストールガイド](INSTALLATION.md)
 - [クイックスタート](QUICKSTART.md)
 - [設定ガイド](CONFIGURATION.md)
-- [パッケージマネージャ](PACKAGE_MANAGER.md)
 
 ### コミュニティ
 

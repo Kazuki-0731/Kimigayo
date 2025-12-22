@@ -7,8 +7,8 @@ LABEL maintainer="Kimigayo OS Team"
 LABEL description="Nginx web server on Kimigayo OS"
 LABEL version="1.0.0"
 
-# Install dependencies using Alpine packages temporarily
-# (In future, this will use 'isn install nginx')
+# Install dependencies using Alpine packages
+# Note: Kimigayo OS follows distroless design (no package manager)
 RUN apk add --no-cache nginx
 
 # Create necessary directories

@@ -528,8 +528,7 @@ copy_components() {
         log_warn "OpenRC installation directory not found: $OPENRC_INSTALL_DIR"
     fi
 
-    # isn package manager removed - see issue #13
-    # Package management will be available in future versions
+    # Package manager removed - Kimigayo OS follows distroless approach
 
     log "✅ Components copied successfully"
 }

@@ -6,9 +6,8 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 
 ## 用語集
 
-- **Kimigayo_OS**: カーネル、ユーザーランドユーティリティ、パッケージ管理を含む完全なオペレーティングシステム
+- **Kimigayo_OS**: カーネル、ユーザーランドユーティリティを含む完全なオペレーティングシステム
 - **Base_Image**: 必須コンポーネントのみを含む最小限の起動可能システム
-- **Package_Manager**: ソフトウェアのインストールと管理を行うisnパッケージ管理システム
 - **Init_System**: システム初期化とサービス管理コンポーネント（OpenRCベース）
 - **Core_Utilities**: BusyBoxによって提供される必須Unixコマンド
 - **Build_System**: コンパイルとイメージ生成のインフラストラクチャ
@@ -36,9 +35,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 
 1. WHEN システムコンポーネントをコンパイルする THEN Build_SystemはPIE、スタック保護、FORTIFY_SOURCEを含むSecurity_Hardening機能を有効にすること
 2. WHEN システムが動作する THEN Kimigayo_OSはランタイムでASLRとDEPを強制すること
-3. WHEN パッケージがインストールされる THEN Package_ManagerはGPG署名とSHA-256ハッシュを検証すること
-4. WHEN システムサービスが開始される THEN Init_Systemは名前空間分離とseccomp-BPFフィルタリングを適用すること
-5. WHEN セキュリティアップデートが利用可能になる THEN Package_Managerはそれらのインストールを優先すること
+3. WHEN システムサービスが開始される THEN Init_Systemは名前空間分離とseccomp-BPFフィルタリングを適用すること
 
 ### 要件 3
 
@@ -48,23 +45,8 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 
 1. WHEN システムをビルドする THEN Build_Systemは個別のカーネルモジュールの選択を許可すること
 2. WHEN システムを設定する THEN Kimigayo_OSはCore_Utilitiesコンポーネントの追加または削除をサポートすること
-3. WHEN ソフトウェアをインストールする THEN Package_Managerは不要なパッケージをインストールすることなく依存関係を自動的に解決すること
-4. WHEN システムが起動する THEN Init_Systemは明示的に有効化されたサービスのみを開始すること
-5. WHERE GUI機能が必要な場合 THEN Kimigayo_OSはオプションのX11またはWaylandモジュールをサポートすること
-
-### 要件 4
-
-**ユーザーストーリー:** パッケージメンテナーとして、高速で信頼性の高いパッケージ管理システムが欲しい。ソフトウェアを効率的に配布・更新できるようにするため。
-
-#### 受入基準
-
-1. WHEN パッケージをインストールする THEN Package_Managerは同等のAlpine Linux操作よりも高速にインストールを完了すること
-2. WHEN 依存関係を解決する THEN Package_Managerはすべての必要な依存関係を自動的に処理すること
-3. WHEN パッケージが配布される THEN Package_Managerは暗号化署名を使用してパッケージの整合性を検証すること
-4. WHEN アップデートが利用可能になる THEN Package_Managerはアトミックなアップデート操作を提供すること
-5. WHEN ネットワーク接続が制限されている THEN Package_Managerはローカルリポジトリからのオフラインパッケージインストールをサポートすること
-
-### 要件 5
+3. WHEN システムが起動する THEN Init_Systemは明示的に有効化されたサービスのみを開始すること
+4. WHERE GUI機能が必要な場合 THEN Kimigayo_OSはオプションのX11またはWaylandモジュールをサポートすること
 
 **ユーザーストーリー:** コンテナオーケストレーターとして、クロスアーキテクチャサポートが欲しい。異なるハードウェアプラットフォーム間で同じOSをデプロイできるようにするため。
 
@@ -73,8 +55,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 1. WHEN 異なるアーキテクチャ向けにビルドする THEN Build_Systemはx86_64とARM64ターゲットをサポートすること
 2. WHEN クロスコンパイルする THEN Build_Systemはサポートされるすべてのアーキテクチャで同一の機能を生成すること
 3. WHEN ARM64で動作する THEN Kimigayo_OSはx86_64と同じパフォーマンス特性を維持すること
-4. WHEN ソフトウェアをパッケージ化する THEN Package_Managerはアーキテクチャ固有のバイナリを正しく処理すること
-5. WHERE RISC-Vサポートが必要な場合 THEN Build_Systemは拡張可能なアーキテクチャサポートを提供すること
+4. WHERE RISC-Vサポートが必要な場合 THEN Build_Systemは拡張可能なアーキテクチャサポートを提供すること
 
 ### 要件 6
 
@@ -109,5 +90,4 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 1. WHEN 開発環境をセットアップする THEN Build_Systemは完全なクロスコンパイル環境を提供すること
 2. WHEN ソフトウェアをコンパイルする THEN Build_Systemは標準Cライブラリとしてmusl libcを使用すること
 3. WHEN バイナリをリンクする THEN Build_Systemは静的リンクと動的リンクの両方のオプションをサポートすること
-4. WHEN パッケージを作成する THEN Build_SystemはPackage_Managerと互換性のあるパッケージを生成すること
-5. WHEN カーネルをビルドする THEN Build_Systemはすべての必要なSecurity_Hardening設定を適用すること
+4. WHEN カーネルをビルドする THEN Build_Systemはすべての必要なSecurity_Hardening設定を適用すること
