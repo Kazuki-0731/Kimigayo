@@ -49,14 +49,14 @@ jobs:
         docker compose run --rm kimigayo-build make test
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: kimigayo-os-${{ github.event.inputs.variant }}-${{ github.event.inputs.arch }}
         path: output/*
         retention-days: 7
 
     - name: Upload build logs
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: build-logs-${{ github.event.inputs.variant }}-${{ github.event.inputs.arch }}
@@ -82,7 +82,7 @@ jobs:
       run: docker compose run --rm kimigayo-build pytest tests/property/ -v || echo "Property tests not ready yet"
 
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: test-results
