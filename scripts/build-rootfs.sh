@@ -9,7 +9,6 @@ set -u  # Exit on undefined variable
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Script directory
@@ -50,7 +49,6 @@ MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
 KERNEL_OUTPUT_DIR="${BUILD_DIR}/kernel/output"
 BUSYBOX_INSTALL_DIR="${BUILD_DIR}/busybox-install-${ARCH}"
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
-PKG_INSTALL_DIR="${BUILD_DIR}/pkg-install-${ARCH}"
 
 # Log file
 LOG_DIR="${BUILD_DIR}/logs"
@@ -275,7 +273,8 @@ optimize_rootfs() {
     log "🔧 Optimizing rootfs size..."
     log "=========================================="
 
-    local size_before=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
+    local size_before
+    size_before=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
     log_info "Size before optimization: $size_before"
 
     # 1. Strip all binaries and shared libraries
@@ -286,22 +285,22 @@ optimize_rootfs() {
     set +e
 
     # Strip all ELF binaries
-    find "$ROOTFS_DIR" -type f -executable 2>/dev/null | while read -r file; do
+    while IFS= read -r file; do
         if file "$file" 2>/dev/null | grep -q "not stripped"; then
             if strip --strip-all "$file" 2>/dev/null; then
                 stripped_count=$((stripped_count + 1))
             fi
         fi
-    done
+    done < <(find "$ROOTFS_DIR" -type f -executable 2>/dev/null)
 
     # Strip shared libraries
-    find "$ROOTFS_DIR" -type f -name "*.so*" 2>/dev/null | while read -r file; do
+    while IFS= read -r file; do
         if file "$file" 2>/dev/null | grep -q "not stripped"; then
             if strip --strip-unneeded "$file" 2>/dev/null; then
                 stripped_count=$((stripped_count + 1))
             fi
         fi
-    done
+    done < <(find "$ROOTFS_DIR" -type f -name "*.so*" 2>/dev/null)
 
     # Re-enable exit on error
     set -e
@@ -327,14 +326,16 @@ optimize_rootfs() {
     fi
 
     # Remove static libraries (.a files) if any
-    local a_files=$(find "$ROOTFS_DIR" -type f -name "*.a" 2>/dev/null | wc -l)
+    local a_files
+    a_files=$(find "$ROOTFS_DIR" -type f -name "*.a" 2>/dev/null | wc -l)
     if [ "$a_files" -gt 0 ]; then
         find "$ROOTFS_DIR" -type f -name "*.a" -delete 2>/dev/null || true
         removed_count=$((removed_count + a_files))
     fi
 
     # Remove libtool archives (.la files) if any
-    local la_files=$(find "$ROOTFS_DIR" -type f -name "*.la" 2>/dev/null | wc -l)
+    local la_files
+    la_files=$(find "$ROOTFS_DIR" -type f -name "*.la" 2>/dev/null | wc -l)
     if [ "$la_files" -gt 0 ]; then
         find "$ROOTFS_DIR" -type f -name "*.la" -delete 2>/dev/null || true
         removed_count=$((removed_count + la_files))
@@ -386,20 +387,21 @@ optimize_rootfs() {
 
     # Compress large text files (> 1KB) in /usr/share
     if [ -d "$ROOTFS_DIR/usr/share" ]; then
-        find "$ROOTFS_DIR/usr/share" -type f -size +1k 2>/dev/null | while read -r file; do
+        while IFS= read -r file; do
             if file "$file" 2>/dev/null | grep -q "text"; then
                 if gzip -9 "$file" 2>/dev/null; then
                     compressed_count=$((compressed_count + 1))
                 fi
             fi
-        done
+        done < <(find "$ROOTFS_DIR/usr/share" -type f -size +1k 2>/dev/null)
     fi
 
     # Re-enable exit on error
     set -e
 
     if [ -d "$ROOTFS_DIR/usr/share" ]; then
-        local gz_files=$(find "$ROOTFS_DIR/usr/share" -type f -name "*.gz" 2>/dev/null | wc -l)
+        local gz_files
+        gz_files=$(find "$ROOTFS_DIR/usr/share" -type f -name "*.gz" 2>/dev/null | wc -l)
         if [ "$gz_files" -gt 0 ]; then
             log_success "  ✓ Compressed $gz_files files"
         else
@@ -412,7 +414,8 @@ optimize_rootfs() {
     # Clean up empty directories
     find "$ROOTFS_DIR" -type d -empty -delete 2>/dev/null || true
 
-    local size_after=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
+    local size_after
+    size_after=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
     log_info "Size after optimization: $size_after"
 
     log ""
@@ -790,15 +793,18 @@ calculate_size() {
     log "Calculating rootfs size..."
 
     if command -v du >/dev/null 2>&1; then
-        local size=$(du -sh "$ROOTFS_DIR" 2>/dev/null | awk '{print $1}')
+        local size
+        size=$(du -sh "$ROOTFS_DIR" 2>/dev/null | awk '{print $1}')
         log_info "  Total rootfs size: $size"
 
         # Count files
-        local file_count=$(find "$ROOTFS_DIR" -type f 2>/dev/null | wc -l)
+        local file_count
+        file_count=$(find "$ROOTFS_DIR" -type f 2>/dev/null | wc -l)
         log_info "  Total files: $file_count"
 
         # Count directories
-        local dir_count=$(find "$ROOTFS_DIR" -type d 2>/dev/null | wc -l)
+        local dir_count
+        dir_count=$(find "$ROOTFS_DIR" -type d 2>/dev/null | wc -l)
         log_info "  Total directories: $dir_count"
     fi
 }

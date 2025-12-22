@@ -15,8 +15,6 @@ STATUS_FILE="${BUILD_DIR}/.build-status"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Component definitions
@@ -52,7 +50,8 @@ init_status_file() {
 # Record build success
 record_success() {
     local component="$1"
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
 
     init_status_file
 
@@ -80,12 +79,14 @@ show_status() {
         component_name="${COMPONENT_NAMES[$component]}"
 
         # Read status from file
+        local status_line
         if [ -f "$STATUS_FILE" ]; then
             status_line=$(grep "^${component}:" "$STATUS_FILE" 2>/dev/null || echo "${component}:pending:never")
         else
             status_line="${component}:pending:never"
         fi
 
+        local comp status timestamp
         IFS=':' read -r comp status timestamp <<< "$status_line"
 
         # Display with appropriate icon and color

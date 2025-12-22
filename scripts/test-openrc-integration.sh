@@ -17,7 +17,6 @@ OPENRC_BIN="${OPENRC_INSTALL_DIR}/sbin/openrc"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Counters
@@ -27,7 +26,7 @@ TESTS_FAILED=0
 
 # Logging functions
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $*"
+    echo -e "${GREEN}[INFO]${NC} $*"
 }
 
 log_success() {

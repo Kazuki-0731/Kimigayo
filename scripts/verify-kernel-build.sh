@@ -18,7 +18,6 @@ KERNEL_SRC_DIR="${PROJECT_ROOT}/build/kernel-src/linux-${KERNEL_VERSION}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Counters
@@ -39,7 +38,7 @@ log_error() {
 }
 
 log_test() {
-    echo -e "${BLUE}[TEST]${NC} $*"
+    echo -e "${GREEN}[TEST]${NC} $*"
 }
 
 log_pass() {
@@ -78,7 +77,8 @@ test_kernel_image_not_empty() {
         return 1
     fi
 
-    local size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
+    local size
+    size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
 
     if [ "$size" -gt 0 ]; then
         log_pass "Kernel image is not empty (${size} bytes)"
@@ -100,7 +100,8 @@ test_kernel_image_size() {
         return 1
     fi
 
-    local size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
+    local size
+    size=$(stat -f%z "$kernel_image" 2>/dev/null || stat -c%s "$kernel_image" 2>/dev/null || echo 0)
     local size_mb=$((size / 1024 / 1024))
 
     # Kernel should be between 1MB and 50MB
@@ -185,7 +186,8 @@ test_kernel_magic_bytes() {
     if [ "$ARCH" = "x86_64" ]; then
         # Check for MZ header (Linux bzImage starts with MZ)
         if command -v xxd &> /dev/null; then
-            local magic=$(xxd -l 2 -p "$kernel_image" 2>/dev/null || echo "")
+            local magic
+            magic=$(xxd -l 2 -p "$kernel_image" 2>/dev/null || echo "")
             if [ "$magic" = "4d5a" ]; then
                 log_pass "Kernel image has valid magic bytes (MZ)"
                 return 0
@@ -252,7 +254,8 @@ show_summary() {
     log_info "Tests Failed: $TESTS_FAILED"
 
     if [ -f "${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}" ]; then
-        local size=$(stat -f%z "${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}" 2>/dev/null || \
+        local size
+        size=$(stat -f%z "${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}" 2>/dev/null || \
                      stat -c%s "${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}" 2>/dev/null || echo 0)
         local size_mb=$((size / 1024 / 1024))
         log_info "Kernel Image Size: ${size_mb}MB"

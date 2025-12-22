@@ -4,9 +4,7 @@
 set -e
 
 # Colors
-BOLD='\033[1m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
@@ -35,14 +33,14 @@ declare -a memory_usage=()
 total_memory=0
 count=0
 
-for i in $(seq 1 $DURATION); do
+for i in $(seq 1 "$DURATION"); do
     # docker statsからメモリ使用量を取得（MB単位）
     mem=$(docker stats --no-stream --format "{{.MemUsage}}" "$CONTAINER_NAME" | awk '{print $1}' | sed 's/MiB//' | sed 's/KiB/0.001/' | sed 's/GiB/*1024/' | bc 2>/dev/null || echo "0")
 
     # 小数点を整数に変換（bcがない環境対応）
     mem_int=$(echo "$mem" | awk '{printf "%.0f", $1}')
 
-    memory_usage+=($mem_int)
+    memory_usage+=("$mem_int")
     total_memory=$((total_memory + mem_int))
     count=$((count + 1))
 
@@ -62,8 +60,7 @@ docker rm "$CONTAINER_NAME" > /dev/null 2>&1
 avg=$((total_memory / count))
 
 # ソートして中央値、最小、最大を計算
-IFS=$'\n' sorted=($(sort -n <<<"${memory_usage[*]}"))
-unset IFS
+mapfile -t sorted < <(printf '%s\n' "${memory_usage[@]}" | sort -n)
 
 if [ $((count % 2)) -eq 0 ]; then
     idx1=$((count / 2 - 1))

@@ -4,9 +4,7 @@
 set -e
 
 # Colors
-BOLD='\033[1m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -121,4 +119,4 @@ else
 fi
 
 echo -e "${GREEN}✓ CHANGELOG.md generated successfully${NC}"
-echo -e "${BLUE}Location:${NC} $CHANGELOG_FILE"
+echo "Location: $CHANGELOG_FILE"

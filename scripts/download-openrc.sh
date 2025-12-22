@@ -19,27 +19,30 @@ BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Logging functions with timestamp (JST)
 log_info() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[INFO] ${timestamp}${NC} $*"
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[INFO] ${timestamp}${NC} $*"
 }
 
 log_success() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${GREEN}[SUCCESS] ${timestamp}${NC} $*"
 }
 
 log_warning() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${YELLOW}[WARNING] ${timestamp}${NC} $*"
 }
 
 log_error() {
-    local timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 

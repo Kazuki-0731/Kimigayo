@@ -4,9 +4,7 @@
 set -e
 
 # Colors
-BOLD='\033[1m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
@@ -41,7 +39,7 @@ for entry in "${IMAGES[@]}"; do
 
     # ローカルにイメージがあるか確認
     if docker image inspect "$image" > /dev/null 2>&1; then
-        echo -e "${BLUE}✓ (ローカル)${NC}"
+        echo "✓ (ローカル)"
         VALID_IMAGES+=("$entry")
     elif docker pull "$image" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"
@@ -94,7 +92,7 @@ printf "%s\n" "$(printf '=%.0s' {1..50})"
 # Kimigayo Minimalのサイズを基準として取得
 kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
 
-while IFS=: read -r size name image; do
+while IFS=: read -r size name image _unused; do
     # 比較率を計算
     if [ "$name" = "Kimigayo Minimal" ]; then
         comparison="(基準)"
@@ -105,14 +103,8 @@ while IFS=: read -r size name image; do
         comparison="-"
     fi
 
-    # 色分け
-    if echo "$name" | grep -q "^Kimigayo"; then
-        color=$BLUE
-    else
-        color=$NC
-    fi
-
-    printf "${color}%-${max_name_len}s${NC}  %10d  %10s\n" "$name" "$size" "$comparison"
+    # Display without color variable
+    printf "%-${max_name_len}s  %10d  %10s\n" "$name" "$size" "$comparison"
 done < "${tmpfile}.sorted"
 
 echo ""
