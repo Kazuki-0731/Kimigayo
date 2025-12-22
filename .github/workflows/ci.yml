@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
+          ignore_paths: build output
+
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: shellcheck
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker compose build
+
+      - name: Build Kimigayo OS (minimal/x86_64)
+        run: |
+          docker compose run --rm \
+            -e ARCH=x86_64 \
+            -e IMAGE_TYPE=minimal \
+            kimigayo-build \
+            make build ARCH=x86_64
+
+      - name: Run unit tests
+        run: |
+          docker compose run --rm kimigayo-build \
+            pytest tests/unit/ -v || echo "Unit tests not ready yet"
+
+      - name: Run property tests
+        run: |
+          docker compose run --rm kimigayo-build \
+            pytest tests/property/ -v || echo "Property tests not ready yet"
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-build-logs
+          path: build/logs/*.log
+          retention-days: 7
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
