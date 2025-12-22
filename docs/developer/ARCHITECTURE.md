@@ -25,11 +25,6 @@ Kimigayo OSは、Alpine Linuxの設計思想を受け継ぎつつ、軽量性、
 │  - データベース (PostgreSQL, MySQL)                     │
 │  - コンテナランタイム (Docker, Podman)                  │
 ├─────────────────────────────────────────────────────────┤
-│         パッケージ管理層 (isn)                          │
-│  - Ed25519署名検証                                      │
-│  - 依存関係解決                                         │
-│  - アトミックインストール                               │
-├─────────────────────────────────────────────────────────┤
 │         システムユーティリティ層                         │
 │  - BusyBox (coreutils, findutils, etc.)                │
 │  - ネットワークツール (ip, ifconfig, curl)              │
@@ -228,41 +223,7 @@ sed, awk, cut, sort, uniq, head, tail
 └───────┘  └─────┘  └───────┘
 ```
 
-### 6. パッケージ管理層 (isn)
-
-**目的**: パッケージのインストール、更新、削除
-
-**アーキテクチャ**:
-```
-┌──────────────────────────────────────────┐
-│          isn CLI (Python)                │
-└──────────────┬───────────────────────────┘
-               │
-    ┌──────────┼──────────────┐
-    │          │              │
-┌───▼────┐ ┌──▼───────┐ ┌───▼──────┐
-│ Resolve│ │ Download │ │ Install  │
-│ Deps   │ │ Package  │ │ Package  │
-└───┬────┘ └──┬───────┘ └───┬──────┘
-    │          │             │
-    └──────────┼─────────────┘
-               │
-    ┌──────────▼──────────┐
-    │  Signature Verify   │
-    │   (Ed25519/GPG)     │
-    └─────────────────────┘
-```
-
-**主要機能**:
-1. **依存関係解決**
-2. **パッケージダウンロード**
-3. **署名検証（Ed25519/GPG）**
-4. **アトミックインストール**
-5. **トランザクション管理**
-
-詳細は [パッケージ管理システム](#パッケージ管理システム) を参照。
-
-### 7. アプリケーション層
+### 6. アプリケーション層
 
 **目的**: ユーザーアプリケーションの実行環境
 
@@ -339,115 +300,6 @@ CONFIG_LSOF=y
 CONFIG_TCPDUMP=y
 ```
 
-## パッケージ管理システム
-
-### アーキテクチャ詳細
-
-```python
-# isn パッケージマネージャの主要クラス
-
-class PackageManager:
-    """パッケージマネージャのメインクラス"""
-
-    def __init__(self):
-        self.db = PackageDatabase()
-        self.resolver = DependencyResolver()
-        self.downloader = PackageDownloader()
-        self.verifier = SignatureVerifier()
-        self.installer = PackageInstaller()
-
-    def install(self, package_name: str) -> bool:
-        # 1. パッケージ情報の取得
-        pkg_info = self.db.get_package(package_name)
-
-        # 2. 依存関係の解決
-        deps = self.resolver.resolve(package_name)
-
-        # 3. パッケージのダウンロード
-        for dep in deps:
-            pkg_file = self.downloader.download(dep)
-
-            # 4. 署名検証
-            if not self.verifier.verify(pkg_file):
-                raise SecurityError(f"Signature verification failed: {dep}")
-
-            # 5. インストール
-            self.installer.install(pkg_file)
-
-        return True
-
-class SignatureVerifier:
-    """Ed25519/GPG署名検証"""
-
-    def verify_ed25519(self, package_file: str, signature: str) -> bool:
-        """Ed25519署名検証（推奨）"""
-        with open(package_file, 'rb') as f:
-            data = f.read()
-
-        public_key = self.load_public_key()
-        return ed25519.verify(signature, data, public_key)
-
-    def verify_gpg(self, package_file: str) -> bool:
-        """GPG署名検証（レガシーサポート）"""
-        result = subprocess.run(
-            ['gpg', '--verify', f'{package_file}.sig', package_file],
-            capture_output=True
-        )
-        return result.returncode == 0
-
-class DependencyResolver:
-    """依存関係解決エンジン"""
-
-    def resolve(self, package_name: str) -> List[str]:
-        """トポロジカルソートで依存関係を解決"""
-        graph = self.build_dependency_graph(package_name)
-        return self.topological_sort(graph)
-
-    def build_dependency_graph(self, package: str) -> Dict:
-        """依存関係グラフの構築"""
-        graph = {}
-        queue = [package]
-
-        while queue:
-            current = queue.pop(0)
-            if current in graph:
-                continue
-
-            deps = self.db.get_dependencies(current)
-            graph[current] = deps
-            queue.extend(deps)
-
-        return graph
-```
-
-### パッケージフォーマット
-
-```
-package.tar.gz
-├── PKGINFO                 # パッケージメタデータ
-├── .PKGINFO.ed25519        # Ed25519署名
-├── .INSTALL                # インストールスクリプト
-├── bin/
-│   └── example
-├── etc/
-│   └── example.conf
-└── usr/
-    ├── lib/
-    └── share/
-```
-
-**PKGINFOフォーマット**:
-```ini
-name = example-package
-version = 1.0.0
-architecture = x86_64
-description = Example package
-url = https://example.com
-license = MIT
-depends = musl busybox
-size = 1048576
-sha256 = abcdef1234567890...
-```
 
 ## セキュリティアーキテクチャ
 
@@ -455,13 +307,9 @@ sha256 = abcdef1234567890...
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 7: アプリケーション層             │
+│  Layer 6: アプリケーション層             │
 │  - Seccomp-BPF                          │
 │  - Namespace isolation                  │
-├─────────────────────────────────────────┤
-│  Layer 6: パッケージ層                  │
-│  - Ed25519署名検証                      │
-│  - SHA-256ハッシュ検証                  │
 ├─────────────────────────────────────────┤
 │  Layer 5: システム層                    │
 │  - ファイアウォール (iptables)          │
@@ -485,34 +333,6 @@ sha256 = abcdef1234567890...
 └─────────────────────────────────────────┘
 ```
 
-### Ed25519署名検証フロー
-
-```
-┌─────────────────┐
-│  パッケージ     │
-│  ダウンロード   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  SHA-256        │
-│  ハッシュ検証   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Ed25519        │
-│  署名検証       │
-└────────┬────────┘
-         │
-      ┌──┴──┐
-      │     │
-   OK │     │ NG
-      ▼     ▼
-  ┌─────┐ ┌─────┐
-  │Install│ │Reject│
-  └─────┘ └─────┘
-```
 
 ## ブートプロセス
 
@@ -595,67 +415,12 @@ systemd-analyze  # systemd環境の場合
 
 ## データフロー
 
-### パッケージインストールフロー
-
-```
-ユーザー
-  │
-  │ isn install vim
-  │
-  ▼
-┌─────────────────┐
-│ Package Manager │
-└────────┬────────┘
-         │
-         │ 1. パッケージ情報取得
-         ▼
-┌─────────────────┐
-│ Package DB      │
-└────────┬────────┘
-         │
-         │ 2. 依存関係解決
-         ▼
-┌─────────────────┐
-│ Dependency      │
-│ Resolver        │
-└────────┬────────┘
-         │
-         │ 3. ダウンロード
-         ▼
-┌─────────────────┐
-│ Package         │
-│ Repository      │
-└────────┬────────┘
-         │
-         │ 4. 署名検証
-         ▼
-┌─────────────────┐
-│ Ed25519         │
-│ Verifier        │
-└────────┬────────┘
-         │
-         │ 5. インストール
-         ▼
-┌─────────────────┐
-│ Package         │
-│ Installer       │
-└────────┬────────┘
-         │
-         │ 6. 完了
-         ▼
-ファイルシステム
-```
 
 ## モジュール間の依存関係
 
 ```
 ┌──────────────┐
 │ Applications │
-└──────┬───────┘
-       │ depends on
-       ▼
-┌──────────────┐
-│ isn (pkg mgr)│
 └──────┬───────┘
        │ uses
        ▼

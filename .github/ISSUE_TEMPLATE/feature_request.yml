@@ -56,7 +56,6 @@ body:
       description: Which component would this feature affect?
       options:
         - Core OS
-        - Package Manager (isn)
         - Init System (OpenRC)
         - Networking
         - Security
