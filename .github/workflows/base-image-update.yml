@@ -162,40 +162,51 @@ jobs:
           git push -u origin "$BRANCH_NAME"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.update.outputs.branch }}
-          title: "⬆️ Update base image components - $(date +%Y-%m-%d)"
-          body: |
-            ## Automated Base Image Update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Build PR body
+          PR_BODY="## Automated Base Image Update
 
-            This PR updates core components to their latest versions.
+          This PR updates core components to their latest versions.
 
-            ### Changes
+          ### Changes
+          "
 
-            ${{ steps.update.outputs.musl_update == 'true' && format('- musl libc: {0} → {1}', needs.check-updates.outputs.musl_current, needs.check-updates.outputs.musl_latest) || '' }}
-            ${{ steps.update.outputs.busybox_update == 'true' && format('- BusyBox: {0} → {1}', needs.check-updates.outputs.busybox_current, needs.check-updates.outputs.busybox_latest) || '' }}
+          if [ "${{ needs.check-updates.outputs.musl_update }}" = "true" ]; then
+            PR_BODY="${PR_BODY}
+          - musl libc: ${{ needs.check-updates.outputs.musl_current }} → ${{ needs.check-updates.outputs.musl_latest }}"
+          fi
 
-            ### Testing Checklist
+          if [ "${{ needs.check-updates.outputs.busybox_update }}" = "true" ]; then
+            PR_BODY="${PR_BODY}
+          - BusyBox: ${{ needs.check-updates.outputs.busybox_current }} → ${{ needs.check-updates.outputs.busybox_latest }}"
+          fi
 
-            - [ ] All variants build successfully (minimal, standard, extended)
-            - [ ] Integration tests pass
-            - [ ] Security scans pass (Trivy)
-            - [ ] Docker images functional
-            - [ ] No performance regressions
+          PR_BODY="${PR_BODY}
 
-            ### Notes
+          ### Testing Checklist
 
-            - This PR was automatically created by the base image update workflow
-            - Please review changelog and test thoroughly before merging
-            - Security scans will run automatically on this PR
+          - [ ] All variants build successfully (minimal, standard, extended)
+          - [ ] Integration tests pass
+          - [ ] Security scans pass (Trivy)
+          - [ ] Docker images functional
+          - [ ] No performance regressions
 
-            🤖 Generated with [Claude Code](https://claude.com/claude-code)
-          labels: |
-            dependencies
-            automated
-            base-image
+          ### Notes
+
+          - This PR was automatically created by the base image update workflow
+          - Please review changelog and test thoroughly before merging
+          - Security scans will run automatically on this PR
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+
+          # Create PR using gh CLI
+          gh pr create \
+            --title "⬆️ Update base image components - $(date +%Y-%m-%d)" \
+            --body "$PR_BODY" \
+            --label "dependencies,automated,base-image" \
+            --base main
 
   # Note: Full build testing is done in the PR's CI/CD pipeline
   # This workflow only creates the update PR
