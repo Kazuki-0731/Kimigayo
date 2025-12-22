@@ -4,7 +4,7 @@
 
 ### 🎉 初回リリース
 
-Kimigayo OS Phase 1の開発が完了しました。Alpine Linuxの設計思想を受け継いだ軽量・高速・セキュアなオペレーティングシステムのコアコンポーネントとインフラストラクチャが整備されました。
+Kimigayo OS Phase 1の開発が完了しました。Googleのdistrolessと同様の設計思想を採用した軽量・高速・セキュアなオペレーティングシステムのコアコンポーネントとインフラストラクチャが整備されました。
 
 ---
 
@@ -260,7 +260,8 @@ Kimigayo OSは、軽量で高速なEd25519署名アルゴリズムをパッケ�
 
 Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
-- [Alpine Linux](https://alpinelinux.org/) - 設計思想とインスピレーション
+- [Google Distroless](https://github.com/GoogleContainerTools/distroless) - 設計思想とインスピレーション
+- [Alpine Linux](https://alpinelinux.org/) - 参考実装とベストプラクティス
 - [musl libc](https://musl.libc.org/) - 軽量なCライブラリ
 - [BusyBox](https://busybox.net/) - Unixユーティリティ
 - [OpenRC](https://github.com/OpenRC/openrc) - Initシステム
