@@ -1,4 +1,4 @@
-name: Security Updates
+name: Security
 
 on:
   schedule:
@@ -8,32 +8,32 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   security-events: write
   issues: write
 
+env:
+  DOCKER_HUB_USERNAME: ishinokazuki
+  IMAGE_NAME: kimigayo-os
+
 jobs:
-  check-security-updates:
+  version-check:
+    name: Check Component Versions
     runs-on: ubuntu-latest
+    outputs:
+      musl_update: ${{ steps.musl_check.outputs.update_needed }}
+      busybox_update: ${{ steps.busybox_check.outputs.update_needed }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Alpine Linux security updates
+      - name: Check Alpine Linux security advisories
         id: alpine_check
         run: |
-          # Get current Alpine version from build script
-          CURRENT_VERSION=$(grep 'ALPINE_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
-
-          # Check latest Alpine Linux security advisories
-          echo "Current Alpine version: $CURRENT_VERSION"
-
           # Fetch Alpine security database
           wget -q https://secdb.alpinelinux.org/edge/main.json -O alpine-security.json || echo "Failed to fetch security database"
 
           if [ -f alpine-security.json ]; then
-            # Count vulnerabilities
             VULN_COUNT=$(jq 'length' alpine-security.json 2>/dev/null || echo "0")
             echo "vulnerabilities=$VULN_COUNT" >> $GITHUB_OUTPUT
             echo "Found $VULN_COUNT packages with known vulnerabilities"
@@ -44,14 +44,10 @@ jobs:
       - name: Check musl libc updates
         id: musl_check
         run: |
-          # Get current musl version
           CURRENT_MUSL=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
-          echo "Current musl version: $CURRENT_MUSL"
-
-          # Check for latest musl version
           LATEST_MUSL=$(curl -sL https://www.musl-libc.org/ | grep -oP 'musl-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "$CURRENT_MUSL")
-          echo "Latest musl version: $LATEST_MUSL"
 
+          echo "Current musl: $CURRENT_MUSL, Latest: $LATEST_MUSL"
           echo "current=$CURRENT_MUSL" >> $GITHUB_OUTPUT
           echo "latest=$LATEST_MUSL" >> $GITHUB_OUTPUT
 
@@ -64,14 +60,10 @@ jobs:
       - name: Check BusyBox updates
         id: busybox_check
         run: |
-          # Get current BusyBox version
           CURRENT_BUSYBOX=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
-          echo "Current BusyBox version: $CURRENT_BUSYBOX"
-
-          # Check for latest BusyBox version
           LATEST_BUSYBOX=$(curl -sL https://busybox.net/downloads/ | grep -oP 'busybox-\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "$CURRENT_BUSYBOX")
-          echo "Latest BusyBox version: $LATEST_BUSYBOX"
 
+          echo "Current BusyBox: $CURRENT_BUSYBOX, Latest: $LATEST_BUSYBOX"
           echo "current=$CURRENT_BUSYBOX" >> $GITHUB_OUTPUT
           echo "latest=$LATEST_BUSYBOX" >> $GITHUB_OUTPUT
 
@@ -80,22 +72,6 @@ jobs:
           else
             echo "update_needed=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Run Trivy security scan
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-security-results.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: 'trivy-security-results.sarif'
 
       - name: Create security report
         id: report
@@ -119,15 +95,10 @@ jobs:
           ### Alpine Linux Security Advisories
           - Vulnerabilities found: ${{ steps.alpine_check.outputs.vulnerabilities }}
 
-          ## Trivy Scan Results
-
-          See uploaded SARIF file in Security tab for detailed vulnerability report.
-
           ## Recommended Actions
 
           EOF
 
-          # Add recommendations
           if [ "${{ steps.musl_check.outputs.update_needed }}" = "true" ]; then
             echo "- [ ] Update musl libc to ${{ steps.musl_check.outputs.latest }}" >> reports/security-check-$(date +%Y%m%d).md
           fi
@@ -140,8 +111,6 @@ jobs:
             echo "- [ ] Review Alpine security advisories" >> reports/security-check-$(date +%Y%m%d).md
           fi
 
-          cat reports/security-check-$(date +%Y%m%d).md
-
       - name: Create issue for security updates
         if: steps.musl_check.outputs.update_needed == 'true' || steps.busybox_check.outputs.update_needed == 'true'
         uses: actions/github-script@v7
@@ -151,7 +120,6 @@ jobs:
             const reportPath = `reports/security-check-${new Date().toISOString().split('T')[0].replace(/-/g, '')}.md`;
             const reportContent = fs.readFileSync(reportPath, 'utf8');
 
-            // Check if issue already exists
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -164,7 +132,6 @@ jobs:
             );
 
             if (existingIssue) {
-              // Update existing issue
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -172,7 +139,6 @@ jobs:
                 body: `## Update - ${new Date().toISOString().split('T')[0]}\n\n${reportContent}`
               });
             } else {
-              // Create new issue
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -188,3 +154,69 @@ jobs:
           name: security-report-${{ github.run_number }}
           path: reports/
           retention-days: 90
+
+  trivy-filesystem-scan:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    needs: version-check
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          scanners: 'vuln,config,secret'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+          category: 'trivy-filesystem'
+
+  trivy-image-scan:
+    name: Trivy Image Scan (Weekly)
+    runs-on: ubuntu-latest
+    # Run only on Sundays (day 0)
+    if: github.event.schedule == '0 2 * * *' && github.event_name == 'schedule' && (github.event.schedule == '0 2 * * 0' || github.event_name == 'workflow_dispatch')
+    strategy:
+      matrix:
+        variant: [minimal, standard, extended]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull Docker image
+        run: |
+          if [[ "${{ matrix.variant }}" == "standard" ]]; then
+            IMAGE_REF="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
+          else
+            IMAGE_REF="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${{ matrix.variant }}"
+          fi
+          echo "IMAGE_REF=${IMAGE_REF}" >> $GITHUB_ENV
+          docker pull ${IMAGE_REF} || echo "Failed to pull ${IMAGE_REF}"
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          format: 'sarif'
+          output: 'trivy-image-${{ matrix.variant }}.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,config,secret'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-image-${{ matrix.variant }}.sarif'
+          category: 'trivy-image-${{ matrix.variant }}'
