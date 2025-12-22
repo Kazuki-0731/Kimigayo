@@ -4,10 +4,10 @@
 
 ## 主な特徴
 
-- 🪶 **超軽量**: ベースイメージ5MB未満
+- 🪶 **超軽量**: ベースイメージ1-3MB（distroless的アプローチ）
 - ⚡ **高速起動**: 10秒以内のシステム起動
 - 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
-- 📦 **パッケージマネージャ**: Ed25519署名検証を備えた`isn`パッケージマネージャを内蔵
+- 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除
 - 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
 - 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
 - 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
@@ -23,7 +23,6 @@
 
 - [インストールガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/INSTALLATION.md)
 - [クイックスタートガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/QUICKSTART.md)
-- [パッケージマネージャガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/PACKAGE_MANAGER.md)
 - [セキュリティガイド](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
 
 ## クイックスタート
@@ -54,10 +53,14 @@ docker run ishinokazuki/kimigayo-os:latest uname -a
 ### ベースイメージとして使用
 
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:latest
+# マルチステージビルドで必要なものを準備
+FROM alpine:3.19 AS builder
+RUN apk add --no-cache nginx
 
-# isnを使用してパッケージをインストール
-RUN isn install nginx
+# Kimigayo OSで最小ランタイム環境を構築
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
+COPY --from=builder /usr/lib/nginx /usr/lib/nginx
 
 # アプリケーションのセットアップ
 COPY . /app
