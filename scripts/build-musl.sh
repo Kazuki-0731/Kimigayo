@@ -53,6 +53,11 @@ log_build() {
 
 # Architecture-specific settings
 setup_arch() {
+    # Normalize arm64 to aarch64 (musl uses aarch64 internally)
+    if [ "$ARCH" = "arm64" ]; then
+        ARCH="aarch64"
+    fi
+
     case "$ARCH" in
         x86_64)
             TARGET="x86_64-linux-musl"
@@ -64,7 +69,7 @@ setup_arch() {
             export RANLIB="${RANLIB:-ranlib}"
             export STRIP="${STRIP:-strip}"
             ;;
-        arm64|aarch64)
+        aarch64)
             TARGET="aarch64-linux-musl"
             CFLAGS_ARCH=""
             # ARM64クロスコンパイラの検出
