@@ -236,15 +236,25 @@ build_musl() {
     # Build
     log_info "Starting musl libc compilation..."
 
-    # Debug: Check generated Makefile
-    log_info "Debug: Checking generated Makefile for ARCH references..."
-    if grep -q "arch/arm64" Makefile 2>/dev/null; then
-        log_warn "⚠️ Found 'arch/arm64' in generated Makefile!"
-        grep "arch/arm64" Makefile | head -3 || true
+    # Debug: Check generated config.mak
+    log_info "Debug: Content of config.mak:"
+    if [ -f config.mak ]; then
+        cat config.mak 2>/dev/null || echo "Cannot read config.mak"
+    else
+        log_warn "config.mak not found!"
     fi
-    if grep -q "arch/aarch64" Makefile 2>/dev/null; then
-        log_info "✓ Found 'arch/aarch64' in generated Makefile"
+
+    # Debug: Check generated Makefile for ARCH references
+    log_info "Debug: Checking Makefile for arch/ paths..."
+    if [ -f Makefile ]; then
+        grep -n "arch/" Makefile 2>/dev/null | head -10 || echo "No arch/ references in Makefile"
+    else
+        log_warn "Makefile not found!"
     fi
+
+    # Debug: Check what arch directory actually exists in source
+    log_info "Debug: Available arch directories in source:"
+    ls -la "$MUSL_SRC_DIR/arch/" 2>/dev/null | grep "^d" | awk '{print $NF}' | grep -v "^\." || echo "Cannot list arch directories"
 
     # Debug: Check for stale dependency files in source directory
     log_info "Debug: Checking source directory for stale files..."
