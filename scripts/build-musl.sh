@@ -198,15 +198,6 @@ configure_musl() {
     export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY}"
     export LDFLAGS="${LDFLAGS_SECURITY}"
 
-    # For ARM64: compiler-rt builtins are not available, so we need to handle soft-float differently
-    # Option 1: Use empty LIBCC and rely on musl's own implementations
-    # Option 2: Build with -ffreestanding to avoid needing runtime library
-    if [ "$ARCH" = "aarch64" ]; then
-        # Export empty LIBCC to prevent configure from auto-detecting unavailable libraries
-        export LIBCC=""
-        log_info "ARM64: Using empty LIBCC (musl will provide necessary functions)"
-    fi
-
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
 
