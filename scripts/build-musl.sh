@@ -194,6 +194,11 @@ configure_musl() {
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
 
+    # Unset ARCH to prevent configure from using it
+    # muslのconfigureはARCH環境変数を見る可能性があるため
+    local SAVED_ARCH="$ARCH"
+    unset ARCH
+
     # Configure
     "${MUSL_SRC_DIR}/configure" \
         --prefix=/usr \
@@ -204,8 +209,12 @@ configure_musl() {
         --enable-wrapper=all \
         2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc configuration failed"
+        export ARCH="$SAVED_ARCH"
         exit 1
     }
+
+    # Restore ARCH
+    export ARCH="$SAVED_ARCH"
 
     log_info "musl libc configuration completed"
 }
