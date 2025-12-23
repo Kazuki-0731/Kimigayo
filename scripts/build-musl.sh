@@ -236,43 +236,10 @@ build_musl() {
     # Build
     log_info "Starting musl libc compilation..."
 
-    # Debug: Check generated config.mak
-    log_info "Debug: Content of config.mak:"
-    if [ -f config.mak ]; then
-        cat config.mak 2>/dev/null || echo "Cannot read config.mak"
-    else
-        log_warn "config.mak not found!"
-    fi
-
-    # Debug: Check generated Makefile for ARCH references
-    log_info "Debug: Checking Makefile for arch/ paths..."
-    if [ -f Makefile ]; then
-        grep -n "arch/" Makefile 2>/dev/null | head -10 || echo "No arch/ references in Makefile"
-    else
-        log_warn "Makefile not found!"
-    fi
-
-    # Debug: Check what arch directory actually exists in source
-    log_info "Debug: Available arch directories in source:"
-    ls -la "$MUSL_SRC_DIR/arch/" 2>/dev/null | grep "^d" | awk '{print $NF}' | grep -v "^\." || echo "Cannot list arch directories"
-
-    # Debug: Check for stale dependency files in source directory
-    log_info "Debug: Checking source directory for stale files..."
-    if find "$MUSL_SRC_DIR" -name "*.d" -o -name "config.mak" 2>/dev/null | grep -q .; then
-        log_warn "⚠️ Found stale build files in source directory!"
-        find "$MUSL_SRC_DIR" -name "*.d" -o -name "config.mak" 2>/dev/null | head -5 || true
-    fi
-
-    # Debug: Show current environment
-    log_info "Debug: ARCH environment variable: ${ARCH:-<not set>}"
-    log_info "Debug: Current directory: $(pwd)"
-
     # CRITICAL: Unset ARCH during make to prevent it from overriding Makefile's ARCH
     # makeは環境変数ARCHがあると、Makefileで定義された$(ARCH)よりも優先される
     local SAVED_ARCH="$ARCH"
     unset ARCH
-
-    log_info "Debug: Running make with ARCH unset (using Makefile's ARCH=$SAVED_ARCH)"
 
     make -j"$JOBS" 2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc build failed"
