@@ -113,17 +113,44 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
-# gcc (libgccを含む) も必要
-RUN apk add --no-cache clang llvm lld compiler-rt gcc
+# cmake: compiler-rtビルド用
+RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
+
+# ARM64用compiler-rt builtinsをソースからビルド
+# Alpine Linuxのcompiler-rtはx86_64専用のため、ARM64ターゲット用を手動ビルド
+RUN cd /tmp && \
+    wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.2/compiler-rt-21.1.2.src.tar.xz && \
+    tar xf compiler-rt-21.1.2.src.tar.xz && \
+    cd compiler-rt-21.1.2.src && \
+    mkdir build && cd build && \
+    cmake -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_C_COMPILER_TARGET=aarch64-linux-musl \
+        -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-musl \
+        -DCMAKE_C_FLAGS="-fPIC" \
+        -DCMAKE_CXX_FLAGS="-fPIC" \
+        -DCOMPILER_RT_BUILD_BUILTINS=ON \
+        -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+        -DCOMPILER_RT_BUILD_XRAY=OFF \
+        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+        -DCOMPILER_RT_BUILD_PROFILE=OFF \
+        -DCOMPILER_RT_BUILD_MEMPROF=OFF \
+        -DCOMPILER_RT_BUILD_ORC=OFF \
+        -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+        ../lib/builtins && \
+    ninja && \
+    mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-linux-musl && \
+    cp lib/linux/libclang_rt.builtins-aarch64.a /usr/lib/llvm21/lib/clang/21/lib/aarch64-linux-musl/ && \
+    cd / && rm -rf /tmp/compiler-rt-21.1.2.src*
 
 # ARM64ターゲット用のGCCラッパースクリプトを作成
-# CRTファイルの問題を回避し、ランタイムライブラリはmuslに任せる：
-# -nostartfiles: GCCのcrtbegin*.o/crtend*.oへの依存を回避（muslが独自のCRTを提供）
-# --rtlib と --unwindlib を指定しない: muslのconfigureが適切なライブラリを自動検出
-# muslは128ビット浮動小数点のソフトウェア実装を含むため、外部ランタイム不要
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# -nostartfiles: GCCのcrtbegin*.o/crtend*.oへの依存を回避
+# --rtlib=compiler-rt: ARM64用にビルドしたcompiler-rt builtinsを使用
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
