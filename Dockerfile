@@ -113,16 +113,19 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
-RUN apk add --no-cache clang llvm lld
+# gcc (libgccを含む) も必要
+RUN apk add --no-cache clang llvm lld compiler-rt gcc
 
 # ARM64ターゲット用のGCCラッパースクリプトを作成
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# libgccを使用してランタイムサポートを提供
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtlib=libgcc --unwindlib=none "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -rtlib=libgcc --unwindlib=none "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
-    ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip
+    ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip && \
+    ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
