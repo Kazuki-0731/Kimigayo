@@ -117,13 +117,13 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN apk add --no-cache clang llvm lld compiler-rt gcc
 
 # ARM64ターゲット用のGCCラッパースクリプトを作成
-# compiler-rtとCRTファイルの問題を回避：
+# CRTファイルの問題を回避し、ランタイムライブラリはmuslに任せる：
 # -nostartfiles: GCCのcrtbegin*.o/crtend*.oへの依存を回避（muslが独自のCRTを提供）
-# -nodefaultlibs: デフォルトライブラリ（libgcc等）の自動リンクを無効化
-# muslのconfigureが必要なライブラリを自動検出してリンクする
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none -nostartfiles -nodefaultlibs "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# --rtlib と --unwindlib を指定しない: muslのconfigureが適切なライブラリを自動検出
+# muslは128ビット浮動小数点のソフトウェア実装を含むため、外部ランタイム不要
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none -nostartfiles -nodefaultlibs "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -nostartfiles "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
