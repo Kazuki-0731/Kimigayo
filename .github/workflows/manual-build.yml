@@ -19,7 +19,7 @@ on:
         type: choice
         options:
           - x86_64
-          - arm64
+          - aarch64
 
 jobs:
   build:
