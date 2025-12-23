@@ -116,43 +116,22 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # cmake: compiler-rtビルド用
 RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
-# ARM64用compiler-rt builtinsをビルド
-# ARM64の128-bit浮動小数点演算に必要なランタイムライブラリ
-RUN cd /tmp && \
-    wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.2/cmake-21.1.2.src.tar.xz && \
-    wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.2/compiler-rt-21.1.2.src.tar.xz && \
-    tar xf cmake-21.1.2.src.tar.xz && \
-    tar xf compiler-rt-21.1.2.src.tar.xz && \
-    cd compiler-rt-21.1.2.src && \
-    mkdir build && cd build && \
-    cmake -G Ninja \
-        -DCMAKE_MODULE_PATH=/tmp/cmake-21.1.2.src/Modules \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DCMAKE_C_COMPILER_TARGET=aarch64-linux-musl \
-        -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-musl \
-        -DCMAKE_C_FLAGS="-fPIC" \
-        -DCMAKE_CXX_FLAGS="-fPIC" \
-        -DCOMPILER_RT_BUILD_BUILTINS=ON \
-        -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-        -DCOMPILER_RT_BUILD_XRAY=OFF \
-        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-        -DCOMPILER_RT_BUILD_PROFILE=OFF \
-        -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-        -DCOMPILER_RT_BUILD_ORC=OFF \
-        -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
-        -DCOMPILER_RT_BAREMETAL_BUILD=ON \
-        ../lib/builtins && \
-    ninja && \
-    mkdir -p /usr/local/lib/clang/21/lib/aarch64-linux-musl && \
-    cp lib/linux/libclang_rt.builtins-aarch64.a /usr/local/lib/clang/21/lib/aarch64-linux-musl/ && \
-    cd / && rm -rf /tmp/cmake-21.1.2.src* /tmp/compiler-rt-21.1.2.src*
+# ARM64用libgccをAlpineリポジトリからダウンロード
+# Alpine Linux aarch64リポジトリのlibgccパッケージを取得
+RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
+    wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
+    tar xzf libgcc-15.2.0-r2.apk && \
+    mkdir -p /usr/aarch64-linux-musl/lib && \
+    cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
+    cd /usr/aarch64-linux-musl/lib && \
+    ln -s libgcc_s.so.1 libgcc_s.so && \
+    cd / && rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトを作成
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# -L/usr/aarch64-linux-musl/lib でARM64用libgccを参照
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld --rtlib=compiler-rt "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
