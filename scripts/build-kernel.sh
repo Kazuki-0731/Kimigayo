@@ -263,6 +263,8 @@ build_kernel() {
             ;;
     esac
 
+    # Use PIPESTATUS to capture make's exit code
+    set +e
     stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
@@ -292,13 +294,18 @@ build_kernel() {
             if [[ "$line" =~ (CHK|UPD|CALL|GEN|Setup|Kernel|vmlinux|bzImage|Image) ]]; then
                 echo "$line" >&2
             fi
-        done || {
+        done
+
+    local make_status=${PIPESTATUS[0]}
+    set -e
+
+    if [ $make_status -ne 0 ]; then
         kill $dots_pid 2>/dev/null || true
         wait $dots_pid 2>/dev/null || true
-        log_error "Kernel build failed"
+        log_error "Kernel build failed with exit code: $make_status"
         log_error "Check log file: $BUILD_LOG"
         exit 1
-    }
+    fi
 
     # Ensure dots process is stopped
     kill $dots_pid 2>/dev/null || true
@@ -306,6 +313,28 @@ build_kernel() {
 
     log_info "=========================================="
     log_info "Kernel build completed successfully"
+
+    # Debug: Check what was actually built
+    log_info "Checking for kernel image..."
+    cd "$KERNEL_SRC_DIR" || exit 1
+    case "$ARCH" in
+        x86_64)
+            if [ -f "arch/x86/boot/bzImage" ]; then
+                log_info "✓ Found bzImage"
+            else
+                log_warn "✗ bzImage not found, checking alternatives..."
+                find arch/x86/boot -name "*Image*" -o -name "vmlinuz*" 2>/dev/null | head -5 || true
+            fi
+            ;;
+        arm64)
+            if [ -f "arch/arm64/boot/Image" ]; then
+                log_info "✓ Found Image"
+            else
+                log_warn "✗ Image not found, checking alternatives..."
+                find arch/arm64/boot -name "*Image*" -o -name "vmlinuz*" 2>/dev/null | head -5 || true
+            fi
+            ;;
+    esac
 }
 
 # Install kernel to output directory
