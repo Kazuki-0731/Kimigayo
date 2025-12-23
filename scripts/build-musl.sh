@@ -228,6 +228,21 @@ build_musl() {
 
     # Build
     log_info "Starting musl libc compilation..."
+
+    # Debug: Check generated Makefile
+    log_info "Debug: Checking generated Makefile for ARCH references..."
+    if grep -q "arch/arm64" Makefile 2>/dev/null; then
+        log_warn "⚠️ Found 'arch/arm64' in generated Makefile!"
+        grep "arch/arm64" Makefile | head -3 || true
+    fi
+    if grep -q "arch/aarch64" Makefile 2>/dev/null; then
+        log_info "✓ Found 'arch/aarch64' in generated Makefile"
+    fi
+
+    # Debug: Show current environment
+    log_info "Debug: ARCH environment variable: ${ARCH:-<not set>}"
+    log_info "Debug: Current directory: $(pwd)"
+
     make -j"$JOBS" 2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc build failed"
         exit 1
