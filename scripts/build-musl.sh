@@ -267,10 +267,21 @@ build_musl() {
     log_info "Debug: ARCH environment variable: ${ARCH:-<not set>}"
     log_info "Debug: Current directory: $(pwd)"
 
+    # CRITICAL: Unset ARCH during make to prevent it from overriding Makefile's ARCH
+    # makeは環境変数ARCHがあると、Makefileで定義された$(ARCH)よりも優先される
+    local SAVED_ARCH="$ARCH"
+    unset ARCH
+
+    log_info "Debug: Running make with ARCH unset (using Makefile's ARCH=$SAVED_ARCH)"
+
     make -j"$JOBS" 2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc build failed"
+        export ARCH="$SAVED_ARCH"
         exit 1
     }
+
+    # Restore ARCH
+    export ARCH="$SAVED_ARCH"
 
     log_info "musl libc build completed successfully"
 }
