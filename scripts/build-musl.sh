@@ -168,6 +168,13 @@ check_prerequisites() {
 configure_musl() {
     log_build "Configuring musl libc for $ARCH"
 
+    # Clean build directory to avoid stale configuration
+    if [ -d "$MUSL_BUILD_DIR" ]; then
+        log_info "Cleaning stale build directory"
+        rm -rf "$MUSL_BUILD_DIR"
+        mkdir -p "$MUSL_BUILD_DIR"
+    fi
+
     cd "$MUSL_BUILD_DIR" || exit 1
 
     # Security hardening flags
