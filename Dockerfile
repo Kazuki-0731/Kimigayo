@@ -117,10 +117,13 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN apk add --no-cache clang llvm lld compiler-rt gcc
 
 # ARM64ターゲット用のGCCラッパースクリプトを作成
-# libgccを使用してランタイムサポートを提供
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtlib=libgcc --unwindlib=none "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# compiler-rtはx86_64専用のため、以下の対策を実施：
+# -mlong-double-64: long doubleを64ビット（doubleと同じ）にして128ビット演算を回避
+# -rtlib=compiler-rt: clangのruntime libraryを使用
+# --unwindlib=none: unwind libraryは不要
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt --unwindlib=none -mlong-double-64 "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -rtlib=libgcc --unwindlib=none "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt --unwindlib=none -mlong-double-64 "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
