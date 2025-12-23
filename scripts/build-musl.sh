@@ -175,6 +175,13 @@ configure_musl() {
         mkdir -p "$MUSL_BUILD_DIR"
     fi
 
+    # Clean source directory of any previous build artifacts
+    log_info "Cleaning source directory of build artifacts"
+    cd "$MUSL_SRC_DIR" || exit 1
+    make clean 2>/dev/null || true
+    find . -name "*.d" -delete 2>/dev/null || true
+    find . -name "config.mak" -delete 2>/dev/null || true
+
     cd "$MUSL_BUILD_DIR" || exit 1
 
     # Security hardening flags
@@ -237,6 +244,13 @@ build_musl() {
     fi
     if grep -q "arch/aarch64" Makefile 2>/dev/null; then
         log_info "✓ Found 'arch/aarch64' in generated Makefile"
+    fi
+
+    # Debug: Check for stale dependency files in source directory
+    log_info "Debug: Checking source directory for stale files..."
+    if find "$MUSL_SRC_DIR" -name "*.d" -o -name "config.mak" 2>/dev/null | grep -q .; then
+        log_warn "⚠️ Found stale build files in source directory!"
+        find "$MUSL_SRC_DIR" -name "*.d" -o -name "config.mak" 2>/dev/null | head -5 || true
     fi
 
     # Debug: Show current environment
