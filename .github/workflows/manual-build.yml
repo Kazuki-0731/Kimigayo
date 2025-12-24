@@ -19,7 +19,7 @@ on:
         type: choice
         options:
           - x86_64
-          - aarch64
+          - arm64
 
 jobs:
   build:
@@ -39,10 +39,10 @@ jobs:
     - name: Run build for ${{ github.event.inputs.arch }}
       run: |
         docker compose run --rm \
-          -e ARCH=${{ github.event.inputs.arch }} \
+          -e TARGET_ARCH=${{ github.event.inputs.arch }} \
           -e IMAGE_TYPE=${{ github.event.inputs.variant }} \
           kimigayo-build \
-          make build ARCH=${{ github.event.inputs.arch }}
+          make build TARGET_ARCH=${{ github.event.inputs.arch }}
 
     - name: Run tests
       run: |
