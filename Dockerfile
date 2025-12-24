@@ -129,12 +129,16 @@ RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
 # -L/usr/aarch64-linux-musl/lib でARM64用libgccを参照
+# カーネルビルド用に LLVM=1 を使用する環境変数を設定する方が良いが、
+# まずはGCC互換のラッパーを提供
 RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
     printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
+    printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -c "$@"\n' > /usr/bin/aarch64-linux-musl-as && \
+    chmod +x /usr/bin/aarch64-linux-musl-as && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
     ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip && \
