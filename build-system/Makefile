@@ -18,11 +18,6 @@ BUILD_DATE := $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
 # Build configuration
 ARCH ?= x86_64
 
-# Normalize arm64 to aarch64 (musl uses aarch64 internally)
-ifeq ($(ARCH),arm64)
-    override ARCH := aarch64
-endif
-
 SECURITY_HARDENING ?= full
 REPRODUCIBLE_BUILD ?= yes
 DEBUG ?= no
