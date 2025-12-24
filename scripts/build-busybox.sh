@@ -18,7 +18,12 @@ ARCH="${ARCH:-x86_64}"
 BUSYBOX_SRC_DIR="${BUILD_DIR}/busybox-${BUSYBOX_VERSION}"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox-build-${ARCH}"
 BUSYBOX_INSTALL_DIR="${BUILD_DIR}/busybox-install-${ARCH}"
-MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+
+# MUSL_INSTALL_DIR can be overridden by environment variable
+# This allows Makefile to pass the correct path based on MUSL_ARCH
+if [ -z "$MUSL_INSTALL_DIR" ]; then
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+fi
 
 # Colors for output
 RED='\033[0;31m'
