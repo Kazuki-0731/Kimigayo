@@ -11,10 +11,9 @@ ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
-# Normalize arm64 to aarch64 early (musl uses aarch64 internally)
-if [ "$ARCH" = "arm64" ]; then
-    ARCH="aarch64"
-fi
+# ARCH is expected to be already normalized:
+# - x86_64 for x86_64
+# - aarch64 for ARM64 (not arm64, as musl uses aarch64 naming)
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
