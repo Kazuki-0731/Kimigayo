@@ -10,6 +10,11 @@ ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
+# Normalize aarch64 to arm64 (kernel uses arm64, but musl uses aarch64)
+if [ "$ARCH" = "aarch64" ]; then
+    ARCH="arm64"
+fi
+
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
