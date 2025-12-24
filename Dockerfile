@@ -127,16 +127,20 @@ RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
     ln -s libgcc_s.so.1 libgcc_s.so && \
     cd / && rm -rf /tmp/aarch64-libs
 
-# ARM64ターゲット用のGCCラッパースクリプトを作成
+# ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
 # -L/usr/aarch64-linux-musl/lib でARM64用libgccを参照
 RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
     printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
+    chmod +x /usr/bin/aarch64-linux-musl-ld && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
     ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip && \
-    ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm
+    ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm && \
+    ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
+    ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
