@@ -39,10 +39,10 @@ jobs:
       - name: Build Kimigayo OS (minimal/x86_64)
         run: |
           docker compose run --rm \
-            -e ARCH=x86_64 \
+            -e TARGET_ARCH=x86_64 \
             -e IMAGE_TYPE=minimal \
             kimigayo-build \
-            make build ARCH=x86_64
+            make build TARGET_ARCH=x86_64
 
       - name: Run unit tests
         run: |
