@@ -207,7 +207,7 @@ busybox:
 	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(BUSYBOX_ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-busybox.sh
-	$(Q)ARCH=$(BUSYBOX_ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
+	$(Q)ARCH=$(BUSYBOX_ARCH) MUSL_INSTALL_DIR=$(BUILD_DIR)/musl-install-$(MUSL_ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
 	@echo "✅ [3/4] BusyBox build completed"
 
 # Init system build (OpenRC)
