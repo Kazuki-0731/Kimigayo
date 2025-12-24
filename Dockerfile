@@ -128,12 +128,11 @@ RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
     cd / && rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
-# -L/usr/aarch64-linux-musl/lib でARM64用libgccを参照
-# カーネルビルド用に LLVM=1 を使用する環境変数を設定する方が良いが、
-# まずはGCC互換のラッパーを提供
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# libgcc_sをリンクパスに追加するが、静的ビルド時は使用されない
+# muslが必要な実装を全て含むため、通常はlibgccは不要
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -lgcc_s "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
