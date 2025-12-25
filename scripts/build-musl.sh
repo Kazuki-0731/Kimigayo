@@ -197,6 +197,12 @@ configure_musl() {
     export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY}"
     export LDFLAGS="${LDFLAGS_SECURITY}"
 
+    # For ARM64, add libgcc_s for 128-bit floating point support
+    if [ "$ARCH" = "aarch64" ]; then
+        export LDFLAGS="${LDFLAGS} -L/usr/aarch64-linux-musl/lib -lgcc_s"
+        log_info "ARM64: Adding libgcc_s for 128-bit floating point support"
+    fi
+
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
 
