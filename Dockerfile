@@ -116,27 +116,33 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # cmake: compiler-rtビルド用
 RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
-# ARM64用libgccをAlpineリポジトリからダウンロード
-# Alpine Linux aarch64リポジトリのlibgccパッケージを取得
+# ARM64用libgccとlinux-headersをAlpineリポジトリからダウンロード
+# Alpine Linux aarch64リポジトリのlibgccとlinux-headersパッケージを取得
 RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
     wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
+    wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-headers-6.6-r1.apk && \
     tar xzf libgcc-15.2.0-r2.apk && \
     mkdir -p /usr/aarch64-linux-musl/lib && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
     cd /usr/aarch64-linux-musl/lib && \
     ln -s libgcc_s.so.1 libgcc_s.so && \
+    cd /tmp/aarch64-libs && \
+    tar xzf linux-headers-6.6-r1.apk && \
+    mkdir -p /usr/aarch64-linux-musl/include && \
+    cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
     cd / && rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
 # libgcc_sをリンクパスに追加するが、静的ビルド時は使用されない
 # muslが必要な実装を全て含むため、通常はlibgccは不要
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# ARM64用のカーネルヘッダー（linux/kd.hなど）をインクルードパスに追加
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
-    printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -c "$@"\n' > /usr/bin/aarch64-linux-musl-as && \
+    printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -c -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-as && \
     chmod +x /usr/bin/aarch64-linux-musl-as && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
