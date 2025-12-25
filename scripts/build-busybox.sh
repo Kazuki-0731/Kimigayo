@@ -199,8 +199,10 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
-if ! make -j"$(nproc)" SKIP_STRIP=y; then
+if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
     log_error "BusyBox build failed"
+    log_error "Last 50 lines of build output:"
+    tail -50 /tmp/busybox-build.log >&2
     exit 1
 fi
 
