@@ -199,6 +199,13 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
+# For ARM64 with LLVM/Clang, avoid GCC-specific libraries
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # Use LLVM's compiler-rt instead of libgcc
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -rtlib=compiler-rt -unwindlib=none"
+    log_info "Using LLVM runtime for ARM64 (LDFLAGS: ${LDFLAGS})"
+fi
+
 if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
     log_error "BusyBox build failed"
     log_error "Last 50 lines of build output:"
