@@ -12,6 +12,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Configuration
 BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
 BUSYBOX_BASE_URL="https://busybox.net/downloads"
+BUSYBOX_GITHUB_MIRROR="https://github.com/mirror/busybox"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-${PROJECT_ROOT}/build/downloads}"
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 
@@ -68,22 +69,46 @@ else
     # Download BusyBox with mirror fallback
     log_info "Downloading BusyBox ${BUSYBOX_VERSION}..."
 
-    # Multiple mirror URLs for redundancy
+    # Convert version format (1.36.1 -> 1_36_1) for GitHub tags
+    github_tag_version="${BUSYBOX_VERSION//./_}"
+
+    # Multiple mirror URLs for redundancy (GitHub mirror first as it's faster and more reliable)
     urls=(
+        "${BUSYBOX_GITHUB_MIRROR}/archive/refs/tags/${github_tag_version}.tar.gz"
         "${BUSYBOX_BASE_URL}/${tarball_filename}"
         "https://www.busybox.net/downloads/${tarball_filename}"
     )
 
     download_success=false
+    downloaded_from_github=false
+
     for url in "${urls[@]}"; do
         log_info "Trying: $url"
 
-        if curl -fSL --connect-timeout 30 --max-time 300 -o "$tarball_path" "$url"; then
+        # Determine temporary download path based on URL
+        if [[ "$url" == *"github.com"* ]]; then
+            temp_download_path="${DOWNLOAD_DIR}/busybox-${github_tag_version}.tar.gz"
+            downloaded_from_github=true
+        else
+            temp_download_path="$tarball_path"
+            downloaded_from_github=false
+        fi
+
+        if curl -fSL --connect-timeout 30 --max-time 300 -o "$temp_download_path" "$url"; then
+            # If downloaded from GitHub, need to convert tar.gz to tar.bz2
+            if [ "$downloaded_from_github" = true ]; then
+                log_info "Converting GitHub archive to standard format..."
+                # Extract from tar.gz and recompress to tar.bz2
+                gunzip -c "$temp_download_path" | bzip2 -c > "$tarball_path"
+                rm -f "$temp_download_path"
+            fi
+
             download_success=true
             log_success "Downloaded from: $url"
             break
         else
             log_warning "Failed to download from: $url"
+            rm -f "$temp_download_path"
         fi
     done
 
