@@ -170,6 +170,13 @@ fi
 log_info "Extracting BusyBox..."
 tar -xjf "$tarball_path" -C "$BUILD_DIR"
 
+# GitHub archives extract to busybox-1_36_1 format, need to rename
+github_extract_dir="${BUILD_DIR}/busybox-${github_tag_version}"
+if [ -d "$github_extract_dir" ] && [ "$github_extract_dir" != "$extract_dir" ]; then
+    log_info "Renaming GitHub archive directory: $github_extract_dir -> $extract_dir"
+    mv "$github_extract_dir" "$extract_dir"
+fi
+
 if [ ! -d "$extract_dir" ]; then
     log_error "Extraction failed: directory not found: $extract_dir"
     exit 1
