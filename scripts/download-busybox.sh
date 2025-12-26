@@ -80,7 +80,7 @@ else
     )
 
     download_success=false
-    downloaded_from_github=false
+    skip_checksum=false
 
     for url in "${urls[@]}"; do
         log_info "Trying: $url"
@@ -88,19 +88,23 @@ else
         # Determine temporary download path based on URL
         if [[ "$url" == *"github.com"* ]]; then
             temp_download_path="${DOWNLOAD_DIR}/busybox-${github_tag_version}.tar.gz"
-            downloaded_from_github=true
+            is_github=true
         else
             temp_download_path="$tarball_path"
-            downloaded_from_github=false
+            is_github=false
         fi
 
         if curl -fSL --connect-timeout 30 --max-time 300 -o "$temp_download_path" "$url"; then
             # If downloaded from GitHub, need to convert tar.gz to tar.bz2
-            if [ "$downloaded_from_github" = true ]; then
+            if [ "$is_github" = true ]; then
                 log_info "Converting GitHub archive to standard format..."
                 # Extract from tar.gz and recompress to tar.bz2
                 gunzip -c "$temp_download_path" | bzip2 -c > "$tarball_path"
                 rm -f "$temp_download_path"
+                # GitHub archives have different checksums due to metadata differences
+                # Skip checksum verification for GitHub downloads
+                skip_checksum=true
+                log_info "Note: Checksum verification will be skipped for GitHub mirror"
             fi
 
             download_success=true
@@ -138,7 +142,10 @@ case "$BUSYBOX_VERSION" in
         ;;
 esac
 
-if [ -n "$expected_sha256" ]; then
+if [ "$skip_checksum" = true ]; then
+    log_warning "Skipping checksum verification (downloaded from GitHub mirror)"
+    log_info "GitHub archives have different metadata than official tarballs"
+elif [ -n "$expected_sha256" ]; then
     actual_sha256=$(sha256sum "$tarball_path" | awk '{print $1}')
 
     if [ "$actual_sha256" != "$expected_sha256" ]; then
