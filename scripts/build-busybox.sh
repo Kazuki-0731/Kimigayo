@@ -167,6 +167,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
+    # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
+    # Disable PIE for static builds (PIE + static is not compatible)
+    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
+    log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -190,8 +195,15 @@ log_info "This may take several minutes..."
 # Set compiler flags for static musl build
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+else
+    # For x86_64: use stack protector (GCC has proper support)
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+fi
 
 # Ensure we're using the correct compiler
 log_info "Compiler: ${CC}"
@@ -199,12 +211,6 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
-# For ARM64 with LLVM/Clang, avoid GCC-specific libraries
-if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # Use LLVM's compiler-rt instead of libgcc
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -rtlib=compiler-rt -unwindlib=none"
-    log_info "Using LLVM runtime for ARM64 (LDFLAGS: ${LDFLAGS})"
-fi
 
 if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
     log_error "BusyBox build failed"
