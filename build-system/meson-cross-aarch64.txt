@@ -6,6 +6,9 @@ strip = 'aarch64-linux-musl-strip'
 ranlib = 'aarch64-linux-musl-ranlib'
 pkgconfig = 'pkg-config'
 
+[properties]
+needs_exe_wrapper = true
+
 [host_machine]
 system = 'linux'
 cpu_family = 'aarch64'
