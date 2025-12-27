@@ -219,7 +219,7 @@ init:
 	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(TARGET_ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
-	$(Q)ARCH=$(TARGET_ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
+	$(Q)ARCH=$(TARGET_ARCH) MUSL_INSTALL_DIR=$(BUILD_DIR)/musl-install-$(MUSL_ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
 	@echo "✅ [4/4] OpenRC build completed"
 
 # Root filesystem
