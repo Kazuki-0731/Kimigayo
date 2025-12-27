@@ -188,6 +188,13 @@ log_info "Resolving configuration dependencies..."
 # This handles BusyBox versions that don't have olddefconfig
 yes "" | make oldconfig > /dev/null 2>&1 || true
 
+# Re-apply ARM64-specific settings after oldconfig (oldconfig may reset some values)
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
+    sed -i "s|CONFIG_STATIC_LIBGCC=.*|CONFIG_STATIC_LIBGCC=n|" .config
+    log_info "Re-applied ARM64 settings after oldconfig (PIE=n, STATIC_LIBGCC=n)"
+fi
+
 # Build BusyBox
 log_info "Building BusyBox..."
 log_info "This may take several minutes..."
