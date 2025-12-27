@@ -210,8 +210,8 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
     # Use LLD linker explicitly and disable GCC-specific features
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -fuse-ld=lld -nostartfiles"
-    # Manually add musl's CRT files
-    export LDFLAGS="$LDFLAGS ${MUSL_INSTALL_DIR}/lib/crt1.o ${MUSL_INSTALL_DIR}/lib/crti.o ${MUSL_INSTALL_DIR}/lib/crtn.o"
+    # Manually add musl's CRT files (installed at /usr/lib/)
+    export LDFLAGS="$LDFLAGS ${MUSL_INSTALL_DIR}/usr/lib/crt1.o ${MUSL_INSTALL_DIR}/usr/lib/crti.o ${MUSL_INSTALL_DIR}/usr/lib/crtn.o"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
