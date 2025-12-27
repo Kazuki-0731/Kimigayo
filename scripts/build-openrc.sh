@@ -151,6 +151,18 @@ meson_options=(
     "-Dnewnet=false"
 )
 
+# Add cross-compilation file for ARM64
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    CROSS_FILE="${PROJECT_ROOT}/build-system/meson-cross-aarch64.txt"
+    if [ -f "$CROSS_FILE" ]; then
+        meson_options+=("--cross-file=$CROSS_FILE")
+        log_info "Using Meson cross-compilation file: $CROSS_FILE"
+    else
+        log_error "Cross-compilation file not found: $CROSS_FILE"
+        exit 1
+    fi
+fi
+
 log_info "Meson options:"
 for opt in "${meson_options[@]}"; do
     log_info "  $opt"

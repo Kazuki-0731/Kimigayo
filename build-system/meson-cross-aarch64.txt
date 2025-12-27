@@ -1,0 +1,13 @@
+[binaries]
+c = 'aarch64-linux-musl-gcc'
+cpp = 'aarch64-linux-musl-g++'
+ar = 'aarch64-linux-musl-ar'
+strip = 'aarch64-linux-musl-strip'
+ranlib = 'aarch64-linux-musl-ranlib'
+pkgconfig = 'pkg-config'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
