@@ -107,6 +107,9 @@ case "$ARCH" in
         export AR="${CROSS_COMPILE}ar"
         export RANLIB="${CROSS_COMPILE}ranlib"
         export STRIP="${CROSS_COMPILE}strip"
+        export HOSTCC="gcc"
+        # Tell BusyBox to use LLD linker and avoid GCC-specific libraries
+        export LD="${CROSS_COMPILE}ld.lld"
         ;;
     *)
         log_error "Unsupported architecture: $ARCH"
@@ -205,7 +208,10 @@ log_info "This may take several minutes..."
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+    # Use LLD linker explicitly and disable GCC-specific features
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -fuse-ld=lld -nostartfiles"
+    # Manually add musl's CRT files
+    export LDFLAGS="$LDFLAGS ${MUSL_INSTALL_DIR}/lib/crt1.o ${MUSL_INSTALL_DIR}/lib/crti.o ${MUSL_INSTALL_DIR}/lib/crtn.o"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
