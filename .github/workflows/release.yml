@@ -103,7 +103,7 @@ jobs:
       - name: Build Kimigayo OS rootfs
         run: |
           # Set architecture environment variable
-          export ARCH=${{ matrix.arch }}
+          export TARGET_ARCH=${{ matrix.arch }}
           export IMAGE_TYPE=${{ matrix.variant }}
 
           # Build the rootfs using build script

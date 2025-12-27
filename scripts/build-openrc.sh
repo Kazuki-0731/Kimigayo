@@ -17,7 +17,12 @@ ARCH="${ARCH:-x86_64}"
 OPENRC_SRC_DIR="${BUILD_DIR}/openrc-${OPENRC_VERSION}"
 OPENRC_BUILD_DIR="${BUILD_DIR}/openrc-build-${ARCH}"
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
-MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+
+# MUSL_INSTALL_DIR can be overridden by environment variable
+# This allows Makefile to pass the correct path based on MUSL_ARCH
+if [ -z "${MUSL_INSTALL_DIR:-}" ]; then
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -145,6 +150,18 @@ meson_options=(
     "-Daudit=disabled"
     "-Dnewnet=false"
 )
+
+# Add cross-compilation file for ARM64
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    CROSS_FILE="${PROJECT_ROOT}/build-system/meson-cross-aarch64.txt"
+    if [ -f "$CROSS_FILE" ]; then
+        meson_options+=("--cross-file=$CROSS_FILE")
+        log_info "Using Meson cross-compilation file: $CROSS_FILE"
+    else
+        log_error "Cross-compilation file not found: $CROSS_FILE"
+        exit 1
+    fi
+fi
 
 log_info "Meson options:"
 for opt in "${meson_options[@]}"; do

@@ -132,10 +132,18 @@ generate_kernel_config() {
         make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
     else
         log_info "Using default kernel config: $KERNEL_CONFIG"
-        make ARCH="$KERNEL_ARCH" "$KERNEL_CONFIG" || {
-            log_error "Failed to generate default config"
-            exit 1
-        }
+        # For ARM64 with LLVM, use LLVM=1
+        if [ "$ARCH" = "arm64" ]; then
+            make ARCH="$KERNEL_ARCH" LLVM=1 "$KERNEL_CONFIG" || {
+                log_error "Failed to generate default config"
+                exit 1
+            }
+        else
+            make ARCH="$KERNEL_ARCH" "$KERNEL_CONFIG" || {
+                log_error "Failed to generate default config"
+                exit 1
+            }
+        fi
 
         # Create default custom config template
         log_info "Creating default config template: $custom_config"
@@ -207,7 +215,11 @@ apply_security_hardening() {
 
     # Update config without interactive prompts
     log_info "Finalizing kernel configuration..."
-    make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
+    if [ "$ARCH" = "arm64" ]; then
+        make ARCH="$KERNEL_ARCH" LLVM=1 olddefconfig > /dev/null 2>&1 || true
+    else
+        make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
+    fi
     log_info "Kernel configuration finalized"
 }
 
@@ -264,8 +276,15 @@ build_kernel() {
     esac
 
     # Use PIPESTATUS to capture make's exit code
+    # For ARM64 with LLVM/Clang toolchain, use LLVM=1
+    local LLVM_FLAG=""
+    if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
+        LLVM_FLAG="LLVM=1 LLVM_IAS=1"
+        log_info "Using LLVM toolchain for ARM64 cross-compilation"
+    fi
+
     set +e
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" "$MAKE_TARGET" 2>&1 | \
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
