@@ -150,7 +150,6 @@ meson_options=(
     "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
-    "-Db_pie=true"
     "-Db_staticpic=true"
     "-Dos=Linux"
     "-Dpam=false"
@@ -159,8 +158,12 @@ meson_options=(
     "-Dnewnet=false"
 )
 
-# Add cross-compilation file for ARM64
+# Architecture-specific Meson options
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64: disable PIE to avoid crtbeginS.o/crtendS.o requirements
+    meson_options+=("-Db_pie=false")
+
+    # Add cross-compilation file
     CROSS_FILE="${PROJECT_ROOT}/build-system/meson-cross-aarch64.txt"
     if [ -f "$CROSS_FILE" ]; then
         meson_options+=("--cross-file=$CROSS_FILE")
@@ -169,6 +172,9 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         log_error "Cross-compilation file not found: $CROSS_FILE"
         exit 1
     fi
+else
+    # For x86_64: enable PIE for better security
+    meson_options+=("-Db_pie=true")
 fi
 
 log_info "Meson options:"
