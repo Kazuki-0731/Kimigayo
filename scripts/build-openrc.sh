@@ -128,8 +128,15 @@ fi
 
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
-export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64 LLVM/Clang: avoid GCC runtime libraries and use musl's strlcat
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY"
+    export LDFLAGS="-Wl,-z,relro -Wl,-z,now -nostdlib ${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+else
+    # For x86_64: use standard flags with stack protector
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
+    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+fi
 
 # Configure with meson
 log_info "Configuring OpenRC with meson..."
