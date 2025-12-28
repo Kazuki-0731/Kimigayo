@@ -129,10 +129,10 @@ fi
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64 LLVM/Clang: use musl's strlcat and link with compiler-rt for soft-float
+    # For ARM64 LLVM/Clang: use musl's strlcat (no stack protector to avoid complexity)
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY"
-    # Use --rtlib=compiler-rt to get soft-float runtime support (__multf3, etc.)
-    export LDFLAGS="-Wl,-z,relro -Wl,-z,now --rtlib=compiler-rt"
+    # Standard linking - let musl-clang wrapper handle the details
+    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 else
     # For x86_64: use standard flags with stack protector
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
