@@ -150,7 +150,6 @@ meson_options=(
     "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
-    "-Db_staticpic=true"
     "-Dos=Linux"
     "-Dpam=false"
     "-Dselinux=disabled"
@@ -160,8 +159,9 @@ meson_options=(
 
 # Architecture-specific Meson options
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64: disable PIE to avoid crtbeginS.o/crtendS.o requirements
+    # For ARM64: disable PIE and staticpic to avoid crtbeginS.o/crtendS.o/libgcc requirements
     meson_options+=("-Db_pie=false")
+    meson_options+=("-Db_staticpic=false")
 
     # Add cross-compilation file
     CROSS_FILE="${PROJECT_ROOT}/build-system/meson-cross-aarch64.txt"
@@ -173,8 +173,9 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         exit 1
     fi
 else
-    # For x86_64: enable PIE for better security
+    # For x86_64: enable PIE and staticpic for better security
     meson_options+=("-Db_pie=true")
+    meson_options+=("-Db_staticpic=true")
 fi
 
 log_info "Meson options:"
