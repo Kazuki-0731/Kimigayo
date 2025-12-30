@@ -9,6 +9,10 @@ pkgconfig = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
 
+# Avoid GCC runtime dependencies (crtbeginS.o, crtendS.o, libgcc, libgcc_eh)
+# Use -nostdlib and manually link musl's libc
+c_link_args = ['-nostdlib', '-lc']
+
 [host_machine]
 system = 'linux'
 cpu_family = 'aarch64'
