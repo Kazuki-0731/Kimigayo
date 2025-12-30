@@ -320,6 +320,22 @@ EOF
 
 log_success "Markdown report: $MD_FILE"
 
+# Cleanup: Remove pulled images
+log_info "=== Cleaning up pulled images ==="
+for image in "${IMAGES[@]}"; do
+    # Skip kimigayo-os (our own image)
+    if [[ "$image" == kimigayo-os:* ]]; then
+        continue
+    fi
+
+    if docker image inspect "$image" > /dev/null 2>&1; then
+        log_info "Removing $image..."
+        docker rmi "$image" > /dev/null 2>&1 || log_warning "Failed to remove $image"
+    fi
+done
+log_success "Cleanup complete"
+echo ""
+
 # Display summary
 echo ""
 log_success "=== Benchmark Complete ==="
