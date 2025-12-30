@@ -4,7 +4,7 @@
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
-.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-all
+.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-all
 
 # デフォルトターゲット
 help:
@@ -73,10 +73,11 @@ help:
 	@echo "  make changelog    - CHANGELOG.mdを生成"
 	@echo ""
 	@echo "⚡ ベンチマーク:"
-	@echo "  make benchmark         - 全ベンチマーク実行"
-	@echo "  make benchmark-startup - 起動時間測定"
-	@echo "  make benchmark-memory  - メモリ使用量測定"
-	@echo "  make benchmark-size    - ディスクサイズ比較"
+	@echo "  make benchmark            - 全ベンチマーク実行"
+	@echo "  make benchmark-startup    - 起動時間測定"
+	@echo "  make benchmark-memory     - メモリ使用量測定"
+	@echo "  make benchmark-size       - ディスクサイズ比較"
+	@echo "  make benchmark-comparison - Alpine/Distroless/Ubuntuとの比較"
 	@echo ""
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
@@ -450,6 +451,10 @@ benchmark-memory:
 # ディスクサイズベンチマーク
 benchmark-size:
 	@bash scripts/benchmark-size.sh
+
+# 比較ベンチマーク（Alpine, Distroless, Ubuntuとの比較）
+benchmark-comparison:
+	@bash scripts/benchmark-comparison.sh
 
 # 全ベンチマーク実行
 benchmark-all:
