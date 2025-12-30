@@ -1,10 +1,20 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Comparison Benchmark Script for Kimigayo OS
 # Compares performance against Alpine, Distroless, and Ubuntu Minimal
 #
+# Note: Requires bash 4.0+ for associative arrays
+# macOS: brew install bash, then use /usr/local/bin/bash or /opt/homebrew/bin/bash
 
 set -euo pipefail
+
+# Check bash version (need 4.0+ for associative arrays)
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "Error: This script requires bash 4.0 or higher (current: ${BASH_VERSION})"
+    echo "On macOS: brew install bash"
+    echo "Then run with: /usr/local/bin/bash or /opt/homebrew/bin/bash"
+    exit 1
+fi
 
 # Save project root directory
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

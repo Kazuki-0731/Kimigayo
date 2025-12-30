@@ -453,8 +453,15 @@ benchmark-size:
 	@bash scripts/benchmark-size.sh
 
 # 比較ベンチマーク（Alpine, Distroless, Ubuntuとの比較）
+# Note: Requires bash 4.0+ (macOS: brew install bash)
 benchmark-comparison:
-	@bash scripts/benchmark-comparison.sh
+	@if command -v /opt/homebrew/bin/bash >/dev/null 2>&1; then \
+		/opt/homebrew/bin/bash scripts/benchmark-comparison.sh; \
+	elif command -v /usr/local/bin/bash >/dev/null 2>&1; then \
+		/usr/local/bin/bash scripts/benchmark-comparison.sh; \
+	else \
+		bash scripts/benchmark-comparison.sh; \
+	fi
 
 # 全ベンチマーク実行
 benchmark-all:
