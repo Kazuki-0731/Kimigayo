@@ -163,15 +163,49 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     meson_options+=("-Db_pie=false")
     meson_options+=("-Db_staticpic=false")
 
-    # Add cross-compilation file
-    CROSS_FILE="${PROJECT_ROOT}/build-system/meson-cross-aarch64.txt"
-    if [ -f "$CROSS_FILE" ]; then
-        meson_options+=("--cross-file=$CROSS_FILE")
-        log_info "Using Meson cross-compilation file: $CROSS_FILE"
+    # Generate cross-compilation file dynamically with correct musl paths
+    CROSS_FILE="${OPENRC_BUILD_DIR}/meson-cross-aarch64-generated.txt"
+    log_info "Generating Meson cross-compilation file: $CROSS_FILE"
+
+    # Determine libc.a path based on musl installation
+    MUSL_LIBC_PATH=""
+    if [ -f "${MUSL_INSTALL_DIR}/usr/lib/libc.a" ]; then
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    elif [ -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/lib/libc.a"
     else
-        log_error "Cross-compilation file not found: $CROSS_FILE"
+        log_error "Cannot find libc.a in musl installation: $MUSL_INSTALL_DIR"
         exit 1
     fi
+
+    log_info "Using musl libc.a from: $MUSL_LIBC_PATH"
+
+    # Create dynamic cross-compilation file
+    cat > "$CROSS_FILE" <<EOF
+[binaries]
+c = 'aarch64-linux-musl-gcc'
+cpp = 'aarch64-linux-musl-g++'
+ar = 'aarch64-linux-musl-ar'
+strip = 'aarch64-linux-musl-strip'
+ranlib = 'aarch64-linux-musl-ranlib'
+pkgconfig = 'pkg-config'
+
+[properties]
+needs_exe_wrapper = true
+
+# Avoid GCC runtime dependencies (crtbeginS.o, crtendS.o, libgcc, libgcc_eh)
+# Use -nostdlib and manually specify musl's static libc
+c_link_args = ['-nostdlib', '-L${MUSL_INSTALL_DIR}/usr/lib', '-L${MUSL_INSTALL_DIR}/lib', '${MUSL_LIBC_PATH}']
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+EOF
+
+    meson_options+=("--cross-file=$CROSS_FILE")
+    log_info "Using dynamically generated cross-compilation file"
 else
     # For x86_64: enable PIE and staticpic for better security
     meson_options+=("-Db_pie=true")
