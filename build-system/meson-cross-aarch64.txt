@@ -10,8 +10,9 @@ pkgconfig = 'pkg-config'
 needs_exe_wrapper = true
 
 # Avoid GCC runtime dependencies (crtbeginS.o, crtendS.o, libgcc, libgcc_eh)
-# Use -nostdlib and manually link musl's libc
-c_link_args = ['-nostdlib', '-lc']
+# Use -nostdlib and manually specify musl's static libc
+# Note: Path will be resolved relative to musl cross-compiler toolchain
+c_link_args = ['-nostdlib', '-L/usr/aarch64-linux-musl/lib', '/usr/aarch64-linux-musl/lib/libc.a']
 
 [host_machine]
 system = 'linux'
