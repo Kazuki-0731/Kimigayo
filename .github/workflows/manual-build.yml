@@ -23,71 +23,12 @@ on:
 
 jobs:
   build:
-    name: Build ${{ github.event.inputs.variant }} for ${{ github.event.inputs.arch }}
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Docker image
-      run: docker compose build --no-cache
-
-    - name: Run build for ${{ github.event.inputs.arch }}
-      run: |
-        docker compose run --rm \
-          -e TARGET_ARCH=${{ github.event.inputs.arch }} \
-          -e IMAGE_TYPE=${{ github.event.inputs.variant }} \
-          kimigayo-build \
-          make build TARGET_ARCH=${{ github.event.inputs.arch }}
-
-    - name: Run tests
-      run: |
-        docker compose run --rm kimigayo-build make test
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v6
-      with:
-        name: kimigayo-os-${{ github.event.inputs.variant }}-${{ github.event.inputs.arch }}
-        path: output/*
-        retention-days: 7
-
-    - name: Upload build logs
-      uses: actions/upload-artifact@v6
-      if: always()
-      with:
-        name: build-logs-${{ github.event.inputs.variant }}-${{ github.event.inputs.arch }}
-        path: build/logs/*.log
-        retention-days: 7
-
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Set up Docker
-      run: docker compose build
-
-    - name: Run unit tests
-      run: docker compose run --rm kimigayo-build pytest tests/unit/ -v || echo "Unit tests not ready yet"
-
-    - name: Run property tests
-      run: docker compose run --rm kimigayo-build pytest tests/property/ -v || echo "Property tests not ready yet"
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v6
-      if: always()
-      with:
-        name: test-results
-        path: tests/reports/
-        retention-days: 7
+    name: Build
+    uses: ./.github/workflows/build-workflow.yml
+    with:
+      variant: ${{ github.event.inputs.variant }}
+      arch: ${{ github.event.inputs.arch }}
+      upload_artifacts: true
 
   security:
     name: Security Scan
