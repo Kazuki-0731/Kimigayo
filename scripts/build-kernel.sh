@@ -277,21 +277,41 @@ build_kernel() {
 
     # Use PIPESTATUS to capture make's exit code
     # For ARM64 with LLVM/Clang toolchain, use LLVM=1
-    local LLVM_FLAG=""
-    local MAKE_EXTRA_FLAGS=""
+    set +e
+    # Use different make commands for ARM64 vs x86_64 to avoid ShellCheck issues with quoted variables
     if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
-        LLVM_FLAG="LLVM=1 LLVM_IAS=1"
-        # For ARM64 with LLVM, add -Wa,-m16 for 16-bit mode support
-        MAKE_EXTRA_FLAGS='REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16"'
         log_info "Using LLVM toolchain for ARM64 cross-compilation"
+        # For ARM64 with LLVM, add -Wa,-m16 for 16-bit mode support
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16" "$MAKE_TARGET" 2>&1 | \
+        while IFS= read -r line; do
+            # Write to log file immediately with tee (unbuffered)
+            echo "$line" | tee -a "$BUILD_LOG" > /dev/null
+
+            # Show compilation progress every 50 lines or for important messages
+            line_count=$((line_count + 1))
+
+            # Show first message immediately and stop dots
+            if (( line_count == 1 )); then
+                kill $dots_pid 2>/dev/null || true
+                wait $dots_pid 2>/dev/null || true
+                echo "" >&2
+                echo "[Building...] Build system initialized!" >&2
+                echo "[Building...] First output: $line" >&2
+            fi
+
+            # Show progress every 50 lines
+            if (( line_count - last_update >= 50 )); then
+                if [[ "$line" =~ ^[[:space:]]*(CC|LD|AR) ]]; then
+                    echo "[Progress] Compiled $line_count files..." >&2
+                    last_update=$line_count
+                fi
+            fi
+        done
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
     else
         # For x86_64 native builds with GCC, use -std=gnu11 -Wno-error only
         # Don't add assembler flags as they cause issues with GNU binutils
-        MAKE_EXTRA_FLAGS='REALMODE_CFLAGS="-std=gnu11 -Wno-error"'
-    fi
-
-    set +e
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" $MAKE_EXTRA_FLAGS "$MAKE_TARGET" 2>&1 | \
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
@@ -321,8 +341,10 @@ build_kernel() {
                 echo "$line" >&2
             fi
         done
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
+    fi
 
-    local make_status=${PIPESTATUS[0]}
+    local make_status=$BUILD_EXIT_CODE
     set -e
 
     if [ $make_status -ne 0 ]; then
