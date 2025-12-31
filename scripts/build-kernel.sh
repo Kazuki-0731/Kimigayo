@@ -309,9 +309,11 @@ build_kernel() {
         done
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
     else
-        # For x86_64 native builds with GCC, add -m16 compiler flag for 16-bit realmode code
-        # This is different from -Wa,-m16 (assembler flag) and tells GCC to generate 16-bit code
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16" "$MAKE_TARGET" 2>&1 | \
+        # For x86_64 native builds with GCC, add flags for 16-bit realmode code
+        # -m16: generate 16-bit code
+        # -fno-stack-protector: disable stack protection (unavailable in realmode)
+        # -mno-retpoline: disable Spectre mitigation (unavailable in realmode)
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16 -fno-stack-protector -mno-retpoline" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
