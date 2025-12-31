@@ -166,12 +166,41 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     CROSS_FILE="${OPENRC_BUILD_DIR}/meson-cross-aarch64-generated.txt"
     log_info "Generating Meson cross-compilation file: $CROSS_FILE"
 
-    # Create cross-compilation file
-    # No special link args - let Clang handle musl linking automatically
+    # Find musl lib directory for crt*.o files
+    MUSL_LIB_DIR=""
+    if [ -d "${MUSL_INSTALL_DIR}/usr/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/usr/lib"
+    elif [ -d "${MUSL_INSTALL_DIR}/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
+    else
+        log_error "Cannot find musl lib directory in: $MUSL_INSTALL_DIR"
+        exit 1
+    fi
+
+    log_info "Using musl lib directory: $MUSL_LIB_DIR"
+
+    # Create wrapper script that uses musl's crt*.o and libs
+    WRAPPER_SCRIPT="${OPENRC_BUILD_DIR}/aarch64-musl-gcc-wrapper.sh"
+    cat > "$WRAPPER_SCRIPT" <<EOF
+#!/bin/sh
+# Wrapper to use musl's startup files instead of GCC's
+# -B: Search directory for startup files (crt*.o)
+# -nostdlib: Don't use standard system startup/libraries
+# -lc: Explicitly link musl libc
+exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
+    -B"${MUSL_LIB_DIR}" \\
+    -L"${MUSL_LIB_DIR}" \\
+    -nostdlib -lc \\
+    -I/usr/aarch64-linux-musl/include \\
+    "\$@"
+EOF
+    chmod +x "$WRAPPER_SCRIPT"
+
+    # Create cross-compilation file pointing to our wrapper
     cat > "$CROSS_FILE" <<EOF
 [binaries]
-c = 'aarch64-linux-musl-gcc'
-cpp = 'aarch64-linux-musl-g++'
+c = '${WRAPPER_SCRIPT}'
+cpp = '${WRAPPER_SCRIPT}'
 ar = 'aarch64-linux-musl-ar'
 strip = 'aarch64-linux-musl-strip'
 ranlib = 'aarch64-linux-musl-ranlib'
