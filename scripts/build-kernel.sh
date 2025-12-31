@@ -278,13 +278,19 @@ build_kernel() {
     # Use PIPESTATUS to capture make's exit code
     # For ARM64 with LLVM/Clang toolchain, use LLVM=1
     local LLVM_FLAG=""
+    local REALMODE_FLAGS=""
     if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
         LLVM_FLAG="LLVM=1 LLVM_IAS=1"
+        REALMODE_FLAGS="REALMODE_CFLAGS=\"-std=gnu11 -Wno-error -Wa,-m16\""
         log_info "Using LLVM toolchain for ARM64 cross-compilation"
+    else
+        # For x86_64 native builds with GCC, don't specify REALMODE_CFLAGS
+        # as the -Wa,-m16 flag doesn't work with GNU binutils assembler
+        REALMODE_FLAGS=""
     fi
 
     set +e
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16" "$MAKE_TARGET" 2>&1 | \
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" $REALMODE_FLAGS "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
