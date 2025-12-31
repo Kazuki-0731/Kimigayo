@@ -181,11 +181,8 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl libc.a from: $MUSL_LIBC_PATH"
 
     # Create dynamic cross-compilation file
-    # Note: We don't use -nostdlib for ARM64 because:
-    # 1. Clang wrapper (aarch64-linux-musl-gcc) automatically handles library paths
-    # 2. Compiler-rt (builtins) is automatically linked by Clang
-    # 3. Using -nostdlib requires manually specifying compiler-rt, which may not be
-    #    available for cross-compilation targets in Alpine Linux
+    # Use -static to create fully static binaries with musl
+    # This avoids needing GCC runtime files (crtbeginS.o, crtendS.o, libgcc)
     cat > "$CROSS_FILE" <<EOF
 [binaries]
 c = 'aarch64-linux-musl-gcc'
@@ -197,6 +194,9 @@ pkgconfig = 'pkg-config'
 
 [properties]
 needs_exe_wrapper = true
+
+[built-in options]
+c_link_args = ['-static']
 
 [host_machine]
 system = 'linux'
