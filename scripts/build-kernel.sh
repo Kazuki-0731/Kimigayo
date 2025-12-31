@@ -313,7 +313,9 @@ build_kernel() {
         # -m16: generate 16-bit code
         # -fno-stack-protector: disable stack protection (unavailable in realmode)
         # -fno-pie: disable position independent executable
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16 -fno-stack-protector -fno-pie" "$MAKE_TARGET" 2>&1 | \
+        # -fcf-protection=none: disable Intel CET (unavailable in realmode)
+        # -mno-80387 -mno-mmx -mno-sse -mno-sse2: disable FPU/SIMD (unavailable in realmode)
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16 -fno-stack-protector -fno-pie -fcf-protection=none -mno-80387 -mno-mmx -mno-sse -mno-sse2" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
