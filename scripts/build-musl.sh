@@ -242,7 +242,7 @@ build_musl() {
     log_info "Starting musl libc compilation..."
 
     # CRITICAL: Unset ARCH during make to prevent it from overriding Makefile's ARCH
-    # makeは環境変数ARCHがあると、Makefileで定義された$(ARCH)よりも優先される
+    # makeは環境変数ARCHがあると、Makefileで定義された$(ARCH)よりも優先されるため
     local SAVED_ARCH="$ARCH"
     unset ARCH
 
