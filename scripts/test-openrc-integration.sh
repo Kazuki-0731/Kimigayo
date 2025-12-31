@@ -11,7 +11,6 @@ BUILD_DIR="${BUILD_DIR:-./build}"
 ARCH="${ARCH:-x86_64}"
 
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
-OPENRC_BIN="${OPENRC_INSTALL_DIR}/sbin/openrc"
 
 # Colors for output
 RED='\033[0;31m'

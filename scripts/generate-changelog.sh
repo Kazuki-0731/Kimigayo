@@ -11,9 +11,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CHANGELOG_FILE="${PROJECT_ROOT}/CHANGELOG.md"
 
-# Get current version
-CURRENT_VERSION=$("$SCRIPT_DIR/get-version.sh")
-
 # Get all tags sorted by version
 TAGS=$(git tag --sort=-version:refname)
 
