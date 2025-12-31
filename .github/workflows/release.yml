@@ -100,14 +100,17 @@ jobs:
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
+      - name: Build Docker build environment
+        run: docker compose build --no-cache
+
       - name: Build Kimigayo OS rootfs
         run: |
-          # Set architecture environment variable
-          export TARGET_ARCH=${{ matrix.arch }}
-          export IMAGE_TYPE=${{ matrix.variant }}
-
-          # Build the rootfs using build script
-          bash scripts/build-rootfs.sh
+          # Build using Docker compose (same as CI/manual-build)
+          docker compose run --rm \
+            -e TARGET_ARCH=${{ matrix.arch }} \
+            -e IMAGE_TYPE=${{ matrix.variant }} \
+            kimigayo-build \
+            make build TARGET_ARCH=${{ matrix.arch }}
 
           # Verify build output exists
           echo "=== Contents of build/rootfs ==="
@@ -138,17 +141,11 @@ jobs:
 
       - name: Run integration tests
         run: |
-          # Set up Python test environment
-          python3 -m pip install --upgrade pip
-          pip3 install pytest hypothesis pytest-cov pytest-xdist pyyaml
-
-          # Run integration tests
           echo "Running integration tests for ${{ matrix.variant }} variant on ${{ matrix.arch }}..."
 
-          # Run Phase 1 integration tests
-          if [ -f "tests/integration/test_phase1_integration.py" ]; then
-            python3 -m pytest tests/integration/test_phase1_integration.py -v || echo "Phase 1 tests not ready yet"
-          fi
+          # Run tests in Docker container (same environment as build)
+          docker compose run --rm kimigayo-build \
+            pytest tests/integration/test_phase1_integration.py -v || echo "Phase 1 tests not ready yet"
 
           # Verify rootfs tarball exists
           TARBALL_COUNT=$(ls -1 output/kimigayo-${{ matrix.variant }}-*.tar.gz 2>/dev/null | wc -l)
