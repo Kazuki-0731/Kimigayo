@@ -87,7 +87,7 @@ show_status() {
         fi
 
         local comp status timestamp
-        IFS=':' read -r comp status timestamp <<< "$status_line"
+        IFS=':' read -r _ status timestamp <<< "$status_line"
 
         # Display with appropriate icon and color
         if [ "$status" = "built" ]; then
@@ -117,7 +117,7 @@ suggest_next_action() {
     for i in {1..6}; do
         component="${COMPONENTS[$i]}"
         status_line=$(grep "^${component}:" "$STATUS_FILE" 2>/dev/null || echo "${component}:pending:never")
-        IFS=':' read -r comp status timestamp <<< "$status_line"
+        IFS=':' read -r _ status timestamp <<< "$status_line"
 
         if [ "$status" != "built" ] && [ "$component" != "pkg" ]; then
             all_built=false

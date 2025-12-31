@@ -231,7 +231,8 @@ test_build_log_no_errors() {
         return 0
     fi
 
-    local error_count=$(grep -i "error:" "$build_log" 2>/dev/null | wc -l | tr -d ' ')
+    local error_count
+    error_count=$(grep -i "error:" "$build_log" 2>/dev/null | wc -l | tr -d ' ')
 
     if [ "$error_count" -eq 0 ]; then
         log_pass "No fatal errors found in build log"

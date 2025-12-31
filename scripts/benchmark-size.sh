@@ -57,7 +57,7 @@ echo ""
 
 # サイズデータを一時ファイルに保存
 tmpfile=$(mktemp)
-trap "rm -f $tmpfile" EXIT
+trap 'rm -f "$tmpfile"' EXIT
 
 max_name_len=0
 
