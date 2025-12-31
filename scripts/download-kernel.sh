@@ -30,6 +30,12 @@ log_info() {
     echo -e "${GREEN}[INFO] ${timestamp}${NC} $*"
 }
 
+log_success() {
+    local timestamp
+    timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[SUCCESS] ${timestamp}${NC} $*"
+}
+
 log_warn() {
     local timestamp
     timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
