@@ -180,33 +180,12 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 
     log_info "Using musl libc.a from: $MUSL_LIBC_PATH"
 
-    # Find compiler-rt builtins library for ARM64
-    # LLVM/Clang uses libclang_rt.builtins instead of libgcc
-    COMPILER_RT_PATH=""
-    for path in \
-        "/usr/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a" \
-        "/usr/lib/llvm*/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a" \
-        "/usr/lib/libclang_rt.builtins-aarch64.a"; do
-        # Use shell expansion to resolve wildcards
-        for file in $path; do
-            if [ -f "$file" ]; then
-                COMPILER_RT_PATH="$file"
-                break 2
-            fi
-        done
-    done
-
-    if [ -z "$COMPILER_RT_PATH" ]; then
-        log_error "Cannot find libclang_rt.builtins-aarch64.a"
-        log_info "Searched paths:"
-        log_info "  /usr/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a"
-        log_info "  /usr/lib/llvm*/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a"
-        exit 1
-    fi
-
-    log_info "Using compiler-rt from: $COMPILER_RT_PATH"
-
     # Create dynamic cross-compilation file
+    # Note: We don't use -nostdlib for ARM64 because:
+    # 1. Clang wrapper (aarch64-linux-musl-gcc) automatically handles library paths
+    # 2. Compiler-rt (builtins) is automatically linked by Clang
+    # 3. Using -nostdlib requires manually specifying compiler-rt, which may not be
+    #    available for cross-compilation targets in Alpine Linux
     cat > "$CROSS_FILE" <<EOF
 [binaries]
 c = 'aarch64-linux-musl-gcc'
@@ -218,11 +197,6 @@ pkgconfig = 'pkg-config'
 
 [properties]
 needs_exe_wrapper = true
-
-# Link with musl libc and compiler-rt builtins
-# -nostdlib: Don't use standard system startup files or libraries
-# We manually specify musl's static libc and LLVM's compiler-rt for builtins
-c_link_args = ['-nostdlib', '-L${MUSL_INSTALL_DIR}/usr/lib', '-L${MUSL_INSTALL_DIR}/lib', '${MUSL_LIBC_PATH}', '${COMPILER_RT_PATH}']
 
 [host_machine]
 system = 'linux'
