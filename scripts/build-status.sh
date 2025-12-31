@@ -86,7 +86,7 @@ show_status() {
             status_line="${component}:pending:never"
         fi
 
-        local comp status timestamp
+        local status timestamp
         IFS=':' read -r _ status timestamp <<< "$status_line"
 
         # Display with appropriate icon and color
