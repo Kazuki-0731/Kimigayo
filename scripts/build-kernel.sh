@@ -285,9 +285,9 @@ build_kernel() {
         MAKE_EXTRA_FLAGS='REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16"'
         log_info "Using LLVM toolchain for ARM64 cross-compilation"
     else
-        # For x86_64 native builds with GCC, don't override REALMODE_CFLAGS
-        # Let the kernel use its default realmode flags to avoid assembler issues
-        MAKE_EXTRA_FLAGS=""
+        # For x86_64 native builds with GCC, use -std=gnu11 -Wno-error only
+        # Don't add assembler flags as they cause issues with GNU binutils
+        MAKE_EXTRA_FLAGS='REALMODE_CFLAGS="-std=gnu11 -Wno-error"'
     fi
 
     set +e
