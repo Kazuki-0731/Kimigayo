@@ -159,30 +159,15 @@ meson_options=(
 
 # Architecture-specific Meson options
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64: disable PIE and staticpic to avoid crtbeginS.o/crtendS.o/libgcc requirements
-    meson_options+=("-Db_pie=false")
-    meson_options+=("-Db_staticpic=false")
+    # For ARM64: Use default settings (PIE enabled)
+    # Let Clang handle everything automatically with musl target
 
-    # Generate cross-compilation file dynamically with correct musl paths
+    # Generate cross-compilation file dynamically
     CROSS_FILE="${OPENRC_BUILD_DIR}/meson-cross-aarch64-generated.txt"
     log_info "Generating Meson cross-compilation file: $CROSS_FILE"
 
-    # Determine libc.a path based on musl installation
-    MUSL_LIBC_PATH=""
-    if [ -f "${MUSL_INSTALL_DIR}/usr/lib/libc.a" ]; then
-        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
-    elif [ -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
-        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/lib/libc.a"
-    else
-        log_error "Cannot find libc.a in musl installation: $MUSL_INSTALL_DIR"
-        exit 1
-    fi
-
-    log_info "Using musl libc.a from: $MUSL_LIBC_PATH"
-
-    # Create dynamic cross-compilation file
-    # Use -static to create fully static binaries with musl
-    # This avoids needing GCC runtime files (crtbeginS.o, crtendS.o, libgcc)
+    # Create cross-compilation file
+    # No special link args - let Clang handle musl linking automatically
     cat > "$CROSS_FILE" <<EOF
 [binaries]
 c = 'aarch64-linux-musl-gcc'
@@ -194,9 +179,6 @@ pkgconfig = 'pkg-config'
 
 [properties]
 needs_exe_wrapper = true
-
-[built-in options]
-c_link_args = ['-static']
 
 [host_machine]
 system = 'linux'

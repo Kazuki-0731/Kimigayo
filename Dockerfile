@@ -133,13 +133,13 @@ RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
     cd / && rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
-# -rtlib=compiler-rt: Use LLVM's compiler-rt instead of GCC's libgcc
-# -unwindlib=none: Don't link libunwind (musl provides unwinding support)
-# -nostartfiles: Don't use standard system startup files (crt*.o)
-# これらのフラグにより、GCC依存を完全に排除
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt -unwindlib=none -nostartfiles -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# musl-clangアプローチ: シンプルにターゲットとリンカのみ指定
+# -fuse-ld=lld: LLVMリンカを使用
+# Clangは--target=aarch64-linux-muslから自動的にmuslの規約を理解する
+# 追加のrtlib/unwindlib指定は不要（muslが完全なC標準ライブラリを提供）
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt -unwindlib=none -nostartfiles -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
