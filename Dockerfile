@@ -113,16 +113,45 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
-RUN apk add --no-cache clang llvm lld
+# cmake: compiler-rtビルド用
+RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
-# ARM64ターゲット用のGCCラッパースクリプトを作成
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+# ARM64用libgccとlinux-headersをAlpineリポジトリからダウンロード
+# Alpine Linux aarch64リポジトリのlibgccとlinux-headersパッケージを取得
+RUN mkdir -p /tmp/aarch64-libs
+WORKDIR /tmp/aarch64-libs
+RUN wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
+    wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-headers-6.16.12-r0.apk && \
+    tar xzf libgcc-15.2.0-r2.apk && \
+    mkdir -p /usr/aarch64-linux-musl/lib && \
+    cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
+    tar xzf linux-headers-6.16.12-r0.apk && \
+    mkdir -p /usr/aarch64-linux-musl/include && \
+    cp -r usr/include/* /usr/aarch64-linux-musl/include/
+WORKDIR /usr/aarch64-linux-musl/lib
+RUN ln -s libgcc_s.so.1 libgcc_s.so
+WORKDIR /
+RUN rm -rf /tmp/aarch64-libs
+
+# ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
+# musl-clangアプローチ: シンプルにターゲットとリンカのみ指定
+# -fuse-ld=lld: LLVMリンカを使用
+# Clangは--target=aarch64-linux-muslから自動的にmuslの規約を理解する
+# 追加のrtlib/unwindlib指定は不要（muslが完全なC標準ライブラリを提供）
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
+    chmod +x /usr/bin/aarch64-linux-musl-ld && \
+    printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -c -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-as && \
+    chmod +x /usr/bin/aarch64-linux-musl-as && \
     ln -sf /usr/bin/llvm-ar /usr/bin/aarch64-linux-musl-ar && \
     ln -sf /usr/bin/llvm-ranlib /usr/bin/aarch64-linux-musl-ranlib && \
-    ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip
+    ln -sf /usr/bin/llvm-strip /usr/bin/aarch64-linux-musl-strip && \
+    ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm && \
+    ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
+    ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}

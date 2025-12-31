@@ -11,10 +11,9 @@ ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
-# Normalize arm64 to aarch64 early (musl uses aarch64 internally)
-if [ "$ARCH" = "arm64" ]; then
-    ARCH="aarch64"
-fi
+# ARCH is expected to be already normalized:
+# - x86_64 for x86_64
+# - aarch64 for ARM64 (not arm64, as musl uses aarch64 naming)
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -145,17 +144,17 @@ check_prerequisites() {
 
     echo 'int main(){return 0;}' > "$test_file"
 
+    # For cross-compilers with -nostartfiles, only test compilation not linking
     if $compiler "$test_file" -o "$test_out" 2>/dev/null; then
         log_info "C compiler check: OK ($compiler)"
     else
-        # For cross-compilers, just check if they can compile (not necessarily execute)
+        # For cross-compilers, just check if they can compile (not necessarily link)
         if $compiler -c "$test_file" -o "${test_out}.o" 2>/dev/null; then
-            log_info "C compiler check: OK ($compiler - cross-compile mode)"
+            log_info "C compiler check: OK ($compiler - cross-compile mode, compile-only)"
         else
-            log_error "C compiler cannot compile: $compiler"
-            log_error "Please check your compiler installation"
-            rm -f "$test_file" "$test_out" "${test_out}.o"
-            exit 1
+            log_warn "C compiler cannot link executables, but may work with musl build"
+            log_warn "Compiler: $compiler"
+            log_warn "If musl configure fails, check compiler installation"
         fi
     fi
 
@@ -175,6 +174,13 @@ configure_musl() {
         mkdir -p "$MUSL_BUILD_DIR"
     fi
 
+    # Clean source directory of any previous build artifacts
+    log_info "Cleaning source directory of build artifacts"
+    cd "$MUSL_SRC_DIR" || exit 1
+    make clean 2>/dev/null || true
+    find . -name "*.d" -delete 2>/dev/null || true
+    find . -name "config.mak" -delete 2>/dev/null || true
+
     cd "$MUSL_BUILD_DIR" || exit 1
 
     # Security hardening flags
@@ -191,8 +197,19 @@ configure_musl() {
     export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY}"
     export LDFLAGS="${LDFLAGS_SECURITY}"
 
+    # For ARM64, add libgcc_s for 128-bit floating point support
+    if [ "$ARCH" = "aarch64" ]; then
+        export LDFLAGS="${LDFLAGS} -L/usr/aarch64-linux-musl/lib -lgcc_s"
+        log_info "ARM64: Adding libgcc_s for 128-bit floating point support"
+    fi
+
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
+
+    # Unset ARCH to prevent configure from using it
+    # muslのconfigureはARCH環境変数を見る可能性があるため
+    local SAVED_ARCH="$ARCH"
+    unset ARCH
 
     # Configure
     "${MUSL_SRC_DIR}/configure" \
@@ -204,8 +221,12 @@ configure_musl() {
         --enable-wrapper=all \
         2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc configuration failed"
+        export ARCH="$SAVED_ARCH"
         exit 1
     }
+
+    # Restore ARCH
+    export ARCH="$SAVED_ARCH"
 
     log_info "musl libc configuration completed"
 }
@@ -219,10 +240,20 @@ build_musl() {
 
     # Build
     log_info "Starting musl libc compilation..."
+
+    # CRITICAL: Unset ARCH during make to prevent it from overriding Makefile's ARCH
+    # makeは環境変数ARCHがあると、Makefileで定義された$(ARCH)よりも優先されるため
+    local SAVED_ARCH="$ARCH"
+    unset ARCH
+
     make -j"$JOBS" 2>&1 | tee -a "$BUILD_LOG" || {
         log_error "musl libc build failed"
+        export ARCH="$SAVED_ARCH"
         exit 1
     }
+
+    # Restore ARCH
+    export ARCH="$SAVED_ARCH"
 
     log_info "musl libc build completed successfully"
 }

@@ -17,7 +17,12 @@ ARCH="${ARCH:-x86_64}"
 OPENRC_SRC_DIR="${BUILD_DIR}/openrc-${OPENRC_VERSION}"
 OPENRC_BUILD_DIR="${BUILD_DIR}/openrc-build-${ARCH}"
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
-MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+
+# MUSL_INSTALL_DIR can be overridden by environment variable
+# This allows Makefile to pass the correct path based on MUSL_ARCH
+if [ -z "${MUSL_INSTALL_DIR:-}" ]; then
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -123,8 +128,16 @@ fi
 
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
-export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64 LLVM/Clang: use musl's strlcat (no stack protector to avoid complexity)
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY"
+    # Standard linking - let musl-clang wrapper handle the details
+    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+else
+    # For x86_64: use standard flags with stack protector
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
+    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+fi
 
 # Configure with meson
 log_info "Configuring OpenRC with meson..."
@@ -137,14 +150,79 @@ meson_options=(
     "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
-    "-Db_pie=true"
-    "-Db_staticpic=true"
     "-Dos=Linux"
     "-Dpam=false"
     "-Dselinux=disabled"
     "-Daudit=disabled"
     "-Dnewnet=false"
 )
+
+# Architecture-specific Meson options
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64: Use default settings (PIE enabled)
+    # Let Clang handle everything automatically with musl target
+
+    # Generate cross-compilation file dynamically
+    CROSS_FILE="${OPENRC_BUILD_DIR}/meson-cross-aarch64-generated.txt"
+    log_info "Generating Meson cross-compilation file: $CROSS_FILE"
+
+    # Find musl lib directory for crt*.o files
+    MUSL_LIB_DIR=""
+    if [ -d "${MUSL_INSTALL_DIR}/usr/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/usr/lib"
+    elif [ -d "${MUSL_INSTALL_DIR}/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
+    else
+        log_error "Cannot find musl lib directory in: $MUSL_INSTALL_DIR"
+        exit 1
+    fi
+
+    log_info "Using musl lib directory: $MUSL_LIB_DIR"
+
+    # Create wrapper script that uses musl's crt*.o and libs
+    WRAPPER_SCRIPT="${OPENRC_BUILD_DIR}/aarch64-musl-gcc-wrapper.sh"
+    cat > "$WRAPPER_SCRIPT" <<EOF
+#!/bin/sh
+# Wrapper to use musl's startup files instead of GCC's
+# -B: Search directory for startup files (crt*.o)
+# -nostdlib: Don't use standard system startup/libraries
+# -lc: Explicitly link musl libc
+exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
+    -B"${MUSL_LIB_DIR}" \\
+    -L"${MUSL_LIB_DIR}" \\
+    -nostdlib -lc \\
+    -I/usr/aarch64-linux-musl/include \\
+    "\$@"
+EOF
+    chmod +x "$WRAPPER_SCRIPT"
+
+    # Create cross-compilation file pointing to our wrapper
+    cat > "$CROSS_FILE" <<EOF
+[binaries]
+c = '${WRAPPER_SCRIPT}'
+cpp = '${WRAPPER_SCRIPT}'
+ar = 'aarch64-linux-musl-ar'
+strip = 'aarch64-linux-musl-strip'
+ranlib = 'aarch64-linux-musl-ranlib'
+pkgconfig = 'pkg-config'
+
+[properties]
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+EOF
+
+    meson_options+=("--cross-file=$CROSS_FILE")
+    log_info "Using dynamically generated cross-compilation file"
+else
+    # For x86_64: enable PIE and staticpic for better security
+    meson_options+=("-Db_pie=true")
+    meson_options+=("-Db_staticpic=true")
+fi
 
 log_info "Meson options:"
 for opt in "${meson_options[@]}"; do

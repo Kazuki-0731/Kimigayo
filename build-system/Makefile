@@ -16,7 +16,33 @@ VERSION := 0.1.0
 BUILD_DATE := $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
 
 # Build configuration
-ARCH ?= x86_64
+# TARGET_ARCH: User-facing architecture name (x86_64, arm64)
+TARGET_ARCH ?= x86_64
+
+# Architecture mappings for different tools
+# - musl/gcc: uses aarch64 for ARM64
+# - kernel: uses arm64 for ARM64
+# - busybox: accepts both
+ifeq ($(TARGET_ARCH),arm64)
+    MUSL_ARCH := aarch64
+    KERNEL_ARCH := arm64
+    BUSYBOX_ARCH := arm64
+    CROSS_COMPILE ?= aarch64-linux-musl-
+else ifeq ($(TARGET_ARCH),x86_64)
+    MUSL_ARCH := x86_64
+    KERNEL_ARCH := x86_64
+    BUSYBOX_ARCH := x86_64
+    CROSS_COMPILE ?= x86_64-linux-musl-
+else
+    $(error Unsupported TARGET_ARCH: $(TARGET_ARCH). Supported: x86_64, arm64)
+endif
+
+# Legacy ARCH variable support (for backward compatibility)
+ifdef ARCH
+    $(warning Warning: ARCH variable is deprecated. Use TARGET_ARCH instead.)
+    TARGET_ARCH := $(ARCH)
+endif
+
 SECURITY_HARDENING ?= full
 REPRODUCIBLE_BUILD ?= yes
 DEBUG ?= no
@@ -35,15 +61,7 @@ INIT_SRC := $(SRC_DIR)/init
 PKG_SRC := $(SRC_DIR)/pkg
 UTILS_SRC := $(SRC_DIR)/utils
 
-# Cross-compilation settings
-ifeq ($(ARCH),x86_64)
-    CROSS_COMPILE ?= x86_64-linux-musl-
-    KERNEL_ARCH := x86_64
-endif
-ifeq ($(ARCH),arm64)
-    CROSS_COMPILE ?= aarch64-linux-musl-
-    KERNEL_ARCH := arm64
-endif
+# Cross-compilation settings (already defined above based on TARGET_ARCH)
 
 # Compiler and flags
 CC := $(CROSS_COMPILE)gcc
@@ -152,56 +170,56 @@ help:
 build: musl kernel busybox init rootfs
 	@echo ""
 	@echo "=========================================="
-	@echo "✅ Build completed for $(ARCH)"
+	@echo "✅ Build completed for $(TARGET_ARCH)"
 	@echo "=========================================="
 
 # musl libc build
 musl:
 	@echo ""
 	@echo "=========================================="
-	@echo "📦 [1/4] Building musl libc ($(ARCH))"
+	@echo "📦 [1/4] Building musl libc ($(TARGET_ARCH))"
 	@echo "=========================================="
-	$(Q)mkdir -p $(BUILD_DIR)/musl-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/musl-build-$(MUSL_ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-musl.sh
-	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-musl.sh
+	$(Q)ARCH=$(MUSL_ARCH) bash $(SCRIPTS_DIR)/build-musl.sh
 	@echo "✅ [1/4] musl libc build completed"
 
 # Kernel build
 kernel:
 	@echo ""
 	@echo "=========================================="
-	@echo "🐧 [2/4] Building Linux Kernel ($(ARCH))"
+	@echo "🐧 [2/4] Building Linux Kernel ($(TARGET_ARCH))"
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/kernel
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-kernel.sh
 	$(Q)bash $(SCRIPTS_DIR)/apply-kernel-patches.sh
-	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
+	$(Q)ARCH=$(KERNEL_ARCH) bash $(SCRIPTS_DIR)/build-kernel.sh
 	@echo "✅ [2/4] Kernel build completed"
 
 # BusyBox build
 busybox:
 	@echo ""
 	@echo "=========================================="
-	@echo "🔧 [3/4] Building BusyBox ($(ARCH)) - $(IMAGE_TYPE)"
+	@echo "🔧 [3/4] Building BusyBox ($(TARGET_ARCH)) - $(IMAGE_TYPE)"
 	@echo "=========================================="
-	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/busybox-build-$(BUSYBOX_ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-busybox.sh
-	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
+	$(Q)ARCH=$(BUSYBOX_ARCH) MUSL_INSTALL_DIR=$(BUILD_DIR)/musl-install-$(MUSL_ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-busybox.sh
 	@echo "✅ [3/4] BusyBox build completed"
 
 # Init system build (OpenRC)
 init:
 	@echo ""
 	@echo "=========================================="
-	@echo "⚙️  [4/4] Building OpenRC Init System ($(ARCH))"
+	@echo "⚙️  [4/4] Building OpenRC Init System ($(TARGET_ARCH))"
 	@echo "=========================================="
-	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(ARCH)
+	$(Q)mkdir -p $(BUILD_DIR)/openrc-build-$(TARGET_ARCH)
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)bash $(SCRIPTS_DIR)/download-openrc.sh
-	$(Q)ARCH=$(ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
+	$(Q)ARCH=$(TARGET_ARCH) MUSL_INSTALL_DIR=$(BUILD_DIR)/musl-install-$(MUSL_ARCH) bash $(SCRIPTS_DIR)/build-openrc.sh
 	@echo "✅ [4/4] OpenRC build completed"
 
 # Root filesystem
@@ -212,7 +230,7 @@ rootfs:
 	@echo "=========================================="
 	$(Q)mkdir -p $(BUILD_DIR)/rootfs
 	$(Q)mkdir -p $(BUILD_DIR)/logs
-	$(Q)ARCH=$(ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-rootfs.sh
+	$(Q)ARCH=$(TARGET_ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-rootfs.sh
 	@echo "✅ Root filesystem build completed"
 
 # ISO image generation
@@ -327,7 +345,10 @@ info:
 	@echo "Project: $(PROJECT_NAME)"
 	@echo "Version: $(VERSION)"
 	@echo "Build Date: $(BUILD_DATE)"
-	@echo "Architecture: $(ARCH)"
+	@echo "Architecture: $(TARGET_ARCH)"
+	@echo "  - musl: $(MUSL_ARCH)"
+	@echo "  - kernel: $(KERNEL_ARCH)"
+	@echo "  - busybox: $(BUSYBOX_ARCH)"
 	@echo "Cross Compiler: $(CROSS_COMPILE)"
 	@echo "Security Hardening: $(SECURITY_HARDENING)"
 	@echo "Reproducible Build: $(REPRODUCIBLE_BUILD)"
