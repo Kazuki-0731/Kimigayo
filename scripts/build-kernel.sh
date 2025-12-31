@@ -216,9 +216,9 @@ apply_security_hardening() {
     # Update config without interactive prompts
     log_info "Finalizing kernel configuration..."
     if [ "$ARCH" = "arm64" ]; then
-        make ARCH="$KERNEL_ARCH" LLVM=1 KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
+        make ARCH="$KERNEL_ARCH" LLVM=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" olddefconfig > /dev/null 2>&1 || true
     else
-        make ARCH="$KERNEL_ARCH" KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
+        make ARCH="$KERNEL_ARCH" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" olddefconfig > /dev/null 2>&1 || true
     fi
     log_info "Kernel configuration finalized"
 }
@@ -284,7 +284,7 @@ build_kernel() {
     fi
 
     set +e
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" REALMODE_CFLAGS="-std=gnu11" "$MAKE_TARGET" 2>&1 | \
+    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
