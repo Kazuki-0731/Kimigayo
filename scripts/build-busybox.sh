@@ -18,7 +18,12 @@ ARCH="${ARCH:-x86_64}"
 BUSYBOX_SRC_DIR="${BUILD_DIR}/busybox-${BUSYBOX_VERSION}"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox-build-${ARCH}"
 BUSYBOX_INSTALL_DIR="${BUILD_DIR}/busybox-install-${ARCH}"
-MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+
+# MUSL_INSTALL_DIR can be overridden by environment variable
+# This allows Makefile to pass the correct path based on MUSL_ARCH
+if [ -z "$MUSL_INSTALL_DIR" ]; then
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -102,6 +107,9 @@ case "$ARCH" in
         export AR="${CROSS_COMPILE}ar"
         export RANLIB="${CROSS_COMPILE}ranlib"
         export STRIP="${CROSS_COMPILE}strip"
+        export HOSTCC="gcc"
+        # Tell BusyBox to use LLD linker and avoid GCC-specific libraries
+        export LD="${CROSS_COMPILE}ld.lld"
         ;;
     *)
         log_error "Unsupported architecture: $ARCH"
@@ -162,6 +170,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
+    # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
+    # Disable PIE for static builds (PIE + static is not compatible)
+    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
+    log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -178,6 +191,13 @@ log_info "Resolving configuration dependencies..."
 # This handles BusyBox versions that don't have olddefconfig
 yes "" | make oldconfig > /dev/null 2>&1 || true
 
+# Re-apply ARM64-specific settings after oldconfig (oldconfig may reset some values)
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
+    sed -i "s|CONFIG_STATIC_LIBGCC=.*|CONFIG_STATIC_LIBGCC=n|" .config
+    log_info "Re-applied ARM64 settings after oldconfig (PIE=n, STATIC_LIBGCC=n)"
+fi
+
 # Build BusyBox
 log_info "Building BusyBox..."
 log_info "This may take several minutes..."
@@ -185,8 +205,19 @@ log_info "This may take several minutes..."
 # Set compiler flags for static musl build
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
-export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
+    # Use -nostdlib to avoid GCC runtime libraries (libgcc, libgcc_eh)
+    # Then manually specify musl's libc.a instead of relying on default linking
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nostdlib"
+    # Add musl's C library and required CRT files
+    export LIBS="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+else
+    # For x86_64: use stack protector (GCC has proper support)
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+fi
 
 # Ensure we're using the correct compiler
 log_info "Compiler: ${CC}"
@@ -194,8 +225,11 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
-if ! make -j"$(nproc)" SKIP_STRIP=y; then
+
+if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
     log_error "BusyBox build failed"
+    log_error "Last 50 lines of build output:"
+    tail -50 /tmp/busybox-build.log >&2
     exit 1
 fi
 

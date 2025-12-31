@@ -47,7 +47,7 @@ init_test_env() {
     mkdir -p "$(dirname "$TEST_LOG")"
 
     # Clear previous test log
-    > "$TEST_LOG"
+    : > "$TEST_LOG"
 
     log_info "Test directory: $TEST_DIR"
     log_info "musl installation: $MUSL_INSTALL_DIR"

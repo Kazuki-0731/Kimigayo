@@ -205,7 +205,6 @@ fi
 log_test "Test 13: Test tar command (if available)"
 if "$BUSYBOX_BIN" --list 2>/dev/null | grep -q "^tar$"; then
     temp_dir=$(mktemp -d)
-    temp_tar="${temp_dir}/test.tar"
     echo "test" > "${temp_dir}/testfile"
 
     if cd "$temp_dir" && "$BUSYBOX_BIN" tar -cf test.tar testfile 2>/dev/null && [ -f test.tar ]; then

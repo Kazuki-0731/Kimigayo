@@ -66,7 +66,8 @@ init_patches_dir() {
 # Check if patches already applied
 is_patches_applied() {
     if [ -f "${KERNEL_SRC_DIR}/.kimigayo-patches-applied" ]; then
-        local applied_count=$(wc -l < "${KERNEL_SRC_DIR}/.kimigayo-patches-applied" 2>/dev/null || echo 0)
+        local applied_count
+        applied_count=$(wc -l < "${KERNEL_SRC_DIR}/.kimigayo-patches-applied" 2>/dev/null || echo 0)
         if [ "$applied_count" -gt 0 ]; then
             log_info "Patches already applied ($applied_count patches)"
             return 0
@@ -78,7 +79,8 @@ is_patches_applied() {
 # Apply a single patch
 apply_patch() {
     local patch_file="$1"
-    local patch_name=$(basename "$patch_file")
+    local patch_name
+    patch_name=$(basename "$patch_file")
 
     log_patch "Applying patch: $patch_name"
 

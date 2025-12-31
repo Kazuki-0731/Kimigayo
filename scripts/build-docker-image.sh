@@ -130,7 +130,7 @@ case "$IMAGE_TYPE" in
 esac
 
 # Compare with float
-if [ $(echo "$IMAGE_SIZE_MB > $SIZE_LIMIT_MB" | bc -l) -eq 1 ]; then
+if [ "$(echo "$IMAGE_SIZE_MB > $SIZE_LIMIT_MB" | bc -l)" -eq 1 ]; then
     log_warn "Image size (${IMAGE_SIZE_MB} MB) exceeds target ($SIZE_LIMIT_MB MB)"
 else
     log "✓ Image size is within target ($SIZE_LIMIT_MB MB)"
