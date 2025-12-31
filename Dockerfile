@@ -118,19 +118,20 @@ RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
 # ARM64用libgccとlinux-headersをAlpineリポジトリからダウンロード
 # Alpine Linux aarch64リポジトリのlibgccとlinux-headersパッケージを取得
-RUN mkdir -p /tmp/aarch64-libs && cd /tmp/aarch64-libs && \
-    wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
+RUN mkdir -p /tmp/aarch64-libs
+WORKDIR /tmp/aarch64-libs
+RUN wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
     wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-headers-6.16.12-r0.apk && \
     tar xzf libgcc-15.2.0-r2.apk && \
     mkdir -p /usr/aarch64-linux-musl/lib && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
-    cd /usr/aarch64-linux-musl/lib && \
-    ln -s libgcc_s.so.1 libgcc_s.so && \
-    cd /tmp/aarch64-libs && \
     tar xzf linux-headers-6.16.12-r0.apk && \
     mkdir -p /usr/aarch64-linux-musl/include && \
-    cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
-    cd / && rm -rf /tmp/aarch64-libs
+    cp -r usr/include/* /usr/aarch64-linux-musl/include/
+WORKDIR /usr/aarch64-linux-musl/lib
+RUN ln -s libgcc_s.so.1 libgcc_s.so
+WORKDIR /
+RUN rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
 # musl-clangアプローチ: シンプルにターゲットとリンカのみ指定
