@@ -2,10 +2,11 @@ diff --git a/arch/x86/realmode/rm/Makefile b/arch/x86/realmode/rm/Makefile
 index 83f1b6a56449..7f47f9327ecb 100644
 --- a/arch/x86/realmode/rm/Makefile
 +++ b/arch/x86/realmode/rm/Makefile
-@@ -53,6 +53,15 @@ KBUILD_CFLAGS	:= $(REALMODE_CFLAGS) -D_SETUP -D_WAKEUP \
+@@ -75,6 +75,15 @@ KBUILD_CFLAGS	:= $(REALMODE_CFLAGS) -D_SETUP -D_WAKEUP \
+ 		   -I$(srctree)/arch/x86/boot
  KBUILD_AFLAGS	:= $(KBUILD_CFLAGS) -D__ASSEMBLY__
  KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
-
++
 +# GCC 15 compatibility: Remove retpoline and return thunk flags for realmode
 +# Realmode code runs in 16-bit mode without runtime support for these mitigations
 +KBUILD_CFLAGS := $(filter-out -mindirect-branch=% -mfunction-return=%,$(KBUILD_CFLAGS))
@@ -14,7 +15,5 @@ index 83f1b6a56449..7f47f9327ecb 100644
 +KBUILD_CFLAGS := $(filter-out $(RETPOLINE_VDSO_CFLAGS),$(KBUILD_CFLAGS))
 +KBUILD_AFLAGS := $(filter-out -mindirect-branch=% -mfunction-return=%,$(KBUILD_AFLAGS))
 +KBUILD_AFLAGS := $(filter-out $(RETPOLINE_CFLAGS),$(KBUILD_AFLAGS))
-+
  GCOV_PROFILE := n
  UBSAN_SANITIZE := n
- KCSAN_SANITIZE := n
