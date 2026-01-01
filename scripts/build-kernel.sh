@@ -288,8 +288,8 @@ build_kernel() {
     # Use different make commands for ARM64 vs x86_64 to avoid ShellCheck issues with quoted variables
     if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
         log_info "Using LLVM toolchain for ARM64 cross-compilation"
-        # For ARM64 with LLVM, add -Wa,-m16 for 16-bit mode support
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16" "$MAKE_TARGET" 2>&1 | \
+        # For ARM64 with LLVM (no realmode, so no REALMODE_CFLAGS)
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
