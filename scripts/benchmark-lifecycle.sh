@@ -42,9 +42,11 @@ mkdir -p "$OUTPUT_DIR"
 
 # Function to measure time in milliseconds
 measure_time() {
-    local start_time=$(date +%s%N)
+    local start_time
+    local end_time
+    start_time=$(date +%s%N)
     "$@" >/dev/null 2>&1
-    local end_time=$(date +%s%N)
+    end_time=$(date +%s%N)
     echo $(( (end_time - start_time) / 1000000 ))
 }
 
@@ -61,7 +63,11 @@ calculate_average() {
 
 # Function to calculate median
 calculate_median() {
-    local sorted=($(printf '%s\n' "$@" | sort -n))
+    # Sort values and store in array (Bash 3.2 compatible)
+    local sorted_str
+    sorted_str=$(printf '%s\n' "$@" | sort -n | tr '\n' ' ')
+    # shellcheck disable=SC2206
+    local sorted=($sorted_str)
     local count=${#sorted[@]}
     local mid=$((count / 2))
     if [ $((count % 2)) -eq 0 ]; then
@@ -82,7 +88,7 @@ calculate_stddev() {
         sum_sq=$((sum_sq + diff * diff))
         count=$((count + 1))
     done
-    echo $(echo "scale=2; sqrt($sum_sq / $count)" | bc)
+    echo "scale=2; sqrt($sum_sq / $count)" | bc
 }
 
 echo ""
