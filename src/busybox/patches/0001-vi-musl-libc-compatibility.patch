@@ -77,3 +77,4 @@
  	return i < 0 ? NULL : q + i;
  }
  # else
+
