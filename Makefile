@@ -78,6 +78,7 @@ help:
 	@echo "  make benchmark-memory     - メモリ使用量測定"
 	@echo "  make benchmark-size       - ディスクサイズ比較"
 	@echo "  make benchmark-lifecycle  - コンテナライフサイクル測定"
+	@echo "  make benchmark-busybox    - BusyBoxコマンド性能測定"
 	@echo "  make benchmark-comparison - Alpine/Distroless/Ubuntuとの比較"
 	@echo ""
 	@echo "📋 ログ確認:"
@@ -468,6 +469,11 @@ benchmark-comparison:
 # コンテナ起動、停止、再起動のライフサイクル全体の性能を測定
 benchmark-lifecycle:
 	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-lifecycle.sh
+
+# BusyBoxコマンド性能ベンチマーク（Phase 3 - Issue #30）
+# ls, grep, find, awk, sort, cat, wc, headの実行速度測定
+benchmark-busybox:
+	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-busybox.sh
 
 # 全ベンチマーク実行
 benchmark-all:
