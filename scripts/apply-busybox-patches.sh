@@ -125,3 +125,5 @@ fi
 
 log_success "All patches applied successfully"
 log_info "Patch log saved to: $PATCH_LOG"
+
+exit 0
