@@ -91,7 +91,9 @@ for patch_file in "$PATCHES_DIR"/*.patch; do
         # Patch can be applied
         if patch -p1 < "$patch_file" >> "$PATCH_LOG" 2>&1; then
             log_success "  ✓ $patch_name applied successfully"
-            ((APPLIED_COUNT++))
+            echo "[DEBUG] About to increment APPLIED_COUNT (current: $APPLIED_COUNT)" >&2
+            ((APPLIED_COUNT++)) || { echo "[DEBUG] APPLIED_COUNT++ failed with $?" >&2; exit 1; }
+            echo "[DEBUG] APPLIED_COUNT incremented to: $APPLIED_COUNT" >&2
         else
             log_error "  ✗ Failed to apply $patch_name"
             ((FAILED_COUNT++))
