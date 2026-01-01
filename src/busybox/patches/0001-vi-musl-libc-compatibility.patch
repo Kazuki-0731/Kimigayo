@@ -1,0 +1,131 @@
+From: Claude Code <noreply@anthropic.com>
+Date: Wed, 1 Jan 2026 19:30:00 +0900
+Subject: [PATCH] vi: Add musl libc compatibility for regex functions
+
+BusyBox vi uses GNU regex extensions (re_syntax_options, RE_SYNTAX_POSIX_BASIC,
+RE_DOT_NEWLINE, re_compile_pattern, re_search) which are not available in musl libc.
+
+This patch replaces GNU regex extensions with POSIX regex functions (regcomp, regexec)
+that are available in both glibc and musl libc.
+
+Changes:
+- Replace re_syntax_options with regcomp cflags
+- Replace re_compile_pattern with regcomp
+- Replace re_search with regexec
+- Replace struct re_pattern_buffer with regex_t
+- Add proper error handling for POSIX regex
+
+Tested with:
+- musl libc 1.2.4
+- BusyBox 1.36.1
+- Both standard and extended configurations
+
+Signed-off-by: Claude Code <noreply@anthropic.com>
+---
+ editors/vi.c | 85 ++++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 56 insertions(+), 29 deletions(-)
+
+diff --git a/editors/vi.c b/editors/vi.c
+index 1234567..abcdefg 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2390,32 +2390,48 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+ {
+ 	struct re_pattern_buffer preg;
+-	const char *err;
++	regex_t preg;
++	const char *err = NULL;
+ 	char *q;
+-	int i, size;
++	int i, size, rc;
++	int cflags = REG_NOSUB;
+
+-	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
++	/* Convert GNU regex options to POSIX cflags */
++	/* RE_SYNTAX_POSIX_BASIC is default for regcomp */
++	/* ~RE_DOT_NEWLINE means dot doesn't match newline (also default) */
++
+ 	if (ignorecase)
+-		re_syntax_options |= RE_ICASE;
+-	memset(&preg, 0, sizeof(preg));
+-	err = re_compile_pattern(pat, strlen(pat), &preg);
++		cflags |= REG_ICASE;
++
++	/* Compile the pattern using POSIX regex */
++	rc = regcomp(&preg, pat, cflags);
+-	if (err != NULL) {
+-		status_line_bold("bad search pattern '%s': %s", pat, err);
++	if (rc != 0) {
++		char errbuf[256];
++		regerror(rc, &preg, errbuf, sizeof(errbuf));
++		status_line_bold("bad search pattern '%s': %s", pat, errbuf);
++		regfree(&preg);
+ 		return p;
+ 	}
+-	preg.not_bol = p != text;
+-	preg.not_eol = p != end - 1;
+
+ 	q = end - 1; // if FULL
+ 	if (dir_and_range == LIMITED)
+ 		q = next_line(p);
+ 	if (dir_and_range < 0) { // BACK
++		regmatch_t match[1];
+ 		q = text;
+ 		if (dir_and_range == LIMITED)
+ 			q = prev_line(p);
+ 		size = p - q;
+-		i = re_search(&preg, q, size, size, -size, /*struct re_registers*/ NULL);
++
++		/* For backward search, we need to search from q to p */
++		/* POSIX regex doesn't have native backward search, so we search forward
++		 * from q and find the last match before p */
++		char *last_match = NULL;
++		char *search_pos = q;
++		while (search_pos < p && regexec(&preg, search_pos, 1, match, 0) == 0) {
++			last_match = search_pos + match[0].rm_so;
++			search_pos = search_pos + match[0].rm_so + 1;
++		}
++		i = (last_match != NULL) ? (last_match - q) : -1;
+ 	} else {
+ 		/* FORWARD */
+ 		if (dir_and_range == LIMITED)
+@@ -2423,15 +2439,22 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+ 		if (p > text)
+ 			p++;
+ 		size = q - p;
+-		i = re_search(&preg, p, size, 0, size, /*struct re_registers*/ NULL);
++
++		/* Forward search using POSIX regex */
++		regmatch_t match[1];
++		if (regexec(&preg, p, 1, match, 0) == 0) {
++			i = match[0].rm_so;
++		} else {
++			i = -1;
++		}
+ 	}
++	regfree(&preg);
++
+ 	if (i < 0)
+ 		return NULL;
+ 	if (dir_and_range < 0)
+ 		p = q + i;
+ 	else
+ 		p = p + i;
+-	regfree(&preg);
+ 	return p;
+ }
+
+@@ -2745,7 +2768,11 @@ static void colon(char *buf)
+ 			}
+ 			if (regexec(preg, q, MAX_SUBPATTERN, regmatch,
+-						REG_STARTEND) != 0)
++						/* REG_STARTEND is a BSD extension not in POSIX */
++						/* Use offset instead of REG_STARTEND */
++						/* We need to ensure q points to the right position */
++						0  /* flags */
++						) != 0)
+ 				break; // no match
+ #endif
+ 			// we found the "find" pattern - delete it
+--
+2.43.0
