@@ -6,8 +6,9 @@
 
 set -euo pipefail
 
-# Save project root directory
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Save script and project root directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Configuration
 BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
