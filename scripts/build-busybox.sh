@@ -83,6 +83,12 @@ fi
 if [ -f "${SCRIPT_DIR}/apply-busybox-patches.sh" ]; then
     log_info "Applying BusyBox patches..."
     bash "${SCRIPT_DIR}/apply-busybox-patches.sh"
+    patch_exit_code=$?
+    log_info "Patch script exited with code: $patch_exit_code"
+    if [ "$patch_exit_code" -ne 0 ]; then
+        log_error "Patch application failed with exit code $patch_exit_code"
+        exit 1
+    fi
 fi
 
 log_info "BusyBox Build Script"
