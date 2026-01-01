@@ -212,8 +212,8 @@ printf "%-35s %15s\n" "Image size (MB)" "$image_size_mb"
 printf "%-35s %15s\n" "Layer count" "$layer_count"
 echo ""
 
-# Save results to JSON
-json_file="${OUTPUT_DIR}/lifecycle_${TIMESTAMP}.json"
+# Save results to JSON (fixed filename, overwrite mode)
+json_file="${OUTPUT_DIR}/lifecycle.json"
 cat > "$json_file" << EOF
 {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -262,8 +262,8 @@ EOF
 log_success "Results saved to: $json_file"
 echo ""
 
-# Save text summary
-txt_file="${OUTPUT_DIR}/lifecycle_${TIMESTAMP}.txt"
+# Save text summary (fixed filename, overwrite mode)
+txt_file="${OUTPUT_DIR}/lifecycle.txt"
 {
     echo "Container Lifecycle Benchmark Results"
     echo "======================================"
