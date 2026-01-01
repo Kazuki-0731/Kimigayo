@@ -1,0 +1,55 @@
+[0;32m[INFO] 2025-12-30 22:45:01[0m === Comparison Benchmark Script ===
+[0;32m[INFO] 2025-12-30 22:45:01[0m Comparing Kimigayo OS against Alpine, Distroless, and Ubuntu
+[0;32m[INFO] 2025-12-30 22:45:01[0m Iterations: 10
+[0;32m[INFO] 2025-12-30 22:45:01[0m Output directory: /Users/susu/workspace/Kimigayo/benchmark-results
+[0;32m[INFO] 2025-12-30 22:45:01[0m === Pulling images ===
+[0;32m[INFO] 2025-12-30 22:45:01[0m Pulling kimigayo-os:standard...
+[1;33m[WARNING] 2025-12-30 22:45:05[0m Failed to pull: kimigayo-os:standard (skipping)
+[0;32m[INFO] 2025-12-30 22:45:05[0m Pulling alpine:latest...
+[0;32m[SUCCESS] 2025-12-30 22:45:07[0m Pulled: alpine:latest
+[0;32m[INFO] 2025-12-30 22:45:07[0m Pulling gcr.io/distroless/base-debian12...
+[0;32m[SUCCESS] 2025-12-30 22:45:09[0m Pulled: gcr.io/distroless/base-debian12
+[0;32m[INFO] 2025-12-30 22:45:09[0m Pulling ubuntu:minimal...
+[1;33m[WARNING] 2025-12-30 22:45:11[0m Failed to pull: ubuntu:minimal (skipping)
+[0;32m[INFO] 2025-12-30 22:45:11[0m === Image Size Comparison ===
+[1;33m[WARNING] 2025-12-30 22:45:12[0m kimigayo-os:standard: not available
+[0;34m[RESULT][0m alpine:latest: 8.7MB (8 MB)
+[0;34m[RESULT][0m gcr.io/distroless/base-debian12: 31.4MB (29 MB)
+[1;33m[WARNING] 2025-12-30 22:45:12[0m ubuntu:minimal: not available
+[0;32m[INFO] 2025-12-30 22:45:12[0m === Startup Time Comparison ===
+[1;33m[WARNING] 2025-12-30 22:45:13[0m kimigayo-os:standard: skipping (not available)
+[0;32m[INFO] 2025-12-30 22:45:13[0m Testing alpine:latest (10 iterations)...
+[0;34m[RESULT][0m alpine:latest: 415ms (avg of 10 runs)
+[0;32m[INFO] 2025-12-30 22:45:17[0m Testing gcr.io/distroless/base-debian12 (10 iterations)...
+[1;33m[WARNING] 2025-12-30 22:45:18[0m   Iteration 1: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:19[0m   Iteration 2: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:21[0m   Iteration 3: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:22[0m   Iteration 4: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:23[0m   Iteration 5: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:24[0m   Iteration 6: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:25[0m   Iteration 7: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:27[0m   Iteration 8: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:28[0m   Iteration 9: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:29[0m   Iteration 10: failed to execute
+[1;33m[WARNING] 2025-12-30 22:45:29[0m gcr.io/distroless/base-debian12: no successful runs
+[1;33m[WARNING] 2025-12-30 22:45:29[0m ubuntu:minimal: skipping (not available)
+[0;32m[INFO] 2025-12-30 22:45:29[0m === Memory Usage Comparison ===
+[1;33m[WARNING] 2025-12-30 22:45:29[0m kimigayo-os:standard: skipping (not available)
+[0;32m[INFO] 2025-12-30 22:45:29[0m Testing alpine:latest...
+[0;34m[RESULT][0m alpine:latest: 0 MB
+[0;32m[INFO] 2025-12-30 22:45:34[0m Testing gcr.io/distroless/base-debian12...
+[1;33m[WARNING] 2025-12-30 22:45:35[0m gcr.io/distroless/base-debian12: failed to start container
+[1;33m[WARNING] 2025-12-30 22:45:35[0m ubuntu:minimal: skipping (not available)
+[0;32m[INFO] 2025-12-30 22:45:35[0m === Feature Comparison ===
+[0;34m[RESULT][0m alpine:latest: Shell=✅, PkgMgr=✅ (apk)
+[0;34m[RESULT][0m gcr.io/distroless/base-debian12: Shell=❌, PkgMgr=❌
+[0;32m[INFO] 2025-12-30 22:45:37[0m === Generating JSON report ===
+[0;32m[SUCCESS] 2025-12-30 22:45:37[0m JSON report: /Users/susu/workspace/Kimigayo/benchmark-results/comparison_20251230_224501.json
+[0;32m[INFO] 2025-12-30 22:45:37[0m === Generating Markdown report ===
+[0;32m[SUCCESS] 2025-12-30 22:45:37[0m Markdown report: /Users/susu/workspace/Kimigayo/benchmark-results/comparison_20251230_224501.md
+[0;32m[SUCCESS] 2025-12-30 22:45:37[0m === Benchmark Complete ===
+[0;32m[INFO] 2025-12-30 22:45:37[0m Results saved to:
+[0;32m[INFO] 2025-12-30 22:45:37[0m   Text:     /Users/susu/workspace/Kimigayo/benchmark-results/comparison_20251230_224501.txt
+[0;32m[INFO] 2025-12-30 22:45:37[0m   JSON:     /Users/susu/workspace/Kimigayo/benchmark-results/comparison_20251230_224501.json
+[0;32m[INFO] 2025-12-30 22:45:37[0m   Markdown: /Users/susu/workspace/Kimigayo/benchmark-results/comparison_20251230_224501.md
+[0;32m[INFO] 2025-12-30 22:45:37[0m Summary table:
