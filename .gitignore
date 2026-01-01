@@ -3,6 +3,7 @@
 # Build artifacts
 /build/
 /output/
+/benchmark-results/
 *.o
 *.a
 *.so

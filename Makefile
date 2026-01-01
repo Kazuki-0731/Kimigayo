@@ -467,7 +467,7 @@ benchmark-comparison:
 # コンテナライフサイクルベンチマーク（Phase 2 - Issue #29）
 # コンテナ起動、停止、再起動のライフサイクル全体の性能を測定
 benchmark-lifecycle:
-	@bash scripts/benchmark-lifecycle.sh
+	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-lifecycle.sh
 
 # 全ベンチマーク実行
 benchmark-all:
