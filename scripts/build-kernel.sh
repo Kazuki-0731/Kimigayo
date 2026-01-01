@@ -207,6 +207,13 @@ apply_security_hardening() {
         scripts/config --disable IP6_NF_IPTABLES
         scripts/config --disable BRIDGE_NETFILTER
 
+        # GCC 15 compatibility: Disable RETPOLINE for x86_64
+        # Realmode code cannot use __x86_return_thunk
+        if [ "$ARCH" = "x86_64" ]; then
+            scripts/config --disable RETPOLINE
+            log_info "Retpoline disabled for GCC 15 compatibility"
+        fi
+
         log_info "Security hardening applied to kernel config"
         log_info "Netfilter/iptables disabled (minimal container OS)"
     else
