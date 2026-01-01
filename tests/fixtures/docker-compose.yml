@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # Test service 1: Simple echo service
+  echo-service:
+    image: ${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest}
+    command: /bin/sh -c "echo 'Echo service started' && sleep 30"
+    container_name: kimigayo-test-echo
+    restart: "no"
+
+  # Test service 2: Sleep service
+  sleep-service:
+    image: ${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest}
+    command: /bin/sh -c "sleep 30"
+    container_name: kimigayo-test-sleep
+    restart: "no"
+
+  # Test service 3: Multi-command service
+  multi-service:
+    image: ${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest}
+    command: /bin/sh -c "ls -la / && echo 'Multi-command service' && sleep 30"
+    container_name: kimigayo-test-multi
+    restart: "no"
+    environment:
+      - TEST_VAR=kimigayo

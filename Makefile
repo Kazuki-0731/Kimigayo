@@ -4,7 +4,7 @@
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
-.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-all
+.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
 
 # デフォルトターゲット
 help:
@@ -77,6 +77,7 @@ help:
 	@echo "  make benchmark-startup    - 起動時間測定"
 	@echo "  make benchmark-memory     - メモリ使用量測定"
 	@echo "  make benchmark-size       - ディスクサイズ比較"
+	@echo "  make benchmark-lifecycle  - コンテナライフサイクル測定"
 	@echo "  make benchmark-comparison - Alpine/Distroless/Ubuntuとの比較"
 	@echo ""
 	@echo "📋 ログ確認:"
@@ -462,6 +463,11 @@ benchmark-comparison:
 	else \
 		bash scripts/benchmark-comparison.sh; \
 	fi
+
+# コンテナライフサイクルベンチマーク（Phase 2 - Issue #29）
+# コンテナ起動、停止、再起動のライフサイクル全体の性能を測定
+benchmark-lifecycle:
+	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-lifecycle.sh
 
 # 全ベンチマーク実行
 benchmark-all:
