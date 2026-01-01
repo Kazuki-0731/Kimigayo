@@ -9,7 +9,6 @@ set -euo pipefail
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/benchmark-results"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 ITERATIONS="${BENCHMARK_ITERATIONS:-10}"
 IMAGE_NAME="${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest}"
 
