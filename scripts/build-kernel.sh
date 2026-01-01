@@ -207,6 +207,13 @@ apply_security_hardening() {
         scripts/config --disable IP6_NF_IPTABLES
         scripts/config --disable BRIDGE_NETFILTER
 
+        # GCC 15 compatibility: Disable RETPOLINE for x86_64
+        # Realmode code cannot use __x86_return_thunk
+        if [ "$ARCH" = "x86_64" ]; then
+            scripts/config --disable RETPOLINE
+            log_info "Retpoline disabled for GCC 15 compatibility"
+        fi
+
         log_info "Security hardening applied to kernel config"
         log_info "Netfilter/iptables disabled (minimal container OS)"
     else
@@ -277,14 +284,46 @@ build_kernel() {
 
     # Use PIPESTATUS to capture make's exit code
     # For ARM64 with LLVM/Clang toolchain, use LLVM=1
-    local LLVM_FLAG=""
-    if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
-        LLVM_FLAG="LLVM=1 LLVM_IAS=1"
-        log_info "Using LLVM toolchain for ARM64 cross-compilation"
-    fi
-
     set +e
-    stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" $LLVM_FLAG KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -Wa,-m16" "$MAKE_TARGET" 2>&1 | \
+    # Use different make commands for ARM64 vs x86_64 to avoid ShellCheck issues with quoted variables
+    if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
+        log_info "Using LLVM toolchain for ARM64 cross-compilation"
+        # For ARM64 with LLVM (no realmode, so no REALMODE_CFLAGS)
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
+        while IFS= read -r line; do
+            # Write to log file immediately with tee (unbuffered)
+            echo "$line" | tee -a "$BUILD_LOG" > /dev/null
+
+            # Show compilation progress every 50 lines or for important messages
+            line_count=$((line_count + 1))
+
+            # Show first message immediately and stop dots
+            if (( line_count == 1 )); then
+                kill $dots_pid 2>/dev/null || true
+                wait $dots_pid 2>/dev/null || true
+                echo "" >&2
+                echo "[Building...] Build system initialized!" >&2
+                echo "[Building...] First output: $line" >&2
+            fi
+
+            # Show progress every 50 lines
+            if (( line_count - last_update >= 50 )); then
+                if [[ "$line" =~ ^[[:space:]]*(CC|LD|AR) ]]; then
+                    echo "[Progress] Compiled $line_count files..." >&2
+                    last_update=$line_count
+                fi
+            fi
+        done
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
+    else
+        # For x86_64 native builds with GCC, add flags for 16-bit realmode code
+        # -m16: generate 16-bit code
+        # -fno-stack-protector: disable stack protection (unavailable in realmode)
+        # -fno-pie: disable position independent executable
+        # -fcf-protection=none: disable Intel CET (unavailable in realmode)
+        # -mno-80387 -mno-mmx -mno-sse -mno-sse2: disable FPU/SIMD (unavailable in realmode)
+        # Note: retpoline flags removed via kernel patch (0002-disable-retpoline-realmode.patch)
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16 -fno-stack-protector -fno-pie -fcf-protection=none -mno-80387 -mno-mmx -mno-sse -mno-sse2" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
@@ -314,8 +353,10 @@ build_kernel() {
                 echo "$line" >&2
             fi
         done
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
+    fi
 
-    local make_status=${PIPESTATUS[0]}
+    local make_status=$BUILD_EXIT_CODE
     set -e
 
     if [ $make_status -ne 0 ]; then
