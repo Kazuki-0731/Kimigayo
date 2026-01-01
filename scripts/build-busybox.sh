@@ -261,7 +261,7 @@ fi
 
 # Verify static linking
 log_info "Verifying static linking..."
-if file busybox | grep -q "statically linked"; then
+if file busybox | grep -qE "(statically linked|static-pie linked)"; then
     log_success "BusyBox is statically linked"
 else
     log_error "BusyBox is not statically linked!"
