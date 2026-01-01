@@ -40,9 +40,6 @@ log_error() {
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
-# Results storage
-declare -A results
-
 # Function to measure time in milliseconds
 measure_time() {
     local start_time=$(date +%s%N)
@@ -114,8 +111,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 done
 run_avg=$(calculate_average "${run_times[@]}")
 run_median=$(calculate_median "${run_times[@]}")
-results[run_to_completion_avg_ms]=$run_avg
-results[run_to_completion_median_ms]=$run_median
 log_success "Run-to-completion: avg=${run_avg}ms, median=${run_median}ms"
 echo ""
 
@@ -131,8 +126,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 done
 start_avg=$(calculate_average "${start_times[@]}")
 start_median=$(calculate_median "${start_times[@]}")
-results[container_start_avg_ms]=$start_avg
-results[container_start_median_ms]=$start_median
 log_success "Container start: avg=${start_avg}ms, median=${start_median}ms"
 echo ""
 
@@ -149,8 +142,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 done
 stop_avg=$(calculate_average "${stop_times[@]}")
 stop_median=$(calculate_median "${stop_times[@]}")
-results[container_stop_avg_ms]=$stop_avg
-results[container_stop_median_ms]=$stop_median
 log_success "Container stop: avg=${stop_avg}ms, median=${stop_median}ms"
 echo ""
 
@@ -167,8 +158,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 done
 restart_avg=$(calculate_average "${restart_times[@]}")
 restart_median=$(calculate_median "${restart_times[@]}")
-results[container_restart_avg_ms]=$restart_avg
-results[container_restart_median_ms]=$restart_median
 log_success "Container restart: avg=${restart_avg}ms, median=${restart_median}ms"
 echo ""
 
@@ -183,8 +172,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 done
 cleanup_avg=$(calculate_average "${cleanup_times[@]}")
 cleanup_median=$(calculate_median "${cleanup_times[@]}")
-results[container_cleanup_avg_ms]=$cleanup_avg
-results[container_cleanup_median_ms]=$cleanup_median
 log_success "Container cleanup: avg=${cleanup_avg}ms, median=${cleanup_median}ms"
 echo ""
 
@@ -193,9 +180,6 @@ log_info "6. Image layer information"
 image_size=$(docker inspect "$IMAGE_NAME" --format '{{.Size}}')
 layer_count=$(docker inspect "$IMAGE_NAME" --format '{{len .RootFS.Layers}}')
 image_size_mb=$(echo "scale=2; $image_size / 1048576" | bc)
-results[image_size_bytes]=$image_size
-results[image_size_mb]=$image_size_mb
-results[layer_count]=$layer_count
 log_success "Image size: ${image_size_mb}MB, Layers: $layer_count"
 echo ""
 
@@ -209,8 +193,6 @@ for i in $(seq 1 3); do  # Only 3 iterations for pull test
 done
 pull_avg=$(calculate_average "${pull_times[@]}")
 pull_median=$(calculate_median "${pull_times[@]}")
-results[image_pull_warm_avg_ms]=$pull_avg
-results[image_pull_warm_median_ms]=$pull_median
 log_success "Image pull (warm): avg=${pull_avg}ms, median=${pull_median}ms"
 echo ""
 
