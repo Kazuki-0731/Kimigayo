@@ -78,6 +78,12 @@ if [ ! -d "$MUSL_INSTALL_DIR" ]; then
     exit 1
 fi
 
+# Apply patches for musl libc compatibility (if any)
+if [ -f "${SCRIPT_DIR}/apply-busybox-patches.sh" ]; then
+    log_info "Applying BusyBox patches..."
+    bash "${SCRIPT_DIR}/apply-busybox-patches.sh"
+fi
+
 log_info "BusyBox Build Script"
 log_info "Version: ${BUSYBOX_VERSION}"
 log_info "Image type: ${IMAGE_TYPE}"
