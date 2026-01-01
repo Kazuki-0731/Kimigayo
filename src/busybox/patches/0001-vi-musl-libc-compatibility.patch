@@ -1,8 +1,6 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
 @@ -2387,10 +2387,11 @@ static int file_size(const char *fn)
- #if ENABLE_FEATURE_VI_SEARCH
- # if ENABLE_FEATURE_VI_REGEX_SEARCH
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -14,13 +12,13 @@
 +	int i, size, range, start, rc;
 +	int cflags = REG_NOSUB;
 +	regmatch_t match[1];
- 
+
 -	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
 +	/* Convert GNU regex options to POSIX cflags */
  	if (ignorecase)
 -		re_syntax_options |= RE_ICASE;
 +		cflags |= REG_ICASE;
- 
+
 -	memset(&preg, 0, sizeof(preg));
 -	err = re_compile_pattern(pat, strlen(pat), &preg);
 -	preg.not_bol = p != text;
@@ -36,14 +34,19 @@
 +		regfree(&preg);
  		return p;
  	}
- 
-@@ -2427,9 +2428,31 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+
+@@ -2427,11 +2428,33 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
  	q = p - start;
  	if (q < text)
  		q = text;
 -	// search for the compiled pattern, preg, in p[]
 -	// range < 0, start == size: search backward
--	i = re_search(&preg, q, size, start, range, /*struct re_registers*/ NULL);
+-	// range > 0, start == 0: search forward
+-	// re_search() < 0: not found or error
+-	// re_search() >= 0: index of found pattern
+-	//           struct pattern   char     int   int    int    struct reg
+-	// re_search(*pattern_buffer, *string, size, start, range, *regs)
+-	i = re_search(&preg, q, size, start, range, /*struct re_registers*:*/ NULL);
 +
 +	/* POSIX regex doesn't support backward search like GNU re_search */
 +	if (range < 0) {
@@ -73,3 +76,4 @@
  	regfree(&preg);
  	return i < 0 ? NULL : q + i;
  }
+ # else
