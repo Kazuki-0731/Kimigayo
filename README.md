@@ -19,7 +19,7 @@
 
 ### 概要
 
-Kimigayo OS は、Google の distroless と同様の設計思想を採用した軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除し、不変インフラを徹底することで、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスとセキュリティを実現します。
+Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思想をハイブリッド的に組み合わせた軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除し、不変インフラを徹底することで、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスとセキュリティを実現します。
 
 ### ✨ 主な特徴
 
@@ -64,9 +64,11 @@ Kimigayo OS は、Google の distroless と同様の設計思想を採用した�
 - **コアユーティリティ**: BusyBox（単一バイナリで多数の Unix コマンドを提供）
 - **Init システム**: OpenRC ベース（systemd より軽量でシンプル）
 
-### 🎯 設計思想: Distroless的アプローチ
+### 🎯 設計思想: Distroless + Alpine のハイブリッドアプローチ
 
-Kimigayo OS は、Googleの[distroless](https://github.com/GoogleContainerTools/distroless)と同様の設計思想を採用しています：
+Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設計思想を組み合わせたハイブリッドアプローチを採用しています：
+
+#### distroless からの継承
 
 **パッケージマネージャーを意図的に排除**することで、以下を実現：
 
@@ -74,6 +76,15 @@ Kimigayo OS は、Googleの[distroless](https://github.com/GoogleContainerTools/
 - ✅ **超軽量**: 1-3MBの極小イメージサイズ
 - ✅ **不変インフラ**: コンテナ時代の「Build once, run anywhere」思想に完全準拠
 - ✅ **予測可能性**: ランタイムでの変更が不可能なため、動作が完全に予測可能
+
+#### Alpine Linux からの継承
+
+- ✅ **musl libc**: 軽量で高速なCライブラリ（glibcの1/10のサイズ）
+- ✅ **BusyBox**: 基本的なUnixコマンドとシェルを提供（デバッグ可能）
+- ✅ **OpenRC**: シンプルで軽量なInitシステム
+- ✅ **セキュリティ強化**: コンパイル時・実行時の包括的な保護（PIE, ASLR, Stack Protector等）
+
+この組み合わせにより、**distroless のセキュリティ** と **Alpine の実用性** を両立し、コンテナ環境に最適化されたOSを実現しています。
 
 **推奨される使用パターン:**
 
@@ -491,10 +502,13 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 ### 🌟 Alpine Linux / distroless との違い
 
+Kimigayo OS は、両者の長所を組み合わせたハイブリッドアプローチです：
+
 #### vs Alpine Linux
 - **パッケージマネージャーなし**: セキュリティ優先の設計（Alpine は apk を含む）
+- **不変インフラ**: ビルド時に全て決定、実行時の変更を排除
 - より充実した日本語ドキュメント
-- モダンなツールチェインの積極採用
+- モダンなツールチェインの積極採用（GCC 15対応済み）
 - プロパティベーステストによる品質保証
 - 再現可能ビルドの徹底
 
@@ -503,6 +517,11 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - BusyBox により基本的なUnixコマンドが利用可能
 - OpenRC による柔軟なサービス管理
 - より汎用的なコンテナ用途に対応
+
+#### 独自の強み
+- **GCC 15完全対応**: ARM64/x86_64両対応の最新ツールチェイン
+- **包括的なテスト**: unit/property/integrationテストによる品質保証
+- **透明性**: 全ビルドプロセスがオープンソース
 
 ### 📚 ドキュメント
 
@@ -569,11 +588,11 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 Kimigayo OS は以下のプロジェクトにインスパイアされ、技術的な基盤を提供していただいています：
 
-- [Google Distroless](https://github.com/GoogleContainerTools/distroless) - 設計思想とインスピレーション
-- [Alpine Linux](https://alpinelinux.org/) - 参考実装とベストプラクティス
-- [musl libc](https://musl.libc.org/) - 軽量な C ライブラリ
-- [BusyBox](https://busybox.net/) - Unix ユーティリティ
-- [OpenRC](https://github.com/OpenRC/openrc) - Init システム
+- [Google Distroless](https://github.com/GoogleContainerTools/distroless) - 不変インフラとセキュリティ優先の設計思想
+- [Alpine Linux](https://alpinelinux.org/) - 軽量性とセキュリティのベストプラクティス
+- [musl libc](https://musl.libc.org/) - 軽量・高速・セキュアな C ライブラリ
+- [BusyBox](https://busybox.net/) - 最小限の Unix ユーティリティ
+- [OpenRC](https://github.com/OpenRC/openrc) - シンプルで軽量な Init システム
 
 ---
 
@@ -581,7 +600,7 @@ Kimigayo OS は以下のプロジェクトにインスパイアされ、技術�
 
 ### Overview
 
-Kimigayo OS is a lightweight, fast, and secure container-focused operating system that inherits the design philosophy of Alpine Linux. Designed to run as Docker images, it aims to operate with minimal resources and deliver high performance in container environments and microservice architectures.
+Kimigayo OS is a lightweight, fast, and secure container-focused operating system that combines the design philosophies of both Google's distroless and Alpine Linux in a hybrid approach. By intentionally excluding package managers and enforcing immutable infrastructure, it operates with minimal resources while delivering high performance and security in container environments and microservice architectures.
 
 ### ✨ Key Features
 
