@@ -124,13 +124,17 @@ jobs:
           mkdir -p output
           cd build/rootfs
           # macOSのリソースフォーク（._*）とその他の不要ファイルを除外
-          tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz \
+          # sudoを使ってroot権限でtarを作成（/etc/shadowなどの権限制限ファイルにアクセスするため）
+          sudo tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz \
             --exclude='._*' \
             --exclude='.DS_Store' \
             --exclude='.AppleDouble' \
             --exclude='.LSOverride' \
+            --numeric-owner \
             .
           cd ../..
+          # tarballの所有権を変更
+          sudo chown $(id -u):$(id -g) output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz
 
           # Verify tarball was created and check its contents
           echo "=== Tarball created ==="
