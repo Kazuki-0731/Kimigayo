@@ -15,7 +15,7 @@ OUTPUT_FILE="${OUTPUT_FILE:-benchmark-size.json}"
 # 比較対象イメージ（カンマ区切りで名前:イメージ形式）
 IMAGES=(
     "Kimigayo Minimal:ishinokazuki/kimigayo-os:latest-minimal"
-    "Kimigayo Standard:ishinokazuki/kimigayo-os:latest"
+    "Kimigayo Standard:ishinokazuki/kimigayo-os:latest-standard"
     "Kimigayo Extended:ishinokazuki/kimigayo-os:latest-extended"
     "Alpine Latest:alpine:latest"
     "Alpine 3.19:alpine:3.19"

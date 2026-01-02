@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # デフォルト設定
 ITERATIONS="${ITERATIONS:-10}"
-IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest}"
+IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest-standard}"
 OUTPUT_FILE="${OUTPUT_FILE:-benchmark-startup.json}"
 
 echo "Kimigayo OS - 起動時間ベンチマーク"
