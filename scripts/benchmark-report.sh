@@ -130,15 +130,19 @@ if [ -f "$INPUT_DIR/lifecycle.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 
     if command -v jq > /dev/null 2>&1; then
-        startup_avg=$(jq -r '.startup.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
-        stop_avg=$(jq -r '.stop.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
-        restart_avg=$(jq -r '.restart.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        startup_avg=$(jq -r '.results.container_start.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        stop_avg=$(jq -r '.results.container_stop.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        restart_avg=$(jq -r '.results.container_restart.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        cleanup_avg=$(jq -r '.results.container_cleanup.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        run_avg=$(jq -r '.results.run_to_completion.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
 
         echo "| 操作 | 平均時間 |" >> "$OUTPUT_FILE"
         echo "|------|----------|" >> "$OUTPUT_FILE"
         echo "| 起動 | ${startup_avg}ms |" >> "$OUTPUT_FILE"
         echo "| 停止 | ${stop_avg}ms |" >> "$OUTPUT_FILE"
         echo "| 再起動 | ${restart_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| クリーンアップ | ${cleanup_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| 実行完了 | ${run_avg}ms |" >> "$OUTPUT_FILE"
     else
         echo "詳細データは \`lifecycle.json\` を参照してください。" >> "$OUTPUT_FILE"
     fi
@@ -153,12 +157,12 @@ if [ -f "$INPUT_DIR/busybox.json" ]; then
     if command -v jq > /dev/null 2>&1; then
         echo "**Kimigayo OS vs Alpine Linux**" >> "$OUTPUT_FILE"
         echo "" >> "$OUTPUT_FILE"
-        echo "| コマンド | Kimigayo OS | Alpine Linux | 比率 |" >> "$OUTPUT_FILE"
-        echo "|---------|-------------|--------------|------|" >> "$OUTPUT_FILE"
+        echo "| コマンド | Kimigayo OS | Alpine Linux | 速度比 |" >> "$OUTPUT_FILE"
+        echo "|---------|-------------|--------------|--------|" >> "$OUTPUT_FILE"
 
         # 各コマンドの結果を抽出
-        jq -r '.commands | to_entries | .[] |
-            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.ratio)x |"' \
+        jq -r '.results | to_entries | .[] |
+            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.speedup)x |"' \
             "$INPUT_DIR/busybox.json" >> "$OUTPUT_FILE" 2>/dev/null || \
             echo "詳細データは \`busybox.json\` を参照してください。" >> "$OUTPUT_FILE"
     else
