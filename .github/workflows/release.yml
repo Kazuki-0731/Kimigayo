@@ -78,7 +78,7 @@ jobs:
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-          # Set architecture for Docker
+          # Convert architecture to Docker Buildx format (amd64/arm64)
           if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
             DOCKER_ARCH="amd64"
           else
@@ -86,17 +86,10 @@ jobs:
           fi
           echo "docker_arch=${DOCKER_ARCH}" >> $GITHUB_OUTPUT
 
-          # Build variant-specific tags
+          # Build variant-specific tags: {version}-{variant}-{arch}
           VARIANT=${{ matrix.variant }}
-          if [[ "${VARIANT}" == "standard" ]]; then
-            # Standard variant gets no suffix
-            TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${DOCKER_ARCH}"
-            TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${DOCKER_ARCH}"
-          else
-            # Minimal and Extended get variant suffix
-            TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
-            TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
-          fi
+          TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
+          TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
@@ -288,27 +281,15 @@ jobs:
           # Extract version from tag
           VERSION=${GITHUB_REF#refs/tags/v}
 
-          # Create manifests for each variant
+          # Create manifests for each variant (all variants get suffix)
           for VARIANT in minimal standard extended; do
-            if [[ "${VARIANT}" == "standard" ]]; then
-              # Standard variant (no suffix)
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-arm64
+            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
 
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-arm64
-            else
-              # Minimal and Extended variants
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
-
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
-            fi
+            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
           done
 
   create-github-release:
