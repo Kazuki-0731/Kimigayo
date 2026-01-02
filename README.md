@@ -529,12 +529,20 @@ Kimigayo OS は、両者の長所を組み合わせたハイブリッドアプ�
 
 | ワークフロー | トリガー | 目的 | 処理内容 |
 |------------|---------|------|---------|
-| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck<br>• ビルド（minimal/x86_64のみ）<br>• テスト（unit, property）<br>• セキュリティスキャン |
-| **release.yml** | タグpush (v*.*.*) | リリース成果物生成 | • 全variant × 全archビルド<br>• Docker Hubへpush<br>• GitHub Release作成 |
+| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck<br>• **全variant × 全arch**ビルド（6パターン）<br>• セキュリティスキャン（Trivy）<br>• Discord通知 |
+| **release.yml** | タグpush (v*.*.*) | リリース成果物生成 | • 全variant × 全archビルド<br>• Docker Hubへpush（マルチアーチマニフェスト作成）<br>• **前回タグからのPRリスト自動生成**<br>• GitHub Release作成<br>• Discord通知 |
+| **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• 統合テスト<br>• Docker imageビルド・push<br>• Trivyセキュリティスキャン |
 | **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• アーティファクトアップロード |
 | **security.yml** | 日次 02:00 UTC | セキュリティチェック | • バージョンチェック（日次）<br>• Trivyスキャン（日次）<br>• イメージスキャン（週次・日曜） |
 | **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox バージョンチェック<br>• 更新があればPR自動作成 |
 | **dependency-review.yml** | PR時 | 依存関係レビュー | • 依存関係の変更を検証 |
+
+**CI/CD改善点（v1.0.0）:**
+- ✅ **全フレーバー×全アーキテクチャのテスト**: minimal/standard/extended × x86_64/arm64の6パターンを自動テスト
+- ✅ **Docker Buildx標準準拠**: タグ命名規則を統一（`{version}-{variant}-{arch}`形式）
+- ✅ **リリースノート自動生成**: 前回タグからのPRリストを自動抽出
+- ✅ **Discord通知**: CI/CD成功/失敗時の通知機能
+- ✅ **再利用可能ワークフロー**: build-workflow.ymlでビルド処理を共通化
 
 **注意**: これらのワークフローは自動的に実行されます。GitHub Actions の使用量にご注意ください。
 
