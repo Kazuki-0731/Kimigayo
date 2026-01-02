@@ -10,7 +10,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/benchmark-results"
 ITERATIONS="${BENCHMARK_ITERATIONS:-10}"
-IMAGE_NAME="${IMAGE_NAME:-kimigayo-os:standard-x86_64}"
+IMAGE_NAME="${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest-standard}"
 ALPINE_IMAGE="${ALPINE_IMAGE:-alpine:latest}"
 
 # Colors

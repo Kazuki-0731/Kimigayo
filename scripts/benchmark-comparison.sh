@@ -29,7 +29,7 @@ MD_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.md"
 
 # Images to compare
 IMAGES=(
-    "kimigayo-os:standard"
+    "ishinokazuki/kimigayo-os:latest-standard"
     "alpine:latest"
     "gcr.io/distroless/base-debian12"
     "ubuntu:minimal"
