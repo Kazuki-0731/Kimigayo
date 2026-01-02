@@ -1,6 +1,6 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
-@@ -2387,10 +2387,11 @@ static int file_size(const char *fn)
+@@ -2387,10 +2387,9 @@ static int file_size(const char *fn)
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -9,16 +9,15 @@
 +	regex_t preg;
  	char *q;
 -	int i, size, range, start;
-+	int i, size, range, start, rc;
-+	int cflags = REG_NOSUB;
-+	regmatch_t match[1];
-
++	int i, size, range, start;
+ 
 -	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
 +	/* Convert GNU regex options to POSIX cflags */
++	int cflags = REG_NOSUB;
  	if (ignorecase)
 -		re_syntax_options |= RE_ICASE;
 +		cflags |= REG_ICASE;
-
+ 
 -	memset(&preg, 0, sizeof(preg));
 -	err = re_compile_pattern(pat, strlen(pat), &preg);
 -	preg.not_bol = p != text;
@@ -26,16 +25,15 @@
 -	if (err != NULL) {
 -		status_line_bold("bad search pattern '%s': %s", pat, err);
 +	/* Compile pattern using POSIX regex */
-+	rc = regcomp(&preg, pat, cflags);
-+	if (rc != 0) {
++	if (regcomp(&preg, pat, cflags) != 0) {
 +		char errbuf[256];
-+		regerror(rc, &preg, errbuf, sizeof(errbuf));
++		regerror(regcomp(&preg, pat, cflags), &preg, errbuf, sizeof(errbuf));
 +		status_line_bold("bad search pattern '%s': %s", pat, errbuf);
 +		regfree(&preg);
  		return p;
  	}
-
-@@ -2427,11 +2428,33 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+ 
+@@ -2427,11 +2426,35 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
  	q = p - start;
  	if (q < text)
  		q = text;
@@ -51,6 +49,7 @@
 +	/* POSIX regex doesn't support backward search like GNU re_search */
 +	if (range < 0) {
 +		/* Backward search: find last match before p */
++		regmatch_t match[1];
 +		char *last_match = NULL;
 +		char *search_pos = q;
 +
@@ -68,6 +67,7 @@
 +		i = (last_match != NULL) ? (last_match - q) : -1;
 +	} else {
 +		/* Forward search */
++		regmatch_t match[1];
 +		char *search_start = q + start;
 +		i = (regexec(&preg, search_start, 1, match, 0) == 0) ?
 +		    (start + match[0].rm_so) : -1;
@@ -76,5 +76,23 @@
  	regfree(&preg);
  	return i < 0 ? NULL : q + i;
  }
- # else
-
+@@ -2745,8 +2768,13 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
+ 	const char *t;
+ 	char *r;
+ 
+-	regmatch[0].rm_so = 0;
+-	regmatch[0].rm_eo = end_line(q) - q;
+-	if (regexec(preg, q, MAX_SUBPATTERN, regmatch, REG_STARTEND) != 0)
++	/* POSIX regex doesn't support REG_STARTEND, search only within line */
++	char *line_end = end_line(q);
++	char saved_char = *line_end;
++	*line_end = '\0';  /* Temporarily null-terminate the line */
++
++	if (regexec(preg, q, MAX_SUBPATTERN, regmatch, 0) != 0) {
++		*line_end = saved_char;  /* Restore original character */
+ 		return found;
++	}
++	*line_end = saved_char;  /* Restore original character */
+ 
+ 	found = q + regmatch[0].rm_so;
+ 	*len_F = regmatch[0].rm_eo - regmatch[0].rm_so;
