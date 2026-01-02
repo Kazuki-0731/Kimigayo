@@ -44,12 +44,11 @@ for i in $(seq 1 "$DURATION"); do
     total_memory=$((total_memory + mem_int))
     count=$((count + 1))
 
-    echo -ne "  測定中 $i/$DURATION秒... ${mem_int}MB\r"
+    echo "  測定中 $i/$DURATION秒... ${mem_int}MB"
 
     sleep 1
 done
 
-echo ""
 echo ""
 
 # コンテナ停止・削除
