@@ -330,6 +330,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: artifacts/
+          pattern: kimigayo-*
 
       - name: Prepare release assets
         run: |
