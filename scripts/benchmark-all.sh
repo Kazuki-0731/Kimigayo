@@ -23,21 +23,33 @@ echo -e "${BLUE}出力ディレクトリ:${NC} $OUTPUT_DIR"
 echo ""
 
 # 1. ディスクサイズベンチマーク
-echo -e "${YELLOW}[1/3] ディスクサイズベンチマーク実行中...${NC}"
+echo -e "${YELLOW}[1/5] ディスクサイズベンチマーク実行中...${NC}"
 echo ""
 OUTPUT_FILE="$OUTPUT_DIR/benchmark-size.json" bash "$SCRIPT_DIR/benchmark-size.sh" || true
 echo ""
 
 # 2. 起動時間ベンチマーク
-echo -e "${YELLOW}[2/3] 起動時間ベンチマーク実行中...${NC}"
+echo -e "${YELLOW}[2/5] 起動時間ベンチマーク実行中...${NC}"
 echo ""
 OUTPUT_FILE="$OUTPUT_DIR/benchmark-startup.json" ITERATIONS=5 bash "$SCRIPT_DIR/benchmark-startup.sh" || true
 echo ""
 
 # 3. メモリ使用量ベンチマーク
-echo -e "${YELLOW}[3/3] メモリ使用量ベンチマーク実行中...${NC}"
+echo -e "${YELLOW}[3/5] メモリ使用量ベンチマーク実行中...${NC}"
 echo ""
 OUTPUT_FILE="$OUTPUT_DIR/benchmark-memory.json" DURATION=10 bash "$SCRIPT_DIR/benchmark-memory.sh" || true
+echo ""
+
+# 4. コンテナライフサイクルベンチマーク
+echo -e "${YELLOW}[4/5] コンテナライフサイクルベンチマーク実行中...${NC}"
+echo ""
+BENCHMARK_ITERATIONS=5 bash "$SCRIPT_DIR/benchmark-lifecycle.sh" || true
+echo ""
+
+# 5. BusyBoxコマンドベンチマーク
+echo -e "${YELLOW}[5/5] BusyBoxコマンドベンチマーク実行中...${NC}"
+echo ""
+BENCHMARK_ITERATIONS=5 bash "$SCRIPT_DIR/benchmark-busybox.sh" || true
 echo ""
 
 # レポート生成
