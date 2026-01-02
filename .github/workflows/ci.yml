@@ -24,10 +24,14 @@ jobs:
   build-and-test:
     name: Build and Test
     needs: shellcheck
+    strategy:
+      matrix:
+        variant: [minimal, standard, extended]
+        arch: [x86_64, arm64]
     uses: ./.github/workflows/build-workflow.yml
     with:
-      variant: minimal
-      arch: x86_64
+      variant: ${{ matrix.variant }}
+      arch: ${{ matrix.arch }}
       upload_artifacts: false
 
   security-scan:
