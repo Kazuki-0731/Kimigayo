@@ -44,7 +44,7 @@ for i in $(seq 1 "$DURATION"); do
     total_memory=$((total_memory + mem_int))
     count=$((count + 1))
 
-    echo "  測定中 $i/${DURATION}sec... ${mem_int}MB"
+    echo "  測定中 ${i}sec... ${mem_int}MB"
 
     sleep 1
 done
