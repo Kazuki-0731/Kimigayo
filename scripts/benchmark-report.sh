@@ -130,15 +130,19 @@ if [ -f "$INPUT_DIR/lifecycle.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 
     if command -v jq > /dev/null 2>&1; then
-        startup_avg=$(jq -r '.startup.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
-        stop_avg=$(jq -r '.stop.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
-        restart_avg=$(jq -r '.restart.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        startup_avg=$(jq -r '.results.container_start.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        stop_avg=$(jq -r '.results.container_stop.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        restart_avg=$(jq -r '.results.container_restart.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        cleanup_avg=$(jq -r '.results.container_cleanup.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        run_avg=$(jq -r '.results.run_to_completion.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
 
         echo "| 操作 | 平均時間 |" >> "$OUTPUT_FILE"
         echo "|------|----------|" >> "$OUTPUT_FILE"
         echo "| 起動 | ${startup_avg}ms |" >> "$OUTPUT_FILE"
         echo "| 停止 | ${stop_avg}ms |" >> "$OUTPUT_FILE"
         echo "| 再起動 | ${restart_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| クリーンアップ | ${cleanup_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| 実行完了 | ${run_avg}ms |" >> "$OUTPUT_FILE"
     else
         echo "詳細データは \`lifecycle.json\` を参照してください。" >> "$OUTPUT_FILE"
     fi
@@ -153,12 +157,12 @@ if [ -f "$INPUT_DIR/busybox.json" ]; then
     if command -v jq > /dev/null 2>&1; then
         echo "**Kimigayo OS vs Alpine Linux**" >> "$OUTPUT_FILE"
         echo "" >> "$OUTPUT_FILE"
-        echo "| コマンド | Kimigayo OS | Alpine Linux | 比率 |" >> "$OUTPUT_FILE"
-        echo "|---------|-------------|--------------|------|" >> "$OUTPUT_FILE"
+        echo "| コマンド | Kimigayo OS | Alpine Linux | 速度比 |" >> "$OUTPUT_FILE"
+        echo "|---------|-------------|--------------|--------|" >> "$OUTPUT_FILE"
 
         # 各コマンドの結果を抽出
-        jq -r '.commands | to_entries | .[] |
-            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.ratio)x |"' \
+        jq -r '.results | to_entries | .[] |
+            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.speedup)x |"' \
             "$INPUT_DIR/busybox.json" >> "$OUTPUT_FILE" 2>/dev/null || \
             echo "詳細データは \`busybox.json\` を参照してください。" >> "$OUTPUT_FILE"
     else
@@ -174,13 +178,26 @@ if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
     echo "" >> "$OUTPUT_FILE"
 
     if command -v jq > /dev/null 2>&1; then
-        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 |" >> "$OUTPUT_FILE"
-        echo "|----|--------------|---------|-------------|" >> "$OUTPUT_FILE"
+        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 | シェル | パッケージマネージャー |" >> "$OUTPUT_FILE"
+        echo "|----|--------------|---------|-------------|--------|---------------------|" >> "$OUTPUT_FILE"
 
-        jq -r '.images | to_entries | .[] |
-            "| \(.key) | \(.value.image_size_mb)MB | \(.value.startup_time_ms)ms | \(.value.memory_usage_mb)MB |"' \
-            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
-            echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+        # 結果を抽出（0の値は「測定失敗」として表示）
+        jq -r '.results | to_entries | .[] |
+            if .value.size_mb == 0 then .value.size_mb = "N/A" else .value.size_mb = (.value.size_mb | tostring) + "MB" end |
+            if .value.startup_ms == 0 then .value.startup_ms = "N/A" else .value.startup_ms = (.value.startup_ms | tostring) + "ms" end |
+            if .value.memory_mb == 0 then .value.memory_mb = "N/A" else .value.memory_mb = (.value.memory_mb | tostring) + "MB" end |
+            "| \(.key) | \(.value.size_mb) | \(.value.startup_ms) | \(.value.memory_mb) | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
+            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        # エラーチェック
+        if [ $? -ne 0 ]; then
+            # フォールバック: シンプルな表示
+            echo "" >> "$OUTPUT_FILE"
+            jq -r '.results | to_entries | .[] |
+                "| \(.key) | \(.value.size_mb)MB | \(.value.startup_ms)ms | \(.value.memory_mb)MB | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
+                "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
+                echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+        fi
     else
         echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
     fi

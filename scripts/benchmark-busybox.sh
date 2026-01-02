@@ -96,8 +96,8 @@ echo ""
 # Ensure images are available
 log_info "Ensuring test images are available..."
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    log_error "Image $IMAGE_NAME not found"
-    exit 1
+    log_warning "Image $IMAGE_NAME not found locally, pulling..."
+    docker pull "$IMAGE_NAME"
 fi
 if ! docker image inspect "$ALPINE_IMAGE" >/dev/null 2>&1; then
     log_warning "Image $ALPINE_IMAGE not found locally, pulling..."
