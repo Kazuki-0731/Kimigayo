@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # デフォルト設定
-IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest}"
+IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest-standard}"
 DURATION="${DURATION:-30}"
 OUTPUT_FILE="${OUTPUT_FILE:-benchmark-memory.json}"
 
