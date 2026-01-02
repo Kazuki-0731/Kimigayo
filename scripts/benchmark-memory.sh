@@ -16,7 +16,7 @@ OUTPUT_FILE="${OUTPUT_FILE:-benchmark-memory.json}"
 echo -e "${BOLD}Kimigayo OS - メモリ使用量ベンチマーク${NC}"
 echo "======================================"
 echo -e "${BLUE}イメージ:${NC} $IMAGE"
-echo -e "${BLUE}測定時間:${NC} ${DURATION}秒"
+echo -e "${BLUE}測定時間:${NC} ${DURATION}sec"
 echo ""
 
 # コンテナ起動
@@ -44,7 +44,7 @@ for i in $(seq 1 "$DURATION"); do
     total_memory=$((total_memory + mem_int))
     count=$((count + 1))
 
-    echo "  測定中 $i/$DURATION秒... ${mem_int}MB"
+    echo "  測定中 $i/${DURATION}sec... ${mem_int}MB"
 
     sleep 1
 done
