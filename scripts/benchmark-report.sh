@@ -35,7 +35,7 @@ EOF
 echo "**生成日時:** $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
-# ディスクサイズ結果
+# 1. ディスクサイズ結果
 if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
     echo "### 💾 ディスクサイズ" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
@@ -55,7 +55,7 @@ if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 fi
 
-# 起動時間結果
+# 2. 起動時間結果
 if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
     echo "### ⚡ 起動時間" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
@@ -90,7 +90,7 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 fi
 
-# メモリ使用量結果
+# 3. メモリ使用量結果
 if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
     echo "### 💾 メモリ使用量" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
@@ -124,16 +124,82 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 fi
 
+# 4. コンテナライフサイクル結果
+if [ -f "$INPUT_DIR/lifecycle.json" ]; then
+    echo "### 🔄 コンテナライフサイクル" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+
+    if command -v jq > /dev/null 2>&1; then
+        startup_avg=$(jq -r '.startup.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        stop_avg=$(jq -r '.stop.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+        restart_avg=$(jq -r '.restart.average_ms' "$INPUT_DIR/lifecycle.json" 2>/dev/null || echo "N/A")
+
+        echo "| 操作 | 平均時間 |" >> "$OUTPUT_FILE"
+        echo "|------|----------|" >> "$OUTPUT_FILE"
+        echo "| 起動 | ${startup_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| 停止 | ${stop_avg}ms |" >> "$OUTPUT_FILE"
+        echo "| 再起動 | ${restart_avg}ms |" >> "$OUTPUT_FILE"
+    else
+        echo "詳細データは \`lifecycle.json\` を参照してください。" >> "$OUTPUT_FILE"
+    fi
+    echo "" >> "$OUTPUT_FILE"
+fi
+
+# 5. BusyBoxコマンド性能結果
+if [ -f "$INPUT_DIR/busybox.json" ]; then
+    echo "### 🔧 BusyBoxコマンド性能" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+
+    if command -v jq > /dev/null 2>&1; then
+        echo "**Kimigayo OS vs Alpine Linux**" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
+        echo "| コマンド | Kimigayo OS | Alpine Linux | 比率 |" >> "$OUTPUT_FILE"
+        echo "|---------|-------------|--------------|------|" >> "$OUTPUT_FILE"
+
+        # 各コマンドの結果を抽出
+        jq -r '.commands | to_entries | .[] |
+            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.ratio)x |"' \
+            "$INPUT_DIR/busybox.json" >> "$OUTPUT_FILE" 2>/dev/null || \
+            echo "詳細データは \`busybox.json\` を参照してください。" >> "$OUTPUT_FILE"
+    else
+        echo "詳細データは \`busybox.json\` を参照してください。" >> "$OUTPUT_FILE"
+    fi
+    echo "" >> "$OUTPUT_FILE"
+fi
+
+# 6. 比較ベンチマーク結果（最新のファイルを使用）
+LATEST_COMPARISON=$(ls -t "$INPUT_DIR"/comparison_*.json 2>/dev/null | head -1)
+if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
+    echo "### 📊 OS間比較ベンチマーク" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+
+    if command -v jq > /dev/null 2>&1; then
+        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 |" >> "$OUTPUT_FILE"
+        echo "|----|--------------|---------|-------------|" >> "$OUTPUT_FILE"
+
+        jq -r '.images | to_entries | .[] |
+            "| \(.key) | \(.value.image_size_mb)MB | \(.value.startup_time_ms)ms | \(.value.memory_usage_mb)MB |"' \
+            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
+            echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+    else
+        echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+    fi
+    echo "" >> "$OUTPUT_FILE"
+fi
+
 # フッター
 cat >> "$OUTPUT_FILE" <<'EOF'
 
 ## 📋 詳細データ
 
-詳細なベンチマークデータは以下のJSONファイルに保存されています:
+詳細なベンチマークデータは以下のファイルに保存されています:
 
 - `benchmark-size.json` - ディスクサイズ比較
 - `benchmark-startup.json` - 起動時間測定
 - `benchmark-memory.json` - メモリ使用量測定
+- `lifecycle.json` - コンテナライフサイクル測定
+- `busybox.json` - BusyBoxコマンド性能測定
+- `comparison_*.json` - OS間比較ベンチマーク
 
 ## 🎯 パフォーマンス目標
 
