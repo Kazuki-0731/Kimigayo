@@ -1,6 +1,8 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
-@@ -2387,10 +2387,8 @@ static int file_size(const char *fn)
+@@ -2387,10 +2387,8 @@ static int file_write(char *fn, char *first, char *last)
+ #if ENABLE_FEATURE_VI_SEARCH
+ # if ENABLE_FEATURE_VI_REGEX_SEARCH
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -11,7 +13,7 @@
  	int i, size, range, start;
 
 @@ -2401,15 +2399,17 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
- 		q = end - 1;	// stay within buffer
+ 		q = prev_line(p);
  	}
 
 -	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
