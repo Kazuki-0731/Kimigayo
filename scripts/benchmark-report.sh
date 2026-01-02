@@ -178,13 +178,26 @@ if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
     echo "" >> "$OUTPUT_FILE"
 
     if command -v jq > /dev/null 2>&1; then
-        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 |" >> "$OUTPUT_FILE"
-        echo "|----|--------------|---------|-------------|" >> "$OUTPUT_FILE"
+        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 | シェル | パッケージマネージャー |" >> "$OUTPUT_FILE"
+        echo "|----|--------------|---------|-------------|--------|---------------------|" >> "$OUTPUT_FILE"
 
-        jq -r '.images | to_entries | .[] |
-            "| \(.key) | \(.value.image_size_mb)MB | \(.value.startup_time_ms)ms | \(.value.memory_usage_mb)MB |"' \
-            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
-            echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+        # 結果を抽出（0の値は「測定失敗」として表示）
+        jq -r '.results | to_entries | .[] |
+            if .value.size_mb == 0 then .value.size_mb = "N/A" else .value.size_mb = (.value.size_mb | tostring) + "MB" end |
+            if .value.startup_ms == 0 then .value.startup_ms = "N/A" else .value.startup_ms = (.value.startup_ms | tostring) + "ms" end |
+            if .value.memory_mb == 0 then .value.memory_mb = "N/A" else .value.memory_mb = (.value.memory_mb | tostring) + "MB" end |
+            "| \(.key) | \(.value.size_mb) | \(.value.startup_ms) | \(.value.memory_mb) | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
+            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        # エラーチェック
+        if [ $? -ne 0 ]; then
+            # フォールバック: シンプルな表示
+            echo "" >> "$OUTPUT_FILE"
+            jq -r '.results | to_entries | .[] |
+                "| \(.key) | \(.value.size_mb)MB | \(.value.startup_ms)ms | \(.value.memory_mb)MB | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
+                "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
+                echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
+        fi
     else
         echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
     fi
