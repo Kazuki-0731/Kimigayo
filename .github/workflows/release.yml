@@ -78,18 +78,21 @@ jobs:
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-          # Set architecture for Docker
-          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-            DOCKER_ARCH="amd64"
+          # Use architecture for consistent naming: {version}-{variant}-{arch}
+          ARCH=${{ matrix.arch }}
+
+          # Docker Buildx requires linux/amd64 and linux/arm64 format
+          if [[ "${ARCH}" == "x86_64" ]]; then
+            DOCKER_PLATFORM="amd64"
           else
-            DOCKER_ARCH="arm64"
+            DOCKER_PLATFORM="arm64"
           fi
-          echo "docker_arch=${DOCKER_ARCH}" >> $GITHUB_OUTPUT
+          echo "docker_arch=${DOCKER_PLATFORM}" >> $GITHUB_OUTPUT
 
           # Build variant-specific tags (all variants get suffix)
           VARIANT=${{ matrix.variant }}
-          TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
-          TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
+          TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${ARCH}"
+          TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${ARCH}"
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
@@ -284,11 +287,11 @@ jobs:
           # Create manifests for each variant (all variants get suffix)
           for VARIANT in minimal standard extended; do
             docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-x86_64 \
               ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
 
             docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-x86_64 \
               ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
           done
 
