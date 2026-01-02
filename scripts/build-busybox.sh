@@ -198,18 +198,32 @@ fi
 install_prefix="${BUSYBOX_INSTALL_DIR}"
 sed -i "s|CONFIG_PREFIX=.*|CONFIG_PREFIX=\"${install_prefix}\"|" .config
 
+# Ensure static linking is enabled
+log_info "Ensuring static linking configuration..."
+sed -i "s|# CONFIG_STATIC is not set|CONFIG_STATIC=y|" .config
+sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
+
 # Apply oldconfig with automatic default answers (non-interactive)
 log_info "Resolving configuration dependencies..."
 # Use 'yes ""' to automatically answer with default for all prompts
 # This handles BusyBox versions that don't have olddefconfig
 yes "" | make oldconfig > /dev/null 2>&1 || true
 
-# Re-apply ARM64-specific settings after oldconfig (oldconfig may reset some values)
+# Re-apply critical settings after oldconfig (oldconfig may reset some values)
+sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    sed -i "s|CONFIG_STATIC_LIBGCC=.*|CONFIG_STATIC_LIBGCC=n|" .config
-    log_info "Re-applied ARM64 settings after oldconfig (PIE=n, STATIC_LIBGCC=n)"
+    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n for ARM64)"
+else
+    log_info "Re-applied settings after oldconfig (STATIC=y)"
 fi
+
+# Verify CONFIG_STATIC is set
+if ! grep -q "^CONFIG_STATIC=y" .config; then
+    log_error "Failed to enable CONFIG_STATIC in BusyBox configuration"
+    exit 1
+fi
+log_success "CONFIG_STATIC=y verified"
 
 # Build BusyBox
 log_info "Building BusyBox..."
@@ -219,13 +233,17 @@ log_info "This may take several minutes..."
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    # Use -nostdlib to avoid GCC runtime libraries (libgcc, libgcc_eh)
-    # Then manually specify musl's libc.a instead of relying on default linking
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nostdlib"
-    # Add musl's C library and required CRT files
-    export LIBS="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    # For ARM64: Use standard static linking
+    # Remove -nostdlib to ensure proper CRT files are included
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+
+    # Verify musl libc is available for static linking
+    if [ ! -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
+        log_error "musl static library not found: ${MUSL_INSTALL_DIR}/lib/libc.a"
+        log_error "Static linking requires musl libc.a"
+        exit 1
+    fi
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
