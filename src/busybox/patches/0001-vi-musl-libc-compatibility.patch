@@ -1,6 +1,6 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
-@@ -2387,10 +2387,9 @@ static int file_size(const char *fn)
+@@ -2386,21 +2386,21 @@ static int file_write(char *fn, char *first, char *last)
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -8,22 +8,22 @@
 -	const char *err;
 +	regex_t preg;
  	char *q;
--	int i, size, range, start;
-+	int i, size, range, start;
+ 	int i, size, range, start;
  
 -	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
 +	/* Convert GNU regex options to POSIX cflags */
 +	int cflags = REG_NOSUB;
  	if (ignorecase)
 -		re_syntax_options |= RE_ICASE;
-+		cflags |= REG_ICASE;
- 
+-
 -	memset(&preg, 0, sizeof(preg));
 -	err = re_compile_pattern(pat, strlen(pat), &preg);
 -	preg.not_bol = p != text;
 -	preg.not_eol = p != end - 1;
 -	if (err != NULL) {
 -		status_line_bold("bad search pattern '%s': %s", pat, err);
++		cflags |= REG_ICASE;
++
 +	/* Compile pattern using POSIX regex */
 +	if (regcomp(&preg, pat, cflags) != 0) {
 +		char errbuf[256];
@@ -33,7 +33,7 @@
  		return p;
  	}
  
-@@ -2427,11 +2426,35 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+@@ -2426,14 +2426,32 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
  	q = p - start;
  	if (q < text)
  		q = text;
@@ -45,7 +45,6 @@
 -	//           struct pattern   char     int   int    int    struct reg
 -	// re_search(*pattern_buffer, *string, size, start, range, *regs)
 -	i = re_search(&preg, q, size, start, range, /*struct re_registers*:*/ NULL);
-+
 +	/* POSIX regex doesn't support backward search like GNU re_search */
 +	if (range < 0) {
 +		/* Backward search: find last match before p */
@@ -72,11 +71,10 @@
 +		i = (regexec(&preg, search_start, 1, match, 0) == 0) ?
 +		    (start + match[0].rm_so) : -1;
 +	}
-+
  	regfree(&preg);
  	return i < 0 ? NULL : q + i;
  }
-@@ -2745,8 +2768,13 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
+@@ -2743,10 +2761,16 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
  	const char *t;
  	char *r;
  
