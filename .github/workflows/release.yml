@@ -86,17 +86,10 @@ jobs:
           fi
           echo "docker_arch=${DOCKER_ARCH}" >> $GITHUB_OUTPUT
 
-          # Build variant-specific tags
+          # Build variant-specific tags (all variants get suffix)
           VARIANT=${{ matrix.variant }}
-          if [[ "${VARIANT}" == "standard" ]]; then
-            # Standard variant gets no suffix
-            TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${DOCKER_ARCH}"
-            TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${DOCKER_ARCH}"
-          else
-            # Minimal and Extended get variant suffix
-            TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
-            TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
-          fi
+          TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
+          TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
@@ -288,28 +281,48 @@ jobs:
           # Extract version from tag
           VERSION=${GITHUB_REF#refs/tags/v}
 
-          # Create manifests for each variant
+          # Create manifests for each variant (all variants get suffix)
           for VARIANT in minimal standard extended; do
-            if [[ "${VARIANT}" == "standard" ]]; then
-              # Standard variant (no suffix)
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-arm64
+            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
 
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-arm64
-            else
-              # Minimal and Extended variants
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
-
-              docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
-                ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
-            fi
+            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
+              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
           done
+
+      - name: Clean up old tags on Docker Hub
+        env:
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Get auth token for Docker Hub API
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+            -d "{\"username\": \"${{ env.DOCKER_HUB_USERNAME }}\", \"password\": \"${DOCKER_HUB_TOKEN}\"}" \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+          # Delete variant-less tags for current version (not following naming convention)
+          for TAG in "${VERSION}" "latest"; do
+            echo "Deleting tag: ${TAG}"
+            curl -s -X DELETE \
+              -H "Authorization: JWT ${TOKEN}" \
+              "https://hub.docker.com/v2/repositories/${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}/tags/${TAG}/" || true
+          done
+
+          # Delete old architecture-specific tags (old naming pattern)
+          for ARCH in amd64 arm64 x86_64; do
+            for TAG in "${VERSION}-${ARCH}" "latest-${ARCH}"; do
+              echo "Deleting old arch tag: ${TAG}"
+              curl -s -X DELETE \
+                -H "Authorization: JWT ${TOKEN}" \
+                "https://hub.docker.com/v2/repositories/${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}/tags/${TAG}/" || true
+            done
+          done
+
+          echo "Tag cleanup completed"
 
   create-github-release:
     needs: [build-and-push, create-manifest]
