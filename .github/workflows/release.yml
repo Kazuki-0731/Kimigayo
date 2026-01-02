@@ -420,3 +420,58 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Discord Notification
+    runs-on: ubuntu-latest
+    needs: [build-and-push, create-manifest, create-github-release]
+    if: always()
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="manual-trigger"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Send success notification
+        if: ${{ needs.build-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success' }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: 'success'
+          title: '🎉 Release Success'
+          description: |
+            **Kimigayo OS ${{ steps.version.outputs.version }} Released**
+
+            • Build & Push: ✅ All variants built
+            • Manifests: ✅ Multi-arch created
+            • GitHub Release: ✅ Published
+            • Docker Hub: ✅ Images pushed
+
+            🐳 Docker: `docker pull ishinokazuki/kimigayo-os:latest`
+            📦 Release: https://github.com/Kazuki-0731/Kimigayo/releases/tag/${{ steps.version.outputs.version }}
+          color: 0x00ff00
+          username: 'Kimigayo Release Bot'
+
+      - name: Send failure notification
+        if: ${{ needs.build-and-push.result == 'failure' || needs.create-manifest.result == 'failure' || needs.create-github-release.result == 'failure' }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: 'failure'
+          title: '❌ Release Failed'
+          description: |
+            **Kimigayo OS ${{ steps.version.outputs.version }} Release Failed**
+
+            • Build & Push: ${{ needs.build-and-push.result == 'success' && '✅' || '❌' }}
+            • Manifests: ${{ needs.create-manifest.result == 'success' && '✅' || '❌' }}
+            • GitHub Release: ${{ needs.create-github-release.result == 'success' && '✅' || '❌' }}
+
+            Tag: ${{ steps.version.outputs.version }}
+            Commit: ${{ github.sha }}
+          color: 0xff0000
+          username: 'Kimigayo Release Bot'
