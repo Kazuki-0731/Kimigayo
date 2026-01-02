@@ -341,7 +341,18 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: |
-          cat > release-notes.md <<'EOF'
+          # Get previous tag
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tail -1)
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, this is the first release"
+            PREVIOUS_TAG="HEAD~100"
+          fi
+
+          echo "Generating release notes from ${PREVIOUS_TAG} to v${{ steps.version.outputs.version }}"
+
+          # Generate PR list
+          cat > release-notes.md <<EOF
           # Kimigayo OS v${{ steps.version.outputs.version }}
 
           ## 🎉 Release Highlights
@@ -351,32 +362,57 @@ jobs:
           ## 📦 Available Images
 
           ### Standard Variant (Recommended)
-          ```bash
-          docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}
-          docker pull ishinokazuki/kimigayo-os:latest
-          ```
+          \`\`\`bash
+          docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-standard
+          docker pull ishinokazuki/kimigayo-os:latest-standard
+          \`\`\`
 
           ### Minimal Variant
-          ```bash
+          \`\`\`bash
           docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-minimal
           docker pull ishinokazuki/kimigayo-os:latest-minimal
-          ```
+          \`\`\`
 
           ### Extended Variant
-          ```bash
+          \`\`\`bash
           docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-extended
           docker pull ishinokazuki/kimigayo-os:latest-extended
-          ```
+          \`\`\`
+
+          ## 🔄 Changes Since ${PREVIOUS_TAG}
+
+          ### Pull Requests
+          EOF
+
+          # Extract PR numbers from commit messages and generate PR list
+          git log ${PREVIOUS_TAG}..HEAD --oneline --grep='Merge pull request' | \
+            sed -n 's/.*Merge pull request #\([0-9]*\).*/\1/p' | \
+            sort -rn | uniq | while read pr; do
+              PR_TITLE=$(gh pr view $pr --json title --jq '.title' 2>/dev/null || echo "PR #$pr")
+              echo "- #$pr: ${PR_TITLE}" >> release-notes.md
+            done
+
+          # Add commit summary if no PRs found
+          PR_COUNT=$(git log ${PREVIOUS_TAG}..HEAD --oneline --grep='Merge pull request' | wc -l)
+          if [ "$PR_COUNT" -eq 0 ]; then
+            echo "" >> release-notes.md
+            echo "### Commits" >> release-notes.md
+            git log ${PREVIOUS_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" >> release-notes.md
+            echo "" >> release-notes.md
+          fi
+
+          # Continue with rest of release notes
+          cat >> release-notes.md <<EOF
 
           ## 🏗️ Build Artifacts
 
           This release includes pre-built rootfs tarballs for all variants and architectures:
-          - `kimigayo-minimal-${{ steps.version.outputs.version }}-x86_64.tar.gz`
-          - `kimigayo-minimal-${{ steps.version.outputs.version }}-arm64.tar.gz`
-          - `kimigayo-standard-${{ steps.version.outputs.version }}-x86_64.tar.gz`
-          - `kimigayo-standard-${{ steps.version.outputs.version }}-arm64.tar.gz`
-          - `kimigayo-extended-${{ steps.version.outputs.version }}-x86_64.tar.gz`
-          - `kimigayo-extended-${{ steps.version.outputs.version }}-arm64.tar.gz`
+          - \`kimigayo-minimal-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
+          - \`kimigayo-minimal-${{ steps.version.outputs.version }}-arm64.tar.gz\`
+          - \`kimigayo-standard-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
+          - \`kimigayo-standard-${{ steps.version.outputs.version }}-arm64.tar.gz\`
+          - \`kimigayo-extended-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
+          - \`kimigayo-extended-${{ steps.version.outputs.version }}-arm64.tar.gz\`
 
           ## 🔒 Security
 
