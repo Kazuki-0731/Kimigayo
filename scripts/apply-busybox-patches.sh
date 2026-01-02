@@ -91,21 +91,21 @@ for patch_file in "$PATCHES_DIR"/*.patch; do
         # Patch can be applied
         if patch -p1 < "$patch_file" >> "$PATCH_LOG" 2>&1; then
             log_success "  ✓ $patch_name applied successfully"
-            ((APPLIED_COUNT++))
+            APPLIED_COUNT=$((APPLIED_COUNT + 1))
         else
             log_error "  ✗ Failed to apply $patch_name"
-            ((FAILED_COUNT++))
+            FAILED_COUNT=$((FAILED_COUNT + 1))
         fi
     else
         # Check if already applied (reversed patch test)
         if patch -p1 -R --dry-run --silent < "$patch_file" > /dev/null 2>&1; then
             log_warning "  ⊘ $patch_name already applied (skipping)"
-            ((APPLIED_COUNT++))
+            APPLIED_COUNT=$((APPLIED_COUNT + 1))
         else
             log_error "  ✗ Cannot apply $patch_name (conflicts or errors)"
             log_error "    Run: patch -p1 --dry-run < $patch_file"
             log_error "    in directory: $BUSYBOX_SRC"
-            ((FAILED_COUNT++))
+            FAILED_COUNT=$((FAILED_COUNT + 1))
         fi
     fi
 done
@@ -125,3 +125,5 @@ fi
 
 log_success "All patches applied successfully"
 log_info "Patch log saved to: $PATCH_LOG"
+
+exit 0
