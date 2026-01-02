@@ -128,18 +128,18 @@ for image in "${IMAGES[@]}"; do
     for i in $(seq 1 "$ITERATIONS"); do
         start=$(date +%s%N)
 
-        # Try different commands for different images
-        # Priority: sleep (most compatible) -> shell commands
-        if docker run --rm "$image" sleep 0.001 > /dev/null 2>&1; then
+        # Try different shell paths for different images
+        # Fallback to sleep if shell is not available (e.g., issue #53)
+        if docker run --rm "$image" /bin/sh -c "exit 0" > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
-        elif docker run --rm "$image" /bin/sh -c "exit 0" > /dev/null 2>&1; then
+        elif docker run --rm "$image" sh -c "exit 0" > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
         elif docker run --rm "$image" /busybox/sh -c "exit 0" > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
-        elif docker run --rm "$image" sh -c "exit 0" > /dev/null 2>&1; then
+        elif docker run --rm "$image" sleep 0.001 > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
         else
