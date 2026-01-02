@@ -426,6 +426,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-push, create-manifest, create-github-release]
     if: always()
+    permissions: {}
     steps:
       - name: Extract version
         id: version
