@@ -1,6 +1,6 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
-@@ -2387,10 +2387,9 @@ static int file_size(const char *fn)
+@@ -2387,10 +2387,8 @@ static int file_size(const char *fn)
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -8,16 +8,19 @@
 -	const char *err;
 +	regex_t preg;
  	char *q;
--	int i, size, range, start;
-+	int i, size, range, start;
- 
+ 	int i, size, range, start;
+
+@@ -2401,15 +2399,17 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+ 		q = end - 1;	// stay within buffer
+ 	}
+
 -	re_syntax_options = RE_SYNTAX_POSIX_BASIC & (~RE_DOT_NEWLINE);
 +	/* Convert GNU regex options to POSIX cflags */
 +	int cflags = REG_NOSUB;
  	if (ignorecase)
 -		re_syntax_options |= RE_ICASE;
 +		cflags |= REG_ICASE;
- 
+
 -	memset(&preg, 0, sizeof(preg));
 -	err = re_compile_pattern(pat, strlen(pat), &preg);
 -	preg.not_bol = p != text;
@@ -32,8 +35,8 @@
 +		regfree(&preg);
  		return p;
  	}
- 
-@@ -2427,11 +2426,35 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+
+@@ -2427,11 +2427,35 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
  	q = p - start;
  	if (q < text)
  		q = text;
@@ -76,10 +79,10 @@
  	regfree(&preg);
  	return i < 0 ? NULL : q + i;
  }
-@@ -2745,8 +2768,13 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
+@@ -2745,8 +2769,13 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
  	const char *t;
  	char *r;
- 
+
 -	regmatch[0].rm_so = 0;
 -	regmatch[0].rm_eo = end_line(q) - q;
 -	if (regexec(preg, q, MAX_SUBPATTERN, regmatch, REG_STARTEND) != 0)
@@ -93,6 +96,6 @@
  		return found;
 +	}
 +	*line_end = saved_char;  /* Restore original character */
- 
+
  	found = q + regmatch[0].rm_so;
  	*len_F = regmatch[0].rm_eo - regmatch[0].rm_so;
