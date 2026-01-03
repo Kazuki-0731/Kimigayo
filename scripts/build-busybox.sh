@@ -249,7 +249,9 @@ yes "" | make oldconfig > /dev/null 2>&1 || true
 sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n for ARM64)"
+    # Disable STATIC_LIBGCC for clang compatibility (avoid -lgcc, -lgcc_eh, crtbeginT.o)
+    sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
+    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n, STATIC_LIBGCC=n for ARM64)"
 else
     log_info "Re-applied settings after oldconfig (STATIC=y)"
 fi
