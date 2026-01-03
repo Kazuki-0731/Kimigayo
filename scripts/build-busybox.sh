@@ -79,17 +79,22 @@ if [ "$ARCH" = "arm64" ]; then
     MUSL_ARCH="aarch64"
 fi
 
-# Try both naming conventions
+# Try both naming conventions and both lib paths (lib/ and usr/lib/)
 MUSL_CHECK_PATHS=(
+    "${MUSL_INSTALL_DIR}/usr/lib/libc.a"
     "${MUSL_INSTALL_DIR}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${MUSL_ARCH}/usr/lib/libc.a"
     "${BUILD_DIR}/musl-install-${MUSL_ARCH}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${ARCH}/usr/lib/libc.a"
     "${BUILD_DIR}/musl-install-${ARCH}/lib/libc.a"
 )
 
 MUSL_FOUND=false
+MUSL_LIBC_PATH=""
 for musl_path in "${MUSL_CHECK_PATHS[@]}"; do
     if [ -f "$musl_path" ]; then
         MUSL_INSTALL_DIR="$(dirname "$(dirname "$musl_path")")"
+        MUSL_LIBC_PATH="$musl_path"
         export MUSL_INSTALL_DIR
         log_info "Found musl libc at: $musl_path"
         MUSL_FOUND=true
@@ -109,10 +114,17 @@ if [ "$MUSL_FOUND" = false ]; then
         log_error "Failed to build musl libc"
         exit 1
     }
-    # Set the install directory
+    # Set the install directory and libc path
     MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
     export MUSL_INSTALL_DIR
+    # Try both possible libc.a locations
+    if [ -f "${MUSL_INSTALL_DIR}/usr/lib/libc.a" ]; then
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    else
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/lib/libc.a"
+    fi
     log_success "musl libc built successfully at: ${MUSL_INSTALL_DIR}"
+    log_info "musl libc.a path: ${MUSL_LIBC_PATH}"
 fi
 
 # Apply patches for musl libc compatibility (if any)
@@ -276,10 +288,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Use -nodefaultlibs to prevent automatic linking of GCC libraries
     # Explicitly specify musl libc path to avoid wrong libc.a
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_INSTALL_DIR}/lib/libc.a"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_LIBC_PATH}"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
+    log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
     log_info "Using minimal linking (nodefaultlibs, explicit musl libc path)"
 else
