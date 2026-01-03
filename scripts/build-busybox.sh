@@ -286,13 +286,22 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64: Use minimal static linking without GCC-specific libraries
     # Disable stack protector to avoid libssp_nonshared dependency with clang
     # Use -nodefaultlibs to prevent automatic linking of GCC libraries
-    # Explicitly specify musl libc path to avoid wrong libc.a
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
+    # Explicitly specify musl libc path and include directory
+
+    # Determine musl include path
+    if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/usr/include"
+    else
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/include"
+    fi
+
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_LIBC_PATH}"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
+    log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
     log_info "Using minimal linking (nodefaultlibs, explicit musl libc path)"
 else
