@@ -274,13 +274,14 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64: Use minimal static linking without GCC-specific libraries
     # Disable stack protector to avoid libssp_nonshared dependency with clang
     # Use -nodefaultlibs to prevent automatic linking of GCC libraries
+    # Explicitly specify musl libc path to avoid wrong libc.a
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs -lc"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_INSTALL_DIR}/lib/libc.a"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using minimal linking (nodefaultlibs, only libc)"
+    log_info "Using minimal linking (nodefaultlibs, explicit musl libc path)"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
