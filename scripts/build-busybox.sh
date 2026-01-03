@@ -239,8 +239,22 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
     # Verify musl libc is available for static linking
-    if [ ! -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
-        log_error "musl static library not found: ${MUSL_INSTALL_DIR}/lib/libc.a"
+    # Try both arm64 and aarch64 naming conventions
+    if [ -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
+        log_success "Found musl libc.a at: ${MUSL_INSTALL_DIR}/lib/libc.a"
+    elif [ -f "${BUILD_DIR}/musl-install-aarch64/lib/libc.a" ]; then
+        log_info "Found musl installation with aarch64 naming, updating path..."
+        MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-aarch64"
+        export MUSL_INSTALL_DIR
+        log_success "Updated MUSL_INSTALL_DIR to: ${MUSL_INSTALL_DIR}"
+    elif [ -f "${BUILD_DIR}/musl-install-arm64/lib/libc.a" ]; then
+        log_success "Found musl libc.a at: ${BUILD_DIR}/musl-install-arm64/lib/libc.a"
+    else
+        log_error "musl static library not found"
+        log_error "Tried paths:"
+        log_error "  - ${MUSL_INSTALL_DIR}/lib/libc.a"
+        log_error "  - ${BUILD_DIR}/musl-install-aarch64/lib/libc.a"
+        log_error "  - ${BUILD_DIR}/musl-install-arm64/lib/libc.a"
         log_error "Static linking requires musl libc.a"
         exit 1
     fi
