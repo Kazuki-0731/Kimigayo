@@ -270,12 +270,13 @@ log_info "This may take several minutes..."
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64: Use standard static linking
-    # Remove -nostdlib to ensure proper CRT files are included
-    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+    # Disable stack protector to avoid libssp_nonshared dependency with clang
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
+    log_info "Stack protector disabled for ARM64 clang compatibility"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
