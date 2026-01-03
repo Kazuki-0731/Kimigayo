@@ -271,16 +271,16 @@ log_info "This may take several minutes..."
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64: Use clang-native static linking
+    # For ARM64: Use minimal static linking without GCC-specific libraries
     # Disable stack protector to avoid libssp_nonshared dependency with clang
-    # Use compiler-rt instead of libgcc, and disable unwind libraries
+    # Use -nodefaultlibs to prevent automatic linking of GCC libraries
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -rtlib=compiler-rt -unwindlib=none"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs -lc"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using clang-native runtime (compiler-rt, no unwind libs)"
+    log_info "Using minimal linking (nodefaultlibs, only libc)"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
