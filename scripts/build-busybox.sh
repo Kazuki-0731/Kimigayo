@@ -72,11 +72,47 @@ if [ ! -d "$BUSYBOX_SRC_DIR" ]; then
     exit 1
 fi
 
-# Check if musl is built
-if [ ! -d "$MUSL_INSTALL_DIR" ]; then
-    log_error "musl libc installation not found: $MUSL_INSTALL_DIR"
-    log_error "Please run build-musl.sh first"
-    exit 1
+# Check if musl is built, auto-build if necessary
+# Determine musl arch (aarch64 vs arm64)
+MUSL_ARCH="$ARCH"
+if [ "$ARCH" = "arm64" ]; then
+    MUSL_ARCH="aarch64"
+fi
+
+# Try both naming conventions
+MUSL_CHECK_PATHS=(
+    "${MUSL_INSTALL_DIR}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${MUSL_ARCH}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${ARCH}/lib/libc.a"
+)
+
+MUSL_FOUND=false
+for musl_path in "${MUSL_CHECK_PATHS[@]}"; do
+    if [ -f "$musl_path" ]; then
+        MUSL_INSTALL_DIR="$(dirname "$(dirname "$musl_path")")"
+        export MUSL_INSTALL_DIR
+        log_info "Found musl libc at: $musl_path"
+        MUSL_FOUND=true
+        break
+    fi
+done
+
+if [ "$MUSL_FOUND" = false ]; then
+    log_warning "musl libc not found, building automatically..."
+    log_info "Downloading musl libc..."
+    bash "${SCRIPT_DIR}/download-musl.sh" || {
+        log_error "Failed to download musl libc"
+        exit 1
+    }
+    log_info "Building musl libc for ${MUSL_ARCH}..."
+    ARCH=$MUSL_ARCH bash "${SCRIPT_DIR}/build-musl.sh" || {
+        log_error "Failed to build musl libc"
+        exit 1
+    }
+    # Set the install directory
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
+    export MUSL_INSTALL_DIR
+    log_success "musl libc built successfully at: ${MUSL_INSTALL_DIR}"
 fi
 
 # Apply patches for musl libc compatibility (if any)
@@ -238,26 +274,8 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
-    # Verify musl libc is available for static linking
-    # Try both arm64 and aarch64 naming conventions
-    if [ -f "${MUSL_INSTALL_DIR}/lib/libc.a" ]; then
-        log_success "Found musl libc.a at: ${MUSL_INSTALL_DIR}/lib/libc.a"
-    elif [ -f "${BUILD_DIR}/musl-install-aarch64/lib/libc.a" ]; then
-        log_info "Found musl installation with aarch64 naming, updating path..."
-        MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-aarch64"
-        export MUSL_INSTALL_DIR
-        log_success "Updated MUSL_INSTALL_DIR to: ${MUSL_INSTALL_DIR}"
-    elif [ -f "${BUILD_DIR}/musl-install-arm64/lib/libc.a" ]; then
-        log_success "Found musl libc.a at: ${BUILD_DIR}/musl-install-arm64/lib/libc.a"
-    else
-        log_error "musl static library not found"
-        log_error "Tried paths:"
-        log_error "  - ${MUSL_INSTALL_DIR}/lib/libc.a"
-        log_error "  - ${BUILD_DIR}/musl-install-aarch64/lib/libc.a"
-        log_error "  - ${BUILD_DIR}/musl-install-arm64/lib/libc.a"
-        log_error "Static linking requires musl libc.a"
-        exit 1
-    fi
+    # Log musl location (already verified above)
+    log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
