@@ -285,25 +285,32 @@ log_info "This may take several minutes..."
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64: Use minimal static linking without GCC-specific libraries
     # Disable stack protector to avoid libssp_nonshared dependency with clang
-    # Use -nodefaultlibs to prevent automatic linking of GCC libraries
-    # Explicitly specify musl libc path and include directory
+    # Use -nodefaultlibs and manually specify musl CRT files and libc
 
-    # Determine musl include path
+    # Determine musl paths
     if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
         MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/usr/include"
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/usr/lib"
     else
         MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/include"
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
     fi
 
+    # musl CRT files for static linking
+    MUSL_CRT1="${MUSL_LIB_DIR}/crt1.o"
+    MUSL_CRTI="${MUSL_LIB_DIR}/crti.o"
+    MUSL_CRTN="${MUSL_LIB_DIR}/crtn.o"
+
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_LIBC_PATH}"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nodefaultlibs ${MUSL_CRT1} ${MUSL_CRTI} ${MUSL_LIBC_PATH} ${MUSL_CRTN}"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
+    log_info "Using musl CRT files: crt1.o, crti.o, crtn.o"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using minimal linking (nodefaultlibs, explicit musl libc path)"
+    log_info "Using nodefaultlibs with explicit musl CRT and libc"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
