@@ -297,16 +297,25 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/include"
     fi
 
+    # Determine musl lib path for CRT files
+    if [ -d "${MUSL_INSTALL_DIR}/usr/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/usr/lib"
+    else
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
+    fi
+
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    # Add musl libc.a to LDFLAGS since we use -nodefaultlibs
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${MUSL_LIBC_PATH}"
+    # Add musl CRT files and libc.a to LDFLAGS since we use -nodefaultlibs
+    # CRT files order: crt1.o crti.o [your objects] crtn.o
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
+    log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using -nodefaultlibs with explicit musl libc.a in LDFLAGS"
+    log_info "Using -nodefaultlibs with explicit musl CRT files and libc.a in LDFLAGS"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
