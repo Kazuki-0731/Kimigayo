@@ -269,7 +269,9 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     # Disable STATIC_LIBGCC for clang compatibility (avoid -lgcc, -lgcc_eh, crtbeginT.o)
     sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
-    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n, STATIC_LIBGCC=n for ARM64)"
+    # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl includes these in libc.a)
+    sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
+    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
 else
     log_info "Re-applied settings after oldconfig (STATIC=y)"
 fi
