@@ -333,8 +333,19 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
+# For ARM64: explicitly set CONFIG_EXTRA_LDLIBS="" to prevent -lm -lresolv
+BUILD_FAILED=false
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    if ! make -j"$(nproc)" SKIP_STRIP=y CONFIG_EXTRA_LDLIBS="" 2>&1 | tee /tmp/busybox-build.log; then
+        BUILD_FAILED=true
+    fi
+else
+    if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
+        BUILD_FAILED=true
+    fi
+fi
 
-if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
+if [ "$BUILD_FAILED" = true ]; then
     log_error "BusyBox build failed"
     log_error "Last 50 lines of build output:"
     tail -50 /tmp/busybox-build.log >&2
