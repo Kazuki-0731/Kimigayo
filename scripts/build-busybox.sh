@@ -72,12 +72,9 @@ if [ ! -d "$BUSYBOX_SRC_DIR" ]; then
     exit 1
 fi
 
-# Check if musl is built
-if [ ! -d "$MUSL_INSTALL_DIR" ]; then
-    log_error "musl libc installation not found: $MUSL_INSTALL_DIR"
-    log_error "Please run build-musl.sh first"
-    exit 1
-fi
+# We now use Alpine's system musl-dev package (installed in Dockerfile)
+# No need to build musl manually
+log_info "Using system musl from Alpine's musl-dev package"
 
 # Apply patches for musl libc compatibility (if any)
 if [ -f "${SCRIPT_DIR}/apply-busybox-patches.sh" ]; then
@@ -181,13 +178,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     if [ -n "$CROSS_COMPILE" ]; then
         sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"${CROSS_COMPILE}\"|" .config
     fi
-    # Set sysroot for musl (for cross-compilation)
-    sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
-    # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
-    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
-    # Disable PIE for static builds (PIE + static is not compatible)
+    # Use system musl (Alpine's musl-dev package)
+    sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"\"|" .config
+    # Disable PIE for static builds
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
+    log_info "Using system musl (Alpine musl-dev) for ARM64"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -207,8 +202,7 @@ yes "" | make oldconfig > /dev/null 2>&1 || true
 # Re-apply ARM64-specific settings after oldconfig (oldconfig may reset some values)
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    sed -i "s|CONFIG_STATIC_LIBGCC=.*|CONFIG_STATIC_LIBGCC=n|" .config
-    log_info "Re-applied ARM64 settings after oldconfig (PIE=n, STATIC_LIBGCC=n)"
+    log_info "Re-applied ARM64 settings after oldconfig (PIE=n)"
 fi
 
 # Build BusyBox
@@ -216,18 +210,14 @@ log_info "Building BusyBox..."
 log_info "This may take several minutes..."
 
 # Set compiler flags for static musl build
-# Alpine Linux's gcc is already configured to use musl
-# Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
+# Alpine Linux's musl-dev provides everything needed for both architectures
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
+    # For ARM64: Simple static linking (system musl handles everything)
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    # Use -nostdlib to avoid GCC runtime libraries (libgcc, libgcc_eh)
-    # Then manually specify musl's libc.a instead of relying on default linking
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nostdlib"
-    # Add musl's C library and required CRT files
-    export LIBS="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+    log_info "Using system musl-dev for ARM64 cross-compilation"
 else
-    # For x86_64: use stack protector (GCC has proper support)
+    # For x86_64: Simple static linking with musl
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 fi
