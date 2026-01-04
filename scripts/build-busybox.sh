@@ -285,18 +285,24 @@ log_info "This may take several minutes..."
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64: Use standard static linking with sysroot pointing to musl
     # Disable stack protector to avoid libssp_nonshared dependency with clang
-    # Let the toolchain use standard linking with musl as sysroot
+    # Explicitly add musl include path for headers like byteswap.h
 
-    # The sysroot is already set by BusyBox's CONFIG_SYSROOT
-    # We just need to ensure static linking and avoid GCC-specific features
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
+    # Determine musl include path
+    if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/usr/include"
+    else
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/include"
+    fi
+
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
+    log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using standard static linking with musl sysroot"
+    log_info "Using standard static linking with musl sysroot and explicit headers"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
