@@ -235,10 +235,13 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
     # Add EXTRA_LDFLAGS to disable GCC-specific libraries
     sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nodefaultlibs\"|" .config
+    # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
+    sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
     # Disable PIE for static builds (PIE + static is not compatible)
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
     log_info "Added -nodefaultlibs to EXTRA_LDFLAGS to avoid GCC libraries"
+    log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
