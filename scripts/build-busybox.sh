@@ -233,9 +233,12 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
     # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
     sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
+    # Add EXTRA_LDFLAGS to disable GCC-specific libraries
+    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nodefaultlibs\"|" .config
     # Disable PIE for static builds (PIE + static is not compatible)
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
+    log_info "Added -nodefaultlibs to EXTRA_LDFLAGS to avoid GCC libraries"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -283,9 +286,9 @@ log_info "This may take several minutes..."
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64: Use standard static linking with sysroot pointing to musl
+    # For ARM64: Use static linking with explicit musl libc
     # Disable stack protector to avoid libssp_nonshared dependency with clang
-    # Explicitly add musl include path for headers like byteswap.h
+    # Use -nodefaultlibs (set in CONFIG_EXTRA_LDFLAGS) and manually add libc
 
     # Determine musl include path
     if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
@@ -295,14 +298,15 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
 
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+    # Add musl libc.a to LDFLAGS since we use -nodefaultlibs
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${MUSL_LIBC_PATH}"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using standard static linking with musl sysroot and explicit headers"
+    log_info "Using -nodefaultlibs with explicit musl libc.a in LDFLAGS"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
