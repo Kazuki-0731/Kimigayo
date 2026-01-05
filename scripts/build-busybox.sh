@@ -233,14 +233,16 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
     # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
     sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
-    # Add EXTRA_LDFLAGS to disable GCC-specific libraries
-    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nodefaultlibs\"|" .config
+    # Add EXTRA_LDFLAGS - use -nostartfiles instead of -nodefaultlibs
+    # -nostartfiles: Don't use standard system startup files (crt*.o) but still link standard libraries
+    # This avoids crtbeginT.o/crtend.o while allowing -lc to work
+    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nostartfiles\"|" .config
     # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
     # Disable PIE for static builds (PIE + static is not compatible)
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
-    log_info "Added -nodefaultlibs to EXTRA_LDFLAGS to avoid GCC libraries"
+    log_info "Using -nostartfiles instead of -nodefaultlibs to avoid GCC CRT files"
     log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
