@@ -314,8 +314,9 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
     # Add musl CRT files and libc.a to LDFLAGS since we use -nodefaultlibs
+    # -Wl,-nostartfiles: Tell linker not to use standard startup files (avoids crtbeginT.o/crtend.o)
     # CRT files order: crt1.o crti.o [your objects] crtn.o
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -Wl,-nostartfiles ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
