@@ -233,16 +233,15 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
     # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
     sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
-    # Add EXTRA_LDFLAGS - use -nostdlib to avoid all standard system libraries and startup files
-    # This prevents GCC CRT files (crtbeginT.o/crtend.o) and libraries (libgcc/libgcc_eh)
+    # Add EXTRA_LDFLAGS - use -nodefaultlibs to avoid GCC libraries
     # We manually specify musl CRT files and libc.a in LDFLAGS
-    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nostdlib\"|" .config
+    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld -nodefaultlibs\"|" .config
     # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
     # Disable PIE for static builds (PIE + static is not compatible)
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
-    log_info "Using -nostdlib to avoid all GCC libraries and CRT files"
+    log_info "Using -nodefaultlibs with empty crtbeginT.o/crtend.o placeholders"
     log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
@@ -312,10 +311,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
 
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    # Add musl CRT files and libc.a to LDFLAGS since we use -nostdlib
+    # Add musl CRT files and libc.a to LDFLAGS since we use -nodefaultlibs
     # CRT files order: crt1.o crti.o [your objects] crtn.o
-    # Note: -nostdlib prevents all standard libraries and startup files, so we provide everything manually
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o"
+    # Create empty crtbeginT.o and crtend.o to satisfy linker (these are GCC-specific, not needed for musl)
+    touch /tmp/crtbeginT.o /tmp/crtend.o
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now /tmp/crtbeginT.o ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o /tmp/crtend.o"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -323,7 +323,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using -nostdlib with explicit musl CRT files and libc.a in LDFLAGS"
+    log_info "Using -nodefaultlibs with musl CRT files, libc.a, and empty GCC CRT placeholders"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
