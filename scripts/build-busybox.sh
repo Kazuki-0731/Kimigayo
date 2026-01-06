@@ -313,9 +313,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
     # Add musl CRT files and libc.a to LDFLAGS since we use -nodefaultlibs
     # CRT files order: crt1.o crti.o [your objects] crtn.o
-    # Create empty crtbeginT.o and crtend.o to satisfy linker (these are GCC-specific, not needed for musl)
-    touch /tmp/crtbeginT.o /tmp/crtend.o
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now /tmp/crtbeginT.o ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o /tmp/crtend.o"
+    # Create empty crtbeginT.o and crtend.o in the build directory to satisfy linker
+    # These are GCC-specific files that are not needed for musl, but linker expects them
+    ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
+    ar crs "${BUSYBOX_BUILD_DIR}/crtend.o" 2>/dev/null || true
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now ${BUSYBOX_BUILD_DIR}/crtbeginT.o ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o ${MUSL_LIBC_PATH} ${MUSL_LIB_DIR}/crtn.o ${BUSYBOX_BUILD_DIR}/crtend.o"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
