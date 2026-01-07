@@ -310,10 +310,14 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
 
     export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    # Create empty crtbeginT.o and crtend.o in the build directory to satisfy clang wrapper
-    # These are GCC-specific files that are not needed for musl, but clang wrapper expects them
+    # Create empty GCC library files to satisfy clang linker
+    # clang with --target=aarch64-linux-musl tries to link against GCC libraries
+    # Create empty archives to satisfy the linker (they won't actually be used)
     ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
     ar crs "${BUSYBOX_BUILD_DIR}/crtend.o" 2>/dev/null || true
+    ar crs "${BUSYBOX_BUILD_DIR}/libssp_nonshared.a" 2>/dev/null || true
+    ar crs "${BUSYBOX_BUILD_DIR}/libgcc.a" 2>/dev/null || true
+    ar crs "${BUSYBOX_BUILD_DIR}/libgcc_eh.a" 2>/dev/null || true
     # Use simple -static flag and let toolchain handle CRT linking automatically
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
 
@@ -323,7 +327,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Using -static with empty GCC CRT placeholders (crtbeginT.o/crtend.o)"
+    log_info "Created empty GCC library placeholders: crtbeginT.o, crtend.o, libssp_nonshared.a, libgcc.a, libgcc_eh.a"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
