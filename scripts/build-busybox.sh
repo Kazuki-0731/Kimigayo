@@ -310,16 +310,29 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
 
     export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    # Create empty GCC library files to satisfy clang linker
-    # clang with --target=aarch64-linux-musl tries to link against GCC libraries
-    # Create empty archives to satisfy the linker (they won't actually be used)
+    # Create empty GCC CRT files to satisfy clang wrapper
+    # clang expects crtbeginT.o and crtend.o but they're not needed for musl
     ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
     ar crs "${BUSYBOX_BUILD_DIR}/crtend.o" 2>/dev/null || true
-    ar crs "${BUSYBOX_BUILD_DIR}/libssp_nonshared.a" 2>/dev/null || true
-    ar crs "${BUSYBOX_BUILD_DIR}/libgcc.a" 2>/dev/null || true
-    ar crs "${BUSYBOX_BUILD_DIR}/libgcc_eh.a" 2>/dev/null || true
-    # Use simple -static flag and let toolchain handle CRT linking automatically
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
+
+    # Find LLVM compiler-rt builtins library for ARM64
+    # This provides __addtf3, __multf3, __divtf3, etc. for 128-bit float operations
+    CLANG_RT_BUILTINS=""
+    for path in /usr/lib/llvm*/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a; do
+        if [ -f "$path" ]; then
+            CLANG_RT_BUILTINS="$path"
+            log_info "Found compiler-rt builtins: $CLANG_RT_BUILTINS"
+            break
+        fi
+    done
+
+    # Use -static and link with compiler-rt builtins instead of libgcc
+    if [ -n "$CLANG_RT_BUILTINS" ]; then
+        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${CLANG_RT_BUILTINS}"
+    else
+        log_warning "compiler-rt builtins not found, using default linking"
+        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
+    fi
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -327,7 +340,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Created empty GCC library placeholders: crtbeginT.o, crtend.o, libssp_nonshared.a, libgcc.a, libgcc_eh.a"
+    log_info "Created empty GCC CRT placeholders: crtbeginT.o, crtend.o"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
