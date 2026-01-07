@@ -232,7 +232,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
     # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
-    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fno-stack-protector\"|" .config
     # Add EXTRA_LDFLAGS - use lld linker only (no -nodefaultlibs, let toolchain handle linking)
     sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld\"|" .config
     # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
@@ -309,7 +309,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
     fi
 
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
+    export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
     # Create empty crtbeginT.o and crtend.o in the build directory to satisfy clang wrapper
     # These are GCC-specific files that are not needed for musl, but clang wrapper expects them
     ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
