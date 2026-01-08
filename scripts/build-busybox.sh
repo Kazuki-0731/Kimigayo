@@ -326,12 +326,16 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         fi
     done
 
-    # Use -static and link with compiler-rt builtins instead of libgcc
+    # Since we use -nodefaultlibs in clang wrapper, we need to manually specify:
+    # 1. musl CRT files (crt1.o, crti.o, crtn.o)
+    # 2. musl libc.a
+    # 3. compiler-rt builtins for 128-bit float operations
+    # Order: crt1.o crti.o [objects] libc.a [builtins] crtn.o
     if [ -n "$CLANG_RT_BUILTINS" ]; then
-        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${CLANG_RT_BUILTINS}"
+        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o -lc ${CLANG_RT_BUILTINS} ${MUSL_LIB_DIR}/crtn.o"
     else
-        log_warning "compiler-rt builtins not found, using default linking"
-        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
+        log_warning "compiler-rt builtins not found, linking without builtins"
+        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o -lc ${MUSL_LIB_DIR}/crtn.o"
     fi
 
     # Log musl location (already verified above)

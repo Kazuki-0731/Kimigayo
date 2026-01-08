@@ -134,12 +134,13 @@ WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
-# musl-clangアプローチ: 最小限の設定でGCCライブラリを回避
+# musl-clangアプローチ: -nodefaultlibsでGCCライブラリの自動リンクを防ぐ
 # -fuse-ld=lld: LLVMリンカを使用
+# -nodefaultlibs: libgcc, libgcc_eh, libssp_nonsharedを自動リンクしない
 # Clangは--target=aarch64-linux-muslから自動的にmuslの規約を理解する
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -nodefaultlibs -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -nodefaultlibs -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
