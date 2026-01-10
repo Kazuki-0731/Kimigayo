@@ -152,16 +152,14 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/us
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
-# Create empty GCC library stubs to satisfy clang linker
-# clang looks for libgcc, libgcc_eh, libssp_nonshared when linking
-# Create them as empty archives - musl provides all necessary functionality
-# Note: We don't use compiler-rt builtins because Alpine's compiler-rt is x86_64-only
-# and cross-architecture compilation causes "incompatible with aarch64linux" errors
+# Link ARM64 compiler-rt builtins to libgcc.a to provide __addtf3, __multf3, etc.
+# Alpine's compiler-rt package includes native ARM64 builtins
+# Create libgcc_eh and libssp_nonshared as empty archives - musl provides their functionality
 RUN cd /usr/aarch64-linux-musl/lib && \
-    ar crs libgcc.a && \
+    ln -sf /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a libgcc.a && \
     ar crs libgcc_eh.a && \
     ar crs libssp_nonshared.a && \
-    echo "Created empty GCC library stubs:" && \
+    echo "Created GCC library compatibility layer:" && \
     ls -lh libgcc.a libgcc_eh.a libssp_nonshared.a
 
 # ビルドディレクトリの作成
