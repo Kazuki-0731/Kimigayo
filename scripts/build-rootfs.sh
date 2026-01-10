@@ -819,6 +819,41 @@ main() {
     log "Output: $ROOTFS_DIR"
     log "========================================"
 
+    # Check and build required components
+    log "Checking required components..."
+
+    # Determine musl arch (aarch64 vs arm64)
+    local MUSL_ARCH="$ARCH"
+    if [ "$ARCH" = "arm64" ]; then
+        MUSL_ARCH="aarch64"
+    fi
+
+    # Check musl libc
+    local MUSL_CHECK_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
+    if [ ! -f "${MUSL_CHECK_DIR}/lib/libc.a" ]; then
+        log_warn "musl libc not found, building..."
+        bash "${SCRIPT_DIR}/download-musl.sh" || { log_error "Failed to download musl"; exit 1; }
+        ARCH=$MUSL_ARCH bash "${SCRIPT_DIR}/build-musl.sh" || { log_error "Failed to build musl"; exit 1; }
+        # Update MUSL_INSTALL_DIR for subsequent builds
+        export MUSL_INSTALL_DIR="${MUSL_CHECK_DIR}"
+    else
+        log_info "✓ musl libc found at: ${MUSL_CHECK_DIR}"
+        export MUSL_INSTALL_DIR="${MUSL_CHECK_DIR}"
+    fi
+
+    # Check BusyBox
+    if [ ! -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
+        log_warn "BusyBox not found, building..."
+        bash "${SCRIPT_DIR}/download-busybox.sh" || { log_error "Failed to download BusyBox"; exit 1; }
+        ARCH=$ARCH IMAGE_TYPE=$IMAGE_TYPE MUSL_INSTALL_DIR="${MUSL_INSTALL_DIR}" \
+            bash "${SCRIPT_DIR}/build-busybox.sh" || { log_error "Failed to build BusyBox"; exit 1; }
+    else
+        log_info "✓ BusyBox found at: ${BUSYBOX_INSTALL_DIR}/bin/busybox"
+    fi
+
+    log "✅ All required components ready"
+    log ""
+
     # Execute build steps
     create_directory_structure
     create_device_nodes

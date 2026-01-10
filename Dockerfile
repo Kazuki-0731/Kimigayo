@@ -134,10 +134,9 @@ WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
-# musl-clangアプローチ: シンプルにターゲットとリンカのみ指定
+# musl-clangアプローチ: シンプルな構成
 # -fuse-ld=lld: LLVMリンカを使用
 # Clangは--target=aarch64-linux-muslから自動的にmuslの規約を理解する
-# 追加のrtlib/unwindlib指定は不要（muslが完全なC標準ライブラリを提供）
 RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
     printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
@@ -152,6 +151,16 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/us
     ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm && \
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
+
+# Link ARM64 compiler-rt builtins to libgcc.a to provide __addtf3, __multf3, etc.
+# Alpine's compiler-rt package includes native ARM64 builtins
+# Create libgcc_eh and libssp_nonshared as empty archives - musl provides their functionality
+RUN cd /usr/aarch64-linux-musl/lib && \
+    ln -sf /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a libgcc.a && \
+    ar crs libgcc_eh.a && \
+    ar crs libssp_nonshared.a && \
+    echo "Created GCC library compatibility layer:" && \
+    ls -lh libgcc.a libgcc_eh.a libssp_nonshared.a
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
