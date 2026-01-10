@@ -152,14 +152,22 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/us
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
-# Create empty GCC library files to satisfy clang linker
+# Create GCC library stubs to satisfy clang linker
 # clang looks for libgcc, libgcc_eh, libssp_nonshared when linking
-# Create them as empty archives in /usr/aarch64-linux-musl/lib
-RUN cd /usr/aarch64-linux-musl/lib && \
-    ar crs libgcc.a && \
+# For libgcc.a: use compiler-rt builtins if available, otherwise create empty
+# For libgcc_eh.a and libssp_nonshared.a: create empty (not needed for musl)
+RUN CLANG_RT_BUILTINS=$(find /usr/lib -name "libclang_rt.builtins-*.a" 2>/dev/null | head -1) && \
+    cd /usr/aarch64-linux-musl/lib && \
+    if [ -n "$CLANG_RT_BUILTINS" ] && [ -f "$CLANG_RT_BUILTINS" ]; then \
+        echo "Found compiler-rt builtins: $CLANG_RT_BUILTINS"; \
+        cp "$CLANG_RT_BUILTINS" libgcc.a; \
+    else \
+        echo "compiler-rt builtins not found, creating empty libgcc.a"; \
+        ar crs libgcc.a; \
+    fi && \
     ar crs libgcc_eh.a && \
     ar crs libssp_nonshared.a && \
-    echo "Created empty GCC library stubs in /usr/aarch64-linux-musl/lib"
+    ls -lh libgcc.a libgcc_eh.a libssp_nonshared.a
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
