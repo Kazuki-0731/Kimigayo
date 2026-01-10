@@ -152,21 +152,16 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/us
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
-# Create GCC library stubs to satisfy clang linker
+# Create empty GCC library stubs to satisfy clang linker
 # clang looks for libgcc, libgcc_eh, libssp_nonshared when linking
-# For libgcc.a: use compiler-rt builtins if available, otherwise create empty
-# For libgcc_eh.a and libssp_nonshared.a: create empty (not needed for musl)
-RUN CLANG_RT_BUILTINS=$(find /usr/lib -name "libclang_rt.builtins-*.a" 2>/dev/null | head -1) && \
-    cd /usr/aarch64-linux-musl/lib && \
-    if [ -n "$CLANG_RT_BUILTINS" ] && [ -f "$CLANG_RT_BUILTINS" ]; then \
-        echo "Found compiler-rt builtins: $CLANG_RT_BUILTINS"; \
-        cp "$CLANG_RT_BUILTINS" libgcc.a; \
-    else \
-        echo "compiler-rt builtins not found, creating empty libgcc.a"; \
-        ar crs libgcc.a; \
-    fi && \
+# Create them as empty archives - musl provides all necessary functionality
+# Note: We don't use compiler-rt builtins because Alpine's compiler-rt is x86_64-only
+# and cross-architecture compilation causes "incompatible with aarch64linux" errors
+RUN cd /usr/aarch64-linux-musl/lib && \
+    ar crs libgcc.a && \
     ar crs libgcc_eh.a && \
     ar crs libssp_nonshared.a && \
+    echo "Created empty GCC library stubs:" && \
     ls -lh libgcc.a libgcc_eh.a libssp_nonshared.a
 
 # ビルドディレクトリの作成
