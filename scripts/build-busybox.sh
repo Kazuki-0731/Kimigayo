@@ -315,28 +315,9 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
     ar crs "${BUSYBOX_BUILD_DIR}/crtend.o" 2>/dev/null || true
 
-    # Find LLVM compiler-rt builtins library for ARM64
-    # This provides __addtf3, __multf3, __divtf3, etc. for 128-bit float operations
-    CLANG_RT_BUILTINS=""
-    for path in /usr/lib/llvm*/lib/clang/*/lib/linux/libclang_rt.builtins-aarch64.a; do
-        if [ -f "$path" ]; then
-            CLANG_RT_BUILTINS="$path"
-            log_info "Found compiler-rt builtins: $CLANG_RT_BUILTINS"
-            break
-        fi
-    done
-
-    # Since we use -nodefaultlibs in clang wrapper, we need to manually specify:
-    # 1. musl CRT files (crt1.o, crti.o, crtn.o)
-    # 2. musl libc.a
-    # 3. compiler-rt builtins for 128-bit float operations
-    # Order: crt1.o crti.o [objects] libc.a [builtins] crtn.o
-    if [ -n "$CLANG_RT_BUILTINS" ]; then
-        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o -lc ${CLANG_RT_BUILTINS} ${MUSL_LIB_DIR}/crtn.o"
-    else
-        log_warning "compiler-rt builtins not found, linking without builtins"
-        export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR} ${MUSL_LIB_DIR}/crt1.o ${MUSL_LIB_DIR}/crti.o -lc ${MUSL_LIB_DIR}/crtn.o"
-    fi
+    # Use simple -static flag and let toolchain handle linking
+    # Empty GCC library stubs are created in Dockerfile at /usr/aarch64-linux-musl/lib
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -345,6 +326,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
     log_info "Created empty GCC CRT placeholders: crtbeginT.o, crtend.o"
+    log_info "Empty GCC library stubs (libgcc.a, libgcc_eh.a, libssp_nonshared.a) created in Dockerfile"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
