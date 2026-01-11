@@ -317,10 +317,21 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 
     # Link libgcc.a into sysroot lib directory so linker can find it with --sysroot
     # libgcc.a is a symlink to compiler-rt builtins created in Dockerfile
-    if [ ! -f "${MUSL_LIB_DIR}/libgcc.a" ]; then
+    # Use -L to check for symlink existence instead of -f
+    if [ ! -L "${MUSL_LIB_DIR}/libgcc.a" ]; then
         ln -sf /usr/aarch64-linux-musl/lib/libgcc.a "${MUSL_LIB_DIR}/libgcc.a"
         ln -sf /usr/aarch64-linux-musl/lib/libgcc_eh.a "${MUSL_LIB_DIR}/libgcc_eh.a"
         ln -sf /usr/aarch64-linux-musl/lib/libssp_nonshared.a "${MUSL_LIB_DIR}/libssp_nonshared.a"
+        log_info "Created libgcc symlinks in sysroot"
+    else
+        log_info "libgcc symlinks already exist in sysroot"
+    fi
+
+    # Verify symlinks were created
+    if [ -L "${MUSL_LIB_DIR}/libgcc.a" ]; then
+        log_info "Verified: ${MUSL_LIB_DIR}/libgcc.a exists"
+    else
+        log_error "Failed to create ${MUSL_LIB_DIR}/libgcc.a"
     fi
 
     # Use simple -static flag and let toolchain handle linking
