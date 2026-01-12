@@ -154,8 +154,21 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtli
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
 
-# Note: With -rtlib=compiler-rt, clang uses compiler-rt directly
-# No need to create libgcc.a symlinks as -lgcc is not requested
+# Create empty GCC compatibility files that clang may still request
+# Even with -rtlib=compiler-rt, clang may still look for these files
+RUN cd /usr/aarch64-linux-musl/lib && \
+    touch crtbeginT.o crtend.o && \
+    ar crs libssp_nonshared.a && \
+    echo "Created GCC compatibility files:" && \
+    ls -lh crtbeginT.o crtend.o libssp_nonshared.a
+
+# Create symlink with correct triple name for compiler-rt builtins
+# clang looks for aarch64-unknown-linux-musl but Alpine provides aarch64-alpine-linux-musl
+RUN mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl && \
+    ln -sf ../aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a \
+           /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a && \
+    echo "Created compiler-rt builtins symlink:" && \
+    ls -lh /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
