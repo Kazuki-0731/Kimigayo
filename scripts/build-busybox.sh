@@ -314,7 +314,15 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
     # clang automatically uses compiler-rt builtins for 128-bit float operations
 
-    # Use simple -static flag and let toolchain handle linking
+    # Copy GCC compatibility files from /usr/aarch64-linux-musl/lib to sysroot
+    # With --sysroot, clang only searches inside sysroot for CRT files
+    if [ ! -f "${MUSL_LIB_DIR}/crtbeginT.o" ]; then
+        cp /usr/aarch64-linux-musl/lib/crtbeginT.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        cp /usr/aarch64-linux-musl/lib/crtend.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        cp /usr/aarch64-linux-musl/lib/libssp_nonshared.a "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        log_info "Copied GCC compatibility files to sysroot"
+    fi
+
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
     # Log musl location (already verified above)
