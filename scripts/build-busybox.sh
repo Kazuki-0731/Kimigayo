@@ -310,33 +310,12 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
 
     export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
-    # Create empty GCC CRT files to satisfy clang wrapper
-    # clang expects crtbeginT.o and crtend.o but they're not needed for musl
-    ar crs "${BUSYBOX_BUILD_DIR}/crtbeginT.o" 2>/dev/null || true
-    ar crs "${BUSYBOX_BUILD_DIR}/crtend.o" 2>/dev/null || true
 
-    # Link libgcc.a into sysroot lib directory so linker can find it with --sysroot
-    # libgcc.a is a symlink to compiler-rt builtins created in Dockerfile
-    # Use -L to check for symlink existence instead of -f
-    if [ ! -L "${MUSL_LIB_DIR}/libgcc.a" ]; then
-        ln -sf /usr/aarch64-linux-musl/lib/libgcc.a "${MUSL_LIB_DIR}/libgcc.a"
-        ln -sf /usr/aarch64-linux-musl/lib/libgcc_eh.a "${MUSL_LIB_DIR}/libgcc_eh.a"
-        ln -sf /usr/aarch64-linux-musl/lib/libssp_nonshared.a "${MUSL_LIB_DIR}/libssp_nonshared.a"
-        log_info "Created libgcc symlinks in sysroot"
-    else
-        log_info "libgcc symlinks already exist in sysroot"
-    fi
-
-    # Verify symlinks were created
-    if [ -L "${MUSL_LIB_DIR}/libgcc.a" ]; then
-        log_info "Verified: ${MUSL_LIB_DIR}/libgcc.a exists"
-    else
-        log_error "Failed to create ${MUSL_LIB_DIR}/libgcc.a"
-    fi
+    # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
+    # clang automatically uses compiler-rt builtins for 128-bit float operations
 
     # Use simple -static flag and let toolchain handle linking
-    # libgcc.a (symlink to compiler-rt builtins) is in /usr/aarch64-linux-musl/lib
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -L/usr/aarch64-linux-musl/lib -L${BUSYBOX_BUILD_DIR} -L${MUSL_LIB_DIR}"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -344,8 +323,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
     log_info "Stack protector disabled for ARM64 clang compatibility"
-    log_info "Created empty GCC CRT placeholders: crtbeginT.o, crtend.o"
-    log_info "libgcc.a linked into sysroot: ${MUSL_LIB_DIR}/libgcc.a -> /usr/aarch64-linux-musl/lib/libgcc.a"
+    log_info "Using -rtlib=compiler-rt (clang uses compiler-rt builtins directly)"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
