@@ -72,11 +72,59 @@ if [ ! -d "$BUSYBOX_SRC_DIR" ]; then
     exit 1
 fi
 
-# Check if musl is built
-if [ ! -d "$MUSL_INSTALL_DIR" ]; then
-    log_error "musl libc installation not found: $MUSL_INSTALL_DIR"
-    log_error "Please run build-musl.sh first"
-    exit 1
+# Check if musl is built, auto-build if necessary
+# Determine musl arch (aarch64 vs arm64)
+MUSL_ARCH="$ARCH"
+if [ "$ARCH" = "arm64" ]; then
+    MUSL_ARCH="aarch64"
+fi
+
+# Try both naming conventions and both lib paths (lib/ and usr/lib/)
+MUSL_CHECK_PATHS=(
+    "${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    "${MUSL_INSTALL_DIR}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${MUSL_ARCH}/usr/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${MUSL_ARCH}/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${ARCH}/usr/lib/libc.a"
+    "${BUILD_DIR}/musl-install-${ARCH}/lib/libc.a"
+)
+
+MUSL_FOUND=false
+MUSL_LIBC_PATH=""
+for musl_path in "${MUSL_CHECK_PATHS[@]}"; do
+    if [ -f "$musl_path" ]; then
+        MUSL_INSTALL_DIR="$(dirname "$(dirname "$musl_path")")"
+        MUSL_LIBC_PATH="$musl_path"
+        export MUSL_INSTALL_DIR
+        log_info "Found musl libc at: $musl_path"
+        MUSL_FOUND=true
+        break
+    fi
+done
+
+if [ "$MUSL_FOUND" = false ]; then
+    log_warning "musl libc not found, building automatically..."
+    log_info "Downloading musl libc..."
+    bash "${SCRIPT_DIR}/download-musl.sh" || {
+        log_error "Failed to download musl libc"
+        exit 1
+    }
+    log_info "Building musl libc for ${MUSL_ARCH}..."
+    ARCH=$MUSL_ARCH bash "${SCRIPT_DIR}/build-musl.sh" || {
+        log_error "Failed to build musl libc"
+        exit 1
+    }
+    # Set the install directory and libc path
+    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
+    export MUSL_INSTALL_DIR
+    # Try both possible libc.a locations
+    if [ -f "${MUSL_INSTALL_DIR}/usr/lib/libc.a" ]; then
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    else
+        MUSL_LIBC_PATH="${MUSL_INSTALL_DIR}/lib/libc.a"
+    fi
+    log_success "musl libc built successfully at: ${MUSL_INSTALL_DIR}"
+    log_info "musl libc.a path: ${MUSL_LIBC_PATH}"
 fi
 
 # Apply patches for musl libc compatibility (if any)
@@ -184,10 +232,16 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
     # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
-    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os\"|" .config
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fno-stack-protector\"|" .config
+    # Add EXTRA_LDFLAGS - use lld linker only (no -nodefaultlibs, let toolchain handle linking)
+    sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld\"|" .config
+    # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
+    sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
     # Disable PIE for static builds (PIE + static is not compatible)
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
     log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
+    log_info "Using -fuse-ld=lld with empty crtbeginT.o/crtend.o placeholders"
+    log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -198,18 +252,36 @@ fi
 install_prefix="${BUSYBOX_INSTALL_DIR}"
 sed -i "s|CONFIG_PREFIX=.*|CONFIG_PREFIX=\"${install_prefix}\"|" .config
 
+# Ensure static linking is enabled
+log_info "Ensuring static linking configuration..."
+sed -i "s|# CONFIG_STATIC is not set|CONFIG_STATIC=y|" .config
+sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
+
 # Apply oldconfig with automatic default answers (non-interactive)
 log_info "Resolving configuration dependencies..."
 # Use 'yes ""' to automatically answer with default for all prompts
 # This handles BusyBox versions that don't have olddefconfig
 yes "" | make oldconfig > /dev/null 2>&1 || true
 
-# Re-apply ARM64-specific settings after oldconfig (oldconfig may reset some values)
+# Re-apply critical settings after oldconfig (oldconfig may reset some values)
+sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    sed -i "s|CONFIG_STATIC_LIBGCC=.*|CONFIG_STATIC_LIBGCC=n|" .config
-    log_info "Re-applied ARM64 settings after oldconfig (PIE=n, STATIC_LIBGCC=n)"
+    # Disable STATIC_LIBGCC for clang compatibility (avoid -lgcc, -lgcc_eh, crtbeginT.o)
+    sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
+    # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl includes these in libc.a)
+    sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
+    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
+else
+    log_info "Re-applied settings after oldconfig (STATIC=y)"
 fi
+
+# Verify CONFIG_STATIC is set
+if ! grep -q "^CONFIG_STATIC=y" .config; then
+    log_error "Failed to enable CONFIG_STATIC in BusyBox configuration"
+    exit 1
+fi
+log_success "CONFIG_STATIC=y verified"
 
 # Build BusyBox
 log_info "Building BusyBox..."
@@ -219,13 +291,47 @@ log_info "This may take several minutes..."
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64 LLVM/Clang: avoid stack protector (needs libssp_nonshared)
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2"
-    # Use -nostdlib to avoid GCC runtime libraries (libgcc, libgcc_eh)
-    # Then manually specify musl's libc.a instead of relying on default linking
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -nostdlib"
-    # Add musl's C library and required CRT files
-    export LIBS="${MUSL_INSTALL_DIR}/usr/lib/libc.a"
+    # For ARM64: Use static linking with explicit musl libc
+    # Disable stack protector to avoid libssp_nonshared dependency with clang
+    # Use -nodefaultlibs (set in CONFIG_EXTRA_LDFLAGS) and manually add libc
+
+    # Determine musl include path
+    if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/usr/include"
+    else
+        MUSL_INCLUDE_DIR="${MUSL_INSTALL_DIR}/include"
+    fi
+
+    # Determine musl lib path for CRT files
+    if [ -d "${MUSL_INSTALL_DIR}/usr/lib" ]; then
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/usr/lib"
+    else
+        MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
+    fi
+
+    export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
+
+    # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
+    # clang automatically uses compiler-rt builtins for 128-bit float operations
+
+    # Copy GCC compatibility files from /usr/aarch64-linux-musl/lib to sysroot
+    # With --sysroot, clang only searches inside sysroot for CRT files
+    if [ ! -f "${MUSL_LIB_DIR}/crtbeginT.o" ]; then
+        cp /usr/aarch64-linux-musl/lib/crtbeginT.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        cp /usr/aarch64-linux-musl/lib/crtend.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        cp /usr/aarch64-linux-musl/lib/libssp_nonshared.a "${MUSL_LIB_DIR}/" 2>/dev/null || true
+        log_info "Copied GCC compatibility files to sysroot"
+    fi
+
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+
+    # Log musl location (already verified above)
+    log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
+    log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
+    log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
+    log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
+    log_info "Stack protector disabled for ARM64 clang compatibility"
+    log_info "Using -rtlib=compiler-rt (clang uses compiler-rt builtins directly)"
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
@@ -238,8 +344,21 @@ log_info "CFLAGS: ${CFLAGS}"
 log_info "LDFLAGS: ${LDFLAGS}"
 
 # Build with verbose output
+# For ARM64: explicitly set LDLIBS="" to prevent -lm -lresolv
+BUILD_FAILED=false
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # Try to override LDLIBS by setting it empty both in environment and make parameter
+    export LDLIBS=""
+    if ! make -j"$(nproc)" SKIP_STRIP=y LDLIBS="" 2>&1 | tee /tmp/busybox-build.log; then
+        BUILD_FAILED=true
+    fi
+else
+    if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
+        BUILD_FAILED=true
+    fi
+fi
 
-if ! make -j"$(nproc)" SKIP_STRIP=y 2>&1 | tee /tmp/busybox-build.log; then
+if [ "$BUILD_FAILED" = true ]; then
     log_error "BusyBox build failed"
     log_error "Last 50 lines of build output:"
     tail -50 /tmp/busybox-build.log >&2

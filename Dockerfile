@@ -134,13 +134,14 @@ WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
 # ARM64ターゲット用のGCCラッパースクリプトとツールチェインを作成
-# musl-clangアプローチ: シンプルにターゲットとリンカのみ指定
+# musl-clangアプローチ: シンプルな構成
 # -fuse-ld=lld: LLVMリンカを使用
+# -rtlib=compiler-rt: libgccではなくcompiler-rtを使用（-lgccを回避）
+# --unwindlib=none: libgcc_sのunwind機能を使わない（muslに内包）
 # Clangは--target=aarch64-linux-muslから自動的にmuslの規約を理解する
-# 追加のrtlib/unwindlib指定は不要（muslが完全なC標準ライブラリを提供）
-RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
+RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt --unwindlib=none -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-gcc && \
     chmod +x /usr/bin/aarch64-linux-musl-gcc && \
-    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
+    printf '#!/bin/sh\nexec clang++ --target=aarch64-linux-musl -fuse-ld=lld -rtlib=compiler-rt --unwindlib=none -L/usr/aarch64-linux-musl/lib -I/usr/aarch64-linux-musl/include "$@"\n' > /usr/bin/aarch64-linux-musl-g++ && \
     chmod +x /usr/bin/aarch64-linux-musl-g++ && \
     printf '#!/bin/sh\nexec ld.lld "$@"\n' > /usr/bin/aarch64-linux-musl-ld && \
     chmod +x /usr/bin/aarch64-linux-musl-ld && \
@@ -152,6 +153,34 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -L/us
     ln -sf /usr/bin/llvm-nm /usr/bin/aarch64-linux-musl-nm && \
     ln -sf /usr/bin/llvm-objcopy /usr/bin/aarch64-linux-musl-objcopy && \
     ln -sf /usr/bin/llvm-objdump /usr/bin/aarch64-linux-musl-objdump
+
+# Create empty GCC compatibility files that clang may still request
+# Even with -rtlib=compiler-rt, clang may still look for these files
+RUN cd /usr/aarch64-linux-musl/lib && \
+    touch crtbeginT.o crtend.o && \
+    ar crs libssp_nonshared.a && \
+    echo "Created GCC compatibility files:" && \
+    ls -lh crtbeginT.o crtend.o libssp_nonshared.a
+
+# Download ARM64 compiler-rt from Alpine repository
+# Alpine only installs native arch compiler-rt, so we need to get ARM64 version manually
+RUN mkdir -p /tmp/compiler-rt-arm64
+WORKDIR /tmp/compiler-rt-arm64
+RUN wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/compiler-rt-21.1.2-r0.apk && \
+    tar xzf compiler-rt-21.1.2-r0.apk && \
+    mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl && \
+    cp -r usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/* /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/
+WORKDIR /
+RUN rm -rf /tmp/compiler-rt-arm64
+
+# Create symlink with correct triple name for compiler-rt builtins
+# clang looks for aarch64-unknown-linux-musl but Alpine provides aarch64-alpine-linux-musl
+RUN mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl && \
+    ln -sf ../aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a \
+           /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a && \
+    echo "Created compiler-rt builtins symlink:" && \
+    ls -lh /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a && \
+    readlink -f /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
