@@ -100,11 +100,12 @@ jobs:
         run: |
           # Build using Docker compose with correct environment variables
           # Note: ARCH (not TARGET_ARCH) is used by build scripts
+          # Working directory in container is /build/kimigayo/build-system
           docker compose run --rm \
             -e ARCH=${{ matrix.arch }} \
             -e IMAGE_TYPE=${{ matrix.variant }} \
             kimigayo-build \
-            bash scripts/build-rootfs.sh
+            bash ../scripts/build-rootfs.sh
 
           # Verify build output exists
           echo "=== Contents of build/rootfs ==="
