@@ -98,12 +98,13 @@ jobs:
 
       - name: Build Kimigayo OS rootfs
         run: |
-          # Build using Docker compose (same as CI/manual-build)
+          # Build using Docker compose with correct environment variables
+          # Note: ARCH (not TARGET_ARCH) is used by build scripts
           docker compose run --rm \
-            -e TARGET_ARCH=${{ matrix.arch }} \
+            -e ARCH=${{ matrix.arch }} \
             -e IMAGE_TYPE=${{ matrix.variant }} \
             kimigayo-build \
-            make build TARGET_ARCH=${{ matrix.arch }}
+            bash scripts/build-rootfs.sh
 
           # Verify build output exists
           echo "=== Contents of build/rootfs ==="
