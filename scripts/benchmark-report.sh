@@ -42,12 +42,22 @@ LATEST_COMPARISON=$(ls -t "$INPUT_DIR"/comparison_*.json 2>/dev/null | head -1)
 if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
     echo "### 💾 ディスクサイズ" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
-    echo "| イメージ | サイズ(MB) |" >> "$OUTPUT_FILE"
-    echo "|----------|------------|" >> "$OUTPUT_FILE"
+    echo "| イメージ | サイズ |" >> "$OUTPUT_FILE"
+    echo "|----------|--------|" >> "$OUTPUT_FILE"
 
     # JSONから結果を抽出（jqがあれば使用、なければgrepとsed）
     if command -v jq > /dev/null 2>&1; then
-        jq -r '.results | to_entries | .[] | "| \(.key) | \(.value.size_mb)MB |"' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE"
+        # Kimigayo OSはKB単位で詳細表示、他はMB単位
+        jq -r '.results | to_entries | .[] |
+            if (.key | contains("Kimigayo")) then
+                if .value.size_kb then
+                    "| \(.key) | \(.value.size_kb)KB (\(.value.size_mb)MB) |"
+                else
+                    "| \(.key) | \(.value.size_mb * 1024 | floor)KB (\(.value.size_mb)MB) |"
+                end
+            else
+                "| \(.key) | \(.value.size_mb)MB |"
+            end' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE"
 
         # OS間比較データから追加のサイズ情報を抽出
         if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then

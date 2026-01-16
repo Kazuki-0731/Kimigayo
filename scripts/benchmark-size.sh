@@ -65,11 +65,12 @@ for entry in "${VALID_IMAGES[@]}"; do
     name="${entry%%:*}"
     image="${entry#*:}"
 
-    # サイズを取得（MB単位）
+    # サイズを取得（MB単位とKB単位）
     size_bytes=$(docker image inspect "$image" --format='{{.Size}}' 2>/dev/null || echo "0")
     size_mb=$((size_bytes / 1024 / 1024))
+    size_kb=$((size_bytes / 1024))
 
-    echo "$size_mb:$name:$image" >> "$tmpfile"
+    echo "$size_mb:$size_kb:$name:$image" >> "$tmpfile"
 
     # 最大名前長を記録（表示整形用）
     name_len=${#name}
@@ -92,7 +93,7 @@ printf "%s\n" "$(printf '=%.0s' {1..50})"
 # Kimigayo Minimalのサイズを基準として取得
 kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
 
-while IFS=: read -r size name image _unused; do
+while IFS=: read -r size size_kb name image _unused; do
     # 比較率を計算
     if [ "$name" = "Kimigayo Minimal" ]; then
         comparison="(基準)"
@@ -116,7 +117,7 @@ echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," >> "$OUTPUT_FILE"
 echo '  "results": {' >> "$OUTPUT_FILE"
 
 first=true
-while IFS=: read -r size name image; do
+while IFS=: read -r size size_kb name image; do
     if [ "$first" = true ]; then
         first=false
     else
@@ -125,7 +126,7 @@ while IFS=: read -r size name image; do
 
     # JSON用にエスケープ
     json_name=$(echo "$name" | sed 's/"/\\"/g')
-    echo -n "    \"$json_name\": {\"size_mb\": $size, \"image\": \"$image\"}" >> "$OUTPUT_FILE"
+    echo -n "    \"$json_name\": {\"size_mb\": $size, \"size_kb\": $size_kb, \"image\": \"$image\"}" >> "$OUTPUT_FILE"
 done < "${tmpfile}.sorted"
 
 echo "" >> "$OUTPUT_FILE"
@@ -136,7 +137,7 @@ echo -e "${GREEN}✓ 結果を $OUTPUT_FILE に保存しました${NC}"
 
 # CI環境の場合は環境変数にも出力
 if [ -n "$GITHUB_OUTPUT" ]; then
-    while IFS=: read -r size name image; do
+    while IFS=: read -r size size_kb name image; do
         case "$name" in
             "Kimigayo Minimal")
                 echo "kimigayo_minimal_size_mb=$size" >> "$GITHUB_OUTPUT"
