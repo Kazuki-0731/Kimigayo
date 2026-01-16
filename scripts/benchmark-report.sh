@@ -87,28 +87,45 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
     echo "### ⚡ 起動時間" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
-    # OS間比較データから起動時間を抽出
-    if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq > /dev/null 2>&1; then
+    # ディスクサイズと同じ順序でOS起動時間を表示
+    if command -v jq > /dev/null 2>&1; then
         echo "| イメージ | 起動時間 |" >> "$OUTPUT_FILE"
         echo "|----------|---------|" >> "$OUTPUT_FILE"
 
-        # 比較データから起動時間を抽出（0とN/Aは除外、短い順にソート）
-        jq -r '.results | to_entries |
-            map(select(.value.startup_ms != 0 and .value.startup_ms != "N/A")) |
-            sort_by(.value.startup_ms | if type == "number" then . else 999999 end) |
-            .[] |
-            if (.key | contains("kimigayo")) then "| Kimigayo Standard | \(.value.startup_ms)ms |"
-            elif (.key | contains("alpine")) then "| Alpine Latest | \(.value.startup_ms)ms |"
-            elif (.key | contains("ubuntu")) then "| Ubuntu 22.04 | \(.value.startup_ms)ms |"
-            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        # benchmark-size.jsonから全OSをリスト化し、比較データとマージ
+        jq -r --slurpfile comparison <(cat "$LATEST_COMPARISON" 2>/dev/null || echo '{"results":{}}') \
+            '.results | to_entries | .[] |
+            .os_name = .key |
+            # 比較データから対応するOSの起動時間を検索
+            .startup = (
+                if (.key | contains("Kimigayo")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.startup_ms)
+                elif (.key | contains("Alpine Latest")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.startup_ms)
+                elif (.key | contains("Alpine 3.19")) then "測定未実施"
+                elif (.key | contains("Ubuntu")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.startup_ms)
+                elif (.key | contains("Debian")) then "測定未実施"
+                elif (.key | contains("BusyBox")) then "測定未実施"
+                else "測定未実施"
+                end
+            ) |
+            if .startup == "N/A" or .startup == -1 then
+                "| \(.os_name) | N/A (実行可能ファイル無し) |"
+            elif (.startup | type) == "number" then
+                "| \(.os_name) | \(.startup)ms |"
+            else
+                "| \(.os_name) | \(.startup) |"
+            end' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE" 2>/dev/null
 
-        # Distroless（N/A）を追加
-        jq -r '.results | to_entries |
-            map(select(.value.startup_ms == "N/A" or .value.startup_ms == 0 or .value.startup_ms == -1)) |
-            .[] |
-            if (.key | contains("distroless/base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
-            elif (.key | contains("distroless/static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
-            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        # Distroless（比較データにのみ存在）を追加
+        if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
+            jq -r '.results | to_entries[] |
+                select(.key | contains("distroless")) |
+                if (.key | contains("base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
+                elif (.key | contains("static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
+                else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        fi
 
         echo "" >> "$OUTPUT_FILE"
     fi
@@ -145,28 +162,45 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
     echo "### 💾 メモリ使用量" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
-    # OS間比較データからメモリ使用量を抽出
-    if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq > /dev/null 2>&1; then
+    # ディスクサイズと同じ順序でOSメモリ使用量を表示
+    if command -v jq > /dev/null 2>&1; then
         echo "| イメージ | メモリ使用量 |" >> "$OUTPUT_FILE"
         echo "|----------|------------|" >> "$OUTPUT_FILE"
 
-        # 比較データからメモリ使用量を抽出（0とN/Aは除外、少ない順にソート）
-        jq -r '.results | to_entries |
-            map(select(.value.memory_mb != 0 and .value.memory_mb != "N/A")) |
-            sort_by(.value.memory_mb | if type == "number" then . else 999999 end) |
-            .[] |
-            if (.key | contains("kimigayo")) then "| Kimigayo Standard | \(.value.memory_mb)MB |"
-            elif (.key | contains("alpine")) then "| Alpine Latest | \(.value.memory_mb)MB |"
-            elif (.key | contains("ubuntu")) then "| Ubuntu 22.04 | \(.value.memory_mb)MB |"
-            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        # benchmark-size.jsonから全OSをリスト化し、比較データとマージ
+        jq -r --slurpfile comparison <(cat "$LATEST_COMPARISON" 2>/dev/null || echo '{"results":{}}') \
+            '.results | to_entries | .[] |
+            .os_name = .key |
+            # 比較データから対応するOSのメモリ使用量を検索
+            .memory = (
+                if (.key | contains("Kimigayo")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.memory_mb)
+                elif (.key | contains("Alpine Latest")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.memory_mb)
+                elif (.key | contains("Alpine 3.19")) then "測定未実施"
+                elif (.key | contains("Ubuntu")) then
+                    ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.memory_mb)
+                elif (.key | contains("Debian")) then "測定未実施"
+                elif (.key | contains("BusyBox")) then "測定未実施"
+                else "測定未実施"
+                end
+            ) |
+            if .memory == "N/A" or .memory == -1 then
+                "| \(.os_name) | N/A (実行可能ファイル無し) |"
+            elif (.memory | type) == "number" then
+                "| \(.os_name) | \(.memory)MB |"
+            else
+                "| \(.os_name) | \(.memory) |"
+            end' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE" 2>/dev/null
 
-        # Distroless（N/A）を追加
-        jq -r '.results | to_entries |
-            map(select(.value.memory_mb == "N/A" or .value.memory_mb == 0 or .value.memory_mb == -1)) |
-            .[] |
-            if (.key | contains("distroless/base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
-            elif (.key | contains("distroless/static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
-            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        # Distroless（比較データにのみ存在）を追加
+        if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
+            jq -r '.results | to_entries[] |
+                select(.key | contains("distroless")) |
+                if (.key | contains("base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
+                elif (.key | contains("static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
+                else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        fi
 
         echo "" >> "$OUTPUT_FILE"
     fi
