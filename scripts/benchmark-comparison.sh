@@ -28,8 +28,10 @@ JSON_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.json"
 MD_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.md"
 
 # Images to compare
+# Use explicit version tags for Kimigayo OS
+KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-2.0.1}"
 IMAGES=(
-    "ishinokazuki/kimigayo-os:latest-standard"
+    "ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-arm64"
     "alpine:latest"
     "gcr.io/distroless/base-debian12:latest"
     "gcr.io/distroless/static-debian12:latest"
@@ -128,34 +130,33 @@ for image in "${IMAGES[@]}"; do
 
     for i in $(seq 1 "$ITERATIONS"); do
         start=$(date +%s%N)
+        execution_success=false
 
         # Try different execution methods for different images
         # 1. Standard shell (Alpine, Ubuntu, Kimigayo)
-        # 2. Distroless: no shell, use sleep or pause directly
         if docker run --rm "$image" /bin/sh -c "exit 0" > /dev/null 2>&1; then
-            end=$(date +%s%N)
-            successful_runs=$((successful_runs + 1))
+            execution_success=true
         elif docker run --rm "$image" sh -c "exit 0" > /dev/null 2>&1; then
-            end=$(date +%s%N)
-            successful_runs=$((successful_runs + 1))
+            execution_success=true
         elif docker run --rm "$image" /busybox/sh -c "exit 0" > /dev/null 2>&1; then
-            end=$(date +%s%N)
-            successful_runs=$((successful_runs + 1))
-        # Distroless images: try sleep directly (no shell)
+            execution_success=true
+        # 2. Distroless images: try sleep directly (no shell)
         elif docker run --rm "$image" sleep 0.001 > /dev/null 2>&1; then
-            end=$(date +%s%N)
-            successful_runs=$((successful_runs + 1))
-        # Distroless static: may have /pause binary
-        elif docker run --rm "$image" /pause > /dev/null 2>&1 & sleep 0.1 && docker ps -q | xargs -r docker stop > /dev/null 2>&1; then
-            end=$(date +%s%N)
-            successful_runs=$((successful_runs + 1))
-        else
-            log_warning "  Iteration $i: failed to execute"
-            continue
+            execution_success=true
+        # 3. Try with timeout (for images that need SIGTERM)
+        elif timeout 1 docker run --rm "$image" tail -f /dev/null > /dev/null 2>&1; then
+            execution_success=true
         fi
 
-        elapsed=$((($end - $start) / 1000000)) # Convert to milliseconds
-        total_time=$((total_time + elapsed))
+        end=$(date +%s%N)
+
+        if [ "$execution_success" = true ]; then
+            successful_runs=$((successful_runs + 1))
+            elapsed=$((($end - $start) / 1000000)) # Convert to milliseconds
+            total_time=$((total_time + elapsed))
+        else
+            log_warning "  Iteration $i: failed to execute"
+        fi
     done
 
     if [ "$successful_runs" -gt 0 ]; then
@@ -211,6 +212,14 @@ for image in "${IMAGES[@]}"; do
 
     sleep 2
 
+    # Verify container is still running
+    if ! docker ps --filter "name=$container_id" --format "{{.Names}}" | grep -q "$container_id"; then
+        log_warning "$image: container stopped unexpectedly"
+        memory_usage["$image"]=0
+        docker rm -f "$container_id" > /dev/null 2>&1 || true
+        continue
+    fi
+
     # Get memory usage in MB
     mem_raw=$(docker stats --no-stream --format "{{.MemUsage}}" "$container_id" 2>/dev/null | awk '{print $1}')
 
@@ -230,7 +239,11 @@ for image in "${IMAGES[@]}"; do
                 mem_mb=$(echo "scale=2; $mem_value * 1024" | bc)
                 ;;
         esac
+    elif [[ "$mem_raw" =~ ^([0-9.]+)MiB$ ]]; then
+        # Alternative format without unit letter
+        mem_mb="${BASH_REMATCH[1]}"
     else
+        log_warning "$image: unable to parse memory usage: $mem_raw"
         mem_mb="0"
     fi
 
