@@ -64,7 +64,11 @@ if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
             jq -r '.results | to_entries |
                 map(select(.key | contains("distroless"))) |
                 .[] |
-                if (.key | contains("static")) then "| Distroless Static | \(.value.size_mb)MB |"
+                # Distroless Staticは1MBなのでKB単位で表示
+                if (.key | contains("static")) then
+                    if .value.size_mb == 1 then "| Distroless Static | \(.value.size_mb * 1024)KB (\(.value.size_mb)MB) |"
+                    else "| Distroless Static | \(.value.size_mb)MB |"
+                    end
                 elif (.key | contains("base")) then "| Distroless Base | \(.value.size_mb)MB |"
                 else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || true
         fi
