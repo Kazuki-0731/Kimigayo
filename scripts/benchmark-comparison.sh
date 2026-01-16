@@ -128,6 +128,13 @@ for image in "${IMAGES[@]}"; do
     total_time=0
     successful_runs=0
 
+    # Check if this is a Distroless image (no executables)
+    if [[ "$image" == *"distroless"* ]]; then
+        log_warning "$image: Skipped (Distroless images have no executables for testing)"
+        startup_times["$image"]=-1  # -1 indicates N/A
+        continue
+    fi
+
     for i in $(seq 1 "$ITERATIONS"); do
         start=$(date +%s%N)
         execution_success=false
@@ -139,12 +146,6 @@ for image in "${IMAGES[@]}"; do
         elif docker run --rm "$image" sh -c "exit 0" > /dev/null 2>&1; then
             execution_success=true
         elif docker run --rm "$image" /busybox/sh -c "exit 0" > /dev/null 2>&1; then
-            execution_success=true
-        # 2. Distroless images: try sleep directly (no shell)
-        elif docker run --rm "$image" sleep 0.001 > /dev/null 2>&1; then
-            execution_success=true
-        # 3. Try with timeout (for images that need SIGTERM)
-        elif timeout 1 docker run --rm "$image" tail -f /dev/null > /dev/null 2>&1; then
             execution_success=true
         fi
 
@@ -181,6 +182,13 @@ for image in "${IMAGES[@]}"; do
         continue
     fi
 
+    # Check if this is a Distroless image (no executables)
+    if [[ "$image" == *"distroless"* ]]; then
+        log_warning "$image: Skipped (Distroless images have no executables for testing)"
+        memory_usage["$image"]=-1  # -1 indicates N/A
+        continue
+    fi
+
     log_info "Testing $image..."
 
     # Run container in background
@@ -188,19 +196,12 @@ for image in "${IMAGES[@]}"; do
     container_id="bench-mem-$$"
     started=false
 
-    # Standard images with shell
+    # Standard images with shell - try different sleep paths
     if docker run -d --name "$container_id" "$image" sleep 60 > /dev/null 2>&1; then
         started=true
-    # BusyBox path
     elif docker run -d --name "$container_id" "$image" /bin/sleep 60 > /dev/null 2>&1; then
         started=true
     elif docker run -d --name "$container_id" "$image" /busybox/sleep 60 > /dev/null 2>&1; then
-        started=true
-    # Distroless: use tail -f /dev/null (keeps container running)
-    elif docker run -d --name "$container_id" "$image" tail -f /dev/null > /dev/null 2>&1; then
-        started=true
-    # Distroless static: use /pause if available
-    elif docker run -d --name "$container_id" "$image" /pause > /dev/null 2>&1; then
         started=true
     fi
 
@@ -247,7 +248,8 @@ for image in "${IMAGES[@]}"; do
         mem_mb="0"
     fi
 
-    memory_usage["$image"]=$(printf "%.0f" "$mem_mb" 2>/dev/null || echo "0")
+    # Round to 1 decimal place to avoid losing small values
+    memory_usage["$image"]=$(printf "%.1f" "$mem_mb" 2>/dev/null || echo "0")
 
     docker rm -f "$container_id" > /dev/null 2>&1
 
@@ -322,12 +324,22 @@ for image in "${IMAGES[@]}"; do
     fi
     first=false
 
+    # Convert -1 to "N/A" for JSON output
+    startup_val="${startup_times[$image]:-0}"
+    memory_val="${memory_usage[$image]:-0}"
+    if [ "$startup_val" = "-1" ]; then
+        startup_val="\"N/A\""
+    fi
+    if [ "$memory_val" = "-1" ]; then
+        memory_val="\"N/A\""
+    fi
+
     cat >> "$JSON_FILE" <<EOF
     "$image": {
       "type": "${image_type[$image]:-N/A}",
       "size_mb": ${image_sizes[$image]:-0},
-      "startup_ms": ${startup_times[$image]:-0},
-      "memory_mb": ${memory_usage[$image]:-0},
+      "startup_ms": $startup_val,
+      "memory_mb": $memory_val,
       "has_shell": "${has_shell[$image]:-N/A}",
       "has_pkg_manager": "${has_pkg_manager[$image]:-N/A}"
     }
@@ -357,7 +369,16 @@ cat > "$MD_FILE" <<EOF
 EOF
 
 for image in "${IMAGES[@]}"; do
-    echo "| $image | ${image_type[$image]:-N/A} | ${image_sizes[$image]:-0} | ${startup_times[$image]:-0} | ${memory_usage[$image]:-0} | ${has_shell[$image]:-N/A} | ${has_pkg_manager[$image]:-N/A} |" >> "$MD_FILE"
+    # Convert -1 to N/A for display
+    startup_display="${startup_times[$image]:-0}"
+    memory_display="${memory_usage[$image]:-0}"
+    if [ "$startup_display" = "-1" ]; then
+        startup_display="N/A"
+    fi
+    if [ "$memory_display" = "-1" ]; then
+        memory_display="N/A"
+    fi
+    echo "| $image | ${image_type[$image]:-N/A} | ${image_sizes[$image]:-0} | $startup_display | $memory_display | ${has_shell[$image]:-N/A} | ${has_pkg_manager[$image]:-N/A} |" >> "$MD_FILE"
 done
 
 cat >> "$MD_FILE" <<EOF
@@ -365,8 +386,8 @@ cat >> "$MD_FILE" <<EOF
 ## Summary
 
 - **Smallest image**: $(for img in "${IMAGES[@]}"; do echo "${image_sizes[$img]:-999999} $img"; done | sort -n | head -1 | awk '{print $2}')
-- **Fastest startup**: $(for img in "${IMAGES[@]}"; do if [ "${startup_times[$img]:-0}" -gt 0 ]; then echo "${startup_times[$img]} $img"; fi; done | sort -n | head -1 | awk '{print $2}')
-- **Lowest memory**: $(for img in "${IMAGES[@]}"; do if [ "${memory_usage[$img]:-0}" -gt 0 ]; then echo "${memory_usage[$img]} $img"; fi; done | sort -n | head -1 | awk '{print $2}')
+- **Fastest startup**: $(for img in "${IMAGES[@]}"; do val="${startup_times[$img]:-0}"; if [ "$val" != "-1" ] && [ "$val" != "0" ]; then echo "$val $img"; fi; done | sort -n | head -1 | awk '{print $2}')
+- **Lowest memory**: $(for img in "${IMAGES[@]}"; do val="${memory_usage[$img]:-0}"; if [ "$val" != "-1" ] && awk "BEGIN {exit !($val > 0)}"; then echo "$val $img"; fi; done | sort -n | head -1 | awk '{print $2}')
 
 ## Notes
 
