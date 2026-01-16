@@ -31,7 +31,8 @@ MD_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.md"
 IMAGES=(
     "ishinokazuki/kimigayo-os:latest-standard"
     "alpine:latest"
-    "gcr.io/distroless/base-debian12"
+    "gcr.io/distroless/base-debian12:latest"
+    "gcr.io/distroless/static-debian12:latest"
     "ubuntu:22.04"
 )
 
@@ -128,8 +129,9 @@ for image in "${IMAGES[@]}"; do
     for i in $(seq 1 "$ITERATIONS"); do
         start=$(date +%s%N)
 
-        # Try different shell paths for different images
-        # Fallback to sleep if shell is not available (e.g., issue #53)
+        # Try different execution methods for different images
+        # 1. Standard shell (Alpine, Ubuntu, Kimigayo)
+        # 2. Distroless: no shell, use sleep or pause directly
         if docker run --rm "$image" /bin/sh -c "exit 0" > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
@@ -139,7 +141,12 @@ for image in "${IMAGES[@]}"; do
         elif docker run --rm "$image" /busybox/sh -c "exit 0" > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
+        # Distroless images: try sleep directly (no shell)
         elif docker run --rm "$image" sleep 0.001 > /dev/null 2>&1; then
+            end=$(date +%s%N)
+            successful_runs=$((successful_runs + 1))
+        # Distroless static: may have /pause binary
+        elif docker run --rm "$image" /pause > /dev/null 2>&1 & sleep 0.1 && docker ps -q | xargs -r docker stop > /dev/null 2>&1; then
             end=$(date +%s%N)
             successful_runs=$((successful_runs + 1))
         else
@@ -176,14 +183,27 @@ for image in "${IMAGES[@]}"; do
     log_info "Testing $image..."
 
     # Run container in background
-    container_id=""
-    if docker run -d --name "bench-mem-$$" "$image" sleep 60 > /dev/null 2>&1; then
-        container_id="bench-mem-$$"
-    elif docker run -d --name "bench-mem-$$" "$image" /bin/sleep 60 > /dev/null 2>&1; then
-        container_id="bench-mem-$$"
-    elif docker run -d --name "bench-mem-$$" "$image" /busybox/sleep 60 > /dev/null 2>&1; then
-        container_id="bench-mem-$$"
-    else
+    # Try different methods depending on image type
+    container_id="bench-mem-$$"
+    started=false
+
+    # Standard images with shell
+    if docker run -d --name "$container_id" "$image" sleep 60 > /dev/null 2>&1; then
+        started=true
+    # BusyBox path
+    elif docker run -d --name "$container_id" "$image" /bin/sleep 60 > /dev/null 2>&1; then
+        started=true
+    elif docker run -d --name "$container_id" "$image" /busybox/sleep 60 > /dev/null 2>&1; then
+        started=true
+    # Distroless: use tail -f /dev/null (keeps container running)
+    elif docker run -d --name "$container_id" "$image" tail -f /dev/null > /dev/null 2>&1; then
+        started=true
+    # Distroless static: use /pause if available
+    elif docker run -d --name "$container_id" "$image" /pause > /dev/null 2>&1; then
+        started=true
+    fi
+
+    if [ "$started" = false ]; then
         log_warning "$image: failed to start container"
         memory_usage["$image"]=0
         continue
@@ -226,16 +246,33 @@ echo ""
 log_info "=== Feature Comparison ==="
 declare -A has_shell
 declare -A has_pkg_manager
+declare -A image_type
 
 for image in "${IMAGES[@]}"; do
     if ! docker image inspect "$image" > /dev/null 2>&1; then
         has_shell["$image"]="N/A"
         has_pkg_manager["$image"]="N/A"
+        image_type["$image"]="N/A"
         continue
+    fi
+
+    # Determine image type
+    if [[ "$image" == *"distroless"* ]]; then
+        image_type["$image"]="Distroless"
+    elif [[ "$image" == *"alpine"* ]]; then
+        image_type["$image"]="Alpine"
+    elif [[ "$image" == *"ubuntu"* ]]; then
+        image_type["$image"]="Ubuntu"
+    elif [[ "$image" == *"kimigayo"* ]]; then
+        image_type["$image"]="Kimigayo"
+    else
+        image_type["$image"]="Other"
     fi
 
     # Check shell availability
     if docker run --rm "$image" /bin/sh -c "exit 0" > /dev/null 2>&1; then
+        has_shell["$image"]="✅"
+    elif docker run --rm "$image" sh -c "exit 0" > /dev/null 2>&1; then
         has_shell["$image"]="✅"
     else
         has_shell["$image"]="❌"
@@ -243,14 +280,16 @@ for image in "${IMAGES[@]}"; do
 
     # Check package manager
     pkg_mgr="❌"
-    if docker run --rm "$image" /bin/sh -c "which apk" > /dev/null 2>&1; then
-        pkg_mgr="✅ (apk)"
-    elif docker run --rm "$image" /bin/sh -c "which apt" > /dev/null 2>&1; then
-        pkg_mgr="✅ (apt)"
+    if [ "${has_shell[$image]}" = "✅" ]; then
+        if docker run --rm "$image" /bin/sh -c "which apk" > /dev/null 2>&1; then
+            pkg_mgr="✅ (apk)"
+        elif docker run --rm "$image" sh -c "which apt" > /dev/null 2>&1; then
+            pkg_mgr="✅ (apt)"
+        fi
     fi
     has_pkg_manager["$image"]="$pkg_mgr"
 
-    log_result "$image: Shell=${has_shell[$image]}, PkgMgr=${has_pkg_manager[$image]}"
+    log_result "$image (${image_type[$image]}): Shell=${has_shell[$image]}, PkgMgr=${has_pkg_manager[$image]}"
 done
 echo ""
 
@@ -272,6 +311,7 @@ for image in "${IMAGES[@]}"; do
 
     cat >> "$JSON_FILE" <<EOF
     "$image": {
+      "type": "${image_type[$image]:-N/A}",
       "size_mb": ${image_sizes[$image]:-0},
       "startup_ms": ${startup_times[$image]:-0},
       "memory_mb": ${memory_usage[$image]:-0},
@@ -299,12 +339,12 @@ cat > "$MD_FILE" <<EOF
 
 ## Performance Comparison
 
-| Image | Size (MB) | Startup (ms) | Memory (MB) | Shell | Package Manager |
-|-------|-----------|--------------|-------------|-------|-----------------|
+| Image | Type | Size (MB) | Startup (ms) | Memory (MB) | Shell | Package Manager |
+|-------|------|-----------|--------------|-------------|-------|-----------------|
 EOF
 
 for image in "${IMAGES[@]}"; do
-    echo "| $image | ${image_sizes[$image]:-0} | ${startup_times[$image]:-0} | ${memory_usage[$image]:-0} | ${has_shell[$image]:-N/A} | ${has_pkg_manager[$image]:-N/A} |" >> "$MD_FILE"
+    echo "| $image | ${image_type[$image]:-N/A} | ${image_sizes[$image]:-0} | ${startup_times[$image]:-0} | ${memory_usage[$image]:-0} | ${has_shell[$image]:-N/A} | ${has_pkg_manager[$image]:-N/A} |" >> "$MD_FILE"
 done
 
 cat >> "$MD_FILE" <<EOF
@@ -328,7 +368,8 @@ log_success "Markdown report: $MD_FILE"
 log_info "=== Cleaning up pulled images ==="
 for image in "${IMAGES[@]}"; do
     # Skip kimigayo-os (our own image)
-    if [[ "$image" == kimigayo-os:* ]]; then
+    if [[ "$image" == *"kimigayo-os"* ]]; then
+        log_info "Keeping $image (our image)"
         continue
     fi
 
