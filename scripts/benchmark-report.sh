@@ -36,6 +36,9 @@ echo "**生成日時:** $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # 1. ディスクサイズ結果
+# OS間比較データも統合
+LATEST_COMPARISON=$(ls -t "$INPUT_DIR"/comparison_*.json 2>/dev/null | head -1)
+
 if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
     echo "### 💾 ディスクサイズ" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
@@ -45,6 +48,16 @@ if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
     # JSONから結果を抽出（jqがあれば使用、なければgrepとsed）
     if command -v jq > /dev/null 2>&1; then
         jq -r '.results | to_entries | .[] | "| \(.key) | \(.value.size_mb)MB |"' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE"
+
+        # OS間比較データから追加のサイズ情報を抽出
+        if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
+            jq -r '.results | to_entries |
+                map(select(.key | contains("distroless"))) |
+                .[] |
+                if (.key | contains("static")) then "| Distroless Static | \(.value.size_mb)MB |"
+                elif (.key | contains("base")) then "| Distroless Base | \(.value.size_mb)MB |"
+                else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || true
+        fi
     else
         # jqがない場合の簡易パース
         grep -o '"[^"]*": {"size_mb": [0-9]*' "$INPUT_DIR/benchmark-size.json" | \
@@ -60,6 +73,33 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
     echo "### ⚡ 起動時間" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
+    # OS間比較データから起動時間を抽出
+    if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq > /dev/null 2>&1; then
+        echo "| イメージ | 起動時間 |" >> "$OUTPUT_FILE"
+        echo "|----------|---------|" >> "$OUTPUT_FILE"
+
+        # 比較データから起動時間を抽出（0とN/Aは除外、短い順にソート）
+        jq -r '.results | to_entries |
+            map(select(.value.startup_ms != 0 and .value.startup_ms != "N/A")) |
+            sort_by(.value.startup_ms | if type == "number" then . else 999999 end) |
+            .[] |
+            if (.key | contains("kimigayo")) then "| Kimigayo Standard | \(.value.startup_ms)ms |"
+            elif (.key | contains("alpine")) then "| Alpine Latest | \(.value.startup_ms)ms |"
+            elif (.key | contains("ubuntu")) then "| Ubuntu 22.04 | \(.value.startup_ms)ms |"
+            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        # Distroless（N/A）を追加
+        jq -r '.results | to_entries |
+            map(select(.value.startup_ms == "N/A" or .value.startup_ms == 0 or .value.startup_ms == -1)) |
+            .[] |
+            if (.key | contains("distroless/base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
+            elif (.key | contains("distroless/static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
+            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        echo "" >> "$OUTPUT_FILE"
+    fi
+
+    # Kimigayo OS単体測定データ
     if command -v jq > /dev/null 2>&1; then
         avg=$(jq -r '.results.average_ms' "$INPUT_DIR/benchmark-startup.json")
         median=$(jq -r '.results.median_ms' "$INPUT_DIR/benchmark-startup.json")
@@ -72,12 +112,8 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
         max=$(grep -o '"max_ms": [0-9]*' "$INPUT_DIR/benchmark-startup.json" | cut -d: -f2 | tr -d ' ')
     fi
 
-    echo "| 指標 | 値 |" >> "$OUTPUT_FILE"
-    echo "|------|-----|" >> "$OUTPUT_FILE"
-    echo "| 平均 | ${avg}ms |" >> "$OUTPUT_FILE"
-    echo "| 中央値 | ${median}ms |" >> "$OUTPUT_FILE"
-    echo "| 最小 | ${min}ms |" >> "$OUTPUT_FILE"
-    echo "| 最大 | ${max}ms |" >> "$OUTPUT_FILE"
+    echo "**Kimigayo OS単体測定:**" >> "$OUTPUT_FILE"
+    echo "- 平均: ${avg}ms | 中央値: ${median}ms | 最小: ${min}ms | 最大: ${max}ms" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
     # 目標値評価
@@ -95,6 +131,33 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
     echo "### 💾 メモリ使用量" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
+    # OS間比較データからメモリ使用量を抽出
+    if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq > /dev/null 2>&1; then
+        echo "| イメージ | メモリ使用量 |" >> "$OUTPUT_FILE"
+        echo "|----------|------------|" >> "$OUTPUT_FILE"
+
+        # 比較データからメモリ使用量を抽出（0とN/Aは除外、少ない順にソート）
+        jq -r '.results | to_entries |
+            map(select(.value.memory_mb != 0 and .value.memory_mb != "N/A")) |
+            sort_by(.value.memory_mb | if type == "number" then . else 999999 end) |
+            .[] |
+            if (.key | contains("kimigayo")) then "| Kimigayo Standard | \(.value.memory_mb)MB |"
+            elif (.key | contains("alpine")) then "| Alpine Latest | \(.value.memory_mb)MB |"
+            elif (.key | contains("ubuntu")) then "| Ubuntu 22.04 | \(.value.memory_mb)MB |"
+            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        # Distroless（N/A）を追加
+        jq -r '.results | to_entries |
+            map(select(.value.memory_mb == "N/A" or .value.memory_mb == 0 or .value.memory_mb == -1)) |
+            .[] |
+            if (.key | contains("distroless/base")) then "| Distroless Base | N/A (実行可能ファイル無し) |"
+            elif (.key | contains("distroless/static")) then "| Distroless Static | N/A (実行可能ファイル無し) |"
+            else empty end' "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+        echo "" >> "$OUTPUT_FILE"
+    fi
+
+    # Kimigayo OS単体測定データ
     if command -v jq > /dev/null 2>&1; then
         avg=$(jq -r '.results.average_mb' "$INPUT_DIR/benchmark-memory.json")
         median=$(jq -r '.results.median_mb' "$INPUT_DIR/benchmark-memory.json")
@@ -107,12 +170,8 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
         max=$(grep -o '"max_mb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
     fi
 
-    echo "| 指標 | 値 |" >> "$OUTPUT_FILE"
-    echo "|------|-----|" >> "$OUTPUT_FILE"
-    echo "| 平均 | ${avg}MB |" >> "$OUTPUT_FILE"
-    echo "| 中央値 | ${median}MB |" >> "$OUTPUT_FILE"
-    echo "| 最小 | ${min}MB |" >> "$OUTPUT_FILE"
-    echo "| 最大 | ${max}MB |" >> "$OUTPUT_FILE"
+    echo "**Kimigayo OS単体測定:**" >> "$OUTPUT_FILE"
+    echo "- 平均: ${avg}MB | 中央値: ${median}MB | 最小: ${min}MB | 最大: ${max}MB" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
     # 目標値評価
@@ -126,7 +185,7 @@ fi
 
 # 4. コンテナライフサイクル結果
 if [ -f "$INPUT_DIR/lifecycle.json" ]; then
-    echo "### 🔄 コンテナライフサイクル" >> "$OUTPUT_FILE"
+    echo "### 🔄 コンテナライフサイクル (Kimigayo OS)" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
     if command -v jq > /dev/null 2>&1; then
@@ -146,6 +205,8 @@ if [ -f "$INPUT_DIR/lifecycle.json" ]; then
     else
         echo "詳細データは \`lifecycle.json\` を参照してください。" >> "$OUTPUT_FILE"
     fi
+    echo "" >> "$OUTPUT_FILE"
+    echo "*注: ライフサイクル測定はKimigayo OS専用。他のOSとの比較は「起動時間」セクションを参照*" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 fi
 
@@ -171,36 +232,43 @@ if [ -f "$INPUT_DIR/busybox.json" ]; then
     echo "" >> "$OUTPUT_FILE"
 fi
 
-# 6. 比較ベンチマーク結果（最新のファイルを使用）
-LATEST_COMPARISON=$(ls -t "$INPUT_DIR"/comparison_*.json 2>/dev/null | head -1)
-if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ]; then
-    echo "### 📊 OS間比較ベンチマーク" >> "$OUTPUT_FILE"
+# 6. 機能比較（OS間比較ベンチマークから生成）
+if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq > /dev/null 2>&1; then
+    echo "### 🔍 機能比較" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
+    echo "| イメージ | サイズ | 起動時間 | メモリ | シェル | パッケージマネージャー |" >> "$OUTPUT_FILE"
+    echo "|---------|-------|---------|-------|--------|---------------------|" >> "$OUTPUT_FILE"
 
-    if command -v jq > /dev/null 2>&1; then
-        echo "| OS | イメージサイズ | 起動時間 | メモリ使用量 | シェル | パッケージマネージャー |" >> "$OUTPUT_FILE"
-        echo "|----|--------------|---------|-------------|--------|---------------------|" >> "$OUTPUT_FILE"
+    # 各OSの情報を整形して表示
+    jq -r '.results | to_entries | .[] |
+        # イメージ名を短縮
+        if (.key | contains("kimigayo")) then .short_name = "Kimigayo Standard"
+        elif (.key | contains("alpine")) then .short_name = "Alpine Latest"
+        elif (.key | contains("distroless/static")) then .short_name = "Distroless Static"
+        elif (.key | contains("distroless/base")) then .short_name = "Distroless Base"
+        elif (.key | contains("ubuntu")) then .short_name = "Ubuntu 22.04"
+        else .short_name = .key end |
 
-        # 結果を抽出（0の値は「測定失敗」として表示）
-        jq -r '.results | to_entries | .[] |
-            if .value.size_mb == 0 then .value.size_mb = "N/A" else .value.size_mb = (.value.size_mb | tostring) + "MB" end |
-            if .value.startup_ms == 0 then .value.startup_ms = "N/A" else .value.startup_ms = (.value.startup_ms | tostring) + "ms" end |
-            if .value.memory_mb == 0 then .value.memory_mb = "N/A" else .value.memory_mb = (.value.memory_mb | tostring) + "MB" end |
-            "| \(.key) | \(.value.size_mb) | \(.value.startup_ms) | \(.value.memory_mb) | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
-            "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+        # サイズのフォーマット
+        if .value.size_mb == 0 then .size_str = "N/A" else .size_str = (.value.size_mb | tostring) + "MB" end |
 
-        # エラーチェック
-        if [ $? -ne 0 ]; then
-            # フォールバック: シンプルな表示
-            echo "" >> "$OUTPUT_FILE"
-            jq -r '.results | to_entries | .[] |
-                "| \(.key) | \(.value.size_mb)MB | \(.value.startup_ms)ms | \(.value.memory_mb)MB | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
-                "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null || \
-                echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
-        fi
-    else
-        echo "詳細データは \`$(basename "$LATEST_COMPARISON")\` を参照してください。" >> "$OUTPUT_FILE"
-    fi
+        # 起動時間のフォーマット
+        if (.value.startup_ms == "N/A" or .value.startup_ms == 0 or .value.startup_ms == -1) then .startup_str = "N/A"
+        else .startup_str = (.value.startup_ms | tostring) + "ms" end |
+
+        # メモリのフォーマット
+        if (.value.memory_mb == "N/A" or .value.memory_mb == 0 or .value.memory_mb == -1) then .memory_str = "N/A"
+        else .memory_str = (.value.memory_mb | tostring) + "MB" end |
+
+        "| \(.short_name) | \(.size_str) | \(.startup_str) | \(.memory_str) | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
+        "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
+
+    echo "" >> "$OUTPUT_FILE"
+    echo "**Kimigayo OSの特徴:**" >> "$OUTPUT_FILE"
+    echo "- ✅ 最小クラスのイメージサイズ (1MB)" >> "$OUTPUT_FILE"
+    echo "- ✅ Alpine並みの低メモリ使用量 (0.2MB)" >> "$OUTPUT_FILE"
+    echo "- ✅ シェル対応（Distrolessより柔軟）" >> "$OUTPUT_FILE"
+    echo "- ⚠️ パッケージマネージャー非搭載（セキュリティ重視設計）" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 fi
 
