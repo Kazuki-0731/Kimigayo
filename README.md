@@ -21,6 +21,9 @@
 
 Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思想をハイブリッド的に組み合わせた軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除し、不変インフラを徹底することで、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスとセキュリティを実現します。
 
+#### Docker Hub
+- https://hub.docker.com/r/ishinokazuki/kimigayo-os
+
 ### ✨ 主な特徴
 
 - 🪶 **超軽量**: わずか1.17MB（Alpineの1/7、Ubuntuの1/56サイズ）
