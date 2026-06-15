@@ -1,7 +1,7 @@
 # Kimigayo OS Build Environment
 # Alpine Linuxをベースとした軽量なビルド環境
 
-FROM alpine:3.23
+FROM alpine:3.24
 
 # メタデータ
 LABEL maintainer="Kimigayo OS Development Team"
