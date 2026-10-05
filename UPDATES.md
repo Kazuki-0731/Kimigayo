@@ -1,7 +1,8 @@
-# Base Image Updates - 2026-01-02
+# Base Image Updates - 2026-10-05
 
 ## Updated Components
 
+- **BusyBox**:  → 
 
 ## Testing Required
 
