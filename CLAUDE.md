@@ -687,11 +687,32 @@ make security-scan                                 # Trivy
 **バージョンを上げたときは追加で:**
 
 ```bash
-grep -rn '6\.6\|1\.36\|1\.2\.4\|0\.52\|3\.19\|3\.23' --include='*.mk' --include='Makefile' \
-  --include='Dockerfile*' --include='*.sh' --include='*.py' --include='*.yml' .
-# → versions.mk 以外に古い数字が残っていないか
-grep -i 'not applicable' build/kernel-patches.log build/busybox-patches.log
-# → 効かなくなったパッチが黙ってスキップされていないか
+# 1) 今どの版を使うことになっているか
+make print-versions
+
+# 2) versions.mk で捨てた「古い値」が他のファイルに残っていないか
+#    （ここに番号を直書きすると次の更新で腐るので、git diff から拾う）
+git diff versions.mk | grep '^-[A-Z]' | grep -oE '[0-9]+\.[0-9.]+' | sort -u |
+while read -r v; do
+  hits=$(grep -rn --fixed-strings "$v" \
+    --include='*.mk' --include='Makefile' --include='Dockerfile*' \
+    --include='*.sh' --include='*.py' --include='*.yml' . \
+    | grep -v '^\./versions.mk' || true)
+  [ -n "$hits" ] && { echo "--- 旧値 $v がまだ残っている:"; echo "$hits"; }
+done
+# チェックサム表とコメント内の経緯は残っていて正しい。
+# それ以外に出たら直す。
+
+# 3) 効かなくなったパッチが黙ってスキップされていないか
+grep -iE 'skipped: [1-9]|not applicable' \
+  build/kernel-patches.log build/busybox-patches.log
+# → 出たら「上流が取り込んだので不要」か「当て直しが必要」かを判断する
+#    （src/kernel/patches/README.md 参照）
+
+# 4) 上流のビルドオプションが消えていないか
+#    OpenRC なら meson_options.txt、BusyBox なら make oldconfig の差分、
+#    カーネルなら make olddefconfig の出力を見る
+grep -oE "^option\('[a-z_-]+'" build/openrc-*/meson_options.txt
 ```
 
 ---
