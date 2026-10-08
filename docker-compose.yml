@@ -4,6 +4,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # versions.mk / git タグ由来。Makefile が export して渡す。
+        ALPINE_VERSION: "${ALPINE_VERSION:-3.24}"
+        KIMIGAYO_VERSION: "${KIMIGAYO_VERSION:-dev}"
     image: kimigayo-os-build:latest
     container_name: kimigayo-build-env
     volumes:
@@ -20,7 +24,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      - KIMIGAYO_VERSION=0.1.0
+      - KIMIGAYO_VERSION=${KIMIGAYO_VERSION:-dev}
       - ARCH=x86_64
       - SECURITY_HARDENING=full
     # リソース制限（開発環境の目標値を反映）

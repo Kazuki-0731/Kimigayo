@@ -2,7 +2,10 @@
 # Multi-stage build for minimal container image
 
 # Stage 1: Extract rootfs from tar.gz
-FROM alpine:3.23 AS extractor
+# 展開用の捨てステージ。最終イメージは scratch なのでここの版は成果物に残らないが、
+# 版を直書きすると更新漏れになるので versions.mk 由来の build arg を使う。
+ARG ALPINE_VERSION=3.24
+FROM alpine:${ALPINE_VERSION} AS extractor
 
 # Build arguments for multi-architecture support
 ARG TARGETARCH

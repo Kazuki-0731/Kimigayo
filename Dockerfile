@@ -1,12 +1,22 @@
 # Kimigayo OS Build Environment
 # Alpine Linuxをベースとした軽量なビルド環境
+#
+# ALPINE_VERSION / KIMIGAYO_VERSION は versions.mk と git タグが真実の源。
+# docker-compose.yml / Makefile が build arg として渡す。
+# ここの既定値は compose を使わず直接 docker build したときのフォールバック。
 
-FROM alpine:3.23
+ARG ALPINE_VERSION=3.24
+
+FROM alpine:${ALPINE_VERSION}
+
+# FROM をまたぐので再宣言が必要（RUN 内で使うため）
+ARG ALPINE_VERSION
+ARG KIMIGAYO_VERSION=dev
 
 # メタデータ
 LABEL maintainer="Kimigayo OS Development Team"
 LABEL description="Build environment for Kimigayo OS"
-LABEL version="0.1.0"
+LABEL version="${KIMIGAYO_VERSION}"
 
 # OpenContainer Initiative (OCI) Labels
 LABEL org.opencontainers.image.title="Kimigayo OS Build Environment"
@@ -15,9 +25,9 @@ LABEL org.opencontainers.image.authors="Kimigayo OS Team"
 LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="${KIMIGAYO_VERSION}"
 LABEL org.opencontainers.image.licenses="GPL-2.0"
-LABEL org.opencontainers.image.base.name="alpine:3.19"
+LABEL org.opencontainers.image.base.name="alpine:${ALPINE_VERSION}"
 
 # 環境変数の設定
 ENV KIMIGAYO_BUILD_DIR=/build
@@ -95,41 +105,31 @@ RUN apk update && apk add --no-cache \
     util-linux
 
 # Pythonテストフレームワークのインストール
-RUN pip3 install --no-cache-dir --break-system-packages \
-    hypothesis \
-    pytest-cov \
-    pytest-xdist \
-    pyyaml
-
-# Rustツールチェインのインストール (isn package manager用)
-# Alpine 3.19のRust (1.76) は古すぎるため、rustupで最新版をインストール
-RUN apk add --no-cache curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal && \
-    . "$HOME/.cargo/env" && \
-    rustup target add x86_64-unknown-linux-musl
-
-# Rustのパスを追加
-ENV PATH="/root/.cargo/bin:${PATH}"
+# 一覧の正本は requirements-dev.txt（Makefile / CI と同じものを入れる）
+COPY requirements-dev.txt /tmp/requirements-dev.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements-dev.txt && \
+    rm -f /tmp/requirements-dev.txt
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
 # cmake: compiler-rtビルド用
 RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
-# ARM64用libgccとlinux-headersをAlpineリポジトリからダウンロード
-# Alpine Linux aarch64リポジトリのlibgccとlinux-headersパッケージを取得
-RUN mkdir -p /tmp/aarch64-libs
+# ARM64用libgccとlinux-headersをAlpineリポジトリから取得
+#
+# 以前は .apk の URL を「libgcc-15.2.0-r2.apk」のようにバージョンごと直打ちして
+# いたため、Alpine を上げるたびに 404 になって壊れていた。
+# apk fetch にパッケージ名だけ渡して、版はリポジトリに決めさせる。
 WORKDIR /tmp/aarch64-libs
-RUN wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk && \
-    wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-headers-6.16.12-r0.apk && \
-    tar xzf libgcc-15.2.0-r2.apk && \
-    mkdir -p /usr/aarch64-linux-musl/lib && \
+RUN apk fetch --no-cache --arch aarch64 \
+        --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
+        libgcc linux-headers && \
+    mkdir -p /usr/aarch64-linux-musl/lib /usr/aarch64-linux-musl/include && \
+    tar xzf libgcc-*.apk && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
-    tar xzf linux-headers-6.16.12-r0.apk && \
-    mkdir -p /usr/aarch64-linux-musl/include && \
-    cp -r usr/include/* /usr/aarch64-linux-musl/include/
-WORKDIR /usr/aarch64-linux-musl/lib
-RUN ln -s libgcc_s.so.1 libgcc_s.so
+    tar xzf linux-headers-*.apk && \
+    cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
+    ln -sf libgcc_s.so.1 /usr/aarch64-linux-musl/lib/libgcc_s.so
 WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
@@ -163,24 +163,30 @@ RUN cd /usr/aarch64-linux-musl/lib && \
     ls -lh crtbeginT.o crtend.o libssp_nonshared.a
 
 # Download ARM64 compiler-rt from Alpine repository
-# Alpine only installs native arch compiler-rt, so we need to get ARM64 version manually
-RUN mkdir -p /tmp/compiler-rt-arm64
+#
+# Alpine は実行アーキテクチャ向けの compiler-rt しか入れないため aarch64 版を手で取る。
+# 配置先は clang 自身に聞く（-print-resource-dir）。
+# 以前は /usr/lib/llvm21/lib/clang/21/... と LLVM のメジャー版を直書きしていたため、
+# Alpine 3.24 で LLVM 21 → 22 に上がった時点でパスが存在しなくなっていた。
 WORKDIR /tmp/compiler-rt-arm64
-RUN wget -q https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/compiler-rt-21.1.2-r0.apk && \
-    tar xzf compiler-rt-21.1.2-r0.apk && \
-    mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl && \
-    cp -r usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/* /usr/lib/llvm21/lib/clang/21/lib/aarch64-alpine-linux-musl/
+RUN apk fetch --no-cache --arch aarch64 \
+        --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
+        compiler-rt && \
+    tar xzf compiler-rt-*.apk && \
+    RESOURCE_DIR="$(clang -print-resource-dir)" && \
+    echo "clang resource dir: ${RESOURCE_DIR}" && \
+    SRC_DIR="$(find usr -type d -name 'aarch64-alpine-linux-musl' | head -1)" && \
+    test -n "$SRC_DIR" || { echo "aarch64 compiler-rt payload not found in apk"; exit 1; } && \
+    mkdir -p "${RESOURCE_DIR}/lib/aarch64-alpine-linux-musl" && \
+    cp -r "$SRC_DIR"/* "${RESOURCE_DIR}/lib/aarch64-alpine-linux-musl/" && \
+    mkdir -p "${RESOURCE_DIR}/lib/aarch64-unknown-linux-musl" && \
+    ln -sf ../aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a \
+           "${RESOURCE_DIR}/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a" && \
+    echo "Created compiler-rt builtins symlink:" && \
+    ls -lh "${RESOURCE_DIR}/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a" && \
+    readlink -f "${RESOURCE_DIR}/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a"
 WORKDIR /
 RUN rm -rf /tmp/compiler-rt-arm64
-
-# Create symlink with correct triple name for compiler-rt builtins
-# clang looks for aarch64-unknown-linux-musl but Alpine provides aarch64-alpine-linux-musl
-RUN mkdir -p /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl && \
-    ln -sf ../aarch64-alpine-linux-musl/libclang_rt.builtins-aarch64.a \
-           /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a && \
-    echo "Created compiler-rt builtins symlink:" && \
-    ls -lh /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a && \
-    readlink -f /usr/lib/llvm21/lib/clang/21/lib/aarch64-unknown-linux-musl/libclang_rt.builtins.a
 
 # ビルドディレクトリの作成
 RUN mkdir -p ${KIMIGAYO_BUILD_DIR} ${KIMIGAYO_OUTPUT_DIR}
