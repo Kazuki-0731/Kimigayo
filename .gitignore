@@ -37,6 +37,12 @@ Thumbs.db
 htmlcov/
 *.pyc
 __pycache__/
+# hypothesis の反例キャッシュ。再生成できるので共有しない
+# （2026-10-09 まで 59 ファイルが追跡されたままだった）
+.hypothesis/
+
+# ベンチマーク・ビルドのログ
+*.log
 
 # Environment variables
 .env
