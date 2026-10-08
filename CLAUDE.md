@@ -421,14 +421,18 @@ make benchmark             # 全ベンチマーク
 > 古いインストール結果が残っていればビルドを飛ばし、しかも
 > 「✅ build completed」と報告していた**（BusyBox 1.36.1 が 1.38.0 の
 > つもりで残る事故を実際に踏んだ。パッチも当たらない）。
-> 確認するなら:
+> 確認するなら（`versions.mk` の値と、実際にビルドされた版を並べる）:
 >
 > ```bash
-> for c in musl busybox openrc; do
->   printf '%-8s ' "$c"
->   cat build/*-install-*/.kimigayo-build-version 2>/dev/null | head -1
-> done
 > make print-versions
+> for c in musl busybox openrc; do
+>   printf '%-10s %s\n' "$c" \
+>     "$(find build -maxdepth 2 -name '.kimigayo-build-version' \
+>         -path "*${c}-install-*" -exec cat {} \; 2>/dev/null)"
+> done
+> # 空欄 = 未ビルド。versions.mk と食い違っていたらビルドし直す
+> # カーネルは build/kernel/output/vmlinuz-<version>-<arch> のファイル名で分かる
+> ls build/kernel/output/vmlinuz-* 2>/dev/null
 > ```
 
 > **`scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
