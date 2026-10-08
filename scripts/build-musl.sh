@@ -21,11 +21,14 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # バージョンは versions.mk（単一の真実の源）から読み込む
 # shellcheck source=scripts/lib/versions.sh
 source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
+# ビルド済み判定（バージョンスタンプ方式）。パスを当てに行かない理由は
+# scripts/lib/build-stamp.sh の冒頭コメント参照。
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
 MUSL_SRC_DIR="${PROJECT_ROOT}/build/musl-src/musl-${MUSL_VERSION}"
 MUSL_BUILD_DIR="${PROJECT_ROOT}/build/musl-build-${ARCH}"
 MUSL_INSTALL_DIR="${PROJECT_ROOT}/build/musl-install-${ARCH}"
-# ビルド済み判定にバージョンを使うためのスタンプ（CLAUDE.md 参照）
-BUILD_VERSION_STAMP="${PROJECT_ROOT}/build/musl-install-${ARCH}/.kimigayo-build-version"
 BUILD_LOG="${PROJECT_ROOT}/build/logs/musl-build.log"
 
 # Colors for output
@@ -413,16 +416,16 @@ main() {
     log_info ""
 
     # Check if musl is already built at the version we want
-    # （ファイルの存在だけを見ると、版を上げても古い libc が残り続ける）
-    if [ -f "${MUSL_INSTALL_DIR}/lib/libc.so" ] && [ -f "${MUSL_INSTALL_DIR}/bin/musl-gcc" ]; then
-        installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
-        if [ "$installed_version" = "$MUSL_VERSION" ]; then
-            log_info "musl libc ${MUSL_VERSION} already built and installed: ${MUSL_INSTALL_DIR}"
-            log_info "Skipping build (use 'make clean-musl' to rebuild)"
-            show_summary
-            log_info "musl libc build check completed!"
-            exit 0
-        fi
+    if kimigayo_is_built "$MUSL_INSTALL_DIR" "$MUSL_VERSION"; then
+        log_info "musl libc ${MUSL_VERSION} already built and installed: ${MUSL_INSTALL_DIR}"
+        log_info "Skipping build (use 'make clean-musl' to rebuild)"
+        show_summary
+        log_info "musl libc build check completed!"
+        exit 0
+    fi
+
+    installed_version="$(kimigayo_built_version "$MUSL_INSTALL_DIR")"
+    if [ -n "$installed_version" ]; then
         log_warn "Installed musl is ${installed_version}, want ${MUSL_VERSION} -- rebuilding"
         # ビルドディレクトリも捨てる（configure の結果が前の版のまま残る）
         rm -rf "${MUSL_INSTALL_DIR}" "${MUSL_BUILD_DIR}"
@@ -439,7 +442,7 @@ main() {
     show_summary
 
     # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-    echo "$MUSL_VERSION" > "$BUILD_VERSION_STAMP"
+    kimigayo_write_build_stamp "$MUSL_INSTALL_DIR" "$MUSL_VERSION"
 
     log_info "musl libc build completed successfully!"
 

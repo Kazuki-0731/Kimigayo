@@ -13,6 +13,11 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/versions.sh
 source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 
+# ビルド済み判定（バージョンスタンプ方式）。パスを当てに行かない理由は
+# scripts/lib/build-stamp.sh の冒頭コメント参照。
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
+
 # Configuration
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 ARCH="${ARCH:-x86_64}"
@@ -58,29 +63,17 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
-# ビルド済み判定は「バージョンも一致しているか」で行う。
-# ファイルの存在だけを見ていたため、versions.mk の版を上げても
-# 古いインストール結果が残っているとビルドを丸ごとスキップし、
-# 「成功」と報告しながら古いバイナリが rootfs に入っていた
-# （実際に BusyBox 1.36.1 が 1.38.0 のつもりで残った）。
-BUILD_VERSION_STAMP="${OPENRC_INSTALL_DIR}/.kimigayo-build-version"
-
 # Check if OpenRC is already built at the version we want
-#
-# 判定に使うのは usr/sbin/openrc。meson に --sbindir=/usr/sbin を渡している
-# ため OpenRC は usr/sbin/ に入る。sbin/openrc を見ていたので条件が
-# 常に偽になり、毎回フルビルドしていた（2026-10-09 修正）。
-if { [ -f "${OPENRC_INSTALL_DIR}/usr/sbin/openrc" ] \
-     || [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ]; } \
-   && [ -d "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
-    installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
-    if [ "$installed_version" = "$OPENRC_VERSION" ]; then
-        log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
-        log_info "Skipping build (use 'make clean-openrc' to rebuild)"
-        log_success "All essential binaries verified"
-        log_info "OpenRC build check completed!"
-        exit 0
-    fi
+if kimigayo_is_built "$OPENRC_INSTALL_DIR" "$OPENRC_VERSION"; then
+    log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
+    log_info "Skipping build (use 'make clean-openrc' to rebuild)"
+    log_success "All essential binaries verified"
+    log_info "OpenRC build check completed!"
+    exit 0
+fi
+
+installed_version="$(kimigayo_built_version "$OPENRC_INSTALL_DIR")"
+if [ -n "$installed_version" ]; then
     log_warning "Installed OpenRC is ${installed_version}, want ${OPENRC_VERSION} -- rebuilding"
     rm -rf "${OPENRC_INSTALL_DIR}" "${OPENRC_BUILD_DIR}"
 fi
@@ -403,7 +396,7 @@ done
 set -o pipefail
 
 # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-echo "$OPENRC_VERSION" > "$BUILD_VERSION_STAMP"
+kimigayo_write_build_stamp "$OPENRC_INSTALL_DIR" "$OPENRC_VERSION"
 
 log_success "OpenRC is ready for integration"
 

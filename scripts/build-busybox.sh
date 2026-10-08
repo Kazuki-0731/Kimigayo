@@ -14,6 +14,11 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=scripts/lib/versions.sh
 source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 
+# ビルド済み判定（バージョンスタンプ方式）。パスを当てに行かない理由は
+# scripts/lib/build-stamp.sh の冒頭コメント参照。
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
+
 # Configuration
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 IMAGE_TYPE="${IMAGE_TYPE:-standard}"
@@ -60,22 +65,16 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
-# ビルド済み判定は「バージョンも一致しているか」で行う。
-# ファイルの存在だけを見ていたため、versions.mk の版を上げても
-# 古いインストール結果が残っているとビルドを丸ごとスキップし、
-# 「成功」と報告しながら古いバイナリが rootfs に入っていた
-# （実際に BusyBox 1.36.1 が 1.38.0 のつもりで残った）。
-BUILD_VERSION_STAMP="${BUSYBOX_INSTALL_DIR}/.kimigayo-build-version"
-
 # Check if BusyBox is already built at the version we want
-if [ -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
-    installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
-    if [ "$installed_version" = "$BUSYBOX_VERSION" ]; then
-        log_info "BusyBox ${BUSYBOX_VERSION} already built and installed: ${BUSYBOX_INSTALL_DIR}"
-        log_info "Skipping build (use 'make clean-busybox' to rebuild)"
-        log_info "BusyBox build check completed!"
-        exit 0
-    fi
+if kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"; then
+    log_info "BusyBox ${BUSYBOX_VERSION} already built and installed: ${BUSYBOX_INSTALL_DIR}"
+    log_info "Skipping build (use 'make clean-busybox' to rebuild)"
+    log_info "BusyBox build check completed!"
+    exit 0
+fi
+
+installed_version="$(kimigayo_built_version "$BUSYBOX_INSTALL_DIR")"
+if [ -n "$installed_version" ]; then
     log_warning "Installed BusyBox is ${installed_version}, want ${BUSYBOX_VERSION} -- rebuilding"
     # ビルドディレクトリも捨てる（前の版の .config とオブジェクトが残る）
     rm -rf "${BUSYBOX_INSTALL_DIR}" "${BUSYBOX_BUILD_DIR}"
@@ -469,7 +468,7 @@ log_info "  Applets installed: ${applet_count}"
 log_info "  Installation directory: ${install_prefix}"
 
 # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-echo "$BUSYBOX_VERSION" > "$BUILD_VERSION_STAMP"
+kimigayo_write_build_stamp "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"
 
 # Record build success
 "${PROJECT_ROOT}/scripts/build-status.sh" record busybox 2>/dev/null || true

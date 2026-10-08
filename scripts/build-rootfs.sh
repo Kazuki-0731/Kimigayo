@@ -9,11 +9,20 @@ set -u  # Exit on undefined variable
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+# log_info が BLUE を使うのに定義が無く、set -u で
+# "BLUE: unbound variable" になっていた（他の scripts/*.sh と同じ値を定義する）
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンとビルド済み判定（CLAUDE.md「バージョンの単一の真実の源」節）
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
 
 # Architecture detection
 detect_arch() {
@@ -829,21 +838,28 @@ main() {
     fi
 
     # Check musl libc
+    #
+    # 以前は ${MUSL_CHECK_DIR}/lib/libc.a の有無で判定していたが、musl は
+    # usr/lib/libc.a に入るため条件が常に成立せず、毎回フルビルドしていた。
+    # インストール先の配置を当てに行かず、バージョンスタンプで判定する。
     local MUSL_CHECK_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
-    if [ ! -f "${MUSL_CHECK_DIR}/lib/libc.a" ]; then
-        log_warn "musl libc not found, building..."
+    if ! kimigayo_is_built "$MUSL_CHECK_DIR" "$MUSL_VERSION"; then
+        log_warn "musl libc ${MUSL_VERSION} not built yet, building..."
         bash "${SCRIPT_DIR}/download-musl.sh" || { log_error "Failed to download musl"; exit 1; }
         ARCH=$MUSL_ARCH bash "${SCRIPT_DIR}/build-musl.sh" || { log_error "Failed to build musl"; exit 1; }
         # Update MUSL_INSTALL_DIR for subsequent builds
         export MUSL_INSTALL_DIR="${MUSL_CHECK_DIR}"
     else
-        log_info "✓ musl libc found at: ${MUSL_CHECK_DIR}"
+        log_info "✓ musl libc ${MUSL_VERSION} found at: ${MUSL_CHECK_DIR}"
         export MUSL_INSTALL_DIR="${MUSL_CHECK_DIR}"
     fi
 
     # Check BusyBox
-    if [ ! -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
-        log_warn "BusyBox not found, building..."
+    #
+    # bin/busybox の有無だけだと、版を上げても古いバイナリをそのまま
+    # rootfs に入れてしまう（1.36.1 が 1.38.0 のつもりで入りかけた）。
+    if ! kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"; then
+        log_warn "BusyBox ${BUSYBOX_VERSION} not built yet, building..."
         bash "${SCRIPT_DIR}/download-busybox.sh" || { log_error "Failed to download BusyBox"; exit 1; }
         ARCH=$ARCH IMAGE_TYPE=$IMAGE_TYPE MUSL_INSTALL_DIR="${MUSL_INSTALL_DIR}" \
             bash "${SCRIPT_DIR}/build-busybox.sh" || { log_error "Failed to build BusyBox"; exit 1; }
@@ -874,8 +890,8 @@ main() {
     # Display next steps
     log_info "Next steps:"
     log_info "  1. Review the rootfs: ls -la $ROOTFS_DIR"
-    log_info "  2. Create an image: make iso or make docker-image"
-    log_info "  3. Test in QEMU: make qemu-test"
+    log_info "  2. Package and build the image: make package-rootfs build-image"
+    log_info "  3. Smoke test the image: make test-smoke"
 
     # Record build success
     "${PROJECT_ROOT}/scripts/build-status.sh" record rootfs 2>/dev/null || true
