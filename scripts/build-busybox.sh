@@ -77,7 +77,8 @@ if [ -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
         exit 0
     fi
     log_warning "Installed BusyBox is ${installed_version}, want ${BUSYBOX_VERSION} -- rebuilding"
-    rm -rf "${BUSYBOX_INSTALL_DIR}"
+    # ビルドディレクトリも捨てる（前の版の .config とオブジェクトが残る）
+    rm -rf "${BUSYBOX_INSTALL_DIR}" "${BUSYBOX_BUILD_DIR}"
 fi
 
 # Check if source directory exists

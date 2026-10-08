@@ -424,7 +424,8 @@ main() {
             exit 0
         fi
         log_warn "Installed musl is ${installed_version}, want ${MUSL_VERSION} -- rebuilding"
-        rm -rf "${MUSL_INSTALL_DIR}"
+        # ビルドディレクトリも捨てる（configure の結果が前の版のまま残る）
+        rm -rf "${MUSL_INSTALL_DIR}" "${MUSL_BUILD_DIR}"
     fi
 
     setup_arch

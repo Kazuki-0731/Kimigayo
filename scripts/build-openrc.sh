@@ -76,7 +76,7 @@ if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -d "${OPENRC_INSTALL_DIR}/lib
         exit 0
     fi
     log_warning "Installed OpenRC is ${installed_version}, want ${OPENRC_VERSION} -- rebuilding"
-    rm -rf "${OPENRC_INSTALL_DIR}"
+    rm -rf "${OPENRC_INSTALL_DIR}" "${OPENRC_BUILD_DIR}"
 fi
 
 # Check if source directory exists
@@ -249,6 +249,19 @@ log_info "Meson options:"
 for opt in "${meson_options[@]}"; do
     log_info "  $opt"
 done
+
+# ここに来るのは「ビルドする」と決めたときだけなので、古い meson の
+# ビルドディレクトリは使い回さず作り直す。
+#
+# 残骸を使い回すと meson が次のように拒否して止まる:
+#   ERROR: Build data file '.../meson-private/build.dat' references
+#   functions or classes that don't exist. This probably means that it
+#   was generated with an old version of meson.
+# Alpine を上げて meson のバージョンが変わると必ず踏む（実際に踏んだ）。
+if [ -d "$OPENRC_BUILD_DIR" ]; then
+    log_info "Removing stale meson build directory: $OPENRC_BUILD_DIR"
+    rm -rf "$OPENRC_BUILD_DIR"
+fi
 
 # Setup meson build
 if ! meson setup "${meson_options[@]}" "$OPENRC_BUILD_DIR" "$OPENRC_SRC_DIR"; then
