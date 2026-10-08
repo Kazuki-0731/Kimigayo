@@ -9,8 +9,11 @@ set -euo pipefail
 # Save project root directory
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # Configuration
-OPENRC_VERSION="${OPENRC_VERSION:-0.52.1}"
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 ARCH="${ARCH:-x86_64}"
 
@@ -150,7 +153,9 @@ meson_options=(
     "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
-    "-Dos=Linux"
+    # 注: -Dos / -Dcapabilities / -Drootprefix / -Dsplit-usr / -Dtermcap は
+    # OpenRC 0.52.1 以降に上流から削除された。渡すと meson setup が
+    # "Unknown options" で失敗する（CLAUDE.md「版上げで実際に壊れた箇所」節）。
     "-Dpam=false"
     "-Dselinux=disabled"
     "-Daudit=disabled"
