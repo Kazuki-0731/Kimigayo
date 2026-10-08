@@ -102,7 +102,7 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
                     ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.startup_ms)
                 elif (.key | contains("Alpine Latest")) then
                     ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.startup_ms)
-                elif (.key | contains("Alpine 3.19")) then "測定未実施"
+                elif (.key | startswith("Alpine 3.")) then "測定未実施"
                 elif (.key | contains("Ubuntu")) then
                     ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.startup_ms)
                 elif (.key | contains("Debian")) then "測定未実施"
@@ -177,7 +177,7 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
                     ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.memory_mb)
                 elif (.key | contains("Alpine Latest")) then
                     ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.memory_mb)
-                elif (.key | contains("Alpine 3.19")) then "測定未実施"
+                elif (.key | startswith("Alpine 3.")) then "測定未実施"
                 elif (.key | contains("Ubuntu")) then
                     ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.memory_mb)
                 elif (.key | contains("Debian")) then "測定未実施"

@@ -12,13 +12,18 @@ NC='\033[0m' # No Color
 # デフォルト設定
 OUTPUT_FILE="${OUTPUT_FILE:-benchmark-size.json}"
 
+# 比較対象の Alpine の版は versions.mk（単一の真実の源）に追従させる
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # 比較対象イメージ（カンマ区切りで名前:イメージ形式）
 IMAGES=(
     "Kimigayo Minimal:ishinokazuki/kimigayo-os:latest-minimal"
     "Kimigayo Standard:ishinokazuki/kimigayo-os:latest-standard"
     "Kimigayo Extended:ishinokazuki/kimigayo-os:latest-extended"
     "Alpine Latest:alpine:latest"
-    "Alpine 3.19:alpine:3.19"
+    "Alpine ${ALPINE_VERSION}:alpine:${ALPINE_VERSION}"
     "Debian Slim:debian:stable-slim"
     "Ubuntu:ubuntu:22.04"
     "BusyBox:busybox:latest"
