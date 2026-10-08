@@ -1,0 +1,17 @@
+# カバレッジ設定
+#
+# この設定は .coveragerc に置かないと効かない。
+# coverage が読むのは .coveragerc / setup.cfg / tox.ini / pyproject.toml で、
+# pytest.ini は読まない（以前 pytest.ini に [coverage:run] と
+# [coverage:report] を書いていたが、まったく効いていなかった）。
+
+[run]
+source = src
+omit =
+    */tests/*
+    */conftest.py
+
+[report]
+precision = 2
+show_missing = true
+skip_covered = false

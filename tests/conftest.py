@@ -12,17 +12,42 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Test configuration
-KIMIGAYO_VERSION = "0.1.0"
+# バージョンは git のリリースタグが真実の源（0.1.0 のハードコードをやめた）
+def _project_version() -> str:
+    try:
+        import subprocess
+        return subprocess.run(
+            ["bash", str(project_root / "scripts" / "get-version.sh")],
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip() or "0.0.0-unknown"
+    except Exception:
+        return "0.0.0-unknown"
+
+
+KIMIGAYO_VERSION = _project_version()
 BUILD_DIR = project_root / "build"
 OUTPUT_DIR = project_root / "output"
 
 # Hypothesis configuration
 from hypothesis import settings, Verbosity
 
-# Register custom Hypothesis profile
-settings.register_profile("kimigayo", max_examples=100, verbosity=Verbosity.verbose)
-settings.register_profile("ci", max_examples=200, verbosity=Verbosity.normal)
-settings.register_profile("dev", max_examples=50, verbosity=Verbosity.verbose)
+# deadline=None にしている理由:
+# ここのプロパティテストは tmp_path への実ファイル書き込みや
+# サブプロセス起動を含み、1例あたり 300-400ms かかることがある。
+# hypothesis の既定デッドライン 200ms は「純粋な関数の性能劣化を拾う」ための
+# もので、I/O を伴うこれらのテストには合わない。
+# 実際に arm64 ホストでの linux/amd64 エミュレーションビルドでは
+# DeadlineExceeded で3件落ちた（ロジックの失敗ではなく実行速度の問題）。
+# CI がテストをゲートにしている以上、速度依存の不安定さは持ち込まない。
+settings.register_profile(
+    "kimigayo", max_examples=100, verbosity=Verbosity.verbose, deadline=None
+)
+settings.register_profile(
+    "ci", max_examples=200, verbosity=Verbosity.normal, deadline=None
+)
+settings.register_profile(
+    "dev", max_examples=50, verbosity=Verbosity.verbose, deadline=None
+)
 
 # Load profile from environment or use default
 profile = os.getenv("HYPOTHESIS_PROFILE", "kimigayo")
