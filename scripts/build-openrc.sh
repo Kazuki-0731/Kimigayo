@@ -66,7 +66,13 @@ log_error() {
 BUILD_VERSION_STAMP="${OPENRC_INSTALL_DIR}/.kimigayo-build-version"
 
 # Check if OpenRC is already built at the version we want
-if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -d "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
+#
+# 判定に使うのは usr/sbin/openrc。meson に --sbindir=/usr/sbin を渡している
+# ため OpenRC は usr/sbin/ に入る。sbin/openrc を見ていたので条件が
+# 常に偽になり、毎回フルビルドしていた（2026-10-09 修正）。
+if { [ -f "${OPENRC_INSTALL_DIR}/usr/sbin/openrc" ] \
+     || [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ]; } \
+   && [ -d "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
     installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
     if [ "$installed_version" = "$OPENRC_VERSION" ]; then
         log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
