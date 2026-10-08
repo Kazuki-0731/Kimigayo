@@ -413,6 +413,24 @@ make benchmark             # 全ベンチマーク
 `drivers/firmware/efi/libstub/Makefile` の `cflags-$(CONFIG_X86) += ... -std=gnu11`、
 `arch/x86/boot/compressed/Makefile` の `KBUILD_CFLAGS += -std=gnu11`）。
 
+> **版を上げたら、本当に新しい版がビルドされたかを確かめる。**
+> `scripts/build-{musl,busybox,openrc}.sh` は
+> インストール先の `.kimigayo-build-version` と `versions.mk` の版が
+> 一致したときだけビルドをスキップする（2026-10-09 にそうした）。
+> **それ以前は「バイナリが存在するか」だけを見ていたため、版を上げても
+> 古いインストール結果が残っていればビルドを飛ばし、しかも
+> 「✅ build completed」と報告していた**（BusyBox 1.36.1 が 1.38.0 の
+> つもりで残る事故を実際に踏んだ。パッチも当たらない）。
+> 確認するなら:
+>
+> ```bash
+> for c in musl busybox openrc; do
+>   printf '%-8s ' "$c"
+>   cat build/*-install-*/.kimigayo-build-version 2>/dev/null | head -1
+> done
+> make print-versions
+> ```
+
 > **`scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
 > `log_warn` して `return 0` する。つまり当たらないパッチは黙ってスキップされ、
 > ビルドは成功したように見える。** バージョンを上げたら
