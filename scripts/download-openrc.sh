@@ -9,9 +9,11 @@ set -euo pipefail
 # Save project root directory
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # Configuration
-OPENRC_VERSION="${OPENRC_VERSION:-0.52.1}"
-OPENRC_BASE_URL="https://github.com/OpenRC/openrc/releases/download"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-${PROJECT_ROOT}/build/downloads}"
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 
@@ -68,10 +70,12 @@ else
     # Download OpenRC with mirror fallback
     log_info "Downloading OpenRC ${OPENRC_VERSION}..."
 
-    # Multiple mirror URLs for redundancy
+    # OpenRC は GitHub の自動生成アーカイブでしか配布されていない。
+    # releases/download/... は全バージョンで 404 を返す（2026-10-09 実測）ため、
+    # 自動生成アーカイブを第一候補にする。
     urls=(
-        "${OPENRC_BASE_URL}/${OPENRC_VERSION}/${tarball_filename}"
         "https://github.com/OpenRC/openrc/archive/refs/tags/${OPENRC_VERSION}.tar.gz"
+        "https://codeload.github.com/OpenRC/openrc/tar.gz/refs/tags/${OPENRC_VERSION}"
     )
 
     download_success=false
@@ -93,10 +97,43 @@ else
     fi
 fi
 
-# Note: OpenRC releases don't have published SHA-256 checksums on their GitHub releases
-# We'll verify the download by checking if extraction succeeds
-log_warning "OpenRC releases don't provide SHA-256 checksums"
-log_info "Verification will be done via successful extraction"
+# Verify SHA-256 checksum
+#
+# OpenRC は公式の SHA-256 一覧を公開していない。ここに書いてある値は
+# Alpine aports の main/openrc/APKBUILD の sha512sums と突合して確認したもの。
+# tarball は GitHub の自動生成アーカイブなので、理論上は再生成でバイト列が
+# 変わりうる。合わなくなったら改竄を疑う前に aports 側と突合する。
+log_info "Verifying SHA-256 checksum..."
+
+expected_sha256=""
+case "$OPENRC_VERSION" in
+    "0.63.2")
+        expected_sha256="a8a890338952202b5893c53b639b098850279a7149e2fc4d42515283facd00e8"
+        ;;
+    *)
+        log_warning "No known checksum for OpenRC ${OPENRC_VERSION}"
+        log_warning "Add it to this script after cross-checking against Alpine aports"
+        ;;
+esac
+
+if [ -n "$expected_sha256" ]; then
+    if command -v sha256sum > /dev/null 2>&1; then
+        actual_sha256="$(sha256sum "$tarball_path" | awk '{print $1}')"
+    else
+        actual_sha256="$(shasum -a 256 "$tarball_path" | awk '{print $1}')"
+    fi
+
+    if [ "$actual_sha256" != "$expected_sha256" ]; then
+        log_error "SHA-256 checksum mismatch!"
+        log_error "Expected: $expected_sha256"
+        log_error "Got:      $actual_sha256"
+        log_error "Refusing to use this tarball. Delete it and retry:"
+        log_error "  rm -f ${tarball_path}"
+        exit 1
+    fi
+
+    log_success "Checksum verification: OK"
+fi
 
 # Extract if needed
 if [ -d "$extract_dir" ]; then
@@ -125,7 +162,8 @@ log_info "  Source directory: ${extract_dir}"
 log_info "  Files count: $(find "$extract_dir" -type f | wc -l)"
 
 # Check for required files
-required_files=("meson.build" "src/rc/rc.c" "sh/openrc-run.sh.in")
+# 0.63.2 でソース構成が変わり src/rc/rc.c は src/openrc/rc.c に移動している
+required_files=("meson.build" "src/openrc/rc.c" "sh/openrc-run.sh.in")
 all_found=true
 
 for file in "${required_files[@]}"; do

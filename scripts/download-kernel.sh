@@ -4,16 +4,18 @@
 
 set -e
 
-# Configuration
-KERNEL_VERSION="${KERNEL_VERSION:-6.6.11}"
-KERNEL_MAJOR_VERSION="$(echo "$KERNEL_VERSION" | cut -d. -f1)"
-KERNEL_BASE_URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR_VERSION}.x"
-KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
-KERNEL_TARBALL_SIGN="linux-${KERNEL_VERSION}.tar.sign"
-
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
+# Configuration（KERNEL_VERSION / KERNEL_SERIES は versions.sh が定義する）
+KERNEL_BASE_URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_SERIES}"
+KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
+KERNEL_TARBALL_SIGN="linux-${KERNEL_VERSION}.tar.sign"
 DOWNLOAD_DIR="${PROJECT_ROOT}/build/downloads"
 KERNEL_SRC_DIR="${PROJECT_ROOT}/build/kernel-src"
 
@@ -185,6 +187,50 @@ show_checksum() {
     fi
 }
 
+# Verify SHA-256 against the value published by kernel.org
+# 取得元: https://cdn.kernel.org/pub/linux/kernel/v<series>/sha256sums.asc
+# 既知の値が無いバージョンでは上流から sha256sums.asc を引いて照合する。
+verify_checksum() {
+    local tarball_path="${DOWNLOAD_DIR}/${KERNEL_TARBALL}"
+    local expected=""
+
+    case "$KERNEL_VERSION" in
+        6.18.55)
+            expected="f410638061a165c12f42ab871d2f3fcd525515359b5faeee80969cff84524df9"
+            ;;
+        *)
+            log_info "No pinned checksum for ${KERNEL_VERSION}, fetching sha256sums.asc..."
+            expected="$(curl -fsSL --connect-timeout 30 --max-time 120 \
+                "${KERNEL_BASE_URL}/sha256sums.asc" 2>/dev/null \
+                | awk -v f="$KERNEL_TARBALL" '$2 == f { print $1 }' || true)"
+            if [ -z "$expected" ]; then
+                log_error "Could not determine expected checksum for ${KERNEL_TARBALL}"
+                log_error "Pin it in this script or check network access to kernel.org"
+                return 1
+            fi
+            ;;
+    esac
+
+    local actual
+    actual="$(cat "${tarball_path}.sha256" 2>/dev/null || echo "")"
+    if [ -z "$actual" ]; then
+        log_error "Checksum file not found: ${tarball_path}.sha256"
+        return 1
+    fi
+
+    if [ "$actual" = "$expected" ]; then
+        log_info "Checksum verification: OK"
+        return 0
+    fi
+
+    log_error "SHA-256 checksum mismatch!"
+    log_error "Expected: $expected"
+    log_error "Actual:   $actual"
+    log_error "Refusing to use this tarball. Delete it and retry:"
+    log_error "  rm -f ${tarball_path} ${tarball_path}.sha256"
+    return 1
+}
+
 # Main
 main() {
     log_info "Kimigayo OS - Kernel Download Script"
@@ -195,6 +241,7 @@ main() {
 
     download_kernel || exit 1
     show_checksum
+    verify_checksum || exit 1
     verify_kernel
     extract_kernel || exit 1
 

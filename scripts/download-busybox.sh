@@ -9,8 +9,11 @@ set -euo pipefail
 # Save project root directory
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # Configuration
-BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
 BUSYBOX_BASE_URL="https://busybox.net/downloads"
 BUSYBOX_GITHUB_MIRROR="https://github.com/mirror/busybox"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-${PROJECT_ROOT}/build/downloads}"
@@ -61,6 +64,17 @@ log_info "Version: ${BUSYBOX_VERSION}"
 log_info "Download directory: ${DOWNLOAD_DIR}"
 log_info "Extract directory: ${extract_dir}"
 
+# GitHub の自動生成アーカイブから取った場合は公式 tarball とバイト列が
+# 違うためチェックサムを飛ばす。既存 tarball を再利用する経路でも参照されるので、
+# if の外で必ず初期化する（未初期化のままだと set -u で落ちていた）。
+skip_checksum=false
+
+# GitHub のタグはドットをアンダースコアにした形式（1.38.0 -> 1_38_0）。
+# 展開後のディレクトリ名のリネームでも参照するので、download 分岐の外で定義する
+# （以前は分岐の中だけで定義しており、既存 tarball を再利用すると
+#  set -u で "github_tag_version: unbound variable" になって落ちていた）。
+github_tag_version="${BUSYBOX_VERSION//./_}"
+
 # Check if already downloaded
 if [ -f "$tarball_path" ]; then
     log_warning "BusyBox tarball already exists: $tarball_path"
@@ -68,9 +82,6 @@ if [ -f "$tarball_path" ]; then
 else
     # Download BusyBox with mirror fallback
     log_info "Downloading BusyBox ${BUSYBOX_VERSION}..."
-
-    # Convert version format (1.36.1 -> 1_36_1) for GitHub tags
-    github_tag_version="${BUSYBOX_VERSION//./_}"
 
     # Multiple mirror URLs for redundancy (GitHub mirror first as it's faster and more reliable)
     urls=(
@@ -129,6 +140,12 @@ log_info "Verifying SHA-256 checksum..."
 # Known SHA-256 checksums for BusyBox versions
 # Source: https://busybox.net/downloads/
 case "$BUSYBOX_VERSION" in
+    "1.38.0")
+        expected_sha256="34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2"
+        ;;
+    "1.37.0")
+        expected_sha256="3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
+        ;;
     "1.36.1")
         expected_sha256="b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314"
         ;;

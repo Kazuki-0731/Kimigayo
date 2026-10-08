@@ -4,14 +4,17 @@
 
 set -e
 
-# Configuration
-MUSL_VERSION="${MUSL_VERSION:-1.2.4}"
-MUSL_BASE_URL="https://musl.libc.org/releases"
-MUSL_TARBALL="musl-${MUSL_VERSION}.tar.gz"
-
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
+# Configuration（MUSL_VERSION は versions.sh が定義する）
+MUSL_BASE_URL="https://musl.libc.org/releases"
+MUSL_TARBALL="musl-${MUSL_VERSION}.tar.gz"
 DOWNLOAD_DIR="${PROJECT_ROOT}/build/downloads"
 MUSL_SRC_DIR="${PROJECT_ROOT}/build/musl-src"
 
@@ -106,8 +109,13 @@ verify_checksum() {
     local tarball_path="${DOWNLOAD_DIR}/${MUSL_TARBALL}"
 
     # Known SHA-256 checksums for musl versions
+    # musl は公式の SHA256 一覧を公開していないため、Alpine aports の
+    # main/musl/APKBUILD の sha512sums と突合して確認している。
     local expected=""
     case "$MUSL_VERSION" in
+        1.2.6)
+            expected="d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a"
+            ;;
         1.2.4)
             expected="7a35eae33d5372a7c0da1188de798726f68825513b7ae3ebe97aaaa52114f039"
             ;;
@@ -129,11 +137,13 @@ verify_checksum() {
             log_info "Checksum verification: OK"
             return 0
         else
-            log_warn "Checksum mismatch!"
-            log_warn "Expected: $expected"
-            log_warn "Actual:   $actual"
-            log_warn "Continuing anyway..."
-            return 0
+            # チェックソムが合わないものは使わない（警告だけで通していた挙動を修正）
+            log_error "Checksum mismatch!"
+            log_error "Expected: $expected"
+            log_error "Actual:   $actual"
+            log_error "Refusing to use this tarball. Delete it and retry:"
+            log_error "  rm -f ${tarball_path}"
+            return 1
         fi
     fi
 }
