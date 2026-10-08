@@ -58,13 +58,25 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
-# Check if OpenRC is already built
+# ビルド済み判定は「バージョンも一致しているか」で行う。
+# ファイルの存在だけを見ていたため、versions.mk の版を上げても
+# 古いインストール結果が残っているとビルドを丸ごとスキップし、
+# 「成功」と報告しながら古いバイナリが rootfs に入っていた
+# （実際に BusyBox 1.36.1 が 1.38.0 のつもりで残った）。
+BUILD_VERSION_STAMP="${OPENRC_INSTALL_DIR}/.kimigayo-build-version"
+
+# Check if OpenRC is already built at the version we want
 if [ -f "${OPENRC_INSTALL_DIR}/sbin/openrc" ] && [ -d "${OPENRC_INSTALL_DIR}/lib/rc/rc" ]; then
-    log_info "OpenRC already built and installed: ${OPENRC_INSTALL_DIR}"
-    log_info "Skipping build (use 'make clean' to rebuild)"
-    log_success "All essential binaries verified"
-    log_info "OpenRC build check completed!"
-    exit 0
+    installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
+    if [ "$installed_version" = "$OPENRC_VERSION" ]; then
+        log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
+        log_info "Skipping build (use 'make clean-openrc' to rebuild)"
+        log_success "All essential binaries verified"
+        log_info "OpenRC build check completed!"
+        exit 0
+    fi
+    log_warning "Installed OpenRC is ${installed_version}, want ${OPENRC_VERSION} -- rebuilding"
+    rm -rf "${OPENRC_INSTALL_DIR}"
 fi
 
 # Check if source directory exists
@@ -370,6 +382,9 @@ for dir in "${OPENRC_INSTALL_DIR}/sbin" "${OPENRC_INSTALL_DIR}/usr/sbin"; do
     fi
 done
 set -o pipefail
+
+# どの版をインストールしたかを残す（次回のビルド済み判定に使う）
+echo "$OPENRC_VERSION" > "$BUILD_VERSION_STAMP"
 
 log_success "OpenRC is ready for integration"
 

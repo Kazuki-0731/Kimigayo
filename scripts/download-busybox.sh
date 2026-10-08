@@ -83,11 +83,16 @@ else
     # Download BusyBox with mirror fallback
     log_info "Downloading BusyBox ${BUSYBOX_VERSION}..."
 
-    # Multiple mirror URLs for redundancy (GitHub mirror first as it's faster and more reliable)
+    # 公式 tarball を先に試す。
+    # GitHub ミラーの自動生成アーカイブは公式と別のバイト列になるため
+    # チェックサム検証を飛ばすことになる（skip_checksum=true）。
+    # 加えて mirror/busybox には新しいタグが無いことがあり、
+    # 実際に 1_38_0 は 404 だった（2026-10-09 実測）。
+    # 検証できる経路を第一候補にし、GitHub ミラーは最後の保険に回す。
     urls=(
-        "${BUSYBOX_GITHUB_MIRROR}/archive/refs/tags/${github_tag_version}.tar.gz"
         "${BUSYBOX_BASE_URL}/${tarball_filename}"
         "https://www.busybox.net/downloads/${tarball_filename}"
+        "${BUSYBOX_GITHUB_MIRROR}/archive/refs/tags/${github_tag_version}.tar.gz"
     )
 
     download_success=false

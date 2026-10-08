@@ -24,6 +24,8 @@ source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 MUSL_SRC_DIR="${PROJECT_ROOT}/build/musl-src/musl-${MUSL_VERSION}"
 MUSL_BUILD_DIR="${PROJECT_ROOT}/build/musl-build-${ARCH}"
 MUSL_INSTALL_DIR="${PROJECT_ROOT}/build/musl-install-${ARCH}"
+# ビルド済み判定にバージョンを使うためのスタンプ（CLAUDE.md 参照）
+BUILD_VERSION_STAMP="${PROJECT_ROOT}/build/musl-install-${ARCH}/.kimigayo-build-version"
 BUILD_LOG="${PROJECT_ROOT}/build/logs/musl-build.log"
 
 # Colors for output
@@ -410,13 +412,19 @@ main() {
     log_info "Build Type: ${BUILD_TYPE}"
     log_info ""
 
-    # Check if musl is already built and installed
+    # Check if musl is already built at the version we want
+    # （ファイルの存在だけを見ると、版を上げても古い libc が残り続ける）
     if [ -f "${MUSL_INSTALL_DIR}/lib/libc.so" ] && [ -f "${MUSL_INSTALL_DIR}/bin/musl-gcc" ]; then
-        log_info "musl libc already built and installed: ${MUSL_INSTALL_DIR}"
-        log_info "Skipping build (use 'make clean' to rebuild)"
-        show_summary
-        log_info "musl libc build check completed!"
-        exit 0
+        installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
+        if [ "$installed_version" = "$MUSL_VERSION" ]; then
+            log_info "musl libc ${MUSL_VERSION} already built and installed: ${MUSL_INSTALL_DIR}"
+            log_info "Skipping build (use 'make clean-musl' to rebuild)"
+            show_summary
+            log_info "musl libc build check completed!"
+            exit 0
+        fi
+        log_warn "Installed musl is ${installed_version}, want ${MUSL_VERSION} -- rebuilding"
+        rm -rf "${MUSL_INSTALL_DIR}"
     fi
 
     setup_arch
@@ -428,6 +436,9 @@ main() {
     verify_installation
     create_musl_gcc_wrapper
     show_summary
+
+    # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
+    echo "$MUSL_VERSION" > "$BUILD_VERSION_STAMP"
 
     log_info "musl libc build completed successfully!"
 

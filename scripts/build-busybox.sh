@@ -60,12 +60,24 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
-# Check if BusyBox is already built
+# ビルド済み判定は「バージョンも一致しているか」で行う。
+# ファイルの存在だけを見ていたため、versions.mk の版を上げても
+# 古いインストール結果が残っているとビルドを丸ごとスキップし、
+# 「成功」と報告しながら古いバイナリが rootfs に入っていた
+# （実際に BusyBox 1.36.1 が 1.38.0 のつもりで残った）。
+BUILD_VERSION_STAMP="${BUSYBOX_INSTALL_DIR}/.kimigayo-build-version"
+
+# Check if BusyBox is already built at the version we want
 if [ -f "${BUSYBOX_INSTALL_DIR}/bin/busybox" ]; then
-    log_info "BusyBox already built and installed: ${BUSYBOX_INSTALL_DIR}"
-    log_info "Skipping build (use 'make clean' to rebuild)"
-    log_info "BusyBox build check completed!"
-    exit 0
+    installed_version="$(cat "$BUILD_VERSION_STAMP" 2>/dev/null || echo "unknown")"
+    if [ "$installed_version" = "$BUSYBOX_VERSION" ]; then
+        log_info "BusyBox ${BUSYBOX_VERSION} already built and installed: ${BUSYBOX_INSTALL_DIR}"
+        log_info "Skipping build (use 'make clean-busybox' to rebuild)"
+        log_info "BusyBox build check completed!"
+        exit 0
+    fi
+    log_warning "Installed BusyBox is ${installed_version}, want ${BUSYBOX_VERSION} -- rebuilding"
+    rm -rf "${BUSYBOX_INSTALL_DIR}"
 fi
 
 # Check if source directory exists
@@ -454,6 +466,9 @@ log_info "  Binary size (stripped): ${stripped_size_kb} KB"
 log_info "  Target size: ${target_size} KB"
 log_info "  Applets installed: ${applet_count}"
 log_info "  Installation directory: ${install_prefix}"
+
+# どの版をインストールしたかを残す（次回のビルド済み判定に使う）
+echo "$BUSYBOX_VERSION" > "$BUILD_VERSION_STAMP"
 
 # Record build success
 "${PROJECT_ROOT}/scripts/build-status.sh" record busybox 2>/dev/null || true
