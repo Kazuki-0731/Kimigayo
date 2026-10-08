@@ -393,8 +393,25 @@ make benchmark             # 全ベンチマーク
     'cd /build/kimigayo && ARCH=x86_64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
 
   # 2) イメージ化と smoke テストはホスト側（docker が使える）
-  make package-rootfs build-image test-smoke ARCH=x86_64 VARIANT=standard
+  #    ただし make package-rootfs / build-image / test-smoke は
+  #    build-rootfs に依存しているので macOS では使えない。
+  #    Makefile と同じ処理を手で打つ:
+  cd build/rootfs && COPYFILE_DISABLE=1 tar czf \
+    ../../output/kimigayo-standard-latest-x86_64.tar.gz \
+    --exclude='._*' --exclude='.DS_Store' . && cd -
+  docker build --platform linux/amd64 -f Dockerfile.runtime \
+    --build-arg TARBALL_PATH=output/kimigayo-standard-latest-x86_64.tar.gz \
+    -t kimigayo-os:standard-x86_64 .
+  docker run --rm --platform linux/amd64 kimigayo-os:standard-x86_64 \
+    /bin/sh -c 'ls / && busybox | head -1'
   ```
+
+  **`COPYFILE_DISABLE=1` を外さないこと。** macOS の `bsdtar` は
+  AppleDouble メンバー（`._*`）を**除外処理のあとに自分で生成する**ため
+  `--exclude='._*'` では止まらない。さらに **bsdtar は自分が作った `._*` を
+  一覧表示時に隠す**ので `tar tzf` で確認しても気づけない
+  （Linux 側で展開すると出てくる）。
+  実測では **458 個の `._*` がイメージに入っていた**（2026-10-09）
 
   **Linux ホストなら `make ci-build-local` がそのまま通る。**
   GitHub Actions（`ubuntu-latest`）はこの経路

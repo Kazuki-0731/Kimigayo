@@ -241,7 +241,13 @@ package-rootfs: build-rootfs
 	@echo "=== Packaging rootfs into tarball ==="
 	@mkdir -p output
 	@# macOSのリソースフォーク（._*）とその他の不要ファイルを除外
-	@cd build/rootfs && tar czf ../../output/$(TARBALL_NAME) \
+	@#
+	@# COPYFILE_DISABLE=1 が必須。macOS の bsdtar は AppleDouble メンバー
+	@# （._*）を「除外処理のあとに」自分で生成するため、--exclude='._*' では
+	@# 止まらない。さらに bsdtar は自分が作った ._* を一覧表示時に隠すので、
+	@# tar tzf で確認しても気づけない（Linux 側で展開すると出てくる）。
+	@# 実測: COPYFILE_DISABLE なしで 458 個の ._* がイメージに入っていた。
+	@cd build/rootfs && COPYFILE_DISABLE=1 tar czf ../../output/$(TARBALL_NAME) \
 		--exclude='._*' \
 		--exclude='.DS_Store' \
 		--exclude='.AppleDouble' \
