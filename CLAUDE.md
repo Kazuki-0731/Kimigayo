@@ -443,6 +443,27 @@ make benchmark             # 全ベンチマーク
 > 消すか作り直す。放置すると「適用されているつもり」のまま進む。
 > 同じことが `scripts/apply-busybox-patches.sh`（`build/busybox-patches.log`）にも言える。
 
+### 版を上げたら `build/` の残骸を疑う
+
+**`build/` には前の版の成果物が残る。これが2通りの形で事故になる。**
+2026-10-09 の更新では**両方を実際に踏んだ**。
+
+1. **黙って古いものが使われる（こちらが危険）** —
+   ビルド済み判定が版を見ていないと、ビルドを飛ばして
+   「✅ build completed」と報告しながら古いバイナリを残す。
+   BusyBox 1.36.1 が 1.38.0 のつもりで残った
+2. **後段で意味の分かりにくいエラーになる** —
+   古い meson で作った `openrc-build-*/meson-private/build.dat` が
+   `references functions or classes that don't exist` で `meson setup` を止めた
+
+**いまは `scripts/build-{musl,busybox,openrc}.sh` が
+`.kimigayo-build-version` と `versions.mk` を突合し、違っていれば
+インストール先とビルドディレクトリの両方を捨てて作り直す。**
+それでも想定外の残骸は出るので、**版上げ直後にビルドが妙な挙動をしたら
+まず `make clean-<component>` を試す**（`clean-musl` / `clean-kernel` /
+`clean-busybox` / `clean-openrc`）。`make clean-all` は
+`build/downloads/` まで消して約150MBの再取得を招くので最後の手段。
+
 ### 版上げで実際に壊れた箇所（前例）
 
 **上流のビルドオプションは消える。** 2026-10-09 の OpenRC 0.52.1 → 0.63.2 で、
