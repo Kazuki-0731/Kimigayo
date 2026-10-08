@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   単一の真実の源と、シェル側のローダ
 - **`TODO.md`** / **`NEXT.md`** — 経緯・判断待ちと直近やること
 - **`requirements-dev.txt`** — 開発・テスト用の Python 依存
+- **`.coveragerc`** — カバレッジ設定（`pytest.ini` に書いても効かないため）
+- `make print-versions` / `print-kernel` 等 — versions.mk の値を単発で取り出す
 - **`src/kernel/patches/README.md`** — 各パッチが存在する理由と、
   版上げ時に当たらなくなったパッケージの扱い
 - カーネル tarball の SHA-256 照合（これまで計算して表示するだけだった）
@@ -68,6 +70,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   「Applied 1 patches successfully」と報告していたのを修正。
   適用／当たらなかった／プレースホルダを分けて数えるようにした
 - `build-system/Makefile` の `VERSION := 0.1.0` を git タグ由来に変更
+- **`apk fetch --arch aarch64` が署名検証で失敗していた** — Alpine は
+  アーキテクチャごとに別の鍵で署名しており、x86_64 のベースイメージには
+  x86_64 用の鍵しか入っていない。`--keys-dir /usr/share/apk/keys/aarch64`
+  を渡して解決（`--allow-untrusted` は使わず検証を維持）
+- **OpenRC 0.63.2 が要求する `libcap` がビルド環境に無かった** —
+  0.52.1 では `-Dcapabilities` で無効化できたが、そのオプションごと
+  上流から削除され必須になっている。`libcap` / `libcap-dev` を追加し、
+  arm64 クロス用には sysroot 側に `libcap.pc` を置いて meson の
+  クロスファイルから `pkg_config_libdir` / `sys_root` で指すようにした
+- **`pytest.ini` に書いた `[hypothesis]` と `[coverage:*]` が効いていなかった** —
+  hypothesis は ini ファイルを読まず、coverage が読むのは
+  `.coveragerc` / `setup.cfg` / `tox.ini` / `pyproject.toml` で `pytest.ini` は
+  読まない。coverage 設定を `.coveragerc` に移し、hypothesis 設定は
+  `tests/conftest.py` のプロファイルに一本化した
+- **hypothesis の既定デッドライン 200ms で3件のプロパティテストが
+  落ちていた** — `tmp_path` への実ファイル書き込みとサブプロセス起動を
+  含むテストが 300-400ms かかるため。ロジックではなく実行速度の問題なので
+  プロファイルに `deadline=None` を設定した
+- **`datetime.utcnow()` / `utcfromtimestamp()` の非推奨**（Python 3.12 で
+  非推奨、将来削除）。`datetime.now(timezone.utc).replace(tzinfo=None)` に
+  置き換えた（naive に戻さないと `isoformat()` が `+00:00` を付けて
+  末尾 `"Z"` の既存書式が壊れる）
+- `tests/conftest.py` の `KIMIGAYO_VERSION = "0.1.0"` を git タグ由来に変更
 
 ### Removed
 
