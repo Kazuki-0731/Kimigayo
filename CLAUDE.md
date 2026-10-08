@@ -435,6 +435,21 @@ make benchmark             # 全ベンチマーク
   リネームとキャッシュ位置の変更（`libexec` → `/var/cache/rc`）があった
   （このリポジトリの `src/openrc/init.d/`・`configs/openrc/rc.conf` は
   どちらも使っていないので影響なしと確認済み）
+- **オプションが消えると、任意だった依存が必須になることがある。**
+  OpenRC 0.52.1 の libcap は
+  `dependency('libcap', required: get_option('capabilities'))` で任意だったが、
+  0.63.2 では `dependency('libcap', version: '>=2.33')` になり**必須**。
+  `capabilities` オプション自体が消えているので無効化できない。
+  ビルド環境に `libcap-dev` を入れ、arm64 クロス用には sysroot 側に
+  `libcap.pc` を置いて meson のクロスファイルから `pkg_config_libdir` で
+  指すようにした（ホストの `.pc` を拾わせない）
+- **`apk` でクロスアーキテクチャのパッケージを取るときは鍵を指定する。**
+  Alpine はアーキテクチャごとに別の鍵で署名しており、x86_64 のイメージには
+  `/etc/apk/keys` に x86_64 用の鍵しか入っていない。
+  `apk fetch --arch aarch64` だけでは APKINDEX が `UNTRUSTED signature` に
+  なり `unable to select package` で失敗する。
+  `--keys-dir /usr/share/apk/keys/aarch64` を渡す
+  （`--allow-untrusted` で黙らせない。署名検証は維持する）
 
 ---
 
@@ -451,6 +466,25 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 - **マーカーは `pytest.ini` に定義済み**（`unit`・`property`・`integration`・
   `slow`・`security`）。`--strict-markers` なので**未定義のマーカーを使うと落ちる**。
   新しいマーカーを使うなら `pytest.ini` に足す
+- **設定の置き場所を間違えると「書いてあるのに効いていない」状態になる。**
+  2026-10-09 まで `pytest.ini` に `[hypothesis]` と `[coverage:run]` /
+  `[coverage:report]` が書かれていたが、**どちらも効いていなかった**
+  （hypothesis は ini を読まない。coverage が読むのは `.coveragerc` /
+  `setup.cfg` / `tox.ini` / `pyproject.toml` で `pytest.ini` は読まない）。
+  正しい置き場所:
+
+  | 何の設定 | どこに書くか |
+  | --- | --- |
+  | pytest 本体（testpaths・addopts・markers） | `pytest.ini` の `[pytest]` |
+  | hypothesis（max_examples・verbosity・deadline） | `tests/conftest.py` の `settings.register_profile` |
+  | coverage（source・omit・report） | `.coveragerc` |
+
+- **hypothesis の `deadline` は無効にしてある**（`tests/conftest.py`）。
+  このリポジトリのプロパティテストは `tmp_path` への実ファイル書き込みや
+  サブプロセス起動を含み、1例あたり 300-400ms かかることがある。
+  既定の 200ms は純粋な関数の性能劣化を拾うための値で、ここには合わない。
+  **arm64 ホストでの linux/amd64 エミュレーションでは実際に 3 件が
+  `DeadlineExceeded` で落ちた**（ロジックの失敗ではなく実行速度の問題）
 - **プロパティテストは `hypothesis`。** 反例は `.hypothesis/examples/` に
   キャッシュされるが**これは Git 管理下に置かない**
   （2026-10-09 に 59 ファイルを追跡から外した）
