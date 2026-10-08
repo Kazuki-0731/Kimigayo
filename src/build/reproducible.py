@@ -9,7 +9,7 @@ import platform
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .config import BuildConfig
 from .image import BaseImage, build_base_image
@@ -317,7 +317,7 @@ class ReproducibleBuilder:
         # Generate build ID if not provided
         if build_id is None:
             build_id = hashlib.sha256(
-                f"{source_dir}{datetime.utcnow().isoformat()}".encode()
+                f"{source_dir}{datetime.now(timezone.utc).replace(tzinfo=None).isoformat()}".encode()
             ).hexdigest()[:16]
 
         # Calculate source hash
@@ -348,7 +348,7 @@ class ReproducibleBuilder:
 
         metadata = BuildMetadata(
             build_id=build_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             source_hash=source_hash,
             output_hash=artifact.image.checksum,
             config=config_dict,

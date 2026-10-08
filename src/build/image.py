@@ -5,7 +5,7 @@ Image building utilities for Kimigayo OS
 import hashlib
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -66,13 +66,27 @@ class BaseImage:
         return self.checksum == expected_checksum
 
 
+def _utc_naive_now() -> datetime:
+    """Return the current UTC time as a naive datetime.
+
+    datetime.utcnow() は Python 3.12 で非推奨になり将来削除される。
+    tz 付きの now(timezone.utc) に替えると isoformat() が "+00:00" を付け、
+    末尾に "Z" を足している既存の書式が壊れる（テストが厳密一致を見ている）
+    ため、naive に戻して従来と同じ文字列を保つ。
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def create_build_metadata(config: BuildConfig) -> BuildMetadata:
     """Create build metadata for reproducible builds"""
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    timestamp = _utc_naive_now().isoformat() + "Z"
 
     # In reproducible builds, use SOURCE_DATE_EPOCH
     if config.reproducible and "SOURCE_DATE_EPOCH" in os.environ:
-        timestamp = datetime.utcfromtimestamp(0).isoformat() + "Z"
+        timestamp = (
+            datetime.fromtimestamp(0, timezone.utc).replace(tzinfo=None).isoformat()
+            + "Z"
+        )
 
     # Calculate build hash (simplified for now)
     build_input = f"{config.architecture.value}{config.security_level.value}{config.reproducible}"
