@@ -199,7 +199,7 @@ Kimigayo OSはdistroless設計を採用しており、パッケージマネー�
 
 ```bash
 # マルチステージビルドの例
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache vim curl wget
 
 FROM ishinokazuki/kimigayo-os:latest

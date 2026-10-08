@@ -35,6 +35,12 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 ### 🎯 v2.0.1 パフォーマンス実績
 
+> 下表は **v2.0.1（2026-01-16）時点の実測値**。
+> その後 2026-10-09 に構成要素をまとめて更新している
+> （カーネル 6.6.11 → 6.18.55、musl 1.2.4 → 1.2.6、
+> BusyBox 1.36.1 → 1.38.0、OpenRC 0.52.1 → 0.63.2）ため、
+> **現在の値は再測定待ち**。
+
 | 指標 | v2.0.1実測値 | 目標値 | 達成状況 |
 |------|-------------|--------|---------|
 | イメージサイズ (Standard) | **1.17MB** (1,171KB) | < 5MB | ✅ **目標の23%** |
@@ -63,10 +69,19 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 ### 🔧 主要コンポーネント
 
-- **カーネル**: セキュリティ強化された Linux カーネル（ASLR, DEP, PIE 等）
-- **C ライブラリ**: musl libc（軽量・高速・セキュア）
-- **コアユーティリティ**: BusyBox（単一バイナリで多数の Unix コマンドを提供）
-- **Init システム**: OpenRC ベース（systemd より軽量でシンプル）
+| コンポーネント | バージョン | 役割 |
+|---|---|---|
+| **Linux カーネル** | 6.18.55 (LTS) | セキュリティ強化（ASLR, DEP, PIE 等）。EOL 2028-12 |
+| **musl libc** | 1.2.6 | C ライブラリ（軽量・高速・セキュア） |
+| **BusyBox** | 1.38.0 | コアユーティリティ（単一バイナリで多数の Unix コマンド） |
+| **OpenRC** | 0.63.2 | Init システム（systemd より軽量でシンプル） |
+| Alpine Linux | 3.24 | ビルド環境のベース（成果物には含まれない） |
+
+バージョンの定義は [versions.mk](versions.mk) が唯一の場所。
+現在の値は `make print-versions` で確認できる。
+
+> **注**: カーネルは Docker イメージには含まれない（コンテナはホストの
+> カーネルで動く）。カーネルをビルドするのはベアメタル／QEMU 検証のため。
 
 ### 🎯 設計思想: Distroless + Alpine のハイブリッドアプローチ
 
@@ -94,7 +109,7 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 
 ```dockerfile
 # マルチステージビルドで必要なものを全てビルド時に準備
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache python3 py3-pip
 COPY requirements.txt .
 RUN pip install -r requirements.txt
@@ -383,7 +398,7 @@ make shell
 
 # コンテナ内でカーネルソースツリーのクリーニング
 # ビルドスクリプトが自動で実行しますが、手動でも可能
-cd /build/kimigayo/build/kernel-src/linux-6.6.11
+cd /build/kimigayo/build/kernel-src/linux-$(make -s -C /build/kimigayo print-kernel)
 make mrproper
 
 # コンテナから出て完全クリーンビルド（すべてリセット）

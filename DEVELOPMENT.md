@@ -11,10 +11,13 @@ Kimigayo/
 ├── build/                  # ビルド作業ディレクトリ
 ├── docs/                   # ドキュメント
 ├── src/                    # ソースコード
-│   ├── kernel/             # カーネル設定
-│   ├── init/               # Initシステム
-│   ├── pkg/                # パッケージマネージャ
-│   └── utils/              # ユーティリティ
+│   ├── kernel/             # カーネル設定・パッチ
+│   ├── libc/               # musl libc
+│   ├── busybox/            # BusyBox設定・パッチ
+│   ├── init/, openrc/      # Initシステム（OpenRC）
+│   ├── security/           # 強化設定
+│   ├── benchmark/          # 計測
+│   └── toolchain/          # クロスコンパイル
 ├── tests/                  # テストコード
 │   ├── unit/               # 単体テスト
 │   ├── property/           # プロパティテスト
@@ -24,6 +27,8 @@ Kimigayo/
 ├── Dockerfile              # ビルド環境
 ├── docker-compose.yml      # Docker Compose設定
 ├── Makefile                # ビルドシステム
+├── versions.mk             # 構成要素のバージョン（単一の真実の源）
+├── CLAUDE.md               # 作業ルールとプロジェクト固有の勘所
 └── SPECIFICATION.md        # 仕様書
 ```
 
@@ -34,11 +39,14 @@ Kimigayo/
 すべての開発はDockerコンテナ内で行うことを推奨します:
 
 ```bash
-# コンテナ起動
-docker-compose run --rm kimigayo-build
+# ビルド環境イメージを構築
+make docker-build
 
-# シェルに入る
-docker-compose run --rm kimigayo-build /bin/bash
+# シェルに入る（推奨。ビルドの進捗がリアルタイムで見える）
+make shell
+
+# 直接叩く場合
+docker compose run --rm kimigayo-build /bin/bash
 ```
 
 ### ローカル環境（上級者向け）
@@ -56,12 +64,14 @@ sudo apt-get install build-essential gcc g++ make cmake \
 
 ### Makefileターゲット
 
+全量は `make help`。
+
 ```bash
-# ヘルプを表示
+# ヘルプを表示（これが最新の一覧）
 make help
 
-# すべてをビルド
-make all
+# OSをビルド（コンテナ内で musl -> kernel -> BusyBox -> OpenRC）
+make build
 
 # アーキテクチャ指定ビルド
 make build ARCH=x86_64
@@ -70,18 +80,22 @@ make build ARCH=arm64
 # テスト実行
 make test
 
-# クリーン
+# どこまで完了したか / ビルド設定
+make status
+make info
+
+# クリーン（clean=成果物のみ / clean-cache=ダウンロード / clean-all=全部）
 make clean
 
-# セキュリティスキャン
+# セキュリティスキャン（Trivy + ShellCheck）
 make security-scan
 
-# ISOイメージ生成
-make iso
-
-# Dockerイメージ生成
-make docker-image
+# rootfs から Docker イメージまで（GitHub Actions 相当）
+make ci-build-local
 ```
+
+**ISO イメージ生成（`make iso`）は無い。**
+Kimigayo OS はコンテナ向けで、成果物は rootfs の tarball と Docker イメージ。
 
 ### ビルドプロセス
 
@@ -90,7 +104,11 @@ make docker-image
 3. **BusyBoxビルド**: カスタマイズ可能
 4. **Initシステムビルド**: OpenRCベース
 5. **ルートファイルシステム構築**
-6. **イメージ生成**: ISO/Docker
+6. **イメージ生成**: rootfs tarball（`output/*.tar.gz`）→ Docker イメージ
+
+**Docker イメージに入るのは rootfs だけで、カーネルは含まれない**
+（コンテナはホストのカーネルで動く）。カーネルをビルドするのは
+ベアメタル／QEMU 検証のため。
 
 ## テスト戦略
 
@@ -117,8 +135,14 @@ def test_build_size_constraint(build_config):
 個別のコンポーネントをテスト:
 
 ```bash
+# 依存をインストール
+pip install -r requirements-dev.txt
+
 # 特定のテストを実行
-pytest tests/unit/test_pkg_manager.py -v
+pytest tests/unit/test_build_config.py -v
+
+# マーカーで絞る（unit / property / integration / slow / security）
+pytest -m "not slow" -q
 
 # カバレッジ測定
 pytest --cov=src tests/
@@ -129,36 +153,49 @@ pytest --cov=src tests/
 システム全体をテスト:
 
 ```bash
-# QEMU環境でのテスト
-make integration-test
+# rootfs tarball に対する統合テスト
+make test-integration
 
-# Docker環境でのテスト
-make docker-test
+# Dockerイメージの起動テスト
+make test-docker
+
+# 機能テスト（BusyBox, Network）
+make test-func
+
+# QEMU でのカーネル起動テスト
+ARCH=x86_64 bash scripts/test-kernel-qemu.sh
 ```
 
 ## デバッグ
 
 ### QEMUでのデバッグ
 
-```bash
-# QEMUで起動（デバッグモード）
-make qemu-debug
+`make qemu-debug` というターゲットは無い。スクリプトを直接使う。
 
-# GDBアタッチ
-gdb -ex "target remote :1234" build/kernel/vmlinuz
+```bash
+# QEMUでカーネルを起動
+ARCH=x86_64 TIMEOUT=30 bash scripts/test-kernel-qemu.sh
+
+# ビルド済みカーネルイメージの場所
+ls build/kernel/output/
+
+# GDBアタッチ（QEMU 側に -s -S を渡して起動した場合）
+gdb -ex "target remote :1234" build/kernel-src/linux-$(make -s print-kernel)/vmlinux
 ```
 
 ### ログ確認
 
 ```bash
-# ビルドログ
-tail -f build/build.log
+# 各コンポーネントのビルドログ（最新100行）
+make log-kernel
+make log-musl
+make log-openrc
 
-# カーネルログ（QEMU内）
-dmesg
+# パッチ適用の結果（版上げ後は必ず見る）
+grep -i 'skipped\|not applicable' build/kernel-patches.log build/busybox-patches.log
 
-# Initログ
-cat /var/log/init.log
+# 生ログ
+ls build/logs/
 ```
 
 ## セキュリティ
@@ -175,28 +212,34 @@ cat /var/log/init.log
 ### セキュリティスキャン
 
 ```bash
-# 静的解析
+# 総合（Trivy イメージ + Trivy FS + ShellCheck）
 make security-scan
 
-# 依存関係チェック
-make dependency-check
+# 個別
+make trivy-scan
+make trivy-fs-scan
+make shellcheck-scan
 ```
+
+依存関係のレビューは CI 側（`.github/workflows/dependency-review.yml`）で回る。
 
 ## パフォーマンス測定
 
 ### 起動時間測定
 
 ```bash
-# QEMUでの起動時間計測
-make measure-boot-time
+make benchmark-startup
 ```
 
 ### メモリ使用量測定
 
 ```bash
-# メモリプロファイリング
-make memory-profile
+make benchmark-memory
 ```
+
+全ベンチマークは `make benchmark`。
+**取った数値は README とベンチマークドキュメントに反映するまでが1セット**
+（→ [CLAUDE.md](CLAUDE.md)「数値を出したら反映まで」節）。
 
 ### ベンチマーク
 
@@ -210,22 +253,41 @@ make benchmark
 ### ビルドエラー
 
 ```bash
-# クリーンビルド
-make clean && make all
+# クリーンビルド（成果物のみ削除。ダウンロードキャッシュは残る）
+make clean && make build
 
-# 詳細ログ
-make V=1 all
+# 完全リセット（ダウンロードキャッシュも消える。再取得は約150MB）
+make clean-all && make build
+
+# 個別のコンポーネントだけやり直す（コンテナ内）
+make clean-kernel && make kernel
+```
+
+**版を上げた直後にビルドが通らないときは、まずパッチの適用結果を見る。**
+当たらなかったパッチは黙ってスキップされる:
+
+```bash
+grep -i 'skipped\|not applicable' build/kernel-patches.log build/busybox-patches.log
 ```
 
 ### Dockerエラー
 
 ```bash
 # イメージ再ビルド
-docker-compose build --no-cache
+make docker-rebuild
 
-# ボリューム削除
-docker-compose down -v
+# コンテナ停止・削除
+make down
+
+# ボリューム（ダウンロードキャッシュ・出力）も削除
+docker compose down -v
 ```
+
+**開発機が Apple Silicon（arm64）の場合、`docker-compose.yml` が
+`platform: linux/amd64` を固定しているため QEMU エミュレーションになる。**
+musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルドは
+非現実的なので GitHub Actions に任せる（→ [CLAUDE.md](CLAUDE.md)
+「ビルドの現実的な制約」節）。
 
 ## リリースプロセス
 

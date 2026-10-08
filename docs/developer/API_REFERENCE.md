@@ -369,7 +369,7 @@ Kimigayo OSはdistroless的アプローチを採用しており、パッケー�
 
 ```dockerfile
 # ビルドステージでソフトウェアを準備
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache nginx openssl
 
 # Kimigayo OSで最小ランタイムを構築

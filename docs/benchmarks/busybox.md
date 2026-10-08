@@ -40,7 +40,7 @@ bash scripts/benchmark-busybox.sh
 
 # 環境変数でカスタマイズ
 IMAGE_NAME=kimigayo-os:standard-x86_64 \
-ALPINE_IMAGE=alpine:3.19 \
+ALPINE_IMAGE=alpine:3.24 \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-busybox.sh
 ```
@@ -211,7 +211,7 @@ Kimigayo OSは全体で10-16%高速：
 docker pull alpine:latest
 
 # または特定バージョンを指定
-ALPINE_IMAGE=alpine:3.19 make benchmark-busybox
+ALPINE_IMAGE=alpine:3.24 make benchmark-busybox
 ```
 
 ### bc: command not found エラー

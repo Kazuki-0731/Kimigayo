@@ -244,7 +244,7 @@ docker compose down
 
 ```dockerfile
 # ビルドステージ
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache gcc musl-dev
 COPY src/ /src
 WORKDIR /src
@@ -419,7 +419,7 @@ docker images | grep kimigayo-os
 
 ```bash
 # マルチステージビルドの例
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache curl
 
 FROM ishinokazuki/kimigayo-os:latest

@@ -26,7 +26,7 @@ Kimigayo OSは全てのパフォーマンス目標を達成し、競合OSと比�
 | **Kimigayo Standard** | 3MB | 3倍 |
 | **Kimigayo Extended** | 3MB | 3倍 |
 | BusyBox | 3MB | 3倍 |
-| Alpine 3.19 | 7MB | 7倍 |
+| Alpine 3.19 | 7MB | 7倍 |  <!-- v2.0.1 時点の実測。比較対象の Alpine も当時の版 -->
 | Alpine Latest | 8MB | 8倍 |
 | Ubuntu 22.04 | 66MB | 66倍 |
 | Debian Stable Slim | 95MB | 95倍 |

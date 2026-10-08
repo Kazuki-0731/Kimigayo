@@ -88,7 +88,7 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-musl-
 **推奨パターン:**
 ```dockerfile
 # ビルドステージ
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache python3 py3-pip
 COPY requirements.txt .
 RUN pip install -r requirements.txt

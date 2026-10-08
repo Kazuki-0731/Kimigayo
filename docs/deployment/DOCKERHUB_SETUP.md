@@ -179,7 +179,7 @@ docker run kimigayo-os:latest uname -a
 
 ```dockerfile
 # マルチステージビルドで必要なものを準備
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache nginx
 
 # Kimigayo OSで最小ランタイム環境を構築

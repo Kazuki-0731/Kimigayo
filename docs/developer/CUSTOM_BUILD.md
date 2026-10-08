@@ -149,7 +149,7 @@ CMD ["/usr/local/bin/myapp"]
 
 ```dockerfile
 # ビルドステージ
-FROM alpine:3.19 AS builder
+FROM alpine:3.24 AS builder
 
 RUN apk add --no-cache gcc g++ musl-dev make
 
