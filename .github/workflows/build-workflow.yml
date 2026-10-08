@@ -75,10 +75,10 @@ jobs:
       run: docker compose build
 
     - name: Run unit tests
-      run: docker compose run --rm kimigayo-build pytest tests/unit/ -v || echo "Unit tests not ready yet"
+      run: docker compose run --rm kimigayo-build pytest tests/unit/ -v
 
     - name: Run property tests
-      run: docker compose run --rm kimigayo-build pytest tests/property/ -v || echo "Property tests not ready yet"
+      run: docker compose run --rm kimigayo-build pytest tests/property/ -v
 
     - name: Upload test results
       uses: actions/upload-artifact@v6

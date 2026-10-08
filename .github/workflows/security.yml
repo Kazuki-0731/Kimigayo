@@ -44,8 +44,16 @@ jobs:
       - name: Check musl libc updates
         id: musl_check
         run: |
-          CURRENT_MUSL=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
-          LATEST_MUSL=$(curl -sL https://www.musl-libc.org/ | grep -oP 'musl-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "$CURRENT_MUSL")
+          # 現在のバージョンは versions.mk（単一の真実の源）から読む。
+          # 以前は scripts/build-rootfs.sh を grep していたが、そこに
+          # MUSL_VERSION= は存在せず常に空だったため、毎日「更新が必要」と
+          # 報告し続けていた。
+          # shellcheck disable=SC1091
+          source scripts/lib/versions.sh
+          CURRENT_MUSL="$MUSL_VERSION"
+          LATEST_MUSL=$(curl -sL https://musl.libc.org/releases.html \
+            | grep -oP 'musl-\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "$CURRENT_MUSL")
+          [ -n "$LATEST_MUSL" ] || LATEST_MUSL="$CURRENT_MUSL"
 
           echo "Current musl: $CURRENT_MUSL, Latest: $LATEST_MUSL"
           echo "current=$CURRENT_MUSL" >> $GITHUB_OUTPUT
@@ -60,8 +68,11 @@ jobs:
       - name: Check BusyBox updates
         id: busybox_check
         run: |
-          CURRENT_BUSYBOX=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          # shellcheck disable=SC1091
+          source scripts/lib/versions.sh
+          CURRENT_BUSYBOX="$BUSYBOX_VERSION"
           LATEST_BUSYBOX=$(curl -sL https://busybox.net/downloads/ | grep -oP 'busybox-\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "$CURRENT_BUSYBOX")
+          [ -n "$LATEST_BUSYBOX" ] || LATEST_BUSYBOX="$CURRENT_BUSYBOX"
 
           echo "Current BusyBox: $CURRENT_BUSYBOX, Latest: $LATEST_BUSYBOX"
           echo "current=$CURRENT_BUSYBOX" >> $GITHUB_OUTPUT
@@ -165,7 +176,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -205,7 +216,7 @@ jobs:
           docker pull ${IMAGE_REF} || echo "Failed to pull ${IMAGE_REF}"
 
       - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
           image-ref: ${{ env.IMAGE_REF }}

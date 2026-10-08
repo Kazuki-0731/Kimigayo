@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run ShellCheck (Static Analysis)
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         continue-on-error: true
         with:
           scandir: './scripts'
@@ -144,7 +144,7 @@ jobs:
 
           # Run tests in Docker container (same environment as build)
           docker compose run --rm kimigayo-build \
-            pytest tests/integration/test_phase1_integration.py -v || echo "Phase 1 tests not ready yet"
+            pytest tests/integration/test_phase1_integration.py -v
 
           # Verify rootfs tarball exists
           TARBALL_COUNT=$(ls -1 output/kimigayo-${{ matrix.variant }}-*.tar.gz 2>/dev/null | wc -l)
@@ -230,7 +230,7 @@ jobs:
           echo "tag=${FIRST_TAG}" >> $GITHUB_OUTPUT
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         if: matrix.arch == 'x86_64'
         with:
@@ -258,7 +258,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run Trivy vulnerability scanner (table output)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         if: matrix.arch == 'x86_64'
         with:
           image-ref: ${{ steps.trivy_tag.outputs.tag }}

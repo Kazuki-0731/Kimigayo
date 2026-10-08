@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy vulnerability scanner (filesystem)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -52,7 +52,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run Trivy vulnerability scanner (table output)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -92,21 +92,29 @@ jobs:
         run: |
           echo "=== Checking component versions against known CVEs ==="
 
-          # Extract versions
-          MUSL_VERSION=$(grep 'MUSL_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
-          BUSYBOX_VERSION=$(grep 'BUSYBOX_VERSION=' scripts/build-rootfs.sh | head -1 | cut -d'=' -f2 | tr -d '"')
+          # Extract versions from versions.mk (single source of truth)
+          #
+          # 以前は scripts/build-rootfs.sh を grep していたが、そこに
+          # MUSL_VERSION= / BUSYBOX_VERSION= は存在せず常に空文字になっていた。
+          # OpenRC と Alpine はハードコードされた古い値（0.44+ / edge）だった。
+          # shellcheck disable=SC1091
+          source scripts/lib/versions.sh
 
-          echo "musl libc version: $MUSL_VERSION"
-          echo "BusyBox version: $BUSYBOX_VERSION"
+          echo "Linux kernel version: $KERNEL_VERSION"
+          echo "musl libc version:    $MUSL_VERSION"
+          echo "BusyBox version:      $BUSYBOX_VERSION"
+          echo "OpenRC version:       $OPENRC_VERSION"
+          echo "Alpine (build env):   $ALPINE_VERSION"
 
           # Note: In production, you would query CVE databases here
           # For now, we'll just report the versions
           cat > dependency-versions.txt << EOF
-          Component Versions:
+          Component Versions (from versions.mk):
+          - Linux kernel: $KERNEL_VERSION
           - musl libc: $MUSL_VERSION
           - BusyBox: $BUSYBOX_VERSION
-          - Alpine Linux: edge (rolling)
-          - OpenRC: 0.44+
+          - OpenRC: $OPENRC_VERSION
+          - Alpine Linux (build env): $ALPINE_VERSION
 
           For CVE information, check:
           - https://security.alpinelinux.org/
