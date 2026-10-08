@@ -5,14 +5,25 @@
 set -e
 
 # Configuration
-KERNEL_VERSION="${KERNEL_VERSION:-6.6.11}"
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 KERNEL_SRC_DIR="${PROJECT_ROOT}/build/kernel-src/linux-${KERNEL_VERSION}"
 PATCHES_DIR="${PROJECT_ROOT}/src/kernel/patches"
 PATCH_LOG="${PROJECT_ROOT}/build/kernel-patches.log"
+
+# apply_patch の戻り値:
+#   0 = 適用した
+#   2 = 差分はあるが当たらなかった（要判断。上流取り込み済み？当て直し必要？）
+#   3 = そもそも差分を含まないファイル（プレースホルダ。判断不要）
+#   他 = 失敗
+readonly PATCH_SKIPPED=2
+readonly PATCH_NOT_A_DIFF=3
 
 # Colors for output
 RED='\033[0;31m'
@@ -82,6 +93,15 @@ apply_patch() {
     local patch_name
     patch_name=$(basename "$patch_file")
 
+    # 差分を1つも含まないファイル（コメントだけのプレースホルダ）は
+    # 「当たらなかったパッチ」と混ぜない。混ぜると毎回 WARN が出続けて、
+    # 本当に当て直しが必要なパッチの警告が埋もれる。
+    if ! grep -qE '^(---|\+\+\+|diff |Index: ) ' "$patch_file" 2>/dev/null \
+       && ! grep -qE '^(--- |\+\+\+ |diff |Index: )' "$patch_file" 2>/dev/null; then
+        log_info "Not a diff (placeholder), ignoring: $patch_name"
+        return "$PATCH_NOT_A_DIFF"
+    fi
+
     log_patch "Applying patch: $patch_name"
 
     cd "$KERNEL_SRC_DIR" || return 1
@@ -96,31 +116,52 @@ apply_patch() {
         return 0
     else
         log_warn "Patch already applied or not applicable: $patch_name"
-        return 0
+        return "$PATCH_SKIPPED"
     fi
 }
 
 # Apply all patches
 apply_all_patches() {
-    local patch_count=0
+    local found_count=0
+    local applied_count=0
+    local skipped_count=0
+    local ignored_count=0
 
     # Find all patch files in patches directory
     if [ -d "$PATCHES_DIR" ]; then
         while IFS= read -r -d '' patch_file; do
-            apply_patch "$patch_file" || {
-                log_error "Failed to apply patch: $(basename "$patch_file")"
-                return 1
-            }
-            patch_count=$((patch_count + 1))
+            found_count=$((found_count + 1))
+            if apply_patch "$patch_file"; then
+                applied_count=$((applied_count + 1))
+            else
+                case "$?" in
+                    "$PATCH_SKIPPED") skipped_count=$((skipped_count + 1)) ;;
+                    "$PATCH_NOT_A_DIFF") ignored_count=$((ignored_count + 1)) ;;
+                    *)
+                        log_error "Failed to apply patch: $(basename "$patch_file")"
+                        return 1
+                        ;;
+                esac
+            fi
         done < <(find "$PATCHES_DIR" -name "*.patch" -print0 | sort -z)
     fi
 
-    if [ "$patch_count" -eq 0 ]; then
+    if [ "$found_count" -eq 0 ]; then
         log_info "No patches found in $PATCHES_DIR"
         log_info "Creating example security hardening patch..."
         create_example_patches
-    else
-        log_info "Applied $patch_count patches successfully"
+        return 0
+    fi
+
+    log_info "Patches found: ${found_count}, applied: ${applied_count}, skipped: ${skipped_count}, placeholders: ${ignored_count}"
+
+    if [ "$skipped_count" -gt 0 ]; then
+        # 当たらなかったパッチは黙って飛ばされる。カーネルを上げた直後は
+        # 「上流が取り込んだので不要」なのか「当て直しが必要」なのかを人が判断する。
+        log_warn "${skipped_count} patch(es) did not apply to Linux ${KERNEL_VERSION}."
+        log_warn "Check whether they are obsolete (upstream took them) or need rebasing:"
+        log_warn "  grep -i 'not applicable' ${PATCH_LOG}"
+        log_warn "See src/kernel/patches/README.md"
     fi
 }
 
