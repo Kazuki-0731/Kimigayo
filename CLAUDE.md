@@ -376,9 +376,28 @@ make benchmark             # 全ベンチマーク
   （`DOCKER_HUB_ACCESS_TOKEN` が入るため**絶対にコミットしない**）
 - **`make build` はホストではなくコンテナ内で走る**
   （`docker compose run --rm kimigayo-build make build`）。
-  一方 **`make ci-build-local` はホスト側で `scripts/build-rootfs.sh` を直接叩く**。
-  rootfs 作成は `build/` に musl・BusyBox・OpenRC のビルド結果が既にあることを
-  前提にしているので、**先に `make build` を通しておくこと**
+- **`make ci-build-local` は macOS ホストでは通らない。**
+  ホスト側で `scripts/build-rootfs.sh` を直接叩き、その中で
+  `build-musl.sh` 等を**実際に呼んでビルドしに行く**（成果物があることを
+  前提にはしていない）。macOS では musl の `configure` が
+  `unsupported long double type` で落ちる（実測）。
+  さらに `ARCH` を省略すると `uname -m` から自動検出するため、
+  Apple Silicon では `arm64` になり、x86_64 のビルド結果があっても使われない。
+- **ローカルで CI 相当を通したいなら、2つの環境に分けて回す。**
+  コンテナには Docker ソケットが**読み取り専用**でしか入っていないので
+  `docker build` ができず、コンテナ内だけでも完結しない:
+
+  ```bash
+  # 1) コンポーネント + rootfs はコンテナ内（ARCH は明示する）
+  docker compose run --rm kimigayo-build sh -c \
+    'cd /build/kimigayo && ARCH=x86_64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
+
+  # 2) イメージ化と smoke テストはホスト側（docker が使える）
+  make package-rootfs build-image test-smoke ARCH=x86_64 VARIANT=standard
+  ```
+
+  **Linux ホストなら `make ci-build-local` がそのまま通る。**
+  GitHub Actions（`ubuntu-latest`）はこの経路
 - **長いビルドは `make shell` → `tmux` 内で回す。** `make build` を
   そのまま叩くと出力が溜まってから出るため進捗が見えない
 
