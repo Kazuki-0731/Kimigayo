@@ -3,8 +3,13 @@
 
 set -e
 
-# Get the latest git tag
-if TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+# Get the latest release tag
+#
+# --match 'v[0-9]*' で「リリースタグだけ」に絞る。
+# 絞らないと、打ち間違いで出来た無関係なタグ（過去に `git tag list` を
+# 打ってしまった `list` タグが実在した）が最新タグとして拾われ、
+# make version / Docker イメージのタグがそれになってしまう。
+if TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null); then
     # Tag exists, use it (remove 'v' prefix if present)
     VERSION="${TAG#v}"
 elif git rev-parse --verify HEAD >/dev/null 2>&1; then
