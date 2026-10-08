@@ -51,6 +51,10 @@ RUN apk update && apk add --no-cache \
     # musl開発ツール
     musl-dev \
     musl-utils \
+    # OpenRC 0.63.2 は libcap が必須（0.52.1 の -Dcapabilities で
+    # 無効化できたが、そのオプションは上流から削除された）
+    libcap \
+    libcap-dev \
     # カーネルビルド用
     linux-headers \
     elfutils-dev \
@@ -122,13 +126,18 @@ RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 # apk fetch にパッケージ名だけ渡して、版はリポジトリに決めさせる。
 WORKDIR /tmp/aarch64-libs
 RUN apk fetch --no-cache --arch aarch64 \
+        --keys-dir /usr/share/apk/keys/aarch64 \
         --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
-        libgcc linux-headers && \
+        libgcc linux-headers libcap libcap-dev && \
     mkdir -p /usr/aarch64-linux-musl/lib /usr/aarch64-linux-musl/include && \
     tar xzf libgcc-*.apk && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
     tar xzf linux-headers-*.apk && \
     cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
+    for a in libcap-2*.apk libcap-dev-*.apk; do tar xzf "$a"; done && \
+    cp -a usr/lib/libcap.so* usr/lib/libpsx.so* /usr/aarch64-linux-musl/lib/ 2>/dev/null || true && \
+    mkdir -p /usr/aarch64-linux-musl/lib/pkgconfig && \
+    cp -a usr/lib/pkgconfig/*.pc /usr/aarch64-linux-musl/lib/pkgconfig/ && \
     ln -sf libgcc_s.so.1 /usr/aarch64-linux-musl/lib/libgcc_s.so
 WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
@@ -170,6 +179,7 @@ RUN cd /usr/aarch64-linux-musl/lib && \
 # Alpine 3.24 で LLVM 21 → 22 に上がった時点でパスが存在しなくなっていた。
 WORKDIR /tmp/compiler-rt-arm64
 RUN apk fetch --no-cache --arch aarch64 \
+        --keys-dir /usr/share/apk/keys/aarch64 \
         --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
         compiler-rt && \
     tar xzf compiler-rt-*.apk && \

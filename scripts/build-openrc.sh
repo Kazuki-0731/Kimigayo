@@ -213,6 +213,10 @@ pkgconfig = 'pkg-config'
 
 [properties]
 needs_exe_wrapper = true
+# OpenRC 0.63.2 は libcap を必須で要求する。pkg-config がホスト(x86_64)の
+# libcap.pc を拾わないよう、sysroot 側だけを見るようにする。
+sys_root = '/usr/aarch64-linux-musl'
+pkg_config_libdir = ['/usr/aarch64-linux-musl/lib/pkgconfig']
 
 [host_machine]
 system = 'linux'
