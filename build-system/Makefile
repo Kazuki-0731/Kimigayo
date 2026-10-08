@@ -12,8 +12,12 @@ endif
 
 # Project information
 PROJECT_NAME := Kimigayo OS
-VERSION := 0.1.0
+# バージョンは git のリリースタグが真実の源（0.1.0 のハードコードをやめた）
+VERSION := $(shell bash $(dir $(lastword $(MAKEFILE_LIST)))../scripts/get-version.sh 2>/dev/null || echo 0.0.0-unknown)
 BUILD_DATE := $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+# 構成要素のバージョンの単一の真実の源
+include $(dir $(lastword $(MAKEFILE_LIST)))../versions.mk
 
 # Build configuration
 # TARGET_ARCH: User-facing architecture name (x86_64, arm64)

@@ -10,8 +10,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # Directories
-BUSYBOX_SRC="${BUSYBOX_SRC:-${PROJECT_ROOT}/build/busybox-1.36.1}"
+BUSYBOX_SRC="${BUSYBOX_SRC:-${PROJECT_ROOT}/build/busybox-${BUSYBOX_VERSION}}"
 PATCHES_DIR="${PROJECT_ROOT}/src/busybox/patches"
 PATCH_LOG="${PROJECT_ROOT}/build/busybox-patches.log"
 

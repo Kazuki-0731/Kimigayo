@@ -18,7 +18,7 @@ def test_kernel_config_default_values():
     config = KernelConfig(architecture="x86_64")
 
     assert config.architecture == "x86_64"
-    assert config.version == KernelVersion.KERNEL_6_6
+    assert config.version == KernelVersion.KERNEL_6_18
     assert config.enable_hardening is True
     assert config.reproducible is True
     assert config.modules == []

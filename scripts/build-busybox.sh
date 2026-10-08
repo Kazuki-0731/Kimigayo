@@ -10,8 +10,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+
 # Configuration
-BUSYBOX_VERSION="${BUSYBOX_VERSION:-1.36.1}"
 BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
 IMAGE_TYPE="${IMAGE_TYPE:-standard}"
 ARCH="${ARCH:-x86_64}"

@@ -1,0 +1,16 @@
+# Kimigayo OS - 開発・テスト用の Python 依存
+#
+# これまで宣言ファイルが無く、Dockerfile と Makefile の test-integration と
+# CI がそれぞれ別に pip install を並べていた（ずれても誰も気づけない状態）。
+#
+#   pip install -r requirements-dev.txt
+#
+# 下限だけを指定している。ビルド環境の Alpine が載せる Python は
+# versions.mk の ALPINE_VERSION に従って上がるため、上限で固定すると
+# Alpine を上げたときにインストールできなくなる。
+
+pytest>=7.4
+hypothesis>=6.100
+pytest-cov>=4.1
+pytest-xdist>=3.5
+PyYAML>=6.0

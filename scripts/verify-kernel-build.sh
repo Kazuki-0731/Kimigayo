@@ -5,12 +5,15 @@
 set -e
 
 # Configuration
-KERNEL_VERSION="${KERNEL_VERSION:-6.6.11}"
 ARCH="${ARCH:-x86_64}"
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 KERNEL_OUTPUT_DIR="${PROJECT_ROOT}/build/kernel/output"
 KERNEL_SRC_DIR="${PROJECT_ROOT}/build/kernel-src/linux-${KERNEL_VERSION}"
 

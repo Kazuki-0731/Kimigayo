@@ -82,19 +82,15 @@ INCLUDES := -I$(MUSL_INCLUDE) -I$(SRC_DIR)/include
 # Library paths
 LIBS := -L$(MUSL_LIB)
 
+# 構成要素のバージョンは versions.mk（単一の真実の源）で定義する。
+# ここに数字を書かないこと（CLAUDE.md「バージョンの単一の真実の源」節）。
+include $(dir $(lastword $(MAKEFILE_LIST)))versions.mk
+
 # Kernel configuration
-KERNEL_VERSION ?= 6.6
 KERNEL_CONFIG := $(KERNEL_SRC)/config/kimigayo_$(ARCH)_defconfig
 
 # BusyBox configuration
-BUSYBOX_VERSION ?= 1.36.1
 BUSYBOX_CONFIG := $(UTILS_SRC)/busybox/kimigayo_defconfig
-
-# OpenRC configuration
-OPENRC_VERSION ?= 0.52
-
-# Package manager configuration
-ISN_VERSION := $(VERSION)
 
 # Build parallelism
 MAKEFLAGS += -j$(shell nproc 2>/dev/null || echo 1)

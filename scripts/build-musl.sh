@@ -6,7 +6,6 @@ set -e
 set -o pipefail
 
 # Configuration
-MUSL_VERSION="${MUSL_VERSION:-1.2.4}"
 ARCH="${ARCH:-x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
@@ -18,6 +17,10 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# バージョンは versions.mk（単一の真実の源）から読み込む
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 MUSL_SRC_DIR="${PROJECT_ROOT}/build/musl-src/musl-${MUSL_VERSION}"
 MUSL_BUILD_DIR="${PROJECT_ROOT}/build/musl-build-${ARCH}"
 MUSL_INSTALL_DIR="${PROJECT_ROOT}/build/musl-install-${ARCH}"

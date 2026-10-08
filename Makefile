@@ -1,10 +1,22 @@
 # Kimigayo OS - Docker Management Makefile
 # プロジェクト管理用の簡易コマンド集
 
+# 構成要素のバージョンの単一の真実の源（CLAUDE.md 参照）
+include versions.mk
+
+# include より後に最初のターゲットが来るので明示しておく。
+# 省略すると、include したファイルがターゲットを持った瞬間に既定ゴールを奪われる。
+.DEFAULT_GOAL := help
+
+# docker compose / Dockerfile に build arg として渡すため export する
+KIMIGAYO_VERSION ?= $(shell bash scripts/get-version.sh 2>/dev/null || echo dev)
+export ALPINE_VERSION KIMIGAYO_VERSION
+
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
+.PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
 
 # デフォルトターゲット
 help:
@@ -246,10 +258,10 @@ package-rootfs: build-rootfs
 test-integration:
 	@echo "=== Running integration tests ==="
 	@python3 -m pip install --upgrade pip --quiet
-	@pip3 install pytest hypothesis pytest-cov pytest-xdist pyyaml --quiet
+	@python3 -m pip install -r requirements-dev.txt --quiet
 	@echo "Running integration tests for $(VARIANT) variant on $(ARCH)..."
 	@if [ -f "tests/integration/test_phase1_integration.py" ]; then \
-		python3 -m pytest tests/integration/test_phase1_integration.py -v || echo "Phase 1 tests not ready yet"; \
+		python3 -m pytest tests/integration/test_phase1_integration.py -v; \
 	fi
 	@echo ""
 	@echo "=== Verifying rootfs tarball ==="
@@ -435,6 +447,20 @@ show-version:
 	@bash scripts/show-version.sh
 
 # CHANGELOG.mdを生成
+# versions.mk の値を単発で取り出す（スクリプト・ドキュメントから使う）
+print-kernel:
+	@echo $(KERNEL_VERSION)
+print-musl:
+	@echo $(MUSL_VERSION)
+print-busybox:
+	@echo $(BUSYBOX_VERSION)
+print-openrc:
+	@echo $(OPENRC_VERSION)
+print-alpine:
+	@echo $(ALPINE_VERSION)
+print-versions:
+	@echo "kernel=$(KERNEL_VERSION) musl=$(MUSL_VERSION) busybox=$(BUSYBOX_VERSION) openrc=$(OPENRC_VERSION) alpine=$(ALPINE_VERSION)"
+
 changelog:
 	@bash scripts/generate-changelog.sh
 

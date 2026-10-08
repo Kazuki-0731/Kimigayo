@@ -15,15 +15,21 @@ from enum import Enum
 
 
 class KernelVersion(Enum):
-    """Supported kernel versions"""
-    KERNEL_6_6 = "6.6"  # LTS
+    """Supported kernel versions.
+
+    実際にビルドされるバージョンは versions.mk の KERNEL_VERSION が決める
+    （単一の真実の源）。ここは Python 側から系列を指定するための列挙。
+    """
+    KERNEL_6_18 = "6.18"  # LTS, EOL 2028-12（既定）
+    KERNEL_6_12 = "6.12"  # LTS, EOL 2028-12
+    KERNEL_6_6 = "6.6"    # LTS, EOL 2027-12（旧既定）
 
 
 @dataclass
 class KernelConfig:
     """Kernel build configuration"""
     architecture: str  # x86_64 or arm64
-    version: KernelVersion = KernelVersion.KERNEL_6_6
+    version: KernelVersion = KernelVersion.KERNEL_6_18
     config_file: Optional[Path] = None
     modules: List[str] = None
     enable_hardening: bool = True
