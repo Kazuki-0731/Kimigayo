@@ -918,6 +918,66 @@ verify_rootfs() {
         log_info "  ✓ OpenRC binaries present in /sbin"
     fi
 
+    # 共有ライブラリの結びつきを見る。
+    #
+    # ファイルの存在では分からない壊れ方が2つある。どちらも実際に
+    # arm64 で踏んで、rootfs の検査は全項目通るのにイメージで
+    # 実行すると落ちた。
+    #
+    #   1. libc.so に SONAME が無い
+    #      これにリンクした実行ファイルの NEEDED が「libc.so」という
+    #      ファイル名で記録される。実行時にローダ（それ自身が libc）が
+    #      /usr/lib/libc.so を2つ目の libc として読み込み、1プロセスに
+    #      libc が二重に載って Segmentation fault になる。
+    #   2. libc.so が出荷しない共有ライブラリに依存している
+    #      arm64 では -lgcc_s が入り込んで NEEDED: libgcc_s.so.1 が付き、
+    #      Error relocating ... __letf2: symbol not found で
+    #      動的リンクのバイナリが全滅した。
+    #
+    # readelf が無い環境（macOS のホスト等）では検査できないので警告に
+    # 留める。CI はビルドコンテナ内で走るので必ず検査される。
+    if command -v readelf >/dev/null 2>&1; then
+        local libc_so="$ROOTFS_DIR/usr/lib/libc.so"
+        if [ -f "$libc_so" ]; then
+            if readelf -d "$libc_so" 2>/dev/null | grep -q 'SONAME'; then
+                log_info "  ✓ libc.so has a SONAME"
+            else
+                log_error "  ✗ libc.so has no SONAME"
+                log_error "      これにリンクした実行ファイルは NEEDED に 'libc.so' を"
+                log_error "      記録し、実行時に libc が二重に載って segfault する"
+                errors=$((errors + 1))
+            fi
+            local libc_needed
+            libc_needed="$(readelf -d "$libc_so" 2>/dev/null | grep 'NEEDED' || true)"
+            if [ -n "$libc_needed" ]; then
+                log_error "  ✗ libc.so depends on shared libraries that are not shipped:"
+                log_error "      ${libc_needed}"
+                errors=$((errors + 1))
+            else
+                log_info "  ✓ libc.so is self-contained (no NEEDED)"
+            fi
+        fi
+
+        # OpenRC の実行ファイルが libc を soname で参照していること
+        local bad_needed=""
+        for f in openrc openrc-run rc-update start-stop-daemon supervise-daemon; do
+            [ -f "$ROOTFS_DIR/sbin/$f" ] || continue
+            if readelf -d "$ROOTFS_DIR/sbin/$f" 2>/dev/null |
+                    grep 'NEEDED' | grep -qE '\[libc\.so\]'; then
+                bad_needed="${bad_needed} ${f}"
+            fi
+        done
+        if [ -n "$bad_needed" ]; then
+            log_error "  ✗ these binaries need a bare 'libc.so' instead of the soname:${bad_needed}"
+            log_error "      libc.musl-${musl_arch}.so.1 になっていないと実行時に segfault する"
+            errors=$((errors + 1))
+        else
+            log_info "  ✓ OpenRC binaries reference libc by soname"
+        fi
+    else
+        log_warn "  readelf not found; skipping shared library checks"
+    fi
+
     # FHS の骨格。空なので optimize_rootfs の空ディレクトリ掃除に
     # 消されやすい（実際に v0.1.0〜v2.0.1 で全部消えていた）。
     local dir_missing=""

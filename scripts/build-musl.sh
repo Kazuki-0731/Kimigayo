@@ -224,6 +224,30 @@ configure_musl() {
     # 正しい状態: libc.so に NEEDED が1つも無い（x86_64 と同じ）。
     # configure の結果は build/musl-build-<arch>/config.mak の LIBCC で確認できる。
 
+    # 共有 libc に SONAME を付ける。
+    #
+    # musl 上流は libc.so に SONAME を埋めない（ディストリが付ける作法で、
+    # Alpine 同梱の /lib/ld-musl-x86_64.so.1 には
+    # SONAME=libc.musl-x86_64.so.1 が入っている）。
+    #
+    # 付けないと、これにリンクした実行ファイルの NEEDED が
+    # **ファイル名そのまま（libc.so）**で記録される。実行時にローダ
+    # （それ自身が libc）が既定の探索パス /lib:/usr/local/lib:/usr/lib から
+    # /usr/lib/libc.so を見つけ、**2つ目の libc として読み込む**。
+    # 1プロセスに libc が二重に載るので Segmentation fault になる。
+    #
+    # SONAME があれば、musl のローダは自分自身の soname を内部で満たすので
+    # 二重読み込みが起きない。
+    #
+    # 2026-10-09 に arm64 でこれを踏んだ。x86_64 は aarch64 と違って
+    # ビルド環境に system musl があり、OpenRC がそちら（SONAME つき）に
+    # リンクされていたため問題が出ていなかった。
+    # 確認方法:
+    #   readelf -d <libc.so>  -> SONAME があること
+    #   readelf -d /sbin/openrc -> NEEDED が libc.musl-<arch>.so.1 であること
+    #                              （libc.so になっていたら不合格）
+    export LDFLAGS="${LDFLAGS} -Wl,-soname=libc.musl-${ARCH}.so.1"
+
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
 
