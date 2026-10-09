@@ -990,8 +990,12 @@ main() {
     #
     # bin/busybox の有無だけだと、版を上げても古いバイナリをそのまま
     # rootfs に入れてしまう（1.36.1 が 1.38.0 のつもりで入りかけた）。
-    if ! kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"; then
-        log_warn "BusyBox ${BUSYBOX_VERSION} not built yet, building..."
+    # 版とバリアントの両方を見る。standard の BusyBox を minimal の
+    # イメージに流用してしまう事故を防ぐ（→ build-stamp.sh のコメント）
+    local BUSYBOX_BUILD_ID
+    BUSYBOX_BUILD_ID="$(kimigayo_busybox_build_id "$BUSYBOX_VERSION" "$IMAGE_TYPE")"
+    if ! kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_BUILD_ID"; then
+        log_warn "BusyBox ${BUSYBOX_BUILD_ID} not built yet, building..."
         bash "${SCRIPT_DIR}/download-busybox.sh" || { log_error "Failed to download BusyBox"; exit 1; }
         ARCH=$ARCH IMAGE_TYPE=$IMAGE_TYPE MUSL_INSTALL_DIR="${MUSL_INSTALL_DIR}" \
             bash "${SCRIPT_DIR}/build-busybox.sh" || { log_error "Failed to build BusyBox"; exit 1; }

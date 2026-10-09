@@ -473,9 +473,19 @@ make benchmark             # 全ベンチマーク
 >         -path "*${c}-install-*" -exec cat {} \; 2>/dev/null)"
 > done
 > # 空欄 = 未ビルド。versions.mk と食い違っていたらビルドし直す
+> # BusyBox は "1.38.0+standard" のようにバリアントも入る（下記）
 > # カーネルは build/kernel/output/vmlinuz-<version>-<arch> のファイル名で分かる
 > ls build/kernel/output/vmlinuz-* 2>/dev/null
 > ```
+
+> **BusyBox のスタンプだけは版 + バリアント。**
+> BusyBox は同じ版でも minimal / standard / extended で `.config` が違い、
+> できあがるバイナリも違う。版だけを見ていたため、
+> **standard をビルドしたあとに `IMAGE_TYPE=minimal` でビルドしても
+> 「already built」でスキップされ、standard の BusyBox が入った
+> minimal イメージが出来ていた**（2026-10-09 に発覚）。
+> いま `.kimigayo-build-version` には `1.38.0+standard` のように入る。
+> **バリアントを切り替えて測るときは、スキップされていないことを確認する。**
 
 > **`scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
 > `log_warn` して `return 0` する。つまり当たらないパッチは黙ってスキップされ、

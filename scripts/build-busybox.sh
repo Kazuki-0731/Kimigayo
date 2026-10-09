@@ -66,8 +66,11 @@ log_error() {
 }
 
 # Check if BusyBox is already built at the version we want
-if kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"; then
-    log_info "BusyBox ${BUSYBOX_VERSION} already built and installed: ${BUSYBOX_INSTALL_DIR}"
+# 版だけでなくバリアントも見る（→ kimigayo_busybox_build_id のコメント）
+BUSYBOX_BUILD_ID="$(kimigayo_busybox_build_id "$BUSYBOX_VERSION" "$IMAGE_TYPE")"
+
+if kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_BUILD_ID"; then
+    log_info "BusyBox ${BUSYBOX_BUILD_ID} already built and installed: ${BUSYBOX_INSTALL_DIR}"
     log_info "Skipping build (use 'make clean-busybox' to rebuild)"
     log_info "BusyBox build check completed!"
     exit 0
@@ -75,7 +78,7 @@ fi
 
 installed_version="$(kimigayo_built_version "$BUSYBOX_INSTALL_DIR")"
 if [ -n "$installed_version" ]; then
-    log_warning "Installed BusyBox is ${installed_version}, want ${BUSYBOX_VERSION} -- rebuilding"
+    log_warning "Installed BusyBox is ${installed_version}, want ${BUSYBOX_BUILD_ID} -- rebuilding"
     # ビルドディレクトリも捨てる（前の版の .config とオブジェクトが残る）
     rm -rf "${BUSYBOX_INSTALL_DIR}" "${BUSYBOX_BUILD_DIR}"
 fi
@@ -468,7 +471,7 @@ log_info "  Applets installed: ${applet_count}"
 log_info "  Installation directory: ${install_prefix}"
 
 # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-kimigayo_write_build_stamp "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_VERSION"
+kimigayo_write_build_stamp "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_BUILD_ID"
 
 # Record build success
 "${PROJECT_ROOT}/scripts/build-status.sh" record busybox 2>/dev/null || true

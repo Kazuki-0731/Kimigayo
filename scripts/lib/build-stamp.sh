@@ -41,6 +41,18 @@ kimigayo_is_built() {
     [ "$(kimigayo_built_version "$install_dir")" = "$wanted" ]
 }
 
+# BusyBox のスタンプ値。
+#
+# BusyBox だけは同じ版でもバリアント（minimal / standard / extended）ごとに
+# .config が違い、できあがるバイナリも違う。版だけを記録していたため、
+# standard をビルドしたあとに IMAGE_TYPE=minimal でビルドしても
+# 「already built」でスキップされ、**standard の BusyBox が入った
+# minimal イメージ**が出来ていた（2026-10-09 に発覚）。
+# 版とバリアントの両方をスタンプに入れて区別する。
+kimigayo_busybox_build_id() {
+    printf '%s+%s' "$1" "$2"
+}
+
 # ビルド成功後に版を記録する
 kimigayo_write_build_stamp() {
     local install_dir="$1" version="$2"
