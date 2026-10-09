@@ -211,6 +211,46 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 
     log_info "Using musl lib directory: $MUSL_LIB_DIR"
 
+    # libc ヘッダは**自前ビルドの musl から取る**。
+    #
+    # /usr/aarch64-linux-musl/include には Linux カーネルヘッダ
+    # （asm/ linux/ asm-generic/ ...）しか入っておらず、libc ヘッダは
+    # 1つも無い。そこを -I で指すだけだと、libc ヘッダはクロスでない
+    # /usr/include（**x86_64 の musl**）から取られる。
+    #
+    # arch ごとに値が違う定数があるので、これは静かに壊れる。実例:
+    #   O_DIRECTORY  x86_64 = 0200000 / aarch64 = 040000
+    # librc は openat(..., O_DIRECTORY) でスクリプトディレクトリを
+    # 開くため、rc_scriptdirfds() が 0 を返して
+    # rc-update show が「終了コード 0 で出力が空」になっていた
+    # （2026-10-09 に実測。コンパイルもリンクも実行も成功するので
+    #   気づきにくい）。
+    #
+    # -nostdlibinc で標準の libc インクルードパスを無効にし、
+    # 自前 musl のヘッダとカーネルヘッダだけを明示する。
+    # clang 自身のヘッダ（stddef.h 等）は -nostdlibinc では消えない。
+    MUSL_INC_DIR=""
+    if [ -f "${MUSL_INSTALL_DIR}/usr/include/bits/fcntl.h" ]; then
+        MUSL_INC_DIR="${MUSL_INSTALL_DIR}/usr/include"
+    elif [ -f "${MUSL_INSTALL_DIR}/include/bits/fcntl.h" ]; then
+        MUSL_INC_DIR="${MUSL_INSTALL_DIR}/include"
+    else
+        log_error "Cannot find musl headers (bits/fcntl.h) in: $MUSL_INSTALL_DIR"
+        log_error "  クロスツールチェーンの include にはカーネルヘッダしか無いため、"
+        log_error "  自前ビルドの musl のヘッダが必須。先に build-musl.sh を通すこと。"
+        exit 1
+    fi
+
+    # 取り違えの再発防止。aarch64 の値であることを確かめる。
+    if ! grep -qE '^#define O_DIRECTORY[[:space:]]+040000' "${MUSL_INC_DIR}/bits/fcntl.h"; then
+        log_error "Unexpected O_DIRECTORY in ${MUSL_INC_DIR}/bits/fcntl.h"
+        log_error "  aarch64 では 040000 のはず。x86_64 のヘッダを指していないか確認する。"
+        grep -n 'define O_DIRECTORY' "${MUSL_INC_DIR}/bits/fcntl.h" || true
+        exit 1
+    fi
+
+    log_info "Using musl include directory: $MUSL_INC_DIR"
+
     # compiler-rt の builtins。
     #
     # Alpine の aarch64 版 libcap.a は outline-atomics 付きでビルドされて
@@ -262,10 +302,23 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 # 順序を崩すとセクションが壊れる。
 M="${MUSL_LIB_DIR}"
 RT="${RT_BUILTINS_DIR}"
-COMMON="--target=aarch64-linux-musl -fuse-ld=lld -B\$M -L\$M -I/usr/aarch64-linux-musl/include"
+COMMON="--target=aarch64-linux-musl -fuse-ld=lld -B\$M -L\$M -nostdlibinc -isystem ${MUSL_INC_DIR} -isystem /usr/aarch64-linux-musl/include"
 
 for arg in "\$@"; do
     case "\$arg" in
+        -E|-S|-M|-MM|--version|-dumpmachine|-###|-print-*)
+            # 前処理・情報取得の呼び出しにはリンク用の引数を足さない。
+            #
+            # meson は既定インクルードディレクトリを調べるために
+            #   clang -x c -E -v -
+            # を実行し、stderr を stdout に混ぜて読む（UTF-8 として）。
+            # ここでリンク用の引数を足すと、末尾に置いた crtn.o が
+            # -x c の影響下で「C ソース」として前処理され、バイナリが
+            # stdout に流れ込んで meson が
+            #   'utf-8' codec can't decode byte 0xb7 ...
+            # で落ちる（2026-10-09 に実測）。
+            exec clang \$COMMON -nostdlib "\$@"
+            ;;
         -c)
             # コンパイルのみ。リンク用の引数を渡すと
             # "argument unused during compilation" が出続ける。
