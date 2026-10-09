@@ -78,12 +78,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       # continue-on-error は付けない。静的解析がリリースを止められない
       # のでは意味がない。
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           additional_files: '.claude/hooks'
           scandir: './scripts'
@@ -104,10 +104,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build build-environment image
         run: docker compose build
@@ -148,7 +148,7 @@ jobs:
           ls -lh output/
 
       - name: Upload rootfs tarball
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
           path: output/*.tar.gz
@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload build logs
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: build-logs-${{ matrix.variant }}-${{ matrix.arch }}
           path: |
@@ -182,10 +182,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Download rootfs tarball
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
           path: output/
@@ -238,7 +238,7 @@ jobs:
             "${{ matrix.arch }}"
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -270,15 +270,19 @@ jobs:
 
     steps:
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      # 作るのは <version>-<variant> と latest-<variant> だけ。
-      # **latest 単体のタグは作っていない。**
-      # docs/user/DOCKER_USAGE.md が ...:latest を案内しているので
-      # 実態とずれている（要判断。どちらに寄せるか決める）。
+      # 作るタグ:
+      #   <version>-<variant>  版を固定したいとき
+      #   latest-<variant>      バリアントを選んで最新を追いたいとき
+      #   <version>             standard の別名（バリアント名を書かない形）
+      #   latest                standard の最新。docs/user/DOCKER_USAGE.md が
+      #                         案内しているので実在させる
+      #
+      # standard を既定にするのは、README が「推奨」としているため。
       - name: Create and push multi-arch manifests
         run: |
           set -euo pipefail
@@ -294,6 +298,13 @@ jobs:
             echo "::notice::manifest ${repo}:${v}-${variant}"
           done
 
+          # バリアント名を書かない形は standard を指す
+          docker buildx imagetools create -t "${repo}:${v}" \
+            "${repo}:${v}-standard-amd64" "${repo}:${v}-standard-arm64"
+          docker buildx imagetools create -t "${repo}:latest" \
+            "${repo}:latest-standard-amd64" "${repo}:latest-standard-arm64"
+          echo "::notice::manifest ${repo}:latest -> standard"
+
   create-github-release:
     name: Create GitHub Release
     needs: [meta, verify-and-push, create-manifest]
@@ -305,12 +316,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: artifacts/
           pattern: kimigayo-*
@@ -393,7 +404,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: Kimigayo OS v${{ needs.meta.outputs.version }}
           body_path: release-notes.md
@@ -414,12 +425,11 @@ jobs:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       # 断言しない。各ジョブの結果をそのまま並べる。
-      # 以前は「Docker Hub: ✅ Images pushed」と書き、さらに
-      # docker pull ...:latest を案内していたが、latest 単体のタグは
-      # 作られていない（latest-standard などだけ）。
+      # 以前は「Docker Hub: ✅ Images pushed」と書いていたが、
+      # ジョブが落ちていても出る文面だった。
       - name: Send notification
         if: env.DISCORD_WEBHOOK != ''
-        uses: sarisia/actions-status-discord@v1
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         with:
           webhook: ${{ env.DISCORD_WEBHOOK }}
           status: ${{ (needs.build.result == 'success' && needs.verify-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success') && 'success' || 'failure' }}

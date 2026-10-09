@@ -53,10 +53,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # --no-cache は付けない。ビルド環境イメージは 1.46GB あり、
       # 毎ジョブ作り直すと matrix のぶんだけ無駄になる。
@@ -103,7 +103,7 @@ jobs:
       # 検証ジョブは別アーキのランナーで走るので、必ず受け渡す。
       # upload_artifacts とは別（あちらは利用者向けの成果物）。
       - name: Upload rootfs tarball for verification
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: rootfs-${{ inputs.variant }}-${{ inputs.arch }}
           path: output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload build artifacts
         if: inputs.upload_artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: kimigayo-os-${{ inputs.variant }}-${{ inputs.arch }}
           path: output/*
@@ -121,7 +121,7 @@ jobs:
       # musl-build.log だけで 6.4MB になるので、失敗時だけ上げる。
       - name: Upload build logs
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: build-logs-${{ inputs.variant }}-${{ inputs.arch }}
           path: |
@@ -141,10 +141,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Download rootfs tarball
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: rootfs-${{ inputs.variant }}-${{ inputs.arch }}
           path: output/
