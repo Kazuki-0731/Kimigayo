@@ -278,6 +278,27 @@ else
     log_error "      patch_openrc_for_busybox (scripts/build-rootfs.sh) に置換を足す"
 fi
 
+# **出荷されるイメージの BusyBox が PIE か（ASLR が効くか）。**
+#
+# 2026-10-10 まで arm64 だけ ELF Type=EXEC だった。x86_64 は Alpine の
+# gcc が default-PIE なので同じ config から PIE になっており、
+# **片方だけ ASLR が効かない状態に気づけなかった。**
+#
+# build-busybox.sh 側にも同じ検査があるが、そこを通ったあとに
+# `make install` がリンクし直して EXEC に戻した前例がある。
+# **ここは実際に配るイメージの中を見る。**
+#
+# イメージに readelf は無いので ELF ヘッダを直接読む。
+# e_type は offset 16 からの 2 バイト（リトルエンディアン）で
+# ET_EXEC=2 / ET_DYN=3。`od -d` は 2 バイト単位の十進で出す。
+etype="$(in_image 'dd if=/bin/busybox bs=1 skip=16 count=2 2>/dev/null | od -d | head -1' | awk '{print $2}')"
+case "$etype" in
+    3) pass "/bin/busybox is a PIE (ASLR works)" ;;
+    2) fail "/bin/busybox is ET_EXEC — ASLR does not work"
+       log_error "      -fPIE / -static-pie の渡し方を確認（scripts/build-busybox.sh）" ;;
+    *) fail "could not read the ELF type of /bin/busybox (got '${etype}')" ;;
+esac
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------

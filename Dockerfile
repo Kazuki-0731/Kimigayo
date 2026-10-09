@@ -205,11 +205,17 @@ RUN printf '#!/bin/sh\nexec clang --target=aarch64-linux-musl -fuse-ld=lld -rtli
 
 # Create empty GCC compatibility files that clang may still request
 # Even with -rtlib=compiler-rt, clang may still look for these files
+#
+# crtbeginS.o / crtendS.o は **static-PIE のとき**に要求される PIC 版。
+# 中身は空でよい（GCC の crtbegin/crtend は静的コンストラクタの登録用で、
+# musl は .init_array を自分で処理するので不要）。無いと
+# `ld.lld: error: cannot open crtbeginS.o` でリンクが落ち、arm64 の
+# BusyBox が PIE にできない。
 RUN cd /usr/aarch64-linux-musl/lib && \
-    touch crtbeginT.o crtend.o && \
+    touch crtbeginT.o crtend.o crtbeginS.o crtendS.o && \
     ar crs libssp_nonshared.a && \
     echo "Created GCC compatibility files:" && \
-    ls -lh crtbeginT.o crtend.o libssp_nonshared.a
+    ls -lh crtbeginT.o crtend.o crtbeginS.o crtendS.o libssp_nonshared.a
 
 # Download ARM64 compiler-rt from Alpine repository
 #

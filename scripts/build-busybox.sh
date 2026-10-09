@@ -249,16 +249,37 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
-    # Disable stack protector for ARM64 LLVM/Clang to avoid libssp_nonshared dependency
-    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fno-stack-protector\"|" .config
+    # **static-PIE にする（ASLR のため）。**
+    #
+    # 2026-10-10 まで arm64 だけ ELF Type=EXEC で出ており、ASLR が
+    # 効いていなかった。x86_64 は Alpine の gcc が default-PIE なので
+    # 同じ config から DYN (PIE) + BIND_NOW になっていて、
+    # **片方だけ弱い状態に気づけなかった。**
+    #
+    # 「PIE と static は両立しない」は musl では成り立たない。
+    # musl は static-PIE 用の start file（rcrt1.o）を持っている。
+    #
+    # ただし **CONFIG_PIE は使えない。** BusyBox の Config.in は
+    #     config PIE
+    #         depends on !STATIC
+    # なので、CONFIG_STATIC=y のまま CONFIG_PIE=y を sed で書いても
+    # `make oldconfig` が `# CONFIG_PIE is not set` に戻す（実測）。
+    # さらに CONFIG_PIE が付ける `-pie` は clang では無視される
+    # （`-static -pie` は "argument unused" の警告だけ出て EXEC になる）。
+    # そこで -fPIE（コンパイル時）と -static-pie（最終リンク時）を直接渡す。
+    #
+    # **-static-pie は CONFIG_EXTRA_LDFLAGS に入れてはいけない。**
+    # BusyBox の ld_flags は LDFLAGS と EXTRA_LDFLAGS を含み、
+    # `built-in.o` を作る**部分リンク（ld -r）にも渡る**ので
+    #     ld.lld: error: -r and -pie may not be used together
+    # で落ちる（実測）。最終リンクだけに効く CFLAGS_busybox で渡す（下記）。
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fstack-protector-strong -fPIE\"|" .config
     # Add EXTRA_LDFLAGS - use lld linker only (no -nodefaultlibs, let toolchain handle linking)
     sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld\"|" .config
     # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
-    # Disable PIE for static builds (PIE + static is not compatible)
-    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
-    log_info "Disabled stack protector and PIE for ARM64 (LLVM/Clang compatibility)"
-    log_info "Using -fuse-ld=lld with empty crtbeginT.o/crtend.o placeholders"
+    log_info "Enabled static-PIE and stack protector for ARM64"
+    log_info "Using -fuse-ld=lld with empty GCC crt placeholders"
     log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
@@ -284,12 +305,13 @@ yes "" | make oldconfig > /dev/null 2>&1 || true
 # Re-apply critical settings after oldconfig (oldconfig may reset some values)
 sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    sed -i "s|CONFIG_PIE=.*|CONFIG_PIE=n|" .config
+    # CONFIG_PIE は Kconfig が STATIC と排他にしているので触らない
+    # （上記参照。PIE 化は -fPIE / -static-pie を直接渡して行う）
     # Disable STATIC_LIBGCC for clang compatibility (avoid -lgcc, -lgcc_eh, crtbeginT.o)
     sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
     # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl includes these in libc.a)
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
-    log_info "Re-applied settings after oldconfig (STATIC=y, PIE=n, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
+    log_info "Re-applied settings after oldconfig (STATIC=y, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
 else
     log_info "Re-applied settings after oldconfig (STATIC=y)"
 fi
@@ -327,19 +349,28 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
     fi
 
-    export CFLAGS="-Os -fno-stack-protector -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
+    export CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
 
     # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
     # clang automatically uses compiler-rt builtins for 128-bit float operations
 
     # Copy GCC compatibility files from /usr/aarch64-linux-musl/lib to sysroot
     # With --sysroot, clang only searches inside sysroot for CRT files
-    if [ ! -f "${MUSL_LIB_DIR}/crtbeginT.o" ]; then
-        cp /usr/aarch64-linux-musl/lib/crtbeginT.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
-        cp /usr/aarch64-linux-musl/lib/crtend.o "${MUSL_LIB_DIR}/" 2>/dev/null || true
-        cp /usr/aarch64-linux-musl/lib/libssp_nonshared.a "${MUSL_LIB_DIR}/" 2>/dev/null || true
-        log_info "Copied GCC compatibility files to sysroot"
-    fi
+    #
+    # crtbeginS.o / crtendS.o は **static-PIE のときに要求される**（PIC 版）。
+    # 中身は空でよい。GCC の crtbegin/crtend は静的コンストラクタの登録用
+    # だが、musl は .init_array を自分で処理するので不要。
+    # 無いと `ld.lld: error: cannot open crtbeginS.o` でリンクが落ちる。
+    for crt in crtbeginT.o crtend.o crtbeginS.o crtendS.o libssp_nonshared.a; do
+        [ -f "${MUSL_LIB_DIR}/${crt}" ] && continue
+        if [ -f "/usr/aarch64-linux-musl/lib/${crt}" ]; then
+            cp "/usr/aarch64-linux-musl/lib/${crt}" "${MUSL_LIB_DIR}/"
+        else
+            # ビルド環境イメージが古い場合でも通るように、ここでも作る
+            : > "${MUSL_LIB_DIR}/${crt}"
+        fi
+        log_info "  placed ${crt} in the musl sysroot"
+    done
 
     export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 
@@ -348,7 +379,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
-    log_info "Stack protector disabled for ARM64 clang compatibility"
+    log_info "Stack protector enabled (__stack_chk_fail is in musl libc.a)"
     log_info "Using -rtlib=compiler-rt (clang uses compiler-rt builtins directly)"
 else
     # For x86_64: use stack protector (GCC has proper support)
@@ -367,7 +398,13 @@ BUILD_FAILED=false
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Try to override LDLIBS by setting it empty both in environment and make parameter
     export LDLIBS=""
-    if ! make -j"$(nproc)" SKIP_STRIP=y LDLIBS="" 2>&1 | tee /tmp/busybox-build.log; then
+    # **CFLAGS_busybox は最終リンクにだけ渡るので、ここで static-PIE にする。**
+    # BusyBox の Makefile.flags で CFLAGS_busybox に足されるのは
+    # CONFIG_STATIC の `-static` と CONFIG_PIE の `$(ARCH_PIE)` だけなので
+    # （1.38.0 で確認）、コマンドラインで上書きしても取りこぼしは無い。
+    # CONFIG_PIE は Kconfig が STATIC と排他にしていて使えない（上記参照）。
+    if ! make -j"$(nproc)" SKIP_STRIP=y LDLIBS="" \
+            CFLAGS_busybox="-static -static-pie" 2>&1 | tee /tmp/busybox-build.log; then
         BUILD_FAILED=true
     fi
 else
@@ -429,8 +466,19 @@ else
 fi
 
 # Install BusyBox
+#
+# **`make install` にもリンク用のフラグを渡す。**
+# install ターゲットは busybox ターゲットに依存しており、条件が揃うと
+# **リンクをやり直す**。フラグ無しで叩いたため、せっかく static-PIE で
+# 作ったバイナリが EXEC で上書きされていた（2026-10-10 に実測）。
+# ビルド直後の検査は通るのに、インストールされたものは PIE でない、
+# という最悪の形だった。
 log_info "Installing BusyBox to ${install_prefix}..."
-make install
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    make install LDLIBS="" CFLAGS_busybox="-static -static-pie"
+else
+    make install
+fi
 
 # Strip binary manually with security-aware stripping
 log_info "Stripping binary..."
@@ -443,6 +491,41 @@ if [ ! -f "${install_prefix}/bin/busybox" ]; then
 fi
 
 log_success "BusyBox installed successfully"
+
+# **ASLR が効く形になっているか（PIE + BIND_NOW）を機械的に確かめる。**
+#
+# 2026-10-10 まで arm64 だけ ELF Type=EXEC で出ており、ASLR が
+# 効いていなかった。x86_64 は Alpine の gcc が default-PIE なので
+# 同じ config から DYN (PIE) + BIND_NOW になっていて、
+# **片方だけ弱い状態に気づけなかった。**
+# `file` が「statically linked」と言うだけでは区別できないので、
+# ELF のヘッダと動的タグを直接見る。
+#
+# **検査するのは install + strip 済みのバイナリ**（＝実際に rootfs に
+# 入るもの）。ビルドディレクトリ側を見ていたときは、そのあとの
+# `make install` がリンクし直して EXEC に戻しても気づけなかった。
+log_info "Verifying hardening (PIE + BIND_NOW) on the installed binary..."
+installed_bb="${install_prefix}/bin/busybox"
+readelf_bin="readelf"
+command -v "$readelf_bin" >/dev/null 2>&1 || readelf_bin="llvm-readelf"
+if ! command -v "$readelf_bin" >/dev/null 2>&1; then
+    log_warning "readelf not found; skipping the PIE/BIND_NOW check"
+else
+    elf_type="$("$readelf_bin" -h "$installed_bb" | sed -n 's/^[[:space:]]*Type:[[:space:]]*\([A-Z]*\).*/\1/p')"
+    if [ "$elf_type" != "DYN" ]; then
+        log_error "BusyBox is not a PIE (ELF type=${elf_type}, expected DYN)"
+        log_error "  ASLR が効きません。-fPIE / -static-pie の渡し方を確認してください"
+        exit 1
+    fi
+    log_success "ELF type is DYN (PIE) — ASLR works"
+
+    if "$readelf_bin" -d "$installed_bb" 2>/dev/null | grep -q "BIND_NOW"; then
+        log_success "BIND_NOW is set (full RELRO)"
+    else
+        log_error "BIND_NOW is not set (LDFLAGS に -Wl,-z,now があるか確認)"
+        exit 1
+    fi
+fi
 
 # List installed applets
 log_info "Counting installed applets..."
