@@ -344,6 +344,32 @@ ALPINE_VERSION  ?= 3.24
 - 上げたら `docs/` と `README.md` のバージョン表記も突合する
   （→「数値を出したら反映まで」節）
 
+### プロジェクト自身の版とコードネームも直書きしない
+
+**構成要素の版は `versions.mk`、プロジェクトの版は `git describe`。**
+どちらもファイルに数字を書かない。
+
+| 欲しいもの | 取り方 |
+| --- | --- |
+| プロジェクトの版（3.0.0） | `scripts/get-version.sh`（`git describe --tags`）。Makefile が `KIMIGAYO_VERSION` として export し、compose の `environment` でコンテナにも入る |
+| コードネーム（Himawari） | `scripts/get-codename.sh`。**メジャー番号から導出する**（表に版を書き足さない） |
+
+> 2026-10-10 まで `/etc/os-release`・`/etc/motd`・`/.kimigayo-build-info` の
+> **3 箇所に `0.1.0` が直書き**されており、v1.0.0 と v2.0.1 を公開した
+> あとのイメージも **`0.1.0` と名乗っていた**。`Dockerfile.runtime` の
+> `ARG VERSION` の既定値も `0.1.0` で、`Makefile` が `--build-arg VERSION`
+> を渡していなかったため `LABEL version` も同じ状態だった。
+> **タグ名だけ合っていて中身のメタデータがずれる**ので、`docker images` を
+> 見ているだけでは気づけない。
+>
+> いまは `build-rootfs.sh` の `resolve_project_version()` が 1 箇所で決め、
+> `verify_rootfs` が `/etc/os-release` の `VERSION_ID` / `VERSION_CODENAME`
+> とビルド中の版を突合する。`verify-image.sh` も os-release の自己整合を見る。
+
+命名体系の正本は [SPECIFICATION.md](SPECIFICATION.md) の「10.3 リリース名」。
+**v1.0 / v2.0 はコードネームの運用開始前に公開済みなので名前を持たない**
+（後付けしない）。
+
 > 2026-10-09 以前は 5 箇所に散っていた（`config.mk` は `6.6`、
 > `scripts/download-kernel.sh` は `6.6.11`、`scripts/build-kernel.sh` は `6.6.11`、
 > `scripts/apply-kernel-patches.sh` は `6.6.11`、`src/kernel/build.py` の

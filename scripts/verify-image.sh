@@ -321,6 +321,41 @@ else
     log_error "      build-rootfs.sh の Step 3（dedup）が効いていない"
 fi
 
+# **/etc/os-release が自己矛盾していないか。**
+#
+# 2026-10-10 まで VERSION / PRETTY_NAME / VERSION_ID に "0.1.0" が
+# 直書きされており、v1.0.0・v2.0.1 を公開したあとのイメージも
+# **0.1.0 と名乗っていた。** いまは git タグ由来の1箇所から作る。
+#
+# ここでは期待する版を外から渡さず、**ファイル内の整合**だけを見る
+# （EXPECT_VERSION を渡したときはそれとも突合する）。
+# 版そのものの突合は build-rootfs.sh の verify_rootfs が行う。
+out="$(in_image 'cat /etc/os-release 2>/dev/null')"
+osr_id="$(printf '%s\n' "$out"   | sed -n 's/^VERSION_ID="\(.*\)"$/\1/p')"
+osr_pretty="$(printf '%s\n' "$out" | sed -n 's/^PRETTY_NAME="\(.*\)"$/\1/p')"
+osr_code="$(printf '%s\n' "$out" | sed -n 's/^VERSION_CODENAME=\(.*\)$/\1/p')"
+if [ -z "$osr_id" ]; then
+    fail "/etc/os-release has no VERSION_ID"
+    show_output "$out"
+elif [ "${osr_pretty#*"$osr_id"}" = "$osr_pretty" ]; then
+    fail "/etc/os-release is inconsistent: PRETTY_NAME does not contain VERSION_ID"
+    show_output "$out"
+elif [ -n "${EXPECT_VERSION:-}" ] && [ "$osr_id" != "$EXPECT_VERSION" ]; then
+    fail "/etc/os-release VERSION_ID=${osr_id} but expected ${EXPECT_VERSION}"
+else
+    pass "/etc/os-release is consistent (${osr_pretty})"
+fi
+
+# コードネームがあるなら PRETTY_NAME にも出ていること（小文字/先頭大文字の差は許容）
+if [ -n "$osr_code" ]; then
+    if printf '%s' "$osr_pretty" | tr '[:upper:]' '[:lower:]' | grep -q -- "$osr_code"; then
+        pass "codename is exposed (VERSION_CODENAME=${osr_code})"
+    else
+        fail "VERSION_CODENAME=${osr_code} is not reflected in PRETTY_NAME"
+        show_output "$out"
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------

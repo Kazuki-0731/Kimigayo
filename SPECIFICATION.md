@@ -194,9 +194,55 @@ Kimigayo OSはDockerイメージとして実行されることを前提に設計
 - セマンティックバージョニング（例: 1.0.0）
 - メジャー.マイナー.パッチ
 
-### 10.3 リリース名
-- Alpineが月の名前を使用するように、Kimigayo OSは日本の季節や自然をテーマにする
-- 例: Sakura (桜), Momiji (紅葉), Yuki (雪)
+### 10.3 リリース名（コードネーム）
+
+**日本の通年の花を 12 本で循環させ、メジャーバージョンに割り当てる。**
+
+Alpine が月の名前を使うのと同じ発想で、日本の季節と自然をテーマにする。
+Ubuntu が `Warty` から `Yakkety` まで一巡したあと `Artful` で A に戻ったのと
+同じく、**12 本を使い切ったら先頭に戻る**（v13.0 は再び Sakura）。
+
+| メジャー | コードネーム | 花 | 象徴・技術的連想 |
+| --- | --- | --- | --- |
+| v1.0 | （命名前） | — | コードネームの運用開始前に公開 |
+| v2.0 | （命名前） | — | 同上 |
+| **v3.0** | **Himawari** | 向日葵 | 太陽に向かう成長・高パフォーマンス |
+| v4.0 | Kiku | 菊 | 長寿・高潔・安定性 |
+| v5.0 | Momiji | 紅葉 | 成熟・変革 |
+| v6.0 | Ume | 梅 | 先駆性・堅牢性 |
+| v7.0 | Fuji | 藤 | 優雅・拡張性 |
+| v8.0 | Asagao | 朝顔 | 高速起動・清々しさ |
+| v9.0 | Tsubaki | 椿 | 常緑・常時稼働 |
+| v10.0 | Satsuki | 皐月 | 軽量・精密設計 |
+| v11.0 | Higanbana | 彼岸花 | 変革・リニューアル |
+| v12.0 | Sazanka | 山茶花 | 厳しい環境での信頼性 |
+| v13.0 | Sakura | 桜 | 新しい始まり（1周目に戻る） |
+| v14.0 | Ajisai | 紫陽花 | 適応性・柔軟性 |
+
+- **v1.0 / v2.0 には後付けしない**（2026-10-10 に決定）。
+  名前を持たずに公開済みなので、事実に合わせる
+- **コードネームはメジャーバージョンに付く。** パッチ・マイナーでは変わらない
+  （3.0.0 も 3.1.4 も "Himawari"）
+- **表に版を書き足す運用にしない。**
+  [scripts/get-codename.sh](scripts/get-codename.sh) がメジャー番号から
+  導出する。版ごとの表にすると更新を忘れる
+
+#### どこに出るか
+
+| 置き場 | 形 |
+| --- | --- |
+| `/etc/os-release` | `VERSION_CODENAME=himawari`（os-release の標準フィールド。Debian / Ubuntu と同じ） |
+| `/etc/os-release` | `VERSION="3.0.0 (Himawari)"` / `PRETTY_NAME="Kimigayo OS 3.0.0 (Himawari)"` |
+| `/etc/motd` | `Kimigayo OS v3.0.0 "Himawari"` |
+| `/.kimigayo-build-info` | `CODENAME=Himawari` |
+| `CHANGELOG.md` / `RELEASE_NOTES.md` | 見出しに併記 |
+
+**版とコードネームは直書きしない。** 版は `git describe`
+（[scripts/get-version.sh](scripts/get-version.sh)）、コードネームは
+[scripts/get-codename.sh](scripts/get-codename.sh) から取る。
+2026-10-10 まで `/etc/os-release`・`/etc/motd`・`/.kimigayo-build-info` の
+3 箇所に `0.1.0` が直書きされており、**v1.0.0 と v2.0.1 を公開したあとの
+イメージも 0.1.0 と名乗っていた**。
 
 ## 11. コミュニティとライセンス
 

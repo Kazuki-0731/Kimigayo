@@ -293,9 +293,13 @@ build-image: package-rootfs
 	@# 省略すると (1) arm64 の rootfs を amd64 のイメージとして包んでしまい、
 	@# (2) Dockerfile.runtime の既定 TARBALL_PATH=output/*.tar.gz が
 	@# 別のバリアント／アーキの tarball を拾う。
+	@# VERSION / IMAGE_VARIANT を渡さないと LABEL が既定値（dev / minimal）
+	@# のまま出る。タグ名だけ合っていて中身のメタデータがずれる。
 	@docker build -f Dockerfile.runtime \
 		--platform $(DOCKER_PLATFORM) \
 		--build-arg TARBALL_PATH=output/$(TARBALL_NAME) \
+		--build-arg VERSION=$(KIMIGAYO_VERSION) \
+		--build-arg IMAGE_VARIANT=$(VARIANT) \
 		-t kimigayo-os:$(VARIANT)-$(ARCH) \
 		-t kimigayo-os:$(VERSION)-$(VARIANT)-$(ARCH) \
 		-t $(DOCKER_IMAGE_TAG) \

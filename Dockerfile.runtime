@@ -34,7 +34,11 @@ ARG TARGETARCH
 ARG TARGETPLATFORM
 
 # Version information (can be overridden at build time)
-ARG VERSION=0.1.0
+#
+# 既定値を 0.1.0 にしていたため、--build-arg VERSION を渡さないビルドでは
+# **v1.0.0 / v2.0.1 を公開したあとのイメージも LABEL version=0.1.0**
+# になっていた（2026-10-10 に発覚）。渡し忘れが一目で分かる値にする。
+ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
 ARG IMAGE_VARIANT=minimal

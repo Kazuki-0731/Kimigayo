@@ -276,6 +276,34 @@ set_permissions() {
 }
 
 # Optimize rootfs size
+# ---------------------------------------------------------------------------
+# プロジェクトの版とコードネームを決める
+#
+# **版をハードコードしない。** 2026-10-10 まで /etc/os-release・/etc/motd・
+# /.kimigayo-build-info の3箇所に "0.1.0" が直書きされており、
+# v1.0.0 と v2.0.1 を公開したあとのイメージも **0.1.0 と名乗っていた**。
+#
+# 供給元は Makefile が export する KIMIGAYO_VERSION（= get-version.sh の
+# git describe）。コンテナには docker-compose.yml の environment で入る。
+# 単体で叩かれたときは自分で get-version.sh を呼ぶ。
+# ---------------------------------------------------------------------------
+OS_VERSION=""
+OS_CODENAME=""
+
+resolve_project_version() {
+    OS_VERSION="${KIMIGAYO_VERSION:-}"
+    if [ -z "$OS_VERSION" ]; then
+        OS_VERSION="$(bash "${SCRIPT_DIR}/get-version.sh" 2>/dev/null || echo "dev")"
+    fi
+    OS_CODENAME="$(bash "${SCRIPT_DIR}/get-codename.sh" "$OS_VERSION" 2>/dev/null || echo "")"
+
+    if [ -n "$OS_CODENAME" ]; then
+        log_info "Project version: ${OS_VERSION} \"${OS_CODENAME}\""
+    else
+        log_info "Project version: ${OS_VERSION} (コードネームなし)"
+    fi
+}
+
 optimize_rootfs() {
     log ""
     log "=========================================="
@@ -961,30 +989,56 @@ EOF
     log_info "  Created: /etc/resolv.conf"
 
     # /etc/os-release
-    cat > "$ROOTFS_DIR/etc/os-release" << 'EOF'
-NAME="Kimigayo OS"
-VERSION="0.1.0"
-ID=kimigayo
-ID_LIKE=alpine
-PRETTY_NAME="Kimigayo OS 0.1.0"
-VERSION_ID="0.1.0"
-HOME_URL="https://github.com/Kazuki-0731/Kimigayo"
-BUG_REPORT_URL="https://github.com/Kazuki-0731/Kimigayo/issues"
-EOF
+    #
+    # コードネームは os-release の標準フィールド VERSION_CODENAME で出す
+    # （Debian / Ubuntu と同じ形。値は小文字）。
+    # 名前が無い版（v1.0 / v2.0 / dev）では VERSION_CODENAME を書かない。
+    local os_pretty="Kimigayo OS ${OS_VERSION}"
+    local os_verstr="${OS_VERSION}"
+    if [ -n "$OS_CODENAME" ]; then
+        os_pretty="Kimigayo OS ${OS_VERSION} (${OS_CODENAME})"
+        os_verstr="${OS_VERSION} (${OS_CODENAME})"
+    fi
+
+    {
+        echo 'NAME="Kimigayo OS"'
+        echo "VERSION=\"${os_verstr}\""
+        echo 'ID=kimigayo'
+        echo 'ID_LIKE=alpine'
+        echo "PRETTY_NAME=\"${os_pretty}\""
+        echo "VERSION_ID=\"${OS_VERSION}\""
+        if [ -n "$OS_CODENAME" ]; then
+            echo "VERSION_CODENAME=$(printf '%s' "$OS_CODENAME" | tr '[:upper:]' '[:lower:]')"
+        fi
+        echo 'HOME_URL="https://github.com/Kazuki-0731/Kimigayo"'
+        echo 'BUG_REPORT_URL="https://github.com/Kazuki-0731/Kimigayo/issues"'
+    } > "$ROOTFS_DIR/etc/os-release"
     chmod 644 "$ROOTFS_DIR/etc/os-release"
-    log_info "  Created: /etc/os-release"
+    log_info "  Created: /etc/os-release (${os_pretty})"
 
     # Create motd (message of the day)
-    cat > "$ROOTFS_DIR/etc/motd" << 'EOF'
+    #
+    # 枠の幅を保つため、版とコードネームを入れた行を中央寄せで組む。
+    local motd_title="Kimigayo OS v${OS_VERSION}"
+    if [ -n "$OS_CODENAME" ]; then
+        motd_title="Kimigayo OS v${OS_VERSION} \"${OS_CODENAME}\""
+    fi
+    local motd_width=56 motd_pad_l motd_pad_r
+    motd_pad_l=$(( (motd_width - ${#motd_title}) / 2 ))
+    [ "$motd_pad_l" -lt 1 ] && motd_pad_l=1
+    motd_pad_r=$(( motd_width - ${#motd_title} - motd_pad_l ))
+    [ "$motd_pad_r" -lt 1 ] && motd_pad_r=1
 
-    ╔════════════════════════════════════════════════════════╗
-    ║                   Kimigayo OS v0.1.0                   ║
-    ║        Lightweight, Fast, and Secure Container OS      ║
-    ╚════════════════════════════════════════════════════════╝
-
-    Documentation: https://github.com/Kazuki-0731/Kimigayo
-
-EOF
+    {
+        echo
+        printf '    ╔%s╗\n' "$(printf '═%.0s' $(seq 1 "$motd_width"))"
+        printf '    ║%*s%s%*s║\n' "$motd_pad_l" "" "$motd_title" "$motd_pad_r" ""
+        echo '    ║        Lightweight, Fast, and Secure Container OS      ║'
+        printf '    ╚%s╝\n' "$(printf '═%.0s' $(seq 1 "$motd_width"))"
+        echo
+        echo '    Documentation: https://github.com/Kazuki-0731/Kimigayo'
+        echo
+    } > "$ROOTFS_DIR/etc/motd"
     chmod 644 "$ROOTFS_DIR/etc/motd"
     log_info "  Created: /etc/motd"
 
@@ -1240,6 +1294,28 @@ verify_rootfs() {
         fi
     fi
 
+    # /etc/os-release の版が、いまビルドしている版と一致すること。
+    #
+    # 2026-10-10 まで "0.1.0" が直書きされており、v1.0.0 と v2.0.1 を
+    # 公開したあとのイメージも 0.1.0 と名乗っていた。**中身を見ないと
+    # 分からない種類の誤り**なので機械的に突合する。
+    if [ -f "$ROOTFS_DIR/etc/os-release" ]; then
+        local osr_id osr_code
+        osr_id="$(sed -n 's/^VERSION_ID="\(.*\)"$/\1/p' "$ROOTFS_DIR/etc/os-release")"
+        osr_code="$(sed -n 's/^VERSION_CODENAME=\(.*\)$/\1/p' "$ROOTFS_DIR/etc/os-release")"
+        if [ "$osr_id" != "$OS_VERSION" ]; then
+            log_error "  ✗ /etc/os-release の VERSION_ID が一致しない"
+            log_error "      os-release: ${osr_id:-（空）} / ビルド中の版: ${OS_VERSION}"
+            errors=$((errors + 1))
+        elif [ -n "$OS_CODENAME" ] && [ "$osr_code" != "$(printf '%s' "$OS_CODENAME" | tr '[:upper:]' '[:lower:]')" ]; then
+            log_error "  ✗ /etc/os-release の VERSION_CODENAME が一致しない"
+            log_error "      os-release: ${osr_code:-（空）} / 期待: ${OS_CODENAME}"
+            errors=$((errors + 1))
+        else
+            log_info "  ✓ /etc/os-release matches ${OS_VERSION}${OS_CODENAME:+ \"$OS_CODENAME\"}"
+        fi
+    fi
+
     # init スクリプトの shebang が解決できること。
     #
     # ファイルがあっても shebang の指す先が無ければ exec できない
@@ -1330,7 +1406,8 @@ generate_metadata() {
 BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 BUILD_ARCH=$ARCH
 IMAGE_TYPE=$IMAGE_TYPE
-VERSION=0.1.0
+VERSION=${OS_VERSION}
+CODENAME=${OS_CODENAME}
 BUILDER=$(whoami)
 BUILD_HOST=$(hostname)
 EOF
@@ -1371,6 +1448,9 @@ main() {
     log "Image Type: $IMAGE_TYPE"
     log "Output: $ROOTFS_DIR"
     log "========================================"
+
+    # 版とコードネームを先に決める（os-release / motd / build-info で使う）
+    resolve_project_version
 
     # Check and build required components
     log "Checking required components..."
