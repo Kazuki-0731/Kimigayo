@@ -1,5 +1,31 @@
 name: Release
 
+# タグを push すると Docker Hub の公開イメージを差し替える。
+#
+# 2026-10-09 に構造から書き換えた。それまでの問題:
+#
+#   - スモークテストが tarball < 1MB なら exit 0 で成功扱いになっていた。
+#     壊れた rootfs ほど小さくなるので、最も危険なときに検査が消える
+#   - スモークテストしたイメージと push するイメージが別物だった
+#     （スモークは --platform も TARBALL_PATH も渡さない docker build、
+#       push は build-push-action の別ビルド）
+#   - スモークの中身が /bin/sh・ls・busybox --help の3つだけ。BusyBox は
+#     static-pie なので、OpenRC も libc.so も /tmp も無くても全部通る
+#   - ビルド経路が ci.yml と違っていた（CI は make、ここは
+#     build-rootfs.sh 直叩き）。CI が緑でも release が通る保証がない
+#   - matrix に fail-fast: false が無く、1セル失敗で他がキャンセルされる。
+#     push 済みのタグは残るのに create-manifest はスキップされ、
+#     マニフェストの無い中途半端な公開状態になる
+#   - ShellCheck と Trivy に continue-on-error が付いていた
+#   - Trivy のイメージスキャンを走らせていたが、Kimigayo は scratch 上の
+#     手組み rootfs でパッケージDBを持たないため常に0件。
+#     「脆弱性なし」ではなく「スキャンしていない」
+#
+# いまの方針:
+#   build（x86 でクロスコンパイル）→ verify-and-push（ネイティブ
+#   ランナーでイメージ化・検証・push）。**検証したそのイメージを push する。**
+#   検証の実体は scripts/verify-image.sh で、ci.yml とローカルも同じものを呼ぶ。
+
 on:
   push:
     tags:
@@ -16,18 +42,62 @@ env:
   IMAGE_NAME: kimigayo-os
 
 permissions:
-  contents: write
-  packages: write
-  security-events: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  meta:
+    name: Resolve version
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Extract version
+        id: v
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=edge
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "::notice::version=${VERSION}"
+
+  # matrix の各セルで回す必要がない。以前は6回走っていた。
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # continue-on-error は付けない。静的解析がリリースを止められない
+      # のでは意味がない。
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          additional_files: '.claude/hooks'
+          scandir: './scripts'
+          severity: warning
+          ignore_paths: build output
+
+  build:
+    name: Build ${{ matrix.variant }} ${{ matrix.arch }}
+    needs: [meta, shellcheck]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
+      # 1セル失敗で他をキャンセルしない（→ 冒頭のコメント）。
+      fail-fast: false
       matrix:
         variant: [minimal, standard, extended]
         arch: [x86_64, arm64]
@@ -36,278 +106,208 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Run ShellCheck (Static Analysis)
-        uses: ludeeus/action-shellcheck@2.0.0
-        continue-on-error: true
-        with:
-          scandir: './scripts'
-          severity: warning
-          ignore_paths: build output
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
-          buildkitd-flags: --debug
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      - name: Build build-environment image
+        run: docker compose build
 
-      - name: Extract metadata
-        id: meta
-        run: |
-          # Extract version from tag (remove 'v' prefix)
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          elif [[ "${{ github.event.inputs.tag }}" != "" ]]; then
-            VERSION=${{ github.event.inputs.tag }}
-            VERSION=${VERSION#v}
-          else
-            VERSION=edge
-          fi
-
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-          # Convert architecture to Docker Buildx format (amd64/arm64)
-          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-            DOCKER_ARCH="amd64"
-          else
-            DOCKER_ARCH="arm64"
-          fi
-          echo "docker_arch=${DOCKER_ARCH}" >> $GITHUB_OUTPUT
-
-          # Build variant-specific tags: {version}-{variant}-{arch}
-          VARIANT=${{ matrix.variant }}
-          TAGS="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-${DOCKER_ARCH}"
-          TAGS="${TAGS},${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-${DOCKER_ARCH}"
-
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-
-      - name: Build Docker build environment
-        run: docker compose build --no-cache
-
+      # ci.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
+      # release で落ちる（逆も）ことになる。
+      # カーネルはイメージに入らないので作らない。
       - name: Build Kimigayo OS rootfs
         run: |
-          # Build using Docker compose with correct environment variables
-          # Note: ARCH (not TARGET_ARCH) is used by build scripts
-          # Working directory in container is /build/kimigayo/build-system
+          set -euo pipefail
           docker compose run --rm \
-            -e ARCH=${{ matrix.arch }} \
             -e IMAGE_TYPE=${{ matrix.variant }} \
             kimigayo-build \
-            bash ../scripts/build-rootfs.sh
+            make build-no-kernel TARGET_ARCH=${{ matrix.arch }} IMAGE_TYPE=${{ matrix.variant }}
 
-          # Verify build output exists
-          echo "=== Contents of build/rootfs ==="
-          ls -lah build/rootfs/ | head -20
+      - name: Fail if patches were silently skipped
+        run: |
+          set -uo pipefail
+          found=0
+          for log in build/kernel-patches.log build/busybox-patches.log; do
+            [ -f "$log" ] || continue
+            if grep -iE 'skipped: [1-9]|not applicable' "$log"; then
+              echo "::error::${log} にスキップされたパッチがあります"
+              found=1
+            fi
+          done
+          exit "$found"
 
-          echo "=== Checking for essential files ==="
-          ls -l build/rootfs/bin/sh 2>/dev/null || echo "WARNING: /bin/sh not found"
-          ls -l build/rootfs/bin/busybox 2>/dev/null || echo "WARNING: /bin/busybox not found"
-
-          # Create output directory and package rootfs
+      - name: Package rootfs
+        run: |
+          set -euo pipefail
           mkdir -p output
-          cd build/rootfs
-          # macOSのリソースフォーク（._*）とその他の不要ファイルを除外
-          # sudoを使ってroot権限でtarを作成（/etc/shadowなどの権限制限ファイルにアクセスするため）
-          sudo tar czf ../../output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz \
-            --exclude='._*' \
-            --exclude='.DS_Store' \
-            --exclude='.AppleDouble' \
-            --exclude='.LSOverride' \
-            --numeric-owner \
-            .
-          cd ../..
-          # tarballの所有権を変更
-          sudo chown $(id -u):$(id -g) output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz
-
-          # Verify tarball was created and check its contents
-          echo "=== Tarball created ==="
+          name="kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}.tar.gz"
+          # root 権限で固める（/etc/shadow を読むため）。
+          # --numeric-owner でホストのユーザー名を埋め込まない。
+          sudo tar czf "output/${name}" -C build/rootfs --numeric-owner .
+          sudo chown "$(id -u):$(id -g)" "output/${name}"
           ls -lh output/
 
-          echo "=== Contents of tarball ==="
-          tar tzf output/kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.tar.gz | head -20
-
-      - name: Run integration tests
-        run: |
-          echo "Running integration tests for ${{ matrix.variant }} variant on ${{ matrix.arch }}..."
-
-          # Run tests in Docker container (same environment as build)
-          docker compose run --rm kimigayo-build \
-            pytest tests/integration/test_phase1_integration.py -v
-
-          # Verify rootfs tarball exists
-          TARBALL_COUNT=$(ls -1 output/kimigayo-${{ matrix.variant }}-*.tar.gz 2>/dev/null | wc -l)
-          if [ "$TARBALL_COUNT" -gt 0 ]; then
-            echo "✓ Rootfs tarball created successfully"
-            ls -lh output/kimigayo-${{ matrix.variant }}-*.tar.gz
-          else
-            echo "✗ Rootfs tarball not found"
-            echo "Contents of output directory:"
-            ls -lah output/ || echo "output/ directory does not exist"
-            exit 1
-          fi
-
-      - name: Test Docker image (smoke test)
-        run: |
-          # Verify tarball has content before building
-          TARBALL=$(ls output/kimigayo-${{ matrix.variant }}-*.tar.gz | head -1)
-          TARBALL_SIZE=$(stat -c%s "$TARBALL" 2>/dev/null || stat -f%z "$TARBALL" 2>/dev/null || echo "0")
-
-          if [ "$TARBALL_SIZE" -lt 1000000 ]; then
-            echo "⚠️ Warning: Tarball is too small ($TARBALL_SIZE bytes), likely empty rootfs"
-            echo "Skipping smoke tests - rootfs needs to be built first"
-            exit 0
-          fi
-
-          # Build test image locally
-          echo "=== Building Docker image ==="
-          docker build -f Dockerfile.runtime -t test-image:${{ matrix.variant }}-${{ matrix.arch }} .
-
-          # Inspect the built image
-          echo "=== Inspecting built image ==="
-          docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} ls -la / || echo "Failed to list root directory"
-
-          # Run basic smoke tests
-          echo "Running smoke tests..."
-
-          # Test 1: Verify image can start
-          docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} /bin/sh -c "echo 'Container started successfully'" || exit 1
-
-          # Test 2: Verify basic commands work
-          docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} /bin/sh -c "ls / && pwd" || exit 1
-
-          # Test 3: Verify BusyBox is available
-          docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} /bin/sh -c "busybox --help" || exit 1
-
-          echo "✓ All smoke tests passed"
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.runtime
-          platforms: linux/${{ steps.meta.outputs.docker_arch }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
-            BUILD_DATE=${{ github.event.repository.updated_at }}
-            VCS_REF=${{ github.sha }}
-            IMAGE_VARIANT=${{ matrix.variant }}
-          labels: |
-            org.opencontainers.image.title=Kimigayo OS
-            org.opencontainers.image.description=Alpine Linux-inspired lightweight, fast, and secure container OS
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=${{ github.repositoryUrl }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Upload build artifacts
+      - name: Upload rootfs tarball
         uses: actions/upload-artifact@v6
         with:
-          name: kimigayo-${{ matrix.variant }}-${{ steps.meta.outputs.version }}-${{ matrix.arch }}
+          name: kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
           path: output/*.tar.gz
           retention-days: 30
+          if-no-files-found: error
 
-      - name: Extract first tag for Trivy
-        id: trivy_tag
-        run: |
-          TAGS="${{ steps.meta.outputs.tags }}"
-          FIRST_TAG=$(echo "$TAGS" | cut -d',' -f1)
-          echo "tag=${FIRST_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.36.0
-        continue-on-error: true
-        if: matrix.arch == 'x86_64'
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v6
         with:
-          image-ref: ${{ steps.trivy_tag.outputs.tag }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          scanners: 'vuln,config,secret'
+          name: build-logs-${{ matrix.variant }}-${{ matrix.arch }}
+          path: |
+            build/logs/*.log
+            build/*-patches.log
+          retention-days: 7
+          if-no-files-found: ignore
 
-      - name: Check if SARIF file exists
-        id: sarif_check
-        if: matrix.arch == 'x86_64'
-        run: |
-          if [ -f "trivy-results.sarif" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Warning: SARIF file not generated. Trivy scan may have failed."
-          fi
-
-      - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: matrix.arch == 'x86_64' && steps.sarif_check.outputs.exists == 'true'
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-      - name: Run Trivy vulnerability scanner (table output)
-        uses: aquasecurity/trivy-action@v0.36.0
-        if: matrix.arch == 'x86_64'
-        with:
-          image-ref: ${{ steps.trivy_tag.outputs.tag }}
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-
-  create-manifest:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Create and push multi-arch manifests
-        run: |
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-
-          # Create manifests for each variant (all variants get suffix)
-          for VARIANT in minimal standard extended; do
-            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT} \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-amd64 \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-${VARIANT}-arm64
-
-            docker buildx imagetools create -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT} \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-amd64 \
-              ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${VARIANT}-arm64
-          done
-
-  create-github-release:
-    needs: [build-and-push, create-manifest]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+  verify-and-push:
+    name: Verify and push ${{ matrix.variant }} ${{ matrix.arch }}
+    needs: [meta, build]
+    # arm64 はネイティブランナーで検証する。QEMU を介さないので
+    # 本物の aarch64 で動くことを確かめられる。
+    # ここでやるのは tarball を scratch に包むだけなのでクロスコンパイルは不要。
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [minimal, standard, extended]
+        arch: [x86_64, arm64]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Extract version
-        id: version
+      - name: Download rootfs tarball
+        uses: actions/download-artifact@v7
+        with:
+          name: kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
+          path: output/
+
+      - name: Resolve tags
+        id: tags
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            docker_arch=amd64
+            platform=linux/amd64
+          else
+            docker_arch=arm64
+            platform=linux/arm64
+          fi
+          repo="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}"
+          v="${{ needs.meta.outputs.version }}"
+          variant="${{ matrix.variant }}"
+          {
+            echo "docker_arch=${docker_arch}"
+            echo "platform=${platform}"
+            echo "primary=${repo}:${v}-${variant}-${docker_arch}"
+            echo "moving=${repo}:latest-${variant}-${docker_arch}"
+          } >> "$GITHUB_OUTPUT"
+
+      # 検証するイメージと push するイメージを同一にする。
+      # 別々にビルドすると「テストした物を出していない」ことになる。
+      - name: Build Docker image
+        run: |
+          set -euo pipefail
+          docker build \
+            --platform "${{ steps.tags.outputs.platform }}" \
+            -f Dockerfile.runtime \
+            --build-arg TARBALL_PATH="output/kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}.tar.gz" \
+            --build-arg VERSION="${{ needs.meta.outputs.version }}" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${{ github.sha }}" \
+            --build-arg IMAGE_VARIANT="${{ matrix.variant }}" \
+            -t "${{ steps.tags.outputs.primary }}" \
+            -t "${{ steps.tags.outputs.moving }}" \
+            .
+
+      # ここを通らなければ push しない。
+      # 以前は tarball が小さいと exit 0 でスキップしていた。
+      - name: Verify image by running it
+        run: |
+          bash scripts/verify-image.sh \
+            "${{ steps.tags.outputs.primary }}" \
+            "${{ matrix.variant }}" \
+            "${{ matrix.arch }}"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Push verified image
+        run: |
+          set -euo pipefail
+          docker push "${{ steps.tags.outputs.primary }}"
+          docker push "${{ steps.tags.outputs.moving }}"
+          echo "::notice::pushed ${{ steps.tags.outputs.primary }}"
+
+      - name: Report image size
+        run: |
+          size=$(docker images "${{ steps.tags.outputs.primary }}" --format '{{.Size}}')
+          {
+            echo "### ${{ matrix.variant }} / ${{ matrix.arch }}"
+            echo ""
+            echo "- image size: \`${size}\`"
+            echo "- verified on: \`$(uname -m)\` runner"
+            echo "- tags: \`${{ steps.tags.outputs.primary }}\`, \`${{ steps.tags.outputs.moving }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  create-manifest:
+    name: Create multi-arch manifests
+    needs: [meta, verify-and-push]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # 作るのは <version>-<variant> と latest-<variant> だけ。
+      # **latest 単体のタグは作っていない。**
+      # docs/user/DOCKER_USAGE.md が ...:latest を案内しているので
+      # 実態とずれている（要判断。どちらに寄せるか決める）。
+      - name: Create and push multi-arch manifests
+        run: |
+          set -euo pipefail
+          repo="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}"
+          v="${{ needs.meta.outputs.version }}"
+          for variant in minimal standard extended; do
+            docker buildx imagetools create -t "${repo}:${v}-${variant}" \
+              "${repo}:${v}-${variant}-amd64" \
+              "${repo}:${v}-${variant}-arm64"
+            docker buildx imagetools create -t "${repo}:latest-${variant}" \
+              "${repo}:latest-${variant}-amd64" \
+              "${repo}:latest-${variant}-arm64"
+            echo "::notice::manifest ${repo}:${v}-${variant}"
+          done
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: [meta, verify-and-push, create-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v7
@@ -317,127 +317,85 @@ jobs:
 
       - name: Prepare release assets
         run: |
+          set -euo pipefail
           mkdir -p release-assets
-
-          # Copy all tar.gz files to release-assets
           find artifacts/ -name "*.tar.gz" -exec cp {} release-assets/ \;
-
-          # Generate checksums
           cd release-assets
           sha256sum *.tar.gz > SHA256SUMS
           sha512sum *.tar.gz > SHA512SUMS
-          cd ..
-
-          # List assets
-          echo "Release assets:"
-          ls -lh release-assets/
-
-          echo ""
-          echo "SHA256 Checksums:"
-          cat release-assets/SHA256SUMS
-
-          echo ""
-          echo "SHA512 Checksums:"
-          cat release-assets/SHA512SUMS
+          ls -lh
+          cat SHA256SUMS
 
       - name: Generate release notes
-        id: release_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          # Get previous tag
-          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tail -1)
+          set -euo pipefail
 
-          if [ -z "$PREVIOUS_TAG" ]; then
-            echo "No previous tag found, this is the first release"
-            PREVIOUS_TAG="HEAD~100"
-          fi
+          PREVIOUS_TAG="$(git tag --sort=-v:refname |
+            grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tail -1)"
+          [ -n "$PREVIOUS_TAG" ] || PREVIOUS_TAG="$(git rev-list --max-parents=0 HEAD | head -1)"
+          echo "::notice::release notes from ${PREVIOUS_TAG}"
 
-          echo "Generating release notes from ${PREVIOUS_TAG} to v${{ steps.version.outputs.version }}"
-
-          # Generate PR list
           cat > release-notes.md <<EOF
-          # Kimigayo OS v${{ steps.version.outputs.version }}
-
-          ## 🎉 Release Highlights
-
-          This release includes all three variants of Kimigayo OS for both x86_64 and ARM64 architectures.
+          # Kimigayo OS v${VERSION}
 
           ## 📦 Available Images
 
-          ### Standard Variant (Recommended)
           \`\`\`bash
-          docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-standard
-          docker pull ishinokazuki/kimigayo-os:latest-standard
+          docker pull ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-standard
+          docker pull ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-minimal
+          docker pull ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-extended
           \`\`\`
 
-          ### Minimal Variant
-          \`\`\`bash
-          docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-minimal
-          docker pull ishinokazuki/kimigayo-os:latest-minimal
-          \`\`\`
+          いずれも x86_64 / arm64 のマルチアーキマニフェストです。
 
-          ### Extended Variant
-          \`\`\`bash
-          docker pull ishinokazuki/kimigayo-os:${{ steps.version.outputs.version }}-extended
-          docker pull ishinokazuki/kimigayo-os:latest-extended
-          \`\`\`
+          ## ✅ 検証したこと
+
+          全バリアント × 両アーキテクチャで、**公開するイメージそのものを
+          起動して**次を確認しています（\`scripts/verify-image.sh\`）。
+
+          - 動的リンカが rootfs 内で解決する
+          - OpenRC の実行ファイル5つがロードできて動く（\`rc-update show\` を含む）
+          - BusyBox 本体が上書きされていない／アプレット数がバリアントと一致
+          - \`/tmp\`・\`/run\`・\`/var/tmp\` などが存在し、スティッキービットが付いている
+          - setuid/setgid バイナリと AppleDouble（\`._*\`）が無い
 
           ## 🔄 Changes Since ${PREVIOUS_TAG}
 
-          ### Pull Requests
           EOF
 
-          # Extract PR numbers from commit messages and generate PR list
-          git log ${PREVIOUS_TAG}..HEAD --oneline --grep='Merge pull request' | \
-            sed -n 's/.*Merge pull request #\([0-9]*\).*/\1/p' | \
-            sort -rn | uniq | while read pr; do
-              PR_TITLE=$(gh pr view $pr --json title --jq '.title' 2>/dev/null || echo "PR #$pr")
-              echo "- #$pr: ${PR_TITLE}" >> release-notes.md
-            done
-
-          # Add commit summary if no PRs found
-          PR_COUNT=$(git log ${PREVIOUS_TAG}..HEAD --oneline --grep='Merge pull request' | wc -l)
-          if [ "$PR_COUNT" -eq 0 ]; then
-            echo "" >> release-notes.md
+          if git log "${PREVIOUS_TAG}..HEAD" --oneline --grep='Merge pull request' | grep -q .; then
+            echo "### Pull Requests" >> release-notes.md
+            git log "${PREVIOUS_TAG}..HEAD" --oneline --grep='Merge pull request' |
+              sed -n 's/.*Merge pull request #\([0-9]*\).*/\1/p' |
+              sort -rn | uniq | while read -r pr; do
+                # set -e 下で gh が失敗するとリリースノート生成ごと
+                # 止まる。タイトルが引けないのは公開を止める理由では
+                # ないので、ここだけフォールバックさせる（番号は残る）。
+                title="$(gh pr view "$pr" --json title --jq '.title' || true)"
+                echo "- #${pr}: ${title:-（タイトル取得失敗）}" >> release-notes.md
+              done
+          else
             echo "### Commits" >> release-notes.md
-            git log ${PREVIOUS_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" >> release-notes.md
+            git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"- %s (%h)" >> release-notes.md
             echo "" >> release-notes.md
           fi
 
-          # Continue with rest of release notes
-          cat >> release-notes.md <<EOF
-
-          ## 🏗️ Build Artifacts
-
-          This release includes pre-built rootfs tarballs for all variants and architectures:
-          - \`kimigayo-minimal-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
-          - \`kimigayo-minimal-${{ steps.version.outputs.version }}-arm64.tar.gz\`
-          - \`kimigayo-standard-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
-          - \`kimigayo-standard-${{ steps.version.outputs.version }}-arm64.tar.gz\`
-          - \`kimigayo-extended-${{ steps.version.outputs.version }}-x86_64.tar.gz\`
-          - \`kimigayo-extended-${{ steps.version.outputs.version }}-arm64.tar.gz\`
-
-          ## 🔒 Security
-
-          All images have been built with security hardening enabled and have passed integration tests.
+          cat >> release-notes.md <<'EOF'
 
           ## 📚 Documentation
 
           - [Installation Guide](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/INSTALLATION.md)
           - [Quick Start Guide](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/user/QUICKSTART.md)
-          - [Docker Hub README](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
-
-          ## ✅ Verification
-
-          All builds have passed:
-          - ✓ Rootfs build verification
-          - ✓ Integration tests
-          - ✓ Docker image smoke tests
+          - [Docker Hub](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
           EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Kimigayo OS v${{ steps.version.outputs.version }}
+          name: Kimigayo OS v${{ needs.meta.outputs.version }}
           body_path: release-notes.md
           files: release-assets/*
           draft: false
@@ -448,55 +406,33 @@ jobs:
   notify:
     name: Discord Notification
     runs-on: ubuntu-latest
-    needs: [build-and-push, create-manifest, create-github-release]
+    needs: [meta, build, verify-and-push, create-manifest, create-github-release]
     if: always()
+    timeout-minutes: 5
     permissions: {}
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
-      - name: Extract version
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION="manual-trigger"
-          fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Send success notification
-        if: ${{ needs.build-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success' }}
+      # 断言しない。各ジョブの結果をそのまま並べる。
+      # 以前は「Docker Hub: ✅ Images pushed」と書き、さらに
+      # docker pull ...:latest を案内していたが、latest 単体のタグは
+      # 作られていない（latest-standard などだけ）。
+      - name: Send notification
+        if: env.DISCORD_WEBHOOK != ''
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: 'success'
-          title: '🎉 Release Success'
+          webhook: ${{ env.DISCORD_WEBHOOK }}
+          status: ${{ (needs.build.result == 'success' && needs.verify-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success') && 'success' || 'failure' }}
+          title: >-
+            ${{ (needs.build.result == 'success' && needs.verify-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success') && '🎉 Release Success' || '❌ Release Failed' }}
           description: |
-            **Kimigayo OS ${{ steps.version.outputs.version }} Released**
+            **Kimigayo OS v${{ needs.meta.outputs.version }}**
 
-            • Build & Push: ✅ All variants built
-            • Manifests: ✅ Multi-arch created
-            • GitHub Release: ✅ Published
-            • Docker Hub: ✅ Images pushed
+            • Build (3 variants x 2 arch): ${{ needs.build.result }}
+            • Verify and push: ${{ needs.verify-and-push.result }}
+            • Multi-arch manifests: ${{ needs.create-manifest.result }}
+            • GitHub Release: ${{ needs.create-github-release.result }}
 
-            🐳 Docker: `docker pull ishinokazuki/kimigayo-os:latest`
-            📦 Release: https://github.com/Kazuki-0731/Kimigayo/releases/tag/${{ steps.version.outputs.version }}
-          color: 0x00ff00
-          username: 'Kimigayo Release Bot'
-
-      - name: Send failure notification
-        if: ${{ needs.build-and-push.result == 'failure' || needs.create-manifest.result == 'failure' || needs.create-github-release.result == 'failure' }}
-        uses: sarisia/actions-status-discord@v1
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: 'failure'
-          title: '❌ Release Failed'
-          description: |
-            **Kimigayo OS ${{ steps.version.outputs.version }} Release Failed**
-
-            • Build & Push: ${{ needs.build-and-push.result == 'success' && '✅' || '❌' }}
-            • Manifests: ${{ needs.create-manifest.result == 'success' && '✅' || '❌' }}
-            • GitHub Release: ${{ needs.create-github-release.result == 'success' && '✅' || '❌' }}
-
-            Tag: ${{ steps.version.outputs.version }}
-            Commit: ${{ github.sha }}
-          color: 0xff0000
+            🐳 `docker pull ishinokazuki/kimigayo-os:${{ needs.meta.outputs.version }}-standard`
+            📦 https://github.com/Kazuki-0731/Kimigayo/releases/tag/v${{ needs.meta.outputs.version }}
           username: 'Kimigayo Release Bot'
