@@ -82,6 +82,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   必須で、ランタイムイメージには musl 以外の共有ライブラリを置いていない。
   meson に `--prefer-static` を渡して libcap を静的リンクするようにした
   （Alpine のように `libcap.so.2` を同梱する方針は採らなかった）
+- **arm64 の OpenRC 0.63.2 が1度もビルドできていなかった**（CI の arm64
+  ジョブ3つが全部これで失敗）。原因が3つ重なっていた。
+  (1) Alpine 3.24 の `libcap` は `libcap2` と `libcap-utils` に依存するだけの
+  メタパッケージ（`.apk` は 1301 バイトで中身なし）で、`apk fetch` は依存を
+  引かないため `libcap.so.2` が sysroot に入っていなかった。`libcap2` を
+  取るようにし、コピー失敗を握り潰していた `2>/dev/null || true` も外した。
+  (2) `.pc` の `libdir` は `/usr/lib` なので meson は `<sysroot>/usr/lib` を
+  見るが、実物は `<sysroot>/lib` にしか無く、`-lcap` がホストの x86_64 の
+  `/usr/lib/libcap.so` に流れて `incompatible with aarch64linux` になっていた。
+  (3) meson のクロスファイルをビルドディレクトリの中に書いていたため、
+  `meson setup` の直前でそのディレクトリを作り直す処理が一緒に消していた
+  （`build/openrc-cross-<arch>/` に分離）
+- **静的リンクした aarch64 の libcap が outline-atomics を参照していた** —
+  `undefined symbol: __aarch64_swp1_acq_rel`。クロスラッパーは `-nostdlib`
+  なので compiler-rt の builtins を明示的にリンク末尾へ足すようにした
+  （アーカイブをファイルパスで渡すと meson の依存解決が
+  `'utf-8' codec can't decode byte` で落ちるため `-l` 形式）
 - **カーネル 6.18.55 の x86_64 ビルドが realmode のリンクで落ちていた。**
   `scripts/build-kernel.sh` が `REALMODE_CFLAGS` を丸ごと上書きしており、
   上流の値にある `-D__DISABLE_EXPORTS` が落ちていたため、realmode の
