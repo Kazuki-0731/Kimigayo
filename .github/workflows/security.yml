@@ -7,9 +7,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   security-events: write
   issues: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   DOCKER_HUB_USERNAME: ishinokazuki
@@ -19,6 +23,7 @@ jobs:
   version-check:
     name: Check Component Versions
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       musl_update: ${{ steps.musl_check.outputs.update_needed }}
       busybox_update: ${{ steps.busybox_check.outputs.update_needed }}
@@ -31,7 +36,14 @@ jobs:
         id: alpine_check
         run: |
           # Fetch Alpine security database
-          wget -q https://secdb.alpinelinux.org/edge/main.json -O alpine-security.json || echo "Failed to fetch security database"
+          # ビルドに使っている Alpine の版を見る。
+          # 以前は edge を見ていたため、実際に使っている 3.24 と
+          # 違うデータベースで判断していた。
+          # shellcheck disable=SC1091
+          source scripts/lib/versions.sh
+          url="https://secdb.alpinelinux.org/v${ALPINE_VERSION}/main.json"
+          echo "fetching ${url}"
+          wget -q "$url" -O alpine-security.json || echo "Failed to fetch ${url}"
 
           if [ -f alpine-security.json ]; then
             VULN_COUNT=$(jq 'length' alpine-security.json 2>/dev/null || echo "0")
@@ -169,7 +181,8 @@ jobs:
   trivy-filesystem-scan:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
-    needs: version-check
+    timeout-minutes: 20
+    # version-check に依存しない。以前は needs を付けて待っていた。
 
     steps:
       - name: Checkout repository
@@ -192,42 +205,21 @@ jobs:
           sarif_file: 'trivy-fs-results.sarif'
           category: 'trivy-filesystem'
 
-  trivy-image-scan:
-    name: Trivy Image Scan (Weekly)
-    runs-on: ubuntu-latest
-    # Run only on Sundays (day 0)
-    if: github.event.schedule == '0 2 * * *' && github.event_name == 'schedule' && (github.event.schedule == '0 2 * * 0' || github.event_name == 'workflow_dispatch')
-    strategy:
-      matrix:
-        variant: [minimal, standard, extended]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Pull Docker image
-        run: |
-          if [[ "${{ matrix.variant }}" == "standard" ]]; then
-            IMAGE_REF="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
-          else
-            IMAGE_REF="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-${{ matrix.variant }}"
-          fi
-          echo "IMAGE_REF=${IMAGE_REF}" >> $GITHUB_ENV
-          docker pull ${IMAGE_REF} || echo "Failed to pull ${IMAGE_REF}"
-
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        continue-on-error: true
-        with:
-          image-ref: ${{ env.IMAGE_REF }}
-          format: 'sarif'
-          output: 'trivy-image-${{ matrix.variant }}.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM'
-          scanners: 'vuln,config,secret'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: 'trivy-image-${{ matrix.variant }}.sarif'
-          category: 'trivy-image-${{ matrix.variant }}'
+  # trivy-image-scan は削除した（2026-10-09）。理由が3つある。
+  #
+  # 1. 一度も走ったことがない。if が自己矛盾していた:
+  #      github.event.schedule == '0 2 * * *' && ... &&
+  #      (github.event.schedule == '0 2 * * 0' || ...)
+  #    schedule が同時に毎日と日曜であることはあり得ない。
+  # 2. 走っても意味がない。Kimigayo は scratch 上の手組み rootfs で
+  #    パッケージデータベースを持たないため、Trivy は対象を1つも
+  #    識別できない（実測で Target: - / Not scanned /
+  #    Metadata.OS: null / Results: 0）。「脆弱性 0 件」ではなく
+  #    「スキャンしていない」。
+  # 3. pull 先が存在しない。standard のとき :latest を指していたが、
+  #    release.yml は latest-standard までしか作らない。
+  #    しかも失敗を || echo で握り潰していた。
+  #
+  # 構成要素の脆弱性は版を手で突合して追う（version-check ジョブ）。
+  # 構造的な対策は SBOM の生成（未着手、要判断）。
+  # → .claude/skills/security-review/SKILL.md

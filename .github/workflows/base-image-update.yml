@@ -20,9 +20,14 @@ env:
   DOCKER_HUB_USERNAME: ishinokazuki
   IMAGE_NAME: kimigayo-os
 
+concurrency:
+  group: base-image-update-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-updates:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       musl_update: ${{ steps.check.outputs.musl_update }}
       busybox_update: ${{ steps.check.outputs.busybox_update }}
@@ -109,6 +114,7 @@ jobs:
     needs: check-updates
     if: needs.check-updates.outputs.should_rebuild == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository

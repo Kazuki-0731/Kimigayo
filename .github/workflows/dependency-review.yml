@@ -13,9 +13,14 @@ permissions:
   pull-requests: write
   security-events: write
 
+concurrency:
+  group: dependency-review-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'pull_request'
 
     steps:
@@ -30,6 +35,7 @@ jobs:
 
   vulnerability-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -135,6 +141,7 @@ jobs:
   create-security-issue:
     needs: vulnerability-scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: failure() && github.event_name == 'schedule'
 
     steps:
