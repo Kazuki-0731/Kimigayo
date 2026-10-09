@@ -27,11 +27,18 @@ services:
       - KIMIGAYO_VERSION=${KIMIGAYO_VERSION:-dev}
       - ARCH=x86_64
       - SECURITY_HARDENING=full
-    # リソース制限（開発環境の目標値を反映）
+    # リソース制限
+    #
+    # memory は 8G。2G だと arm64 のクロスビルドで meson setup が
+    # OOM kill される（`Killed` だけ出て原因が分かりにくい）。
+    # 開発機が Apple Silicon のとき、この amd64 コンテナは QEMU
+    # エミュレーションで動くため、ネイティブより多くのメモリを使う。
+    # CI（ubuntu-latest, x86_64 ネイティブ）では問題にならないが、
+    # 手元と CI で同じ compose を使うので手元に合わせる。
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
           cpus: '4'
         reservations:
           memory: 512M

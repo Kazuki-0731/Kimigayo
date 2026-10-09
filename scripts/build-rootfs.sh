@@ -523,25 +523,40 @@ copy_components() {
         log_warn "musl installation directory not found: $MUSL_INSTALL_DIR"
     fi
 
-    # Copy kernel modules (if built)
+    # カーネルとモジュール（ビルドされていれば）
+    #
+    # **Docker イメージにカーネルは入らない。** コンテナはホストの
+    # カーネルで動くので、ここでコピーするのはベアメタル／QEMU 検証用の
+    # rootfs を作るときのためだけ。カーネルが無くても警告で済ませる。
+    #
+    # パスは build-kernel.sh の出力に合わせる。
+    # 2026-10-09 まで boot/vmlinuz と lib/modules を探していたが、
+    # build-kernel.sh が実際に置くのは
+    #   $KERNEL_OUTPUT_DIR/vmlinuz-<version>-<arch>
+    #   $KERNEL_OUTPUT_DIR/modules/lib/modules/<version>/
+    # で、**一度も噛み合っていなかった**（コンテナ向けには無害だが、
+    # ベアメタル用の rootfs を作ると静かにカーネル無しになる）。
     if [ -d "$KERNEL_OUTPUT_DIR" ]; then
-        log_info "Copying kernel modules..."
-
-        # Copy kernel modules if they exist
-        if [ -d "$KERNEL_OUTPUT_DIR/lib/modules" ]; then
-            mkdir -p "$ROOTFS_DIR/lib/modules"
-            cp -a "$KERNEL_OUTPUT_DIR/lib/modules"/* "$ROOTFS_DIR/lib/modules/" 2>/dev/null || true
-            log_info "  ✓ Kernel modules copied"
+        local kernel_image="${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}"
+        if [ -f "$kernel_image" ]; then
+            mkdir -p "$ROOTFS_DIR/boot"
+            cp -a "$kernel_image" "$ROOTFS_DIR/boot/"
+            ln -sf "vmlinuz-${KERNEL_VERSION}-${ARCH}" "$ROOTFS_DIR/boot/vmlinuz"
+            log_info "  ✓ Kernel copied: boot/$(basename "$kernel_image")"
+        else
+            log_info "  カーネルは未ビルド（コンテナ向けには不要）: $kernel_image"
         fi
 
-        # Copy kernel binary
-        if [ -f "$KERNEL_OUTPUT_DIR/boot/vmlinuz" ]; then
-            mkdir -p "$ROOTFS_DIR/boot"
-            cp "$KERNEL_OUTPUT_DIR/boot/vmlinuz" "$ROOTFS_DIR/boot/"
-            log_info "  ✓ Kernel binary copied"
+        # modules_install は INSTALL_MOD_PATH=$KERNEL_OUTPUT_DIR/modules なので
+        # 実体は modules/lib/modules/<version>/ に入る
+        local mod_src="${KERNEL_OUTPUT_DIR}/modules/lib/modules"
+        if [ -d "$mod_src" ]; then
+            mkdir -p "$ROOTFS_DIR/lib/modules"
+            cp -a "$mod_src"/* "$ROOTFS_DIR/lib/modules/"
+            log_info "  ✓ Kernel modules copied: $(ls "$mod_src" | tr '\n' ' ')"
         fi
     else
-        log_warn "Kernel output directory not found: $KERNEL_OUTPUT_DIR"
+        log_info "  カーネル出力なし（コンテナ向けには不要）: $KERNEL_OUTPUT_DIR"
     fi
 
     # Copy BusyBox
