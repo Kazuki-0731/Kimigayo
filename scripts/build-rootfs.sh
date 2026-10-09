@@ -978,34 +978,45 @@ verify_rootfs() {
         log_warn "  readelf not found; skipping shared library checks"
     fi
 
-    # 成果物の新しさ。
+    # コンポーネントの作り直し漏れ。
     #
     # .kimigayo-build-version はコンポーネント間の依存を見ないので、
     # musl を作り直しても BusyBox と OpenRC は「ビルド済み」と判定されて
     # 古いバイナリが残る。それは別の musl に対してリンクされたもので、
     # 実行すると Segmentation fault になる（2026-10-09 に実測）。
     #
-    # musl は [1/4] で最初に作られるので、正常なビルドでは
-    # 依存先が libc.so より必ず新しい。古いものがあれば作り直し漏れ。
+    # 比較するのは**インストール先のスタンプファイルの mtime**。
+    # rootfs 側のファイルは使えない。optimize_rootfs の strip が
+    # 書き換えたものだけ mtime が更新され、既に strip 済みのものは
+    # 据え置かれるため、順序が逆転する（実際に誤検知した。
+    # libc.so が strip されて最も新しくなり、全部が「古い」と判定された）。
+    # スタンプは各コンポーネントのビルド末尾に書かれ、以後触られない。
+    #
+    # musl は [1/4] で最初に作られるので、正常なビルドでは依存先の
+    # スタンプが musl より必ず新しい。
     # （→ CLAUDE.md「musl を作り直したら、それにリンクしているものも
     #   作り直す」節）
-    if [ -f "$ROOTFS_DIR/usr/lib/libc.so" ]; then
+    local musl_stamp="${MUSL_INSTALL_DIR}/.kimigayo-build-version"
+    if [ -f "$musl_stamp" ]; then
         local stale=""
-        local f
-        for f in sbin/openrc sbin/rc-update sbin/start-stop-daemon \
-                 lib/librc.so.1 lib/libeinfo.so.1 bin/busybox; do
-            [ -f "$ROOTFS_DIR/$f" ] || continue
-            if [ "$ROOTFS_DIR/usr/lib/libc.so" -nt "$ROOTFS_DIR/$f" ]; then
-                stale="${stale} /${f}"
+        local dep
+        for dep in "BusyBox:${BUSYBOX_INSTALL_DIR}" "OpenRC:${OPENRC_INSTALL_DIR:-}"; do
+            local name="${dep%%:*}" dir="${dep#*:}"
+            [ -n "$dir" ] || continue
+            local stamp="${dir}/.kimigayo-build-version"
+            [ -f "$stamp" ] || continue
+            if [ "$musl_stamp" -nt "$stamp" ]; then
+                stale="${stale} ${name}"
             fi
         done
         if [ -n "$stale" ]; then
-            log_error "  ✗ older than libc.so (linked against a different musl):${stale}"
-            log_error "      musl を作り直したあと、依存先を作り直していない。"
+            log_error "  ✗ built before the current musl:${stale}"
+            log_error "      musl を作り直したあと、これらを作り直していない。"
+            log_error "      別の musl に対してリンクされているので実行時に落ちる。"
             log_error "      make clean-busybox clean-openrc してからやり直す。"
             errors=$((errors + 1))
         else
-            log_info "  ✓ components are newer than libc.so"
+            log_info "  ✓ components were built after the current musl"
         fi
     fi
 
