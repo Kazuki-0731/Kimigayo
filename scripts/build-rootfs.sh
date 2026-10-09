@@ -932,15 +932,13 @@ verify_rootfs() {
         log_info "  ✓ essential directories present"
     fi
 
-    # /tmp と /var/tmp はスティッキービットが必要
+    # /tmp と /var/tmp はスティッキービットが必要。
+    # stat の書式は GNU と BSD で違うので POSIX の test -k で見る
+    # （macOS の stat -f '%Lp' はスティッキービットを落とす）。
     for d in tmp var/tmp; do
-        if [ -d "$ROOTFS_DIR/$d" ]; then
-            local mode
-            mode="$(stat -c '%a' "$ROOTFS_DIR/$d" 2>/dev/null || stat -f '%Lp' "$ROOTFS_DIR/$d" 2>/dev/null)"
-            if [ "$mode" != "1777" ]; then
-                log_error "  ✗ /${d} should be 1777 but is ${mode}"
-                errors=$((errors + 1))
-            fi
+        if [ -d "$ROOTFS_DIR/$d" ] && [ ! -k "$ROOTFS_DIR/$d" ]; then
+            log_error "  ✗ /${d} is missing the sticky bit (should be 1777)"
+            errors=$((errors + 1))
         fi
     done
 
