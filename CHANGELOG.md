@@ -31,6 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   （`Dockerfile`・`Makefile`・CI がそれぞれ別に並べていた）
 - 外部 GitHub Action の `@master` 参照を tag 固定
   （`trivy-action@v0.36.0`・`action-shellcheck@2.0.0`）
+- **README とドキュメントの性能数値を実測値に差し替えた。**
+  Standard（x86_64）は **3.43MB**。比較対象も同じホスト・同じ platform で
+  測り直した（`gcr.io/distroless/static-debian12` 2.11MB /
+  `alpine:latest` 3.24.2 が 8.42MB / `ubuntu:24.04` 78.2MB）。
+  **v2.0.1 の 1.17MB は Init も `libc.so` も入っていないイメージの値**なので、
+  現在の値と同じものを測った数字ではない
+- **起動時間 439ms とメモリ 0.2MB を撤回した。**
+  `scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` の
+  終了までを測っており、正常なイメージでは約 5,600ms になる。
+  439ms はこの `sleep` が成立しなかった場合の値で、起動時間ではない。
+  計測方法を決め直すまで「未測定」と記載する
+- 「完全静的リンク・依存関係ゼロ」という記述を実態に合わせた。
+  BusyBox は static-pie だが、OpenRC は musl と自身の
+  `librc` / `libeinfo` に動的リンクする
 
 ### Added
 
@@ -49,6 +63,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **配布イメージに OpenRC のバイナリが1つも入っていなかった**（v0.1.0 以降ずっと）。
+  `scripts/build-rootfs.sh` が OpenRC の `usr/sbin` / `usr/lib` を
+  コピー対象にしていなかった（OpenRC の prefix は `/usr` なので
+  実行ファイル9個と `librc.so.1` / `libeinfo.so.1` はすべてそこに入る）。
+  ログは「✓ OpenRC copied」と出ていた。
+  加えて `build-rootfs.sh` は musl と BusyBox しかビルド確認していなかったため、
+  `make build-rootfs` / `make ci-build-local` の経路では OpenRC が
+  そもそもビルドされていなかった
+- **musl の `libc.so` が入っておらず、動的リンカがリンク切れだった**
+  （v0.1.0 以降ずっと）。`/lib/ld-musl-<arch>.so.1` は
+  `/usr/lib/libc.so` を指す絶対シンボリックリンクだが、その実体を
+  コピーしていなかった。BusyBox は static-pie なので smoke テストは通り、
+  気づけない状態だった。README が案内する「自分のアプリを COPY する」
+  使い方はこれで動くようになった
+- **OpenRC の `start-stop-daemon` / `supervise-daemon` が
+  `libcap.so.2` を解決できず起動しなかった。** OpenRC 0.63.2 は libcap が
+  必須で、ランタイムイメージには musl 以外の共有ライブラリを置いていない。
+  meson に `--prefer-static` を渡して libcap を静的リンクするようにした
+  （Alpine のように `libcap.so.2` を同梱する方針は採らなかった）
+- **カーネル 6.18.55 の x86_64 ビルドが realmode のリンクで落ちていた。**
+  `scripts/build-kernel.sh` が `REALMODE_CFLAGS` を丸ごと上書きしており、
+  上流の値にある `-D__DISABLE_EXPORTS` が落ちていたため、realmode の
+  アセンブリで `RET` が `jmp __x86_return_thunk` に展開され
+  `undefined reference to '__x86_return_thunk'` になっていた。
+  6.18 では上流の `REALMODE_CFLAGS` が `-std=gnu11` を持つので上書きは不要
+- **`make shellcheck-scan` が手元で回らず、警告が出ても成功していた。**
+  shellcheck が無い環境では即 exit 1（ビルド環境イメージにも入っていない）、
+  かつ `find -exec shellcheck {} \;` で終了コードを捨てていた。
+  Docker イメージでの代替と、終了コードの伝播を入れた
 - **`scripts/download-busybox.sh` がキャッシュ済み tarball を再利用すると
   必ず落ちていた** — `skip_checksum` と `github_tag_version` が
   ダウンロード分岐の中でしか定義されておらず `set -u` に殺されていた
