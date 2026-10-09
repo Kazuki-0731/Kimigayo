@@ -281,8 +281,16 @@ jobs:
       #   <version>             standard の別名（バリアント名を書かない形）
       #   latest                standard の最新。docs/user/DOCKER_USAGE.md が
       #                         案内しているので実在させる
+      #   latest-<arch>         standard のアーキ別。docs/RELEASE_CHECKLIST.md が
+      #                         `docker pull ...:latest-amd64` を案内している
       #
       # standard を既定にするのは、README が「推奨」としているため。
+      #
+      # **公開済みのタグを1つでも更新し忘れると、古い内容が残り続ける。**
+      # latest-amd64 / latest-arm64 は 2025-12-21 から公開されているのに
+      # このジョブが作っていなかった。2026-10-09 の事故で 9 タグが v0.1.1 の
+      # 内容（OpenRC も libc.so も /tmp も入っていない版）に差し替わった際、
+      # このままでは latest-amd64 / latest-arm64 だけ復旧できなかった。
       - name: Create and push multi-arch manifests
         run: |
           set -euo pipefail
@@ -304,6 +312,13 @@ jobs:
           docker buildx imagetools create -t "${repo}:latest" \
             "${repo}:latest-standard-amd64" "${repo}:latest-standard-arm64"
           echo "::notice::manifest ${repo}:latest -> standard"
+
+          # latest-<arch> も standard の別名（単一プラットフォーム）
+          for a in amd64 arm64; do
+            docker buildx imagetools create -t "${repo}:latest-${a}" \
+              "${repo}:latest-standard-${a}"
+            echo "::notice::tag ${repo}:latest-${a} -> standard-${a}"
+          done
 
   create-github-release:
     name: Create GitHub Release
