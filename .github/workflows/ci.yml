@@ -25,6 +25,12 @@ jobs:
     name: Build and Test
     needs: shellcheck
     strategy:
+      # 1つ落ちると他の5つがキャンセルされ、何が本当に壊れているのか
+      # 分からなくなる（2026-10-09 の run 37869425207 では
+      # pytest のパス指定ミス1件で残り全部がキャンセルされ、
+      # カーネル 6.18.55 が arm64 で通るのかが分からなかった）。
+      # 1回の run で全組み合わせの結果を見たいので最後まで走らせる。
+      fail-fast: false
       matrix:
         variant: [minimal, standard, extended]
         arch: [x86_64, arm64]

@@ -74,11 +74,16 @@ jobs:
     - name: Set up Docker
       run: docker compose build
 
+    # docker-compose.yml の working_dir は /build/kimigayo/build-system なので、
+    # tests/unit のような相対パスはそのままでは解決できない
+    # （pytest.ini は上に辿って見つかるので rootdir だけ正しくなり、
+    #   "file or directory not found: tests/unit/" で落ちていた）。
+    # -w でリポジトリルートを指定する。
     - name: Run unit tests
-      run: docker compose run --rm kimigayo-build pytest tests/unit/ -v
+      run: docker compose run --rm -w /build/kimigayo kimigayo-build pytest tests/unit/ -v
 
     - name: Run property tests
-      run: docker compose run --rm kimigayo-build pytest tests/property/ -v
+      run: docker compose run --rm -w /build/kimigayo kimigayo-build pytest tests/property/ -v
 
     - name: Upload test results
       uses: actions/upload-artifact@v6
