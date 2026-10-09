@@ -34,34 +34,15 @@ print(d.get("tool_input", {}).get("command", ""))
 
 [ -n "$CMD" ] || exit 0
 
-# heredoc の中身は判定対象から外す。
-# コミットメッセージを heredoc で渡すのが普通なので、本文に
-# 「.env は履歴に入っていない」「git tag を打つ前に」のような説明が
-# あるだけでブロックしてしまう（実際に誤検知した）。
-# 判定したいのは実行されるコマンドの側だけ。
-CMD="$(printf '%s' "$CMD" | python3 -I -c '
-import re, sys
-text = sys.stdin.read()
-lines = text.split("\n")
-out = []
-pending = []          # まだ終端していない heredoc のマーカー
-skipping = None
-for line in lines:
-    if skipping is not None:
-        if line.strip() == skipping:
-            skipping = pending.pop(0) if pending else None
-            if skipping is not None:
-                continue
-            skipping = None
-        continue
-    # そのコマンド行自体は残す（git add などの判定に必要）
-    out.append(line)
-    markers = re.findall(r"<<-?\s*[\x27\"]?([A-Za-z_][A-Za-z0-9_]*)[\x27\"]?", line)
-    if markers:
-        pending = list(markers)
-        skipping = pending.pop(0)
-print("\n".join(out))
-' 2>/dev/null || printf '%s' "$CMD")"
+# 判定対象を「実際に実行されるコマンド」だけに絞る。
+# コマンド全体を正規表現で見ると、heredoc のコミットメッセージ本文、
+# 読むだけの操作、echo の引数として書いた説明文まで引っかかる
+# （3つとも実際に踏んだ）。理由と実装は extract-commands.py のコメント。
+EXTRACT="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/extract-commands.py"
+if [ -f "$EXTRACT" ]; then
+    CMD="$(printf '%s' "$CMD" | python3 -I "$EXTRACT" 2>/dev/null || printf '%s' "$CMD")"
+fi
+[ -n "$(printf '%s' "$CMD" | tr -d '[:space:]')" ] || exit 0
 
 block() {
     printf 'ブロックしました: %s\n\n%s\n' "$1" "$2" >&2
