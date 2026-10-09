@@ -424,13 +424,35 @@ make benchmark             # 全ベンチマーク
 - **長いビルドは `make shell` → `tmux` 内で回す。** `make build` を
   そのまま叩くと出力が溜まってから出るため進捗が見えない
 
-### ビルドの現実的な制約
+### フルビルドは x86_64 / arm64 とも GitHub Actions で回す（既定）
+
+**これが方針。開発機でフルビルドしない。**
 
 - **`docker-compose.yml` は `platform: linux/amd64` を固定している。**
-  開発機が Apple Silicon（arm64）だと **QEMU エミュレーションになる**。
+  開発機が Apple Silicon（arm64）だと **x86_64 が QEMU エミュレーションに
+  なり、遅いうえに実機が熱くなる**（過去にこれで GitHub Actions へ移した）。
   musl・BusyBox・OpenRC は許容範囲だが、**カーネルのフルビルドは非現実的**
-  （数時間〜、失敗もする）。**カーネルの検証は GitHub Actions
-  （`ci.yml` の matrix: variant × arch）に任せる**のが既定
+  （数時間〜、失敗もする）
+- **arm64 も Actions に任せる。** `ubuntu-latest`（x86_64）から
+  clang/lld でクロスコンパイルするので QEMU を介さない。
+  **2026-10-09 に 3 バリアント × 2 アーキテクチャの 6 ジョブすべて成功**
+  （run 37880882653、カーネル 6.18.55 込み）。所要時間:
+
+  | | x86_64 | arm64 |
+  | --- | --- | --- |
+  | minimal | 15:47 | 42:44 |
+  | standard | 27:05 | 47:30 |
+  | extended | 14:59 | 28:50 |
+
+  **ジョブの `timeout-minutes` は未設定なので既定の 360 分。**
+  最長 47 分なので余裕がある。**arm64 を開発機のネイティブビルドに
+  移す必要はない**（`platform` 固定を外す話も不要）
+- **開発機でやるのは「段を絞ったビルド」まで。** 例:
+  `make ARCH=x86_64 arch/x86/realmode/` のようにカーネルの一部だけ、
+  あるいは `scripts/build-openrc.sh` 単体。
+  **arm64 のクロスビルドを手元で回すなら compose を使わない**
+  （`memory: 2G` 制限で `meson setup` が OOM kill される。
+  `docker run --memory 8g` で直接叩く → [NEXT.md](NEXT.md)）
 - **Docker イメージにカーネルは入らない。** rootfs だけなので、
   musl / BusyBox / OpenRC の変更は `make ci-build-local` で検証できる。
   **「イメージが動いた」はカーネルを検証したことにならない**
