@@ -536,27 +536,36 @@ copy_components() {
     #   $KERNEL_OUTPUT_DIR/modules/lib/modules/<version>/
     # で、**一度も噛み合っていなかった**（コンテナ向けには無害だが、
     # ベアメタル用の rootfs を作ると静かにカーネル無しになる）。
-    if [ -d "$KERNEL_OUTPUT_DIR" ]; then
-        local kernel_image="${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}"
-        if [ -f "$kernel_image" ]; then
-            mkdir -p "$ROOTFS_DIR/boot"
-            cp -a "$kernel_image" "$ROOTFS_DIR/boot/"
-            ln -sf "vmlinuz-${KERNEL_VERSION}-${ARCH}" "$ROOTFS_DIR/boot/vmlinuz"
-            log_info "  ✓ Kernel copied: boot/$(basename "$kernel_image")"
-        else
-            log_info "  カーネルは未ビルド（コンテナ向けには不要）: $kernel_image"
-        fi
+    # **カーネルとモジュールは必ず arch と版で絞る。**
+    # build/kernel/output/ には前のビルドの成果物が残る。絞らないと
+    # 別アーキ・別版のものが入る。2026-10-09 に実際に踏んで、
+    # arm64 の rootfs に x86_64 / 6.6.11 のモジュール 232KB が
+    # 入っていた（minimal のイメージが standard より大きいという
+    # 不自然さから気づいた）。
+    #
+    # モジュールのコピーはカーネル本体が見つかったときだけ行う。
+    # コンテナ向けの成果物にモジュールだけ入っても意味がなく、
+    # 「カーネルは無いのにモジュールはある」状態は紛らわしい。
+    local kernel_image="${KERNEL_OUTPUT_DIR}/vmlinuz-${KERNEL_VERSION}-${ARCH}"
+    if [ -f "$kernel_image" ]; then
+        mkdir -p "$ROOTFS_DIR/boot"
+        cp -a "$kernel_image" "$ROOTFS_DIR/boot/"
+        ln -sf "vmlinuz-${KERNEL_VERSION}-${ARCH}" "$ROOTFS_DIR/boot/vmlinuz"
+        log_info "  ✓ Kernel copied: boot/$(basename "$kernel_image")"
 
         # modules_install は INSTALL_MOD_PATH=$KERNEL_OUTPUT_DIR/modules なので
-        # 実体は modules/lib/modules/<version>/ に入る
-        local mod_src="${KERNEL_OUTPUT_DIR}/modules/lib/modules"
+        # 実体は modules/lib/modules/<version>/ に入る。
+        # ディレクトリ名は KERNEL_VERSION そのままなので一致で絞れる。
+        local mod_src="${KERNEL_OUTPUT_DIR}/modules/lib/modules/${KERNEL_VERSION}"
         if [ -d "$mod_src" ]; then
             mkdir -p "$ROOTFS_DIR/lib/modules"
-            cp -a "$mod_src"/* "$ROOTFS_DIR/lib/modules/"
-            log_info "  ✓ Kernel modules copied: $(ls "$mod_src" | tr '\n' ' ')"
+            cp -a "$mod_src" "$ROOTFS_DIR/lib/modules/"
+            log_info "  ✓ Kernel modules copied: lib/modules/${KERNEL_VERSION}"
+        else
+            log_info "  カーネルモジュールなし: $mod_src"
         fi
     else
-        log_info "  カーネル出力なし（コンテナ向けには不要）: $KERNEL_OUTPUT_DIR"
+        log_info "  カーネルは未ビルド（コンテナ向けには不要）: $(basename "$kernel_image")"
     fi
 
     # Copy BusyBox
