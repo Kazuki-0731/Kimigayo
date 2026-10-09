@@ -468,7 +468,12 @@ make benchmark             # 全ベンチマーク
 | パッチ | 理由 |
 | --- | --- |
 | `src/busybox/patches/0001-vi-musl-libc-compatibility.patch` | BusyBox の `editors/vi.c` が glibc の GNU 正規表現拡張（`re_syntax_options`・`re_compile_pattern`・`re_search`）を使っており musl ではコンパイルできない。POSIX `regcomp`/`regexec` に書き換えている。**1.38.0 でも上流は GNU 拡張のまま**なので引き続き必要（2026-10-09 に 1.38.0 への適用を dry-run で確認）。詳細 → [docs/development/busybox-vi-patch.md](docs/development/busybox-vi-patch.md) |
-| `src/kernel/patches/0001-security-hardening.patch` | **中身はコメントだけのプレースホルダ。** 実パッチではない |
+
+**カーネルのパッチは現在0件。** `0001-security-hardening.patch` は中身が
+コメントだけのプレースホルダで、毎ビルド「適用できないパッチ」として
+警告を出すだけだったので削除した（2026-10-09）。
+`apply-kernel-patches.sh` が0件のときに再生成する処理も外してある
+（消しても次のビルドで復活していた）。
 
 **削除済みのパッチ（2026-10-09、カーネル 6.6 → 6.18 で不要になった）:**
 `0002-disable-retpoline-realmode.patch`・`0003-efi-stub-std-gnu11.patch`・

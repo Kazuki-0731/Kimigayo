@@ -147,9 +147,12 @@ apply_all_patches() {
     fi
 
     if [ "$found_count" -eq 0 ]; then
-        log_info "No patches found in $PATCHES_DIR"
-        log_info "Creating example security hardening patch..."
-        create_example_patches
+        # パッチが無いのは正常な状態。
+        # 以前はここでコメントだけのプレースホルダを生成していたが、
+        # それは毎ビルド「適用できないパッチ」として警告を出すだけで、
+        # 消しても次のビルドで復活していた。必要になったら
+        # src/kernel/patches/ に実物を置く（置き方は README.md）。
+        log_info "No patches to apply (this is normal for Linux ${KERNEL_VERSION})"
         return 0
     fi
 
@@ -163,32 +166,6 @@ apply_all_patches() {
         log_warn "  grep -i 'not applicable' ${PATCH_LOG}"
         log_warn "See src/kernel/patches/README.md"
     fi
-}
-
-# Create example security hardening patches
-create_example_patches() {
-    local example_patch="${PATCHES_DIR}/0001-security-hardening.patch"
-
-    if [ -f "$example_patch" ]; then
-        log_info "Example patch already exists"
-        return 0
-    fi
-
-    cat > "$example_patch" << 'EOF'
-# Kimigayo OS Security Hardening Patch
-# This is a placeholder for future security patches
-#
-# Example patches that may be added:
-# - Grsecurity/PaX security enhancements
-# - Kernel self-protection features
-# - Additional ASLR improvements
-# - Stack canary enhancements
-#
-# Note: Actual patches will be added based on security requirements
-EOF
-
-    log_info "Created example patch template: $example_patch"
-    log_info "Add actual .patch files to $PATCHES_DIR as needed"
 }
 
 # Verify kernel source integrity after patching
