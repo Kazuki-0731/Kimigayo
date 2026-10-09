@@ -14,6 +14,15 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-memo-files.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-edit-during-build.sh\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
