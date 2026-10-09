@@ -50,7 +50,11 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 x86_64（`--platform linux/amd64`）/ ホストは macOS（Apple Silicon, arm64）で
 QEMU エミュレーション / Alpine 3.24 ベースのビルド環境 /
 カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
-**arm64 は未測定。**
+
+**arm64 のイメージサイズは未測定。** rootfs までは CI で作れており
+（minimal 3.8M / standard 3.9M / extended 3.9M、x86_64 と同等）、
+3 バリアント × 2 アーキテクチャの 6 ジョブすべてビルド成功している
+（2026-10-09、run 37880882653）。
 
 | バリアント | BusyBox アプレット | BusyBox 本体 | tarball | イメージ |
 | --- | --- | --- | --- | --- |
