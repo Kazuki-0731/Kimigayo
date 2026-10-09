@@ -147,7 +147,7 @@ format: sarif, table
 - ✅ [docs/user/INSTALLATION.md](user/INSTALLATION.md) - インストールガイド
 - ✅ [docs/user/QUICKSTART.md](user/QUICKSTART.md) - クイックスタート
 - ✅ [docs/user/DOCKER_USAGE.md](user/DOCKER_USAGE.md) - Docker使用方法
-- ✅ [docs/user/PACKAGE_MANAGER.md](user/PACKAGE_MANAGER.md) - パッケージマネージャ
+- ✅ [docs/user/CONFIGURATION.md](user/CONFIGURATION.md) - パッケージマネージャ
 - ✅ [docs/user/CONFIGURATION.md](user/CONFIGURATION.md) - システム設定
 
 ### 開発者向けドキュメント

@@ -320,10 +320,10 @@ diff benchmark-results/lifecycle_*.txt
 
 ## 関連ドキュメント
 
-- [起動時間ベンチマーク](./startup.md)
-- [メモリ使用量ベンチマーク](./memory.md)
-- [サイズベンチマーク](./size.md)
-- [比較ベンチマーク](./comparison.md)
+<!-- startup.md / memory.md / size.md / comparison.md は未作成。
+     起動時間とメモリは計測方法に問題があり再測定待ち
+     （→ README.md「パフォーマンス実績」節）。 -->
+
 
 ## 参考情報
 

@@ -392,9 +392,9 @@ make build-all
 ## References
 
 - [Issue Triage Process](ISSUE_TRIAGE.md)
-- [Security Policy](../../SECURITY.md)
+- [Security Policy](../security/SECURITY_POLICY.md)
 - [Contributing Guide](../../CONTRIBUTING.md)
-- [Release Process](../developer/RELEASE_PROCESS.md)
+- [Release Process](../../RELEASE_NOTES.md)
 
 ---
 

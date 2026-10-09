@@ -312,7 +312,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 ## 参考資料
 
 - [SPECIFICATION.md](./SPECIFICATION.md) - プロジェクト仕様
-- [.kiro/specs/](./kiro/specs/) - Kiro仕様
+- [.kiro/specs/](./.kiro/specs/) - Kiro仕様
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - 貢献ガイド
 - [Alpine Linux](https://alpinelinux.org/) - 参考ディストリビューション
 - [musl libc](https://musl.libc.org/) - Cライブラリ

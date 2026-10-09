@@ -13,7 +13,7 @@ KIMIGAYO_VERSION ?= $(shell bash scripts/get-version.sh 2>/dev/null || echo dev)
 export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
-.PHONY: build-rootfs package-rootfs build-image verify-image test-integration test-smoke ci-build-local ci-build-all
+.PHONY: build-rootfs package-rootfs build-image verify-image check-links test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
@@ -430,6 +430,16 @@ trivy-fs-scan:
 # 検査対象。.claude/hooks/ も含める（Claude Code のフックは
 # このリポジトリの作業ルールの一部であり、壊れると静かに効かなくなる）。
 SHELLCHECK_TARGETS := scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
+
+# ドキュメントのリンク切れ検査
+#
+# **追跡ファイル基準で判定する。** ローカルのファイルシステムで見ると、
+# .gitignore されているファイル（TODO.md など）が手元にあるせいで
+# 「リンクは生きている」と誤判定し、clone した人だけ壊れている状態を
+# 見逃す。実際に README が追跡されていない TODO.md を指していた。
+check-links:
+	@echo "=== Checking markdown links (tracked files only) ==="
+	@python3 scripts/check-links.py
 
 shellcheck-scan:
 	@echo "=== Running ShellCheck on scripts (severity: warning) ==="

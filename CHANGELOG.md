@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`CLAUDE.md`** — Claude Code 向けの作業ルールとプロジェクト固有の勘所
 - **`versions.mk`** / `scripts/lib/versions.sh` — 構成要素のバージョンの
   単一の真実の源と、シェル側のローダ
-- **`TODO.md`** / **`NEXT.md`** — 経緯・判断待ちと直近やること
+- **`TODO.md`** / **`NEXT.md`** — 手元の作業メモ（`.gitignore` 済み、追跡しない）
 - **`requirements-dev.txt`** — 開発・テスト用の Python 依存
 - **`.coveragerc`** — カバレッジ設定（`pytest.ini` に書いても効かないため）
 - `make print-versions` / `print-kernel` 等 — versions.mk の値を単発で取り出す
@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ランタイム関数で、x86_64 は `long double` が 80-bit でハードウェア
   命令を使うため同じ問題が出ない。BusyBox は static-pie なので
   影響を受けず smoke テストは通る。
-  経緯と対応方針 → [TODO.md](TODO.md)
+  経緯は `git log` のコミットメッセージを参照
 - **配布イメージに `/tmp` が無かった**（v0.1.0 以降ずっと）。
   `/run`・`/var/log`・`/var/tmp`・`/var/cache`・`/var/lib`・`/home`・`/opt`・
   `/srv`・`/mnt`・`/media`・`/usr/local/*` も同様で、`/var` には宛先の無い

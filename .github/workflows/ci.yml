@@ -82,6 +82,11 @@ jobs:
       # ローカルの make shellcheck-scan と同じ対象にする。
       # 以前は ./scripts だけで .claude/hooks/ が入らず、
       # ローカルで通るものが CI では見られていなかった。
+      # 追跡ファイル基準でリンクを検査する。手元では .gitignore された
+      # ファイルがあるせいで気づけない種類の壊れ方なので CI で止める。
+      - name: Check markdown links
+        run: python3 scripts/check-links.py
+
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:

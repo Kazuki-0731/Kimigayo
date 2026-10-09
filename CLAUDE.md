@@ -242,8 +242,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 短く示す:
 
 1. **次にやるべきこと** — 今すぐ着手できる直近の一手
-2. **残っていること** — 判断待ち・保留中のタスク（[TODO.md](TODO.md)・
-   [NEXT.md](NEXT.md) の未消化項目、会話中で「後で」と保留したもの）
+2. **残っていること** — 判断待ち・保留中のタスク（`TODO.md`・
+   `NEXT.md` の未消化項目、会話中で「後で」と保留したもの）
 3. **追加でやった方がいいこと** — 頼まれていないが気づいた改善点。
    **提案に留め、指示なく実行しない**（→「指示の範囲を超えない」節）
 
@@ -452,7 +452,7 @@ make benchmark             # 全ベンチマーク
   あるいは `scripts/build-openrc.sh` 単体。
   **arm64 のクロスビルドを手元で回すなら compose を使わない**
   （`memory: 2G` 制限で `meson setup` が OOM kill される。
-  `docker run --memory 8g` で直接叩く → [NEXT.md](NEXT.md)）
+  `docker run --memory 8g` で直接叩く）
 - **Docker イメージにカーネルは入らない。** rootfs だけなので、
   musl / BusyBox / OpenRC の変更は `make ci-build-local` で検証できる。
   **「イメージが動いた」はカーネルを検証したことにならない**
@@ -712,6 +712,27 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 - `.gitignore` にも同じパターンを書いてあるが、そちらは補助。
   **パターンを増やすときは両方を更新する**
 
+### 公開ドキュメントからメモへリンクしない
+
+**追跡されないファイルへのリンクは、手元では壊れていることに気づけない。**
+`.gitignore` されていてもファイルは手元にあるので、ローカルで
+リンクを辿れてしまう。**clone した人にだけ壊れている。**
+
+実例（2026-10-09）: `README.md`・`CHANGELOG.md`・`docs/developer/
+PERFORMANCE_TUNING.md` が、追跡していない `TODO.md` を指していた。
+
+**判定は追跡ファイル基準で機械的に行う:**
+
+```bash
+make check-links        # scripts/check-links.py
+```
+
+`ci.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
+書かないこと（それでは今回の件を検知できない）。
+
+経緯をドキュメントに残したいときは、メモにリンクするのではなく
+**内容を置き場に移す**（→ 下記の対応表）。
+
 ### メモに書くべきでないもの
 
 **他の人に残す必要がある内容をメモに書かない。** そこは追跡されないので
@@ -920,7 +941,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 ## 現在地の把握
 
-**[TODO.md](TODO.md) と [NEXT.md](NEXT.md) を最初に読む。** 役割は分かれている:
+**`TODO.md` と `NEXT.md` を最初に読む。** 役割は分かれている:
 
 - **`TODO.md`** — 「いま何が起きていて、なぜそうしたか」という経緯・現在地に
   加え、**判断待ち・今後やることの TODO**（決定が必要、ユーザー操作待ち、

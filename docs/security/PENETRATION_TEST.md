@@ -424,7 +424,7 @@ ls -la /proc/self/ns/
 
 - [セキュリティ監査ガイドライン](./SECURITY_AUDIT.md)
 - [脆弱性報告手順](./VULNERABILITY_REPORTING.md)
-- [インシデント対応計画](./INCIDENT_RESPONSE.md)
+- [インシデント対応計画](./VULNERABILITY_REPORTING.md)
 - [セキュリティポリシー](./SECURITY_POLICY.md)
 
 ## 参考資料

@@ -197,7 +197,7 @@ Kimigayo OSは以下のセキュリティ標準への準拠を目指していま
 - **セキュリティガイド**: [SECURITY_GUIDE.md](SECURITY_GUIDE.md)
 - **脆弱性報告手順**: [VULNERABILITY_REPORTING.md](VULNERABILITY_REPORTING.md)
 - **セキュリティ強化設定**: [HARDENING_GUIDE.md](HARDENING_GUIDE.md)
-- **監査レポート**: [docs/security/audits/](audits/)
+- **監査レポート**: [SECURITY_AUDIT.md](SECURITY_AUDIT.md)（`audits/` は未作成）
 
 ## 連絡先
 
