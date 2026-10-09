@@ -1,5 +1,20 @@
 name: Reusable Build Workflow
 
+# ビルドして、イメージにして、**実際に実行して検証する**。
+#
+# 2026-10-09 まで、このワークフローは rootfs を作るところで止まっていた。
+# イメージ化も実行もしていなかったため、次の壊れ方をすべて見逃していた。
+#
+#   - OpenRC のバイナリが1つも入っていない（v0.1.0〜v2.0.1 の全タグ）
+#   - musl の libc.so が無く動的リンカがリンク切れ
+#   - /tmp・/run が無い（サイズ最適化が空ディレクトリを消していた）
+#   - arm64 の libc.so が出荷しない libgcc_s.so.1 に依存していて、
+#     動的リンクのバイナリが全滅（6ジョブすべて緑のまま）
+#
+# 検証の実体は scripts/verify-image.sh。**ここに検証ロジックを書かない。**
+# CI・release・ローカル（make verify-image）が同じものを呼ぶ必要がある。
+# YAML に書くと経路ごとにずれて、同じ見逃しが起きる。
+
 on:
   workflow_call:
     inputs:
@@ -13,82 +28,159 @@ on:
         required: true
         type: string
         default: 'x86_64'
+      build_kernel:
+        description: >-
+          カーネルもビルドする。Docker イメージにカーネルは入らないので、
+          既定では飛ばす（1 run あたり数十分の差）。
+          src/kernel/ や KERNEL_VERSION を触ったときだけ true にする。
+        required: false
+        type: boolean
+        default: false
       upload_artifacts:
-        description: 'Upload build artifacts'
+        description: 'Upload the rootfs tarball as a build artifact'
         required: false
         type: boolean
         default: false
 
 jobs:
   build:
-    name: Build ${{ inputs.variant }} for ${{ inputs.arch }}
+    name: Build ${{ inputs.variant }} ${{ inputs.arch }}${{ inputs.build_kernel && ' (+kernel)' || '' }}
     runs-on: ubuntu-latest
+    # 実測の最長は arm64 standard の 47 分（カーネル込み、run 37880882653）。
+    # 既定の 360 分だとハングしたときに 6 時間占有する。
+    # timeout-minutes に式を書くのは対応が怪しいので定数にしてある。
+    timeout-minutes: 120
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker image
-      run: docker compose build --no-cache
+      # --no-cache は付けない。ビルド環境イメージは 1.46GB あり、
+      # 毎ジョブ作り直すと matrix のぶんだけ無駄になる。
+      # 中身が変わったかは Dockerfile のハッシュで Docker が判断する。
+      - name: Build build-environment image
+        run: docker compose build
 
-    - name: Run build for ${{ inputs.arch }}
-      run: |
-        docker compose run --rm \
-          -e TARGET_ARCH=${{ inputs.arch }} \
-          -e IMAGE_TYPE=${{ inputs.variant }} \
-          kimigayo-build \
-          make build TARGET_ARCH=${{ inputs.arch }}
+      - name: Build Kimigayo OS
+        run: |
+          set -euo pipefail
+          target=$([ "${{ inputs.build_kernel }}" = "true" ] && echo build || echo build-no-kernel)
+          echo "::notice::make ${target} TARGET_ARCH=${{ inputs.arch }} IMAGE_TYPE=${{ inputs.variant }}"
+          docker compose run --rm \
+            -e IMAGE_TYPE=${{ inputs.variant }} \
+            kimigayo-build \
+            make "${target}" TARGET_ARCH=${{ inputs.arch }} IMAGE_TYPE=${{ inputs.variant }}
 
-    - name: Run tests
-      run: |
-        docker compose run --rm kimigayo-build make test
+      # パッチが当たらなくても apply-*-patches.sh は log_warn して return 0 する。
+      # 黙ってスキップされたまま成功扱いになるのを止める。
+      - name: Fail if patches were silently skipped
+        run: |
+          set -uo pipefail
+          found=0
+          for log in build/kernel-patches.log build/busybox-patches.log; do
+            [ -f "$log" ] || continue
+            if grep -iE 'skipped: [1-9]|not applicable' "$log"; then
+              echo "::error::${log} にスキップされたパッチがあります"
+              found=1
+            fi
+          done
+          exit "$found"
 
-    - name: Upload build artifacts
-      if: inputs.upload_artifacts
-      uses: actions/upload-artifact@v6
-      with:
-        name: kimigayo-os-${{ inputs.variant }}-${{ inputs.arch }}
-        path: output/*
-        retention-days: 7
+      - name: Package rootfs
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          # root 権限で固める。/etc/shadow のような権限制限ファイルを
+          # 読むため。--numeric-owner はホストのユーザー名を埋め込まないため。
+          sudo tar czf "output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz" \
+            -C build/rootfs --numeric-owner .
+          sudo chown "$(id -u):$(id -g)" "output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz"
+          ls -lh output/
 
-    - name: Upload build logs
-      uses: actions/upload-artifact@v6
-      if: always()
-      with:
-        name: build-logs-${{ inputs.variant }}-${{ inputs.arch }}
-        path: build/logs/*.log
-        retention-days: 7
+      # 検証ジョブは別アーキのランナーで走るので、必ず受け渡す。
+      # upload_artifacts とは別（あちらは利用者向けの成果物）。
+      - name: Upload rootfs tarball for verification
+        uses: actions/upload-artifact@v6
+        with:
+          name: rootfs-${{ inputs.variant }}-${{ inputs.arch }}
+          path: output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
 
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
+      - name: Upload build artifacts
+        if: inputs.upload_artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: kimigayo-os-${{ inputs.variant }}-${{ inputs.arch }}
+          path: output/*
+          retention-days: 7
+
+      # musl-build.log だけで 6.4MB になるので、失敗時だけ上げる。
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-logs-${{ inputs.variant }}-${{ inputs.arch }}
+          path: |
+            build/logs/*.log
+            build/*-patches.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  verify-image:
+    name: Verify image ${{ inputs.variant }} ${{ inputs.arch }}
     needs: build
+    # arm64 はネイティブランナーで実行する。QEMU を介さないので速く、
+    # 本物の aarch64 で動くため検証の信頼性が最も高い。
+    # ビルド自体は x86 からのクロスコンパイル（build ジョブ）のまま。
+    runs-on: ${{ inputs.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 15
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Set up Docker
-      run: docker compose build
+      - name: Download rootfs tarball
+        uses: actions/download-artifact@v7
+        with:
+          name: rootfs-${{ inputs.variant }}-${{ inputs.arch }}
+          path: output/
 
-    # docker-compose.yml の working_dir は /build/kimigayo/build-system なので、
-    # tests/unit のような相対パスはそのままでは解決できない
-    # （pytest.ini は上に辿って見つかるので rootdir だけ正しくなり、
-    #   "file or directory not found: tests/unit/" で落ちていた）。
-    # -w でリポジトリルートを指定する。
-    - name: Run unit tests
-      run: docker compose run --rm -w /build/kimigayo kimigayo-build pytest tests/unit/ -v
+      - name: Build Docker image
+        run: |
+          set -euo pipefail
+          # --platform と TARBALL_PATH は必須。
+          # 省略すると arm64 の rootfs を amd64 のイメージとして包み、
+          # 既定の TARBALL_PATH=output/*.tar.gz が別の tarball を拾う。
+          platform=$([ "${{ inputs.arch }}" = "arm64" ] && echo linux/arm64 || echo linux/amd64)
+          docker build \
+            --platform "$platform" \
+            -f Dockerfile.runtime \
+            --build-arg TARBALL_PATH="output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz" \
+            -t "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
+            .
+          docker images "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
+            --format 'image size: {{.Size}}'
 
-    - name: Run property tests
-      run: docker compose run --rm -w /build/kimigayo kimigayo-build pytest tests/property/ -v
+      # ここが本題。検証の実体はスクリプト側にある（→ 冒頭のコメント）。
+      - name: Verify image by running it
+        run: |
+          bash scripts/verify-image.sh \
+            "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
+            "${{ inputs.variant }}" \
+            "${{ inputs.arch }}"
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v6
-      if: always()
-      with:
-        name: test-results-${{ inputs.variant }}-${{ inputs.arch }}
-        path: tests/reports/
-        retention-days: 7
+      - name: Report image size
+        if: success()
+        run: |
+          size=$(docker images "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" --format '{{.Size}}')
+          echo "::notice::${{ inputs.variant }} ${{ inputs.arch }} image size: ${size}"
+          {
+            echo "### ${{ inputs.variant }} / ${{ inputs.arch }}"
+            echo ""
+            echo "- image size: \`${size}\`"
+            echo "- verified on: \`$(uname -m)\` runner"
+          } >> "$GITHUB_STEP_SUMMARY"

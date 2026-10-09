@@ -104,7 +104,7 @@ else
 endif
 
 # Phony targets
-.PHONY: all build clean help test docker-build docker-test \
+.PHONY: all build build-no-kernel clean help test docker-build docker-test \
         kernel musl init utils rootfs iso docker-image \
         security-scan dependency-check qemu-test \
         install uninstall test-unit test-property test-integration test-musl
@@ -176,6 +176,21 @@ build: musl kernel busybox init rootfs
 	@echo "=========================================="
 	@echo "✅ Build completed for $(TARGET_ARCH)"
 	@echo "=========================================="
+
+# カーネルを除いたビルド。
+#
+# Docker イメージにカーネルは入らない（コンテナはホストのカーネルで
+# 動く）。カーネルをビルドするのはベアメタル／QEMU 検証のためなので、
+# musl / BusyBox / OpenRC の変更を確かめたいだけならこれで足りる。
+# CI では src/kernel/ などを触ったときだけ build を使い、それ以外は
+# こちらを使う（1 run あたり数十分の差になる）。
+build-no-kernel: musl busybox init rootfs
+	@echo ""
+	@echo "=========================================="
+	@echo "✅ Build completed for $(TARGET_ARCH) (kernel skipped)"
+	@echo "=========================================="
+	@echo "   カーネルは含まれていない。ベアメタル／QEMU 検証には"
+	@echo "   make build / make kernel が必要。"
 
 # musl libc build
 musl:

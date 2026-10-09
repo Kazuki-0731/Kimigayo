@@ -6,30 +6,120 @@ on:
   pull_request:
     branches: [ main ]
 
+# 連続して push したときに前の run を止める。
+# 2026-10-09 に2回、前の run が走り続けて CI 時間を二重に消費し、
+# 手で gh run cancel した。main では前の結果も見たいことがあるが、
+# ビルドが 1 run あたり数十分かかるのでキャンセルを既定にする。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
+  # カーネルを毎回ビルドするかをここで決める。
+  # Docker イメージにカーネルは入らない（コンテナはホストのカーネルで
+  # 動く）ので、カーネルを触っていない push でフルビルドする価値は低い。
+  # 1 run あたり数十分の差になる。
+  decide:
+    name: Decide scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build_kernel: ${{ steps.changed.outputs.kernel }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check whether kernel-related files changed
+        id: changed
+        run: |
+          set -euo pipefail
+
+          # カーネルに関係するパス。ここを触ったときだけフルビルドする。
+          patterns='^(src/kernel/|scripts/build-kernel\.sh|scripts/download-kernel\.sh|scripts/apply-kernel-patches\.sh|versions\.mk|config\.mk|Dockerfile$)'
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          # 新しいブランチの初回 push や force push では before が
+          # 全ゼロになる。比較できないので安全側（フルビルド）に倒す。
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] ||
+             ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "比較元が取れないのでカーネルもビルドする"
+            echo "kernel=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          files="$(git diff --name-only "$base" "$head")"
+          echo "変更ファイル:"
+          echo "$files" | sed 's/^/  /'
+
+          if echo "$files" | grep -qE "$patterns"; then
+            echo "::notice::カーネル関連の変更あり -> カーネルもビルドする"
+            echo "kernel=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::カーネル関連の変更なし -> カーネルは飛ばす"
+            echo "kernel=false" >> "$GITHUB_OUTPUT"
+          fi
+
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # ローカルの make shellcheck-scan と同じ対象にする。
+      # 以前は ./scripts だけで .claude/hooks/ が入らず、
+      # ローカルで通るものが CI では見られていなかった。
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
+          additional_files: '.claude/hooks'
           scandir: './scripts'
           severity: warning
           ignore_paths: build output
 
-  build-and-test:
-    name: Build and Test
-    needs: shellcheck
+  # pytest はビルド結果に依存しないので matrix から外す。
+  # 以前は build ジョブの make test と独立した test ジョブの両方で
+  # 走っており、1 run で 12 回（6 セル × 2）同じテストを回していた。
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Build build-environment image
+        run: docker compose build
+
+      # docker-compose.yml の working_dir は build-system なので
+      # -w でリポジトリルートを指定する。これが無いと
+      # "file or directory not found: tests/unit/" で落ちる。
+      - name: Run unit and property tests
+        run: |
+          docker compose run --rm -w /build/kimigayo kimigayo-build \
+            pytest tests/unit tests/property -q
+
+  build-and-verify:
+    name: Build and Verify
+    needs: [shellcheck, decide]
     strategy:
       # 1つ落ちると他の5つがキャンセルされ、何が本当に壊れているのか
       # 分からなくなる（2026-10-09 の run 37869425207 では
       # pytest のパス指定ミス1件で残り全部がキャンセルされ、
       # カーネル 6.18.55 が arm64 で通るのかが分からなかった）。
-      # 1回の run で全組み合わせの結果を見たいので最後まで走らせる。
       fail-fast: false
       matrix:
         variant: [minimal, standard, extended]
@@ -38,20 +128,30 @@ jobs:
     with:
       variant: ${{ matrix.variant }}
       arch: ${{ matrix.arch }}
+      build_kernel: ${{ needs.decide.outputs.build_kernel == 'true' }}
       upload_artifacts: false
 
+  # Trivy のファイルシステムスキャンはビルド結果に依存しない。
+  # 以前は needs: build-and-test で最長 47 分待っていた。
+  #
+  # イメージスキャンはここでやらない。Kimigayo は scratch 上の手組み
+  # rootfs でパッケージデータベースを持たないため、Trivy は対象を1つも
+  # 識別できない（実測で Target: - / Not scanned / Metadata.OS: null）。
+  # 「脆弱性 0 件」ではなく「スキャンしていない」なので、
+  # 走らせると誤った安心を与える。
+  # → CLAUDE.md「セキュリティ」節、.claude/skills/security-review/
   security-scan:
-    name: Security Scan
+    name: Security Scan (filesystem)
     runs-on: ubuntu-latest
-    needs: build-and-test
+    timeout-minutes: 15
     permissions:
+      contents: read
       security-events: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Run Trivy security scan
+      - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
@@ -69,44 +169,37 @@ jobs:
   notify:
     name: Discord Notification
     runs-on: ubuntu-latest
-    needs: [shellcheck, build-and-test, security-scan]
-    if: always()
+    needs: [shellcheck, tests, build-and-verify, security-scan]
+    if: always() && github.event_name == 'push'
+    timeout-minutes: 5
     permissions: {}
+    # secrets コンテキストは step の if では参照できないので env に移す。
+    # webhook が未設定のリポジトリ（fork など）でジョブを失敗させない。
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
-      - name: Send success notification
-        if: ${{ needs.shellcheck.result == 'success' && needs.build-and-test.result == 'success' && needs.security-scan.result == 'success' }}
+      # 文面で断言しない。
+      # 以前は「Security Scan: ✅ No critical issues」と書いていたが、
+      # Trivy の fs スキャンは SARIF を出すだけで exit-code を指定して
+      # いないためジョブは落ちない。つまり中身を見ずに「問題なし」と
+      # 言っていた。いまは各ジョブの結果だけを並べる。
+      - name: Send notification
+        if: env.DISCORD_WEBHOOK != ''
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: 'success'
-          title: '✅ CI/CD Success'
+          webhook: ${{ env.DISCORD_WEBHOOK }}
+          status: ${{ (needs.shellcheck.result == 'success' && needs.tests.result == 'success' && needs.build-and-verify.result == 'success' && needs.security-scan.result == 'success') && 'success' || 'failure' }}
+          title: >-
+            ${{ (needs.shellcheck.result == 'success' && needs.tests.result == 'success' && needs.build-and-verify.result == 'success' && needs.security-scan.result == 'success') && '✅ CI Success' || '❌ CI Failed' }}
           description: |
-            **Kimigayo OS CI/CD completed successfully**
+            **Kimigayo OS CI**
 
-            • ShellCheck: ✅ Passed
-            • Build & Test: ✅ All variants passed
-            • Security Scan: ✅ No critical issues
+            • ShellCheck: ${{ needs.shellcheck.result }}
+            • Tests: ${{ needs.tests.result }}
+            • Build and Verify (3 variants x 2 arch): ${{ needs.build-and-verify.result }}
+            • Trivy filesystem scan: ${{ needs.security-scan.result }}
+              （SARIF を Security タブへ送るだけで、結果でジョブは落ちない）
 
             Commit: ${{ github.sha }}
             Branch: ${{ github.ref_name }}
-          color: 0x00ff00
-          username: 'Kimigayo CI Bot'
-
-      - name: Send failure notification
-        if: ${{ needs.shellcheck.result == 'failure' || needs.build-and-test.result == 'failure' || needs.security-scan.result == 'failure' }}
-        uses: sarisia/actions-status-discord@v1
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: 'failure'
-          title: '❌ CI/CD Failed'
-          description: |
-            **Kimigayo OS CI/CD failed**
-
-            • ShellCheck: ${{ needs.shellcheck.result == 'success' && '✅' || '❌' }}
-            • Build & Test: ${{ needs.build-and-test.result == 'success' && '✅' || '❌' }}
-            • Security Scan: ${{ needs.security-scan.result == 'success' && '✅' || '❌' }}
-
-            Commit: ${{ github.sha }}
-            Branch: ${{ github.ref_name }}
-          color: 0xff0000
           username: 'Kimigayo CI Bot'

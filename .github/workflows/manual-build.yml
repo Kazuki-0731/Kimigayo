@@ -21,24 +21,29 @@ on:
           - x86_64
           - arm64
 
+      build_kernel:
+        description: 'カーネルもビルドする（イメージには入らない。ベアメタル／QEMU 検証用）'
+        required: false
+        default: false
+        type: boolean
+
 jobs:
   build:
     name: Build
     uses: ./.github/workflows/build-workflow.yml
     with:
-      variant: ${{ github.event.inputs.variant }}
-      arch: ${{ github.event.inputs.arch }}
+      variant: ${{ inputs.variant }}
+      arch: ${{ inputs.arch }}
+      build_kernel: ${{ inputs.build_kernel }}
       upload_artifacts: true
 
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Run security scan
-      run: |
-        docker compose build
-        docker compose run --rm kimigayo-build make security-scan
+  # security ジョブは外した。
+  # make security-scan は trivy-scan（イメージスキャン）を含むが、
+  # Kimigayo は scratch 上の手組み rootfs でパッケージデータベースを
+  # 持たないため Trivy は対象を1つも識別できない（実測で
+  # Target: - / Not scanned / Metadata.OS: null / Results: 0）。
+  # 「脆弱性 0 件」ではなく「スキャンしていない」ので、走らせると
+  # 誤った安心を与える。そもそもこのジョブは needs: build を
+  # 付けておらず、イメージが存在しない状態で走っていた。
+  # ファイルシステムスキャンは ci.yml と security.yml が担当する。
+  # → CLAUDE.md「セキュリティ」節、.claude/skills/security-review/
