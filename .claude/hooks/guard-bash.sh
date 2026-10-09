@@ -59,6 +59,19 @@ lines_with() {
     printf '%s\n' "$CMD" | grep -E "$1" || true
 }
 
+# そのコマンド「自身」が $1 である行だけを返す。
+# extract-commands.py の出力は1行1コマンドで、先頭に VAR=val と sudo が
+# 残ることがあるのでそこだけ読み飛ばす。
+#
+# オプションに同じ語が現れるケースを除くために必要。
+# 例: docker run --rm -v cache:/build/kimigayo/build/downloads ...
+#     ここには rm が含まれるが削除コマンドではない（実際に誤検知した）。
+lines_cmd() {
+    printf '%s\n' "$CMD" |
+        grep -E "^(([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*)(sudo[[:space:]]+)?$1([[:space:]]|$)" ||
+        true
+}
+
 # v*.*.* のタグ「作成」は release.yml を起動し、Docker Hub の latest を
 # 差し替える。削除（-d）・一覧（-l / --list）・検証は読むだけなので通す。
 tag_lines="$(lines_with '\bgit[[:space:]]+tag\b')"
@@ -135,7 +148,8 @@ OpenRC の再ダウンロード（約150MB）とフルビルドを招きます�
 （CLAUDE.md「削除指示を受けたら」節）"
 fi
 
-if printf '%s' "$CMD" | grep -qE 'rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*[^|;&]*build/downloads'; then
+rm_lines="$(lines_cmd 'rm')"
+if [ -n "$rm_lines" ] && printf '%s' "$rm_lines" | grep -q 'build/downloads'; then
     block "ダウンロードキャッシュの削除" \
 "build/downloads/ は約150MB の再取得を招きます。
 意図した削除ならユーザーに確認してください
@@ -149,9 +163,10 @@ fi
 # macOS の bsdtar は AppleDouble（._*）を除外処理のあとに自分で生成し、
 # しかも自分が作った ._* を一覧表示時に隠すため tar tzf では気づけない。
 # 実測で 458 個がイメージに混入していた（2026-10-09）。
-if [ "$(uname -s)" = "Darwin" ] &&
-   printf '%s' "$CMD" | grep -qE '\btar[[:space:]]+-?[a-zA-Z]*c[a-zA-Z]*f?\b' &&
-   ! printf '%s' "$CMD" | grep -q 'COPYFILE_DISABLE'; then
+tar_lines="$(lines_cmd 'tar')"
+if [ "$(uname -s)" = "Darwin" ] && [ -n "$tar_lines" ] &&
+   printf '%s' "$tar_lines" | grep -qE '^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(sudo[[:space:]]+)?tar[[:space:]]+-?[a-zA-Z]*c' &&
+   ! printf '%s' "$tar_lines" | grep -q 'COPYFILE_DISABLE'; then
     block "COPYFILE_DISABLE なしの tar（macOS）" \
 "macOS の bsdtar は AppleDouble メンバー（._*）を --exclude の処理の
 あとに自分で生成するため --exclude='._*' では止まりません。さらに

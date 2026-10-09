@@ -205,11 +205,24 @@ configure_musl() {
     export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY}"
     export LDFLAGS="${LDFLAGS_SECURITY}"
 
-    # For ARM64, add libgcc_s for 128-bit floating point support
-    if [ "$ARCH" = "aarch64" ]; then
-        export LDFLAGS="${LDFLAGS} -L/usr/aarch64-linux-musl/lib -lgcc_s"
-        log_info "ARM64: Adding libgcc_s for 128-bit floating point support"
-    fi
+    # aarch64 の 128-bit long double（TFmode）演算と複素数乗算は
+    # コンパイラランタイム（libgcc / compiler-rt builtins）が提供する。
+    # musl はそれを LIBCC で解決する仕組みを持っており、configure が
+    # libclang_rt.builtins.a（静的）を自動検出する。
+    #
+    # ここで -lgcc_s を足してはいけない。**共有**の libgcc_s が LIBCC の
+    # 静的アーカイブより先にリンクを満たしてしまい、libc.so に
+    # NEEDED: libgcc_s.so.1 が付いて __letf2 などが UND のまま残る。
+    # ランタイムイメージには musl 以外の共有ライブラリを置かないので、
+    # 実行時に次が出て**動的リンクのバイナリが全滅する**:
+    #   Error relocating /lib/ld-musl-aarch64.so.1: __letf2: symbol not found
+    # 2026-10-09 に実測。24シンボル（__addtf3 __divtf3 __eqtf2 …
+    # __mulsc3 __muldc3 __multc3 …）がすべて UND になり、OpenRC の
+    # 実行ファイル4つが起動しなかった。BusyBox は static-pie なので
+    # 影響を受けず、smoke テストと verify_rootfs は通ってしまっていた。
+    #
+    # 正しい状態: libc.so に NEEDED が1つも無い（x86_64 と同じ）。
+    # configure の結果は build/musl-build-<arch>/config.mak の LIBCC で確認できる。
 
     log_info "CFLAGS: $CFLAGS"
     log_info "LDFLAGS: $LDFLAGS"
