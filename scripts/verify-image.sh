@@ -203,7 +203,10 @@ out="$(in_image '
 failed=""
 total=0
 for f in /etc/init.d/*; do
-    [ -f "$f" ] || continue
+    # 実行可能なものだけ試す。functions.sh のような
+    # 「. で読み込む関数ライブラリ」は実行権限が無く、実行すると
+    # Permission denied になるが、それは正常な状態。
+    [ -f "$f" ] && [ -x "$f" ] || continue
     total=$((total + 1))
     "$f" describe >/dev/null 2>&1 || failed="${failed} $(basename "$f")"
 done

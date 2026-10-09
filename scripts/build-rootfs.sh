@@ -1081,6 +1081,9 @@ verify_rootfs() {
         local script interp
         for script in "$ROOTFS_DIR/etc/init.d"/*; do
             [ -f "$script" ] || continue
+            # 実行可能なものだけ見る（functions.sh のような関数ライブラリは
+            # 実行権限が無く、shebang も持たない）
+            [ -x "$script" ] || continue
             total_scripts=$((total_scripts + 1))
             interp="$(head -1 "$script" | sed -n 's|^#!\([^ ]*\).*|\1|p')"
             [ -n "$interp" ] || continue
