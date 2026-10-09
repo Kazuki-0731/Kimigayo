@@ -421,7 +421,26 @@ optimize_rootfs() {
     fi
 
     # Clean up empty directories
-    find "$ROOTFS_DIR" -type d -empty -delete 2>/dev/null || true
+    # ただし FHS の骨格は「空であることが正しい」ので消してはいけない。
+    # 2026-10-09 までこの find が無条件だったため、
+    # create_directory_structure が作った /tmp・/run・/var/log などが
+    # 全リリースイメージ（v0.1.0〜v2.0.1）から欠落していた。
+    # /run が無いと OpenRC が state を書けず、/var/lock -> ../run/lock も
+    # 宛先の無いリンクになる。/tmp が無いと多くのソフトウェアが動かない。
+    # 空ディレクトリは tar/イメージのサイズをほぼ増やさないので残して問題ない。
+    local keep_dirs=(
+        "tmp" "var/tmp" "var/log" "var/cache" "var/lib"
+        "run" "run/lock"
+        "dev" "proc" "sys"
+        "home" "root" "mnt" "media" "opt" "srv"
+        "usr/local/bin" "usr/local/sbin" "usr/local/lib"
+    )
+    local find_args=( "$ROOTFS_DIR" -mindepth 1 -type d -empty )
+    local keep
+    for keep in "${keep_dirs[@]}"; do
+        find_args+=( ! -path "$ROOTFS_DIR/$keep" )
+    done
+    find "${find_args[@]}" -delete 2>/dev/null || true
 
     local size_after
     size_after=$(du -sh "$ROOTFS_DIR" | awk '{print $1}')
@@ -898,6 +917,32 @@ verify_rootfs() {
     else
         log_info "  ✓ OpenRC binaries present in /sbin"
     fi
+
+    # FHS の骨格。空なので optimize_rootfs の空ディレクトリ掃除に
+    # 消されやすい（実際に v0.1.0〜v2.0.1 で全部消えていた）。
+    local dir_missing=""
+    local d
+    for d in tmp run run/lock var/log var/tmp home root mnt opt srv; do
+        [ -d "$ROOTFS_DIR/$d" ] || dir_missing="${dir_missing} /${d}"
+    done
+    if [ -n "$dir_missing" ]; then
+        log_error "  ✗ essential directories missing:${dir_missing}"
+        errors=$((errors + 1))
+    else
+        log_info "  ✓ essential directories present"
+    fi
+
+    # /tmp と /var/tmp はスティッキービットが必要
+    for d in tmp var/tmp; do
+        if [ -d "$ROOTFS_DIR/$d" ]; then
+            local mode
+            mode="$(stat -c '%a' "$ROOTFS_DIR/$d" 2>/dev/null || stat -f '%Lp' "$ROOTFS_DIR/$d" 2>/dev/null)"
+            if [ "$mode" != "1777" ]; then
+                log_error "  ✗ /${d} should be 1777 but is ${mode}"
+                errors=$((errors + 1))
+            fi
+        fi
+    done
 
     if [ "$errors" -gt 0 ]; then
         log_error "rootfs verification failed (${errors} problem(s))"
