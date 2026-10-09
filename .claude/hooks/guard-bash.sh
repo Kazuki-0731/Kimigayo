@@ -72,9 +72,18 @@ block() {
 # 1. 外に出て取り消せないもの
 # ---------------------------------------------------------------------------
 
-# v*.*.* のタグ付けは release.yml を起動し、Docker Hub の latest を差し替える。
-if printf '%s' "$CMD" | grep -qE '\bgit[[:space:]]+tag\b' &&
-   printf '%s' "$CMD" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+# 判定は行単位で行う。コマンド全体を見ると、別の行で
+# タグを「読んでいる」だけの場合まで巻き込む（実際に誤検知した）。
+lines_with() {
+    printf '%s\n' "$CMD" | grep -E "$1" || true
+}
+
+# v*.*.* のタグ「作成」は release.yml を起動し、Docker Hub の latest を
+# 差し替える。削除（-d）・一覧（-l / --list）・検証は読むだけなので通す。
+tag_lines="$(lines_with '\bgit[[:space:]]+tag\b')"
+if [ -n "$tag_lines" ] &&
+   printf '%s' "$tag_lines" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+' &&
+   ! printf '%s' "$tag_lines" | grep -qE '(^|[[:space:]])(-d|--delete|-l|--list|--verify|-n[0-9]*)([[:space:]]|$)'; then
     block "リリースタグの作成" \
 "v*.*.* タグを push すると .github/workflows/release.yml が走り、
 Docker Hub の公開イメージ（latest を含む）を差し替えます。
@@ -86,8 +95,9 @@ Docker Hub の公開イメージ（latest を含む）を差し替えます。
 ユーザーに確認してから、承認を得て実行してください。"
 fi
 
-if printf '%s' "$CMD" | grep -qE '\bgit[[:space:]]+push\b' &&
-   printf '%s' "$CMD" | grep -qE '(--tags|--follow-tags|[[:space:]]v[0-9]+\.[0-9]+\.[0-9]+)'; then
+push_lines="$(lines_with '\bgit[[:space:]]+push\b')"
+if [ -n "$push_lines" ] &&
+   printf '%s' "$push_lines" | grep -qE '(--tags|--follow-tags|[[:space:]]v[0-9]+\.[0-9]+\.[0-9]+)'; then
     block "タグの push" \
 "タグの push は release.yml を起動し、Docker Hub の公開イメージを
 差し替えます。毎回ユーザーの明示的な承認が必要です。"
@@ -103,8 +113,8 @@ fi
 # 2. 履歴を壊すもの
 # ---------------------------------------------------------------------------
 
-if printf '%s' "$CMD" | grep -qE '\bgit[[:space:]]+push\b' &&
-   printf '%s' "$CMD" | grep -qE '(--force([^-]|$)|--force-with-lease|[[:space:]]-f([[:space:]]|$))'; then
+if [ -n "$push_lines" ] &&
+   printf '%s' "$push_lines" | grep -qE '(--force([^-]|$)|--force-with-lease|[[:space:]]-f([[:space:]]|$))'; then
     block "force push" \
 "履歴の書き換えはユーザーに確認してから行う操作です
 （CLAUDE.md「Git の運用ルール」節）。"
@@ -177,8 +187,9 @@ fi
 # 5. 機密
 # ---------------------------------------------------------------------------
 
-if printf '%s' "$CMD" | grep -qE '\bgit[[:space:]]+add\b' &&
-   printf '%s' "$CMD" | grep -qE '(^|[[:space:]/])\.env([[:space:]]|$)'; then
+add_lines="$(lines_with '\bgit[[:space:]]+add\b')"
+if [ -n "$add_lines" ] &&
+   printf '%s' "$add_lines" | grep -qE '(^|[[:space:]/])\.env([[:space:]]|$)'; then
     block ".env の追加" \
 ".env には DOCKER_HUB_ACCESS_TOKEN が入るため絶対にコミットしません
 （CLAUDE.md「セキュリティ」節）。"
