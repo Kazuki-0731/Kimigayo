@@ -232,32 +232,55 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     WRAPPER_SCRIPT="${OPENRC_CROSS_DIR}/aarch64-musl-gcc-wrapper.sh"
     cat > "$WRAPPER_SCRIPT" <<EOF
 #!/bin/sh
-# Wrapper to use musl's startup files instead of GCC's
-# -B: Search directory for startup files (crt*.o)
-# -nostdlib: Don't use standard system startup/libraries
-# -lc: Explicitly link musl libc
+# aarch64 クロスビルド用のコンパイララッパー
 #
-# リンク時だけ compiler-rt の builtins を末尾に足す。
-# -c のコンパイルにも渡すと "argument unused during compilation" が
-# 出続けるので、コンパイルかリンクかを見て分ける。
+# なぜ必要か:
+#   Alpine の clang は aarch64-linux-musl ターゲットでも GCC 流儀の
+#   crtbeginS.o / crtendS.o と -lgcc を要求するが、どちらも存在しない
+#   （クロスツールチェーンには crtbeginT.o / crtend.o しか無く、
+#     clang の resource dir には libclang_rt.builtins.a しか無い）。
+#   そのため -nostdlib を使って自分で必要なものだけを渡す。
+#
+# **crt を明示的に渡すことが必須。**
+#   -B は crt の「探索先」を変えるだけで、-nostdlib は crt の
+#   「自動リンク」を抑止する。以前は -nostdlib だけで -B に任せていた
+#   ため、OpenRC の実行ファイルに _start が入らず
+#   **エントリポイントが 0x0** になっていた。ローダはアドレス 0 へ
+#   飛ぶので実行した瞬間に Segmentation fault（139）。
+#   依存解決は正常（ld-musl --list は通る）なので、リンク時には
+#   気づけなかった（2026-10-09 に実測）。
+#
+#   正しい状態: readelf -h が Entry point != 0x0、readelf -sW に _start。
+#
+# リンクの種類で渡すものが違う:
+#   コンパイル（-c）  crt もライブラリも渡さない
+#   共有ライブラリ（-shared）  crti.o と crtn.o のみ（Scrt1.o は実行
+#                              ファイル用なので付けてはいけない）
+#   実行ファイル      Scrt1.o + crti.o + crtn.o と -pie
+#
+# crtn.o は必ず最後。crti.o / crtn.o は .init / .fini の前後半で、
+# 順序を崩すとセクションが壊れる。
+M="${MUSL_LIB_DIR}"
+RT="${RT_BUILTINS_DIR}"
+COMMON="--target=aarch64-linux-musl -fuse-ld=lld -B\$M -L\$M -I/usr/aarch64-linux-musl/include"
+
 for arg in "\$@"; do
-    if [ "\$arg" = "-c" ]; then
-        exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
-            -B"${MUSL_LIB_DIR}" \\
-            -L"${MUSL_LIB_DIR}" \\
-            -nostdlib -lc \\
-            -I/usr/aarch64-linux-musl/include \\
-            "\$@"
-    fi
+    case "\$arg" in
+        -c)
+            # コンパイルのみ。リンク用の引数を渡すと
+            # "argument unused during compilation" が出続ける。
+            exec clang \$COMMON -nostdlib "\$@"
+            ;;
+        -shared)
+            exec clang \$COMMON -nostdlib -shared \\
+                "\$M/crti.o" "\$@" -lc -L"\$RT" -lclang_rt.builtins "\$M/crtn.o"
+            ;;
+    esac
 done
 
-exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
-    -B"${MUSL_LIB_DIR}" \\
-    -L"${MUSL_LIB_DIR}" \\
-    -nostdlib -lc \\
-    -I/usr/aarch64-linux-musl/include \\
-    "\$@" \\
-    -L"${RT_BUILTINS_DIR}" -lclang_rt.builtins
+exec clang \$COMMON -nostdlib -pie \\
+    "\$M/Scrt1.o" "\$M/crti.o" "\$@" \\
+    -lc -L"\$RT" -lclang_rt.builtins "\$M/crtn.o"
 EOF
     chmod +x "$WRAPPER_SCRIPT"
 
