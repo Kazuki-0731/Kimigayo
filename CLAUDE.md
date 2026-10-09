@@ -620,6 +620,15 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   `-fstack-protector-strong`・`-D_FORTIFY_SOURCE=2`・`-Wl,-z,relro,now,noexecstack`）。
   **緩めるのは提案に留める**（→「指示の範囲を超えない」節）
 - `make security-scan` = Trivy（イメージ）+ Trivy（ファイルシステム）+ ShellCheck
+- **`make trivy-scan`（イメージスキャン）は何も検査していない。**
+  Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
+  持たないため、Trivy は対象を1つも識別できない（実測で
+  `Target: -` / `Not scanned` / `Metadata.OS: null` / `Results: 0`）。
+  **「脆弱性 0 件」ではなく「スキャンしていない」。**
+  それでも `security-scan` は「✅ 完了」と出すので、沈黙を安全と
+  読まないこと。脆弱性の追跡は構成要素の版を手で突合する
+  （→ `security-review` skill）。`trivy-fs-scan` はリポジトリ側の
+  依存を見るので有効
 - `.github/workflows/security.yml` が毎日 02:00 UTC に走り、
   `base-image-update.yml` が毎週月曜に上流の版を確認する。
   **これらが作る PR / Issue は「上流が動いた」という一次情報**なので、
@@ -693,6 +702,7 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 | `version-bump` | 構成要素のバージョンを上げる（上流調査 → チェックサム → パッチ → 検証 → 反映） |
 | `measure-and-land` | 計測して数値を着地させる |
 | `release` | リリースの準備と承認の取り方 |
+| `security-review` | セキュリティ点検（CVE 追跡・強化フラグの検証・攻撃面・供給網・脆弱性報告への対応） |
 
 ### カスタムコマンド
 

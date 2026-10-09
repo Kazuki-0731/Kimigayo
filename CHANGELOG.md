@@ -63,6 +63,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **arm64 の動的リンクバイナリが1つも動かないことが判明**（未修正）。
+  `/lib/ld-musl-aarch64.so.1`（musl の `libc.so`）自身が `__letf2` を
+  解決できず、OpenRC の実行ファイル4つすべてが
+  `Error relocating ...: __letf2: symbol not found` で起動しない。
+  `__letf2` は aarch64 の 128-bit `long double` を扱うコンパイラ
+  ランタイム関数で、x86_64 は `long double` が 80-bit でハードウェア
+  命令を使うため同じ問題が出ない。BusyBox は static-pie なので
+  影響を受けず smoke テストは通る。
+  経緯と対応方針 → [TODO.md](TODO.md)
 - **配布イメージに `/tmp` が無かった**（v0.1.0 以降ずっと）。
   `/run`・`/var/log`・`/var/tmp`・`/var/cache`・`/var/lib`・`/home`・`/opt`・
   `/srv`・`/mnt`・`/media`・`/usr/local/*` も同様で、`/var` には宛先の無い
