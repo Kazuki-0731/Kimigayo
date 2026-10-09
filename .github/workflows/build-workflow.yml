@@ -51,9 +51,29 @@ jobs:
     # timeout-minutes に式を書くのは対応が怪しいので定数にしてある。
     timeout-minutes: 120
 
+    # verify-image ジョブは別ランナーで docker build をやり直す
+    # （rootfs は artifact 経由）。**版を両方のジョブで同じ値にする**ため、
+    # ここで決めて出力する。片方だけ渡すと /etc/os-release と LABEL が
+    # 食い違い、verify-image.sh の突合で落ちる。
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # get-version.sh は `git describe --tags` を使う。
+          # 既定の浅いクローンではタグが無く 0.0.0-<sha> になる。
+          fetch-depth: 0
+
+      - name: Resolve project version
+        id: ver
+        run: |
+          set -euo pipefail
+          v="$(bash scripts/get-version.sh)"
+          cn="$(bash scripts/get-codename.sh "$v" || true)"
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+          echo "::notice::version=${v}${cn:+ \"${cn}\"}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -63,6 +83,10 @@ jobs:
       # 中身が変わったかは Dockerfile のハッシュで Docker が判断する。
       - name: Build build-environment image
         run: docker compose build
+        env:
+          # Dockerfile の LABEL version 用。公開しないイメージだが、
+          # 既定値のまま出すと「どの版で作った環境か」が追えない。
+          KIMIGAYO_VERSION: ${{ steps.ver.outputs.version }}
 
       - name: Build Kimigayo OS
         run: |
@@ -71,6 +95,7 @@ jobs:
           echo "::notice::make ${target} TARGET_ARCH=${{ inputs.arch }} IMAGE_TYPE=${{ inputs.variant }}"
           docker compose run --rm \
             -e IMAGE_TYPE=${{ inputs.variant }} \
+            -e KIMIGAYO_VERSION=${{ steps.ver.outputs.version }} \
             kimigayo-build \
             make "${target}" TARGET_ARCH=${{ inputs.arch }} IMAGE_TYPE=${{ inputs.variant }}
 
@@ -156,10 +181,19 @@ jobs:
           # 省略すると arm64 の rootfs を amd64 のイメージとして包み、
           # 既定の TARBALL_PATH=output/*.tar.gz が別の tarball を拾う。
           platform=$([ "${{ inputs.arch }}" = "arm64" ] && echo linux/arm64 || echo linux/amd64)
+          # VERSION / IMAGE_VARIANT を渡さないと LABEL が既定値のまま出る。
+          # **渡し忘れても docker build は成功する**ので、タグ名だけ合って
+          # 中身のメタデータがずれる。2026-10-10 まで CI が作るイメージは
+          # すべて `io.kimigayo.variant=minimal` / `version=dev` だった。
+          # VERSION は build ジョブと同じ値を使う（os-release と突合される）。
           docker build \
             --platform "$platform" \
             -f Dockerfile.runtime \
             --build-arg TARBALL_PATH="output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz" \
+            --build-arg VERSION="${{ needs.build.outputs.version }}" \
+            --build-arg IMAGE_VARIANT="${{ inputs.variant }}" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${{ github.sha }}" \
             -t "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
             .
           docker images "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
