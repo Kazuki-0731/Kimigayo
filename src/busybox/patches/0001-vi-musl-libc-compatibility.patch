@@ -1,6 +1,6 @@
 --- a/editors/vi.c
 +++ b/editors/vi.c
-@@ -2386,21 +2386,21 @@ static int file_write(char *fn, char *first, char *last)
+@@ -2386,21 +2386,22 @@ static int file_write(char *fn, char *first, char *last)
  // search for pattern starting at p
  static char *char_search(char *p, const char *pat, int dir_and_range)
  {
@@ -25,15 +25,16 @@
 +		cflags |= REG_ICASE;
 +
 +	/* Compile pattern using POSIX regex */
-+	if (regcomp(&preg, pat, cflags) != 0) {
++	int rc = regcomp(&preg, pat, cflags);
++	if (rc != 0) {
 +		char errbuf[256];
-+		regerror(regcomp(&preg, pat, cflags), &preg, errbuf, sizeof(errbuf));
++		regerror(rc, &preg, errbuf, sizeof(errbuf));
 +		status_line_bold("bad search pattern '%s': %s", pat, errbuf);
-+		regfree(&preg);
++		/* regcomp 失敗時に regfree を呼ぶのは POSIX 未規定なので呼ばない */
  		return p;
  	}
  
-@@ -2426,14 +2426,32 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
+@@ -2426,14 +2427,32 @@ static char *char_search(char *p, const char *pat, int dir_and_range)
  	q = p - start;
  	if (q < text)
  		q = text;
@@ -74,7 +75,7 @@
  	regfree(&preg);
  	return i < 0 ? NULL : q + i;
  }
-@@ -2743,10 +2761,16 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
+@@ -2743,10 +2762,16 @@ static char *regex_search(char *q, regex_t *preg, const char *Rorig,
  	const char *t;
  	char *r;
  
