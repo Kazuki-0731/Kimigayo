@@ -538,6 +538,36 @@ make benchmark             # 全ベンチマーク
 `clean-busybox` / `clean-openrc`）。`make clean-all` は
 `build/downloads/` まで消して約150MBの再取得を招くので最後の手段。
 
+### musl を作り直したら、それにリンクしているものも作り直す
+
+**`.kimigayo-build-version` はコンポーネント間の依存を見ていない。**
+版が同じなら「ビルド済み」と判定するので、**musl を作り直しても
+BusyBox と OpenRC は古いバイナリのまま残る。**
+
+2026-10-09 に arm64 の musl のリンク方法を直したあと、これで実際に
+詰まった。rootfs の検査（`verify_rootfs`）は全項目通るのに、
+イメージで OpenRC を実行すると **Segmentation fault（終了コード 139）**
+になった。原因は OpenRC のバイナリが古い musl に対してリンクされた
+ままだったこと（`ls -l` の日時で分かる）。
+
+**musl を作り直したときは、BusyBox と OpenRC の成果物も捨てる:**
+
+```bash
+# arm64 の例。musl は aarch64、BusyBox と OpenRC は arm64 という
+# ディレクトリ名の違いに注意（MUSL_ARCH のマッピング）
+rm -rf build/musl-install-aarch64 build/musl-build-aarch64 \
+       build/busybox-install-arm64 build/busybox-build-arm64 \
+       build/openrc-install-arm64 build/openrc-build-arm64 build/openrc-cross-arm64
+```
+
+`make clean-musl` だけでは足りない。
+**「ビルドは通ったのに実行すると落ちる」ときは、まず成果物の日時を見る。**
+
+```bash
+ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
+# libc.so より古い実行ファイルがあれば、それは別の musl 向け
+```
+
 ### 版上げで実際に壊れた箇所（前例）
 
 **上流のビルドオプションは消える。** 2026-10-09 の OpenRC 0.52.1 → 0.63.2 で、
