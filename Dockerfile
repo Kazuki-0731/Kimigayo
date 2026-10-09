@@ -159,12 +159,26 @@ RUN apk fetch --no-cache --arch aarch64 \
     # （2026-10-09 の CI で arm64 の3バリアントが全部これで落ちた）
     mkdir -p /usr/aarch64-linux-musl/usr && \
     ln -sfn ../lib /usr/aarch64-linux-musl/usr/lib && \
+    # ヘッダも同じ理屈で sysroot に入れる。
+    # libcap.pc は includedir=/usr/include を宣言しており、meson は
+    # PKG_CONFIG_SYSROOT_DIR を付けて -I<sysroot>/usr/include に書き換える。
+    # そこにヘッダが無いと、コンパイラの既定パスにある**ホストの
+    # x86_64 の** /usr/include/sys/capability.h が使われる。
+    # 2026-10-09 まで arm64 の OpenRC はそうなっていた（コンパイルも
+    # リンクも通るので気づけない。同じ経路で libc ヘッダまで x86_64 の
+    # ものを使っており、O_DIRECTORY の値が違って rc-update show が
+    # 空になっていた）。
+    mkdir -p /usr/aarch64-linux-musl/include/sys && \
+    cp -a usr/include/sys/*.h /usr/aarch64-linux-musl/include/sys/ && \
+    ln -sfn ../include /usr/aarch64-linux-musl/usr/include && \
+    test -e /usr/aarch64-linux-musl/usr/include/sys/capability.h && \
     # リンク切れを残さない。ここが切れていると meson の依存解決が
     # 落ちたり、ホストの x86_64 の libcap を拾ったりする
     test -e /usr/aarch64-linux-musl/usr/lib/libcap.a && \
     test -e /usr/aarch64-linux-musl/usr/lib/libcap.so && \
     ls -lL /usr/aarch64-linux-musl/usr/lib/libcap.a \
-           /usr/aarch64-linux-musl/usr/lib/libcap.so
+           /usr/aarch64-linux-musl/usr/lib/libcap.so \
+           /usr/aarch64-linux-musl/usr/include/sys/capability.h
 WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
