@@ -4,14 +4,24 @@
 # 除外するのは個人のメモと実行時の生成物だけ。
 # 機密は .claude/ には置かない（Docker Hub トークンは .env、下記で無視）。
 .claude/*.md
-# settings.local.json は ~/.gitignore_global が無視しているので打ち消す
-# （リポジトリの .gitignore はグローバルの excludesFile より優先される）。
-!.claude/settings.local.json
+# settings.local.json は共有しない。
+# 権限の allow リストは「秘密が入っているか」ではなく「他人の環境に
+# 何を事前承認させるか」で判断する。実際に Read(///**)（全ファイル
+# システムの読み取り）と Bash(bash:*)（任意のコマンド）が入っていた。
+# これを公開リポジトリに置くと、clone した全員にその承認が効く。
+# 共有するのは settings.json（Hook の登録だけ）。
+.claude/settings.local.json
 .claude/plans/
 .claude/state/
 .claude/sessions/
 .claude/shell-snapshots/
 .claude/todos/
+
+# 作業メモはリポジトリに入れない。
+# git log が「メモを更新した」コミットで埋まるのを避けるため。
+# 経緯の正本は git log とコミットメッセージ、仕様の正本は .kiro/specs/。
+/TODO.md
+/NEXT.md
 
 # Build artifacts
 /build/

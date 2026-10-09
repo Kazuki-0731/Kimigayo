@@ -100,7 +100,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `Makefile` の `help` と `docs/` が日本語という混在状態。**新しく書くときは
 そのファイルの周囲に合わせ、勝手に統一しない。**
 
-## ユーザー（石野）も間違えることがある
+## 依頼者も間違えることがある
 
 **ユーザー自身も、指示の内容やこれまでの経緯を勘違いしたり忘れたりする
 ことがある。** コード・`git log`・ドキュメント・`.kiro/specs/`・過去のルール
@@ -237,7 +237,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 次・残り・追加提案を都度示す
 
-**ユーザーは会話の途中で決めたこと・保留にしたことを忘れやすいと自認している。**
+**長い作業では、会話の途中で決めたことや保留にしたことが埋もれる。**
 作業の区切り（実装完了・調査完了・ビルド完了）ごとに、聞かれなくても次の3点を
 短く示す:
 
@@ -655,10 +655,17 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 **ここに機密を置かない。** Docker Hub トークンは `.env`（`.gitignore` 済み）。
 個人のパスも書かない。
 
+> **`settings.local.json` は共有しない。** 判断基準は「秘密が入っているか」
+> ではなく**「他人の環境に何を事前承認させるか」**。実際に
+> `Read(///**)`（全ファイルシステムの読み取り）と `Bash(bash:*)`（任意の
+> コマンド）が入っていた。**このリポジトリは公開されているので、置けば
+> clone した全員の Claude Code にその承認が効く。**
+> 共有するのは `settings.json`（Hook の登録だけ）。
+
 | 場所 | 中身 | Git |
 | --- | --- | --- |
 | `.claude/settings.json` | Hook の登録、`env` | 追跡 |
-| `.claude/settings.local.json` | 権限の allow リスト | 追跡（`~/.gitignore_global` を `!` で打ち消している） |
+| `.claude/settings.local.json` | 権限の allow リスト | **無視**（下記） |
 | `.claude/hooks/*.sh` | 機械的に止めるもの | 追跡。`make shellcheck-scan` の対象 |
 | `.claude/agents/*.md` | Subagent の定義 | 追跡 |
 | `.claude/skills/*/SKILL.md` | 手順（判断を伴うもの） | 追跡 |
@@ -681,9 +688,9 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 （→「Git の運用ルール」節）に任せる。ここで止めると承認後も進めなくなる。
 止めているのは**外に出て取り消せないもの**（タグ・Docker Hub）だけ。
 
-> `settings.local.json` の allow リストには `Bash(git push:*)` が入っている。
-> 承認ルールとの整合は `guard-bash.sh` が取っている（Hook は権限の
-> allow より先に走り、危険な部分集合だけを止める）。
+> 権限の allow リストで `git push` を事前承認している環境でも、
+> `guard-bash.sh` が整合を取る（Hook は権限の allow より先に走り、
+> 危険な部分集合だけを止める）。
 
 ### Subagent — 役割とツールを絞って任せる
 
