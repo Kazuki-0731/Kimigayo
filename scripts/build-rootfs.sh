@@ -652,6 +652,8 @@ copy_components() {
         copy_over "$OPENRC_INSTALL_DIR/usr/share" "$ROOTFS_DIR/usr/share"
 
         log_info "  ✓ OpenRC copied"
+
+        patch_openrc_for_busybox || return 1
     else
         log_warn "OpenRC installation directory not found: $OPENRC_INSTALL_DIR"
     fi
@@ -662,6 +664,150 @@ copy_components() {
 }
 
 # Create essential configuration files
+# ---------------------------------------------------------------------------
+# OpenRC の init スクリプトを BusyBox の userland に合わせる
+#
+# なぜ必要か（2026-10-10 に `openrc boot` を実走させて発覚）:
+#   OpenRC の上流 init スクリプトは GNU procps / coreutils / kmod を前提に
+#   長オプションを使う。Kimigayo の userland は BusyBox だけなので、
+#   対応していないオプションはその場で usage を吐いて失敗する。
+#   実測では `sysctl` が毎回 ERROR になっていた:
+#       /sbin/sysctl: unrecognized option: system
+#       * ERROR: sysctl failed to start
+#   rc-update show も `<script> describe` も start() を呼ばないので、
+#   既存の検査では一切検知できなかった。
+#
+# 直す対象は「Docker で実際に走るもの」だけに絞る。
+# root / fsck / hwclock / modules / localmount / swap / procfs は
+# depend() に `keyword -docker` が付いており**コンテナでは実行されない**
+# （実測で確認）。Kimigayo はコンテナ向け OS なので触らない。
+#
+# 置換前の文字列が消えていたら**ビルドを止める**。OpenRC を上げて上流が
+# 書き換えたときに「当てたつもり」で進まないため。
+# ---------------------------------------------------------------------------
+replace_line_in_file() {
+    local file="$1" needle="$2" replacement="$3" n
+
+    if [ ! -f "$file" ]; then
+        log_error "Not found: $file"
+        return 1
+    fi
+    n="$(grep -cF -- "$needle" "$file" || true)"
+    if [ "$n" != "1" ]; then
+        log_error "Expected exactly 1 occurrence of the following in ${file}, got ${n}:"
+        log_error "    $needle"
+        log_error "  OpenRC ${OPENRC_VERSION} の上流が書き換えた可能性があります。"
+        log_error "  該当スクリプトを読み直して、この置換を作り直してください。"
+        return 1
+    fi
+    # **置換は index()/substr() で行う。`sub()` は使えない。**
+    # awk の sub() は第1引数を**正規表現**として解釈するため、
+    # `sysctl ${quiet} --system` のような `$` `{` `}` を含む文字列は
+    # マッチしない。sub() で書いたときは置換が1件も起きないのに
+    # 「✓ 置き換えた」と報告していた（2026-10-10）。
+    #
+    # **`mv` ではなく `cat >` で書き戻す。**
+    # mv は awk が作った新ファイル（0644）で元を置き換えるため、
+    # init スクリプトの実行権限が落ちる。実際に sysctl と bootmisc が
+    # 0644 になり、OpenRC から起動されなくなった（同日）。
+    awk -v needle="$needle" -v repl="$replacement" '
+        {
+            i = index($0, needle)
+            if (i > 0) {
+                print substr($0, 1, i - 1) repl substr($0, i + length(needle))
+                next
+            }
+            print
+        }
+    ' "$file" > "${file}.new" || return 1
+    cat "${file}.new" > "$file" && rm -f "${file}.new"
+
+    # **置換後に消えたことを確かめる。** 「当てたつもり」で進まないため。
+    if grep -qF -- "$needle" "$file"; then
+        log_error "Replacement did not take effect in ${file}:"
+        log_error "    $needle"
+        return 1
+    fi
+}
+
+patch_openrc_for_busybox() {
+    local initd="$ROOTFS_DIR/etc/init.d"
+    [ -d "$initd" ] || return 0
+
+    log_info "Adapting OpenRC init scripts to the BusyBox userland..."
+
+    # --- sysctl: BusyBox には --system が無い ---------------------------------
+    #
+    # procps の `sysctl --system` は複数のディレクトリから *.conf を読む。
+    # BusyBox の `-p` は複数ファイルを取れるので、読む場所を自分で並べて渡す。
+    # （同名ファイルのディレクトリ間シャドウイングまでは再現しない。
+    #   Kimigayo が置くのは /etc/sysctl.d/99-kimigayo-performance.conf だけ）
+    if [ -f "$initd/sysctl" ]; then
+        replace_line_in_file "$initd/sysctl" \
+            'sysctl ${quiet} --system' \
+            'kimigayo_sysctl ${quiet}' || return 1
+
+        # BusyBox 版の本体を関数として足す（上流の構造は崩さない）
+        cat >> "$initd/sysctl" << 'SYSCTL_EOF'
+
+# ---------------------------------------------------------------------------
+# Kimigayo: BusyBox の sysctl に --system が無いための置き換え。
+# 上流の Linux_sysctl() は procps の長オプションを前提にしていた。
+# ---------------------------------------------------------------------------
+kimigayo_sysctl()
+{
+	local quiet="$1" conf= files= out=
+
+	# コンテナではカーネルは**ホストのもの**。非特権コンテナは
+	# /proc/sys を read-only で渡されるので、どのキーも書けない。
+	# これは「設定に失敗した」ではなく「ここの担当ではない」ので、
+	# エラーにせず対象外として抜ける（設定するならホスト側で
+	# docker run --sysctl、または --privileged）。
+	#
+	# 判定に `[ -w /proc/sys/kernel ]` は使えない。read-only mount でも
+	# root には writable と返る（実測）。/proc/mounts を見る。
+	if grep -q " /proc/sys proc ro[, ]" /proc/mounts 2>/dev/null; then
+		einfo "kernel parameters are managed by the host (/proc/sys is read-only)"
+		return 0
+	fi
+
+	for conf in /run/sysctl.d/*.conf /etc/sysctl.d/*.conf \
+		/usr/local/lib/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf \
+		/lib/sysctl.d/*.conf /etc/sysctl.conf; do
+		[ -r "$conf" ] && files="${files} ${conf}"
+	done
+	[ -n "$files" ] || return 0
+
+	# -e: このカーネルに存在しないキーを警告にしない
+	#     （コンテナでは見えない net.* がある。実測で rmem_default 等）
+	# shellcheck disable=SC2086
+	out="$(sysctl ${quiet} -e -p ${files} 2>&1)"
+	[ -n "$out" ] && printf "%s\n" "$out"
+
+	# **BusyBox の sysctl は書き込みに失敗しても終了コード 0 を返す**（実測）。
+	# そのままだと全キー失敗でも [ ok ] になるので、出力で判定する。
+	case "$out" in
+	*"error setting key"*) return 1 ;;
+	esac
+	return 0
+}
+SYSCTL_EOF
+        log_info "  ✓ sysctl: --system -> BusyBox の -p に置き換え"
+    fi
+
+    # --- bootmisc: BusyBox の mount には --bind が無い ------------------------
+    #
+    # clean_run() が /run の下敷きを掃除するために bind mount する。
+    # BusyBox の mount は長オプションを持たないが `-o bind` で同じことができる。
+    # keyword に -docker が無いので**コンテナでも実行される**。
+    if [ -f "$initd/bootmisc" ]; then
+        replace_line_in_file "$initd/bootmisc" \
+            'mount --bind / $dir' \
+            'mount -o bind / $dir' || return 1
+        log_info "  ✓ bootmisc: mount --bind -> mount -o bind"
+    fi
+}
+
 create_config_files() {
     log "Creating essential configuration files..."
 
@@ -1077,14 +1223,21 @@ verify_rootfs() {
     # OpenRC の prefix が /usr なので shebang は /usr/sbin/openrc-run を
     # 指すが、rootfs には /sbin/openrc-run しか置いていなかった。
     if [ -d "$ROOTFS_DIR/etc/init.d" ]; then
-        local bad_shebang="" total_scripts=0
+        local bad_shebang="" not_exec="" total_scripts=0
         local script interp
         for script in "$ROOTFS_DIR/etc/init.d"/*; do
             [ -f "$script" ] || continue
-            # 実行可能なものだけ見る（functions.sh のような関数ライブラリは
-            # 実行権限が無く、shebang も持たない）
-            [ -x "$script" ] || continue
+            # **shebang の有無で判定する。`[ -x ]` で絞ってはいけない。**
+            # functions.sh は `.` で読み込む関数ライブラリで shebang も
+            # 実行権限も無い。一方、実行権限だけを条件にすると
+            # 「実行権限が落ちた init スクリプト」を検査対象から外して
+            # しまい、壊れたことに気づけない（2026-10-10 に実際に起きた）。
+            case "$(head -1 "$script")" in "#!"*) ;; *) continue ;; esac
             total_scripts=$((total_scripts + 1))
+            if [ ! -x "$script" ]; then
+                not_exec="${not_exec} $(basename "$script")"
+                continue
+            fi
             interp="$(head -1 "$script" | sed -n 's|^#!\([^ ]*\).*|\1|p')"
             [ -n "$interp" ] || continue
             # rootfs 基準で解決する（ホスト側で解決させない）
@@ -1092,13 +1245,20 @@ verify_rootfs() {
                 bad_shebang="${bad_shebang} $(basename "$script")->${interp}"
             fi
         done
+        if [ -n "$not_exec" ]; then
+            log_error "  ✗ init scripts without the executable bit:"
+            log_error "      ${not_exec}"
+            log_error "      shebang を持つのに実行権限が無い。OpenRC から起動できない"
+            errors=$((errors + 1))
+        fi
         if [ -n "$bad_shebang" ]; then
             log_error "  ✗ init scripts whose interpreter is missing in the rootfs:"
             log_error "      ${bad_shebang}"
             log_error "      これらは exec できない（No such file or directory になる）"
             errors=$((errors + 1))
-        else
-            log_info "  ✓ all ${total_scripts} init script interpreters resolve"
+        fi
+        if [ -z "$not_exec" ] && [ -z "$bad_shebang" ]; then
+            log_info "  ✓ all ${total_scripts} init scripts are executable and their interpreters resolve"
         fi
     fi
 

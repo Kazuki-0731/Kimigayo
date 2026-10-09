@@ -199,28 +199,84 @@ fi
 # ファイルは存在し、rc-update show も通るので気づけない。
 #
 # describe は副作用が無く、どのスクリプトでも実装されている。
+#
+# **判定は shebang の有無で行う。`[ -x ]` で絞ってはいけない。**
+# functions.sh は `.` で読み込む関数ライブラリで、shebang も実行権限も
+# 無い（/lib/rc/rc/sh/functions.sh への symlink）。これを除外したくて
+# `[ -x ]` を条件にしたところ、**実行権限が落ちた init スクリプトまで
+# 検査対象から外れた。** 2026-10-10 に sysctl と bootmisc の権限を
+# 落とす変更を入れたのに 22 項目すべて通ってしまった。
 out="$(in_image '
 failed=""
+notexec=""
 total=0
 for f in /etc/init.d/*; do
-    # 実行可能なものだけ試す。functions.sh のような
-    # 「. で読み込む関数ライブラリ」は実行権限が無く、実行すると
-    # Permission denied になるが、それは正常な状態。
-    [ -f "$f" ] && [ -x "$f" ] || continue
+    [ -f "$f" ] || continue
+    case "$(head -1 "$f")" in "#!"*) ;; *) continue ;; esac
     total=$((total + 1))
+    if [ ! -x "$f" ]; then notexec="${notexec} $(basename "$f")"; continue; fi
     "$f" describe >/dev/null 2>&1 || failed="${failed} $(basename "$f")"
 done
-printf "total=%s failed=%s\n" "$total" "${failed:-none}"')"
+printf "total=%s notexec=%s failed=%s\n" "$total" "${notexec:-none}" "${failed:-none}"')"
+total_scripts="$(printf '%s' "$out" | sed -n 's/^total=\([0-9]*\).*/\1/p')"
 case "$out" in
-    *"failed=none"*)
-        pass "all init scripts are executable (${out%% *})"
+    *"notexec=none failed=none"*)
+        # 本数の下限も見る。init スクリプトが丸ごと入らなくなる事故
+        # （OpenRC のコピー漏れ）を「0 本中 0 本成功」で通さないため。
+        if [ "${total_scripts:-0}" -ge 30 ]; then
+            pass "all ${total_scripts} init scripts are executable and run"
+        else
+            fail "too few init scripts: ${total_scripts} (expected >= 30)"
+            show_output "$out"
+        fi
         ;;
     *)
         fail "some init scripts cannot be executed"
         show_output "$out"
-        log_error "      shebang の指す先が rootfs に無い可能性が高い"
+        log_error "      notexec= があれば実行権限が落ちている"
+        log_error "      failed=  があれば shebang の指す先が rootfs に無い"
         ;;
 esac
+
+# **BusyBox が持たない長オプションを init スクリプトが使っていないか。**
+#
+# OpenRC の上流 init スクリプトは GNU procps / coreutils / kmod を前提に
+# 長オプションを使う。Kimigayo の userland は BusyBox だけなので、
+# 未対応のオプションは start() の中で usage を吐いて失敗する。
+# 2026-10-10 まで sysctl が毎回これで ERROR になっていた:
+#     /sbin/sysctl: unrecognized option: system
+# 直前の describe 検査では start() を呼ばないので絶対に出ない。
+#
+# depend() に `keyword -docker` があるものは**コンテナでは実行されない**
+# ので対象外（root / fsck / hwclock / modules / localmount / swap / procfs）。
+# ベアメタルは Kimigayo の対象外（→ CLAUDE.md「このプロジェクトは何か」）。
+out="$(in_image '
+for f in /etc/init.d/*; do
+    [ -f "$f" ] && [ -x "$f" ] || continue
+    grep -q "keyword .*-docker" "$f" && continue
+    # コメント行は実行されないので除外する（経緯の説明に長オプションを
+    # 書くことがある）。
+    grep -v "^[[:space:]]*#" "$f" |
+    grep -oE "[a-z][a-z0-9_.-]*[[:space:]][^;|&]*--[a-z][a-z0-9-]*" 2>/dev/null |
+    while read -r line; do
+        cmd="${line%% *}"
+        opt="$(printf "%s" "$line" | grep -oE -- "--[a-z][a-z0-9-]*" | tail -1)"
+        path="$(command -v "$cmd" 2>/dev/null)"
+        [ -n "$path" ] || continue
+        # BusyBox のアプレットだけ見る。OpenRC 自身のコマンド
+        # （start-stop-daemon 等）は長オプションを持っているので対象外。
+        [ "$(readlink -f "$path")" = /bin/busybox ] || continue
+        busybox "$cmd" --help 2>&1 | grep -q -- "$opt" ||
+            printf "%s: %s %s\n" "$(basename "$f")" "$cmd" "$opt"
+    done
+done | sort -u')"
+if [ -z "$(printf '%s' "$out" | tr -d '[:space:]')" ]; then
+    pass "init scripts use no BusyBox-unsupported long options"
+else
+    fail "init scripts pass unsupported long options to BusyBox applets"
+    show_output "$out"
+    log_error "      patch_openrc_for_busybox (scripts/build-rootfs.sh) に置換を足す"
+fi
 
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
