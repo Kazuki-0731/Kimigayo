@@ -91,10 +91,43 @@ fi
 
 push_lines="$(lines_with '\bgit[[:space:]]+push\b')"
 if [ -n "$push_lines" ] &&
-   printf '%s' "$push_lines" | grep -qE '(--tags|--follow-tags|[[:space:]]v[0-9]+\.[0-9]+\.[0-9]+)'; then
+   printf '%s' "$push_lines" | grep -qE '(--tags|--follow-tags|[[:space:]]v[0-9]+\.[0-9]+\.[0-9]+|refs/tags/)'; then
+    # **そのタグのコミット時点のワークフロー**を調べて見せる。
+    #
+    # タグ push で走るのは、いまの main にあるものではなく、タグが
+    # 指すコミットの .github/workflows/ で決まる。
+    # 2026-10-09 にこれで事故った: release.yml を gh workflow disable で
+    # 止めて v0.1.1 を push したところ、当時のコミットにあった
+    # docker-publish.yml（"Docker Build and Push"）が走り、
+    # **Docker Hub の latest を含む公開イメージが差し替わった。**
+    # いまの main にそのファイルは無いので gh workflow list にも出ず、
+    # 現在の一覧を見るだけでは気づけなかった。
+    # gh workflow disable はワークフロー ID 単位なので、古いコミットに
+    # しか無いものは止められない（ID が存在しない）。
+    tag_report=""
+    tags_in_cmd="$(printf '%s\n' "$push_lines" | tr ' ' '\n' |
+        sed -n 's|^refs/tags/||p; /^v[0-9][0-9.]*$/p' | sort -u | tr '\n' ' ')"
+    detector="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/tag-push-workflows.py"
+    if [ -f "$detector" ] && [ -n "$(printf '%s' "$tags_in_cmd" | tr -d ' ')" ]; then
+        # shellcheck disable=SC2086
+        tag_report="$(python3 -I "$detector" $tags_in_cmd 2>/dev/null || true)"
+    fi
+
     block "タグの push" \
-"タグの push は release.yml を起動し、Docker Hub の公開イメージを
-差し替えます。毎回ユーザーの明示的な承認が必要です。"
+"タグの push は、**そのタグのコミット時点にあるワークフロー**を起動します。
+いまの main のワークフローではありません。Docker Hub の公開イメージが
+差し替わる可能性があります。毎回ユーザーの明示的な承認が必要です。
+
+このタグで起動するワークフロー:
+${tag_report:-  （タグ名を特定できませんでした。手動で確認してください:
+    python3 .claude/hooks/tag-push-workflows.py <tag>）}
+
+**gh workflow disable では古いコミットにしか無いワークフローを
+止められません**（ワークフロー ID が存在しないため）。
+上に ★ が出ているなら、公開を避けるには次のいずれかが必要です:
+  - リポジトリ全体の Actions を一時停止する
+    gh api -X PUT repos/{owner}/{repo}/actions/permissions -f enabled=false
+  - 公開されてしまう前提で進め、あとで正しいイメージを出し直す"
 fi
 
 if printf '%s' "$CMD" | grep -qE '\bdocker[[:space:]]+push\b'; then
