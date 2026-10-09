@@ -49,3 +49,10 @@ __pycache__/
 
 # Docker
 # .dockerignore - now tracked for runtime image build
+
+# コンパイラ probe の副産物
+# meson はリンカ検出で `<cc> -Wl,--version` を実行する。
+# OpenRC の aarch64 クロスラッパーはリンク時に compiler-rt を足すので
+# この probe が実際にリンクまで成功し、-o が無いため cwd（リポジトリ直下）に
+# a.out を落とす。成果物ではないので追跡しない。
+/a.out
