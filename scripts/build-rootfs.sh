@@ -609,6 +609,31 @@ copy_components() {
         # 参照しているので、Alpine と同じく /sbin に置く。
         copy_over "$OPENRC_INSTALL_DIR/usr/sbin" "$ROOTFS_DIR/sbin"
 
+        # **/usr/sbin にも同じ名前で引けるようにする。**
+        #
+        # OpenRC の prefix は /usr なので、install される init スクリプトの
+        # shebang は #!/usr/sbin/openrc-run になっている。/sbin に移すだけだと
+        # 37 本のうち 36 本が
+        #   unable to exec `/etc/init.d/sysctl': No such file or directory
+        # で**1つも起動できない**（ファイルはあるので存在チェックでは通る。
+        # ENOENT は shebang の指す先が無いことを意味する）。
+        #
+        # 2026-10-09 に実測。`openrc default` を走らせて初めて分かった。
+        # rc-update show も verify-image.sh も init スクリプトを exec しない
+        # ので、それまで気づけなかった。
+        #
+        # シンボリックリンクなのでサイズはほぼ増えない。
+        if [ -d "$OPENRC_INSTALL_DIR/usr/sbin" ]; then
+            mkdir -p "$ROOTFS_DIR/usr/sbin"
+            local orc_bin
+            for orc_bin in "$OPENRC_INSTALL_DIR/usr/sbin"/*; do
+                [ -e "$orc_bin" ] || continue
+                orc_bin="$(basename "$orc_bin")"
+                ln -sfn "../../sbin/${orc_bin}" "$ROOTFS_DIR/usr/sbin/${orc_bin}"
+            done
+            log_info "  ✓ OpenRC binaries linked into /usr/sbin (init スクリプトの shebang 用)"
+        fi
+
         # Copy libraries
         copy_over "$OPENRC_INSTALL_DIR/lib" "$ROOTFS_DIR/lib"
 
@@ -1041,6 +1066,36 @@ verify_rootfs() {
             errors=$((errors + 1))
         else
             log_info "  ✓ components were built after the current musl"
+        fi
+    fi
+
+    # init スクリプトの shebang が解決できること。
+    #
+    # ファイルがあっても shebang の指す先が無ければ exec できない
+    # （execve が ENOENT を返し "No such file or directory" になる）。
+    # 2026-10-09 に 37 本中 36 本がこれで起動できない状態だった。
+    # OpenRC の prefix が /usr なので shebang は /usr/sbin/openrc-run を
+    # 指すが、rootfs には /sbin/openrc-run しか置いていなかった。
+    if [ -d "$ROOTFS_DIR/etc/init.d" ]; then
+        local bad_shebang="" total_scripts=0
+        local script interp
+        for script in "$ROOTFS_DIR/etc/init.d"/*; do
+            [ -f "$script" ] || continue
+            total_scripts=$((total_scripts + 1))
+            interp="$(head -1 "$script" | sed -n 's|^#!\([^ ]*\).*|\1|p')"
+            [ -n "$interp" ] || continue
+            # rootfs 基準で解決する（ホスト側で解決させない）
+            if [ ! -e "${ROOTFS_DIR}${interp}" ]; then
+                bad_shebang="${bad_shebang} $(basename "$script")->${interp}"
+            fi
+        done
+        if [ -n "$bad_shebang" ]; then
+            log_error "  ✗ init scripts whose interpreter is missing in the rootfs:"
+            log_error "      ${bad_shebang}"
+            log_error "      これらは exec できない（No such file or directory になる）"
+            errors=$((errors + 1))
+        else
+            log_info "  ✓ all ${total_scripts} init script interpreters resolve"
         fi
     fi
 

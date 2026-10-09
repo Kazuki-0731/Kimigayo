@@ -190,6 +190,35 @@ else
     show_output "$out"
 fi
 
+# **init スクリプトを実際に exec する。**
+#
+# ここまでの検査はどれも init スクリプトを起動しない。2026-10-09 に、
+# 37 本中 36 本が shebang の指す先（/usr/sbin/openrc-run）が無いために
+#   unable to exec `/etc/init.d/sysctl': No such file or directory
+# となり**1つも起動できない**状態だったのを見逃していた。
+# ファイルは存在し、rc-update show も通るので気づけない。
+#
+# describe は副作用が無く、どのスクリプトでも実装されている。
+out="$(in_image '
+failed=""
+total=0
+for f in /etc/init.d/*; do
+    [ -f "$f" ] || continue
+    total=$((total + 1))
+    "$f" describe >/dev/null 2>&1 || failed="${failed} $(basename "$f")"
+done
+printf "total=%s failed=%s\n" "$total" "${failed:-none}"')"
+case "$out" in
+    *"failed=none"*)
+        pass "all init scripts are executable (${out%% *})"
+        ;;
+    *)
+        fail "some init scripts cannot be executed"
+        show_output "$out"
+        log_error "      shebang の指す先が rootfs に無い可能性が高い"
+        ;;
+esac
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------
