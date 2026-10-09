@@ -131,18 +131,40 @@ WORKDIR /tmp/aarch64-libs
 RUN apk fetch --no-cache --arch aarch64 \
         --keys-dir /usr/share/apk/keys/aarch64 \
         --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
-        libgcc linux-headers libcap libcap-dev libcap-static && \
+        libgcc linux-headers libcap2 libcap-dev libcap-static && \
     mkdir -p /usr/aarch64-linux-musl/lib /usr/aarch64-linux-musl/include && \
     tar xzf libgcc-*.apk && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
     tar xzf linux-headers-*.apk && \
     cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
-    for a in libcap-2*.apk libcap-dev-*.apk libcap-static-*.apk; do tar xzf "$a"; done && \
-    cp -a usr/lib/libcap.so* usr/lib/libpsx.so* /usr/aarch64-linux-musl/lib/ 2>/dev/null || true && \
-    cp -a usr/lib/libcap.a usr/lib/libpsx.a /usr/aarch64-linux-musl/lib/ 2>/dev/null || true && \
+    # 取るのは libcap ではなく libcap2。
+    # Alpine 3.24 の libcap は libcap2 と libcap-utils に依存するだけの
+    # メタパッケージで、.apk は 1301 バイトでファイルを1つも含まない。
+    # apk fetch は依存を引かないので、libcap を指定しても
+    # libcap.so.2 は取れず <sysroot>/lib/libcap.so がリンク切れになっていた
+    # （ネイティブ側は apk add が依存を解決するので気づけなかった）。
+    for a in libcap2-*.apk libcap-dev-*.apk libcap-static-*.apk; do tar xzf "$a"; done && \
+    cp -a usr/lib/libcap.so* usr/lib/libpsx.so* /usr/aarch64-linux-musl/lib/ && \
+    cp -a usr/lib/libcap.a usr/lib/libpsx.a /usr/aarch64-linux-musl/lib/ && \
     mkdir -p /usr/aarch64-linux-musl/lib/pkgconfig && \
     cp -a usr/lib/pkgconfig/*.pc /usr/aarch64-linux-musl/lib/pkgconfig/ && \
-    ln -sf libgcc_s.so.1 /usr/aarch64-linux-musl/lib/libgcc_s.so
+    ln -sf libgcc_s.so.1 /usr/aarch64-linux-musl/lib/libgcc_s.so && \
+    # sysroot として <sysroot>/usr/lib からも引けるようにする。
+    # .pc の libdir は /usr/lib なので、meson が sys_root を付けて
+    # 解決すると <sysroot>/usr/lib を見る。実物が <sysroot>/lib にしか
+    # 無いと libcap.a を見つけられず `-L<sysroot>/usr/lib -lcap` に落ち、
+    # 存在しないディレクトリを素通りして**ホストの x86_64 の
+    # /usr/lib/libcap.so** を拾う:
+    #   ld.lld: error: /usr/lib/libcap.so is incompatible with aarch64linux
+    # （2026-10-09 の CI で arm64 の3バリアントが全部これで落ちた）
+    mkdir -p /usr/aarch64-linux-musl/usr && \
+    ln -sfn ../lib /usr/aarch64-linux-musl/usr/lib && \
+    # リンク切れを残さない。ここが切れていると meson の依存解決が
+    # 落ちたり、ホストの x86_64 の libcap を拾ったりする
+    test -e /usr/aarch64-linux-musl/usr/lib/libcap.a && \
+    test -e /usr/aarch64-linux-musl/usr/lib/libcap.so && \
+    ls -lL /usr/aarch64-linux-musl/usr/lib/libcap.a \
+           /usr/aarch64-linux-musl/usr/lib/libcap.so
 WORKDIR /
 RUN rm -rf /tmp/aarch64-libs
 
