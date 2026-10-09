@@ -299,6 +299,28 @@ case "$etype" in
     *) fail "could not read the ELF type of /bin/busybox (got '${etype}')" ;;
 esac
 
+# **同一内容のファイルが同じディレクトリに重複していないか。**
+#
+# OpenRC の上流（meson）は argv[0] で分岐する1つのプログラムを
+# 名前ごとの実コピーで install する。以前は名前のリストで symlink 化して
+# いたが実際のグループと一致しておらず、**33 ファイル・635KB が
+# 重複したまま配られていた**（rootfs の 19%。2026-10-10 に実測）。
+# いまは build-rootfs.sh が内容で判定して symlink にまとめる。
+#
+# ここで見るのは「まとめ忘れが無いか」。OpenRC を上げて新しいヘルパが
+# 増えたときも、名前を足さずに検知できる。
+out="$(in_image '
+find / -xdev -type f ! -path "/proc/*" ! -path "/sys/*" -exec md5sum {} + 2>/dev/null |
+    awk "{ h=\$1; p=\$2; d=p; sub(/\/[^\/]*$/, \"\", d); k=h \" \" d; c[k]++ }
+         END { for (k in c) if (c[k] > 1) print c[k], k }" | sort -rn')"
+if [ -z "$(printf '%s' "$out" | tr -d '[:space:]')" ]; then
+    pass "no duplicate files left un-deduplicated"
+else
+    fail "identical files are duplicated in the same directory"
+    show_output "$out"
+    log_error "      build-rootfs.sh の Step 3（dedup）が効いていない"
+fi
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------

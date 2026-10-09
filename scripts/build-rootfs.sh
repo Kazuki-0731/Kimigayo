@@ -356,35 +356,60 @@ optimize_rootfs() {
         log_info "  ✓ No unnecessary files found"
     fi
 
-    # 3. Create symbolic links for duplicate OpenRC binaries
-    log_info "Step 3: Creating symbolic links for duplicate binaries..."
-    local symlink_count=0
+    # 3. 同一内容のファイルを symlink にまとめる
+    #
+    # **判定は内容（md5）で行う。名前のリストを持たない。**
+    # 以前はここに einfo 系 11 個の名前をハードコードしていたが、
+    # 実際の重複グループとほとんど一致していなかった。実測（2026-10-10、
+    # standard x86_64）では、その処理を通したあとでも**33 ファイル・
+    # 635KB が重複したまま**残っていた。rootfs 3,351KB の 19% に当たる。
+    #
+    #    9 個 × 26,440B  /lib/rc/rc/sbin/mark_service_*
+    #    9 個 × 26,440B  /lib/rc/rc/bin/service_*
+    #   11 個 × 18,544B  /lib/rc/rc/bin/{einfo,vewarn,vebegin,esyslog,...}
+    #    4 個 × 14,072B  /lib/rc/rc/bin/get_options 他
+    #
+    # OpenRC の上流（meson）がこれらを名前ごとの実コピーで install する。
+    # 中身は argv[0] で分岐する1つのプログラムで、バイナリに
+    # "%s: unknown applet" が入っている（BusyBox と同じ方式）。
+    # したがって symlink で完全に等価。
+    #
+    # **同じディレクトリ内の重複だけをまとめる。** ディレクトリをまたぐと
+    # 「たまたま内容が同じだが別物」（空ファイル、同じ雛形の設定）を
+    # 繋いでしまう。実測では重複はすべて /lib/rc/rc/{bin,sbin} の中だけ
+    # だったので、この制限で取りこぼしは無い。
+    #
+    # **strip のあとに行う。** strip は symlink を辿って実体を書き換える
+    # ので、先にまとめると他の名前の内容まで変わってしまう。
+    log_info "Step 3: Deduplicating identical files into symlinks..."
+    local symlink_count=0 saved_bytes=0
+    local dedup_list="${ROOTFS_DIR}/.kimigayo-dedup.tmp"
 
-    # Many einfo-related binaries are hardlinks to the same binary
-    # Convert them to symlinks to save space
-    if [ -d "$ROOTFS_DIR/lib/rc/rc/bin" ]; then
-        local einfo_bins=(ebegin eend eerror eerrorn eindent einfo einfon eoutdent ewarn ewarnn ewend)
-        local base_bin="$ROOTFS_DIR/lib/rc/rc/bin/einfo"
+    find "$ROOTFS_DIR" -type f ! -name '.kimigayo-dedup.tmp' -exec md5sum {} + 2>/dev/null |
+        sort > "$dedup_list" || true
 
-        if [ -f "$base_bin" ]; then
-            for bin in "${einfo_bins[@]}"; do
-                local target="$ROOTFS_DIR/lib/rc/rc/bin/$bin"
-                if [ -f "$target" ] && [ "$target" != "$base_bin" ]; then
-                    # Check if they are identical
-                    if cmp -s "$base_bin" "$target"; then
-                        rm -f "$target"
-                        ln -s "einfo" "$target"
-                        symlink_count=$((symlink_count + 1))
-                    fi
-                fi
-            done
+    local prev_hash="" prev_dir="" prev_name=""
+    local dhash dpath ddir dname dsize
+    while read -r dhash dpath; do
+        [ -n "$dpath" ] || continue
+        ddir="$(dirname "$dpath")"
+        dname="$(basename "$dpath")"
+        dsize="$(stat -c%s "$dpath" 2>/dev/null || echo 0)"
+        if [ "$dhash" = "$prev_hash" ] && [ "$ddir" = "$prev_dir" ] && [ "$dsize" -gt 0 ]; then
+            rm -f "$dpath"
+            ln -s "$prev_name" "$dpath"
+            symlink_count=$((symlink_count + 1))
+            saved_bytes=$((saved_bytes + dsize))
+        else
+            prev_hash="$dhash"; prev_dir="$ddir"; prev_name="$dname"
         fi
-    fi
+    done < "$dedup_list"
+    rm -f "$dedup_list"
 
-    if [ $symlink_count -gt 0 ]; then
-        log_success "  ✓ Created $symlink_count symbolic links"
+    if [ "$symlink_count" -gt 0 ]; then
+        log_success "  ✓ Replaced $symlink_count duplicate files with symlinks ($((saved_bytes / 1024)) KB saved)"
     else
-        log_info "  ✓ No duplicate binaries found"
+        log_info "  ✓ No duplicate files found"
     fi
 
     # 4. Compress compressible files
