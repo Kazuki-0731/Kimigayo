@@ -24,6 +24,13 @@ ARCH="${ARCH:-x86_64}"
 
 OPENRC_SRC_DIR="${BUILD_DIR}/openrc-${OPENRC_VERSION}"
 OPENRC_BUILD_DIR="${BUILD_DIR}/openrc-build-${ARCH}"
+# meson のクロスファイルとコンパイララッパーの置き場所。
+# ビルドディレクトリの中には置かない。meson setup の直前で
+# ビルドディレクトリを作り直すため、中に置くと一緒に消えて
+#   ERROR: Cannot find specified cross file: .../meson-cross-aarch64-generated.txt
+# になる（2026-10-09 の CI で arm64 の3バリアントが全部これで落ちた）。
+# meson のビルドディレクトリは捨てる前提の出力先なので、入力を置かない。
+OPENRC_CROSS_DIR="${BUILD_DIR}/openrc-cross-${ARCH}"
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
 
 # MUSL_INSTALL_DIR can be overridden by environment variable
@@ -187,7 +194,8 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # Let Clang handle everything automatically with musl target
 
     # Generate cross-compilation file dynamically
-    CROSS_FILE="${OPENRC_BUILD_DIR}/meson-cross-aarch64-generated.txt"
+    mkdir -p "$OPENRC_CROSS_DIR"
+    CROSS_FILE="${OPENRC_CROSS_DIR}/meson-cross-aarch64-generated.txt"
     log_info "Generating Meson cross-compilation file: $CROSS_FILE"
 
     # Find musl lib directory for crt*.o files
@@ -203,20 +211,53 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 
     log_info "Using musl lib directory: $MUSL_LIB_DIR"
 
+    # compiler-rt の builtins。
+    #
+    # Alpine の aarch64 版 libcap.a は outline-atomics 付きでビルドされて
+    # いるため、__aarch64_swp1_acq_rel のようなヘルパを参照する
+    # （compiler-rt に 253 個入っている）。
+    # ラッパーは -nostdlib なので clang が builtins を自動で足さず、
+    #   ld.lld: error: undefined symbol: __aarch64_swp1_acq_rel
+    # になる。アーカイブの解決は順序依存なので、libcap.a より後ろ、
+    # つまり meson が渡す引数（"$@"）の後ろに置く必要がある。
+    RT_BUILTINS_DIR="$(clang -print-resource-dir)/lib/aarch64-unknown-linux-musl"
+    if [ ! -e "${RT_BUILTINS_DIR}/libclang_rt.builtins.a" ]; then
+        log_error "compiler-rt builtins not found: ${RT_BUILTINS_DIR}/libclang_rt.builtins.a"
+        log_error "Dockerfile の aarch64 compiler-rt 展開が失敗している可能性がある"
+        exit 1
+    fi
+    log_info "Using compiler-rt builtins: ${RT_BUILTINS_DIR}/libclang_rt.builtins.a"
+
     # Create wrapper script that uses musl's crt*.o and libs
-    WRAPPER_SCRIPT="${OPENRC_BUILD_DIR}/aarch64-musl-gcc-wrapper.sh"
+    WRAPPER_SCRIPT="${OPENRC_CROSS_DIR}/aarch64-musl-gcc-wrapper.sh"
     cat > "$WRAPPER_SCRIPT" <<EOF
 #!/bin/sh
 # Wrapper to use musl's startup files instead of GCC's
 # -B: Search directory for startup files (crt*.o)
 # -nostdlib: Don't use standard system startup/libraries
 # -lc: Explicitly link musl libc
+#
+# リンク時だけ compiler-rt の builtins を末尾に足す。
+# -c のコンパイルにも渡すと "argument unused during compilation" が
+# 出続けるので、コンパイルかリンクかを見て分ける。
+for arg in "\$@"; do
+    if [ "\$arg" = "-c" ]; then
+        exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
+            -B"${MUSL_LIB_DIR}" \\
+            -L"${MUSL_LIB_DIR}" \\
+            -nostdlib -lc \\
+            -I/usr/aarch64-linux-musl/include \\
+            "\$@"
+    fi
+done
+
 exec clang --target=aarch64-linux-musl -fuse-ld=lld \\
     -B"${MUSL_LIB_DIR}" \\
     -L"${MUSL_LIB_DIR}" \\
     -nostdlib -lc \\
     -I/usr/aarch64-linux-musl/include \\
-    "\$@"
+    "\$@" \\
+    -L"${RT_BUILTINS_DIR}" -lclang_rt.builtins
 EOF
     chmod +x "$WRAPPER_SCRIPT"
 

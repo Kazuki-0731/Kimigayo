@@ -321,7 +321,7 @@ clean-busybox:
 
 clean-openrc:
 	@echo "[CLEAN] Removing OpenRC build artifacts..."
-	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* 2>/dev/null || true
+	$(Q)rm -rf $(BUILD_DIR)/openrc-build-* $(BUILD_DIR)/openrc-install-* $(BUILD_DIR)/openrc-cross-* 2>/dev/null || true
 	@echo "[SUCCESS] OpenRC clean completed"
 
 clean-rootfs:
