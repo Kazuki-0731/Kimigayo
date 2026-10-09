@@ -319,14 +319,23 @@ build_kernel() {
         done
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
     else
-        # For x86_64 native builds with GCC, add flags for 16-bit realmode code
-        # -m16: generate 16-bit code
-        # -fno-stack-protector: disable stack protection (unavailable in realmode)
-        # -fno-pie: disable position independent executable
-        # -fcf-protection=none: disable Intel CET (unavailable in realmode)
-        # -mno-80387 -mno-mmx -mno-sse -mno-sse2: disable FPU/SIMD (unavailable in realmode)
-        # Note: retpoline flags removed via kernel patch (0002-disable-retpoline-realmode.patch)
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" REALMODE_CFLAGS="-std=gnu11 -Wno-error -m16 -fno-stack-protector -fno-pie -fcf-protection=none -mno-80387 -mno-mmx -mno-sse -mno-sse2" "$MAKE_TARGET" 2>&1 | \
+        # REALMODE_CFLAGS は上書きしない。
+        #
+        # 6.6 系を GCC 15 でビルドするには realmode に -std=gnu11 を
+        # 渡す必要があり、ここで REALMODE_CFLAGS を丸ごと差し替えていた。
+        # 6.18 では arch/x86/Makefile の REALMODE_CFLAGS が最初から
+        # -std=gnu11 を持っているので上書きは不要。
+        #
+        # そして上書きは有害だった。上流の REALMODE_CFLAGS にある
+        # -D__DISABLE_EXPORTS が落ちるため、arch/x86/include/asm/linkage.h の
+        #   #if defined(CONFIG_MITIGATION_RETHUNK) && !defined(__DISABLE_EXPORTS)
+        #   #define RET jmp __x86_return_thunk
+        # が realmode のアセンブリでも有効になり、realmode.elf のリンクが
+        #   undefined reference to `__x86_return_thunk`
+        # で落ちる（2026-10-09 の CI 実測。6.18.55 / x86_64 / GCC）。
+        # -DDISABLE_BRANCH_PROFILING・-march=i386・-mregparm=3・-ffreestanding も
+        # 同時に落ちていた。
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null

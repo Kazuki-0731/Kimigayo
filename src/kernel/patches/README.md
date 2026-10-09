@@ -22,6 +22,33 @@
 
 復元が必要なら `git log --diff-filter=D --follow -- src/kernel/patches/` から辿れる。
 
+### 0002 を消したあとに realmode のリンクが落ちた（2026-10-09）
+
+削除後の CI で x86_64 のカーネルビルドが次で落ちた。
+
+```
+ld: arch/x86/realmode/rm/trampoline_64.o: in function `verify_cpu':
+(.text+0x183): undefined reference to `__x86_return_thunk'
+```
+
+**これはパッチを消したのが原因ではなく、`scripts/build-kernel.sh` が
+`REALMODE_CFLAGS` を丸ごと上書きしていたのが原因。** 上流の値にある
+`-D__DISABLE_EXPORTS` が落ちるため、`arch/x86/include/asm/linkage.h` の
+
+```c
+#if defined(CONFIG_MITIGATION_RETHUNK) && !defined(__DISABLE_EXPORTS) && !defined(BUILD_VDSO)
+#define RET	jmp __x86_return_thunk
+```
+
+が realmode のアセンブリにも効いてしまう（`RET` はマクロなので、
+C のフラグを `filter-out` しても消えない）。上書きをやめて上流の
+`REALMODE_CFLAGS` を使うようにしたら通った
+（`make ARCH=x86_64 arch/x86/realmode/` で `LD realmode.elf` まで確認、
+`CONFIG_MITIGATION_RETHUNK=y`）。
+
+**教訓: 上流の変数を「追加」ではなく「代入」で差し替えると、
+そこに入っていた他の定義も一緒に消える。**
+
 ## パッチを足す・消すときの注意
 
 **`apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
