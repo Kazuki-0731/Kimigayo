@@ -164,6 +164,14 @@ meson_options=(
     "--sbindir=/usr/sbin"
     "--libexecdir=/lib/rc"
     "--buildtype=release"
+    # libcap を静的リンクする。
+    # OpenRC 0.63.2 では libcap が必須（無効化オプションは上流から削除）で、
+    # start-stop-daemon と supervise-daemon が libcap.so.2 にリンクする。
+    # 動的のままだと rootfs に Alpine の libcap.so.2 を同梱しない限り
+    # 「Error loading shared library libcap.so.2」で両方起動しない（実測）。
+    # BusyBox が static-pie なのと揃え、ランタイムには musl 以外の
+    # 共有ライブラリを置かない方針で静的にする。
+    "--prefer-static"
     # 注: -Dos / -Dcapabilities / -Drootprefix / -Dsplit-usr / -Dtermcap は
     # OpenRC 0.52.1 以降に上流から削除された。渡すと meson setup が
     # "Unknown options" で失敗する（CLAUDE.md「版上げで実際に壊れた箇所」節）。

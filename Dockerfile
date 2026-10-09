@@ -52,9 +52,12 @@ RUN apk update && apk add --no-cache \
     musl-dev \
     musl-utils \
     # OpenRC 0.63.2 は libcap が必須（0.52.1 の -Dcapabilities で
-    # 無効化できたが、そのオプションは上流から削除された）
+    # 無効化できたが、そのオプションは上流から削除された）。
+    # libcap-static は start-stop-daemon / supervise-daemon を
+    # 静的リンクするため（ランタイムイメージに他者の .so を持ち込まない）。
     libcap \
     libcap-dev \
+    libcap-static \
     # カーネルビルド用
     linux-headers \
     elfutils-dev \
@@ -128,14 +131,15 @@ WORKDIR /tmp/aarch64-libs
 RUN apk fetch --no-cache --arch aarch64 \
         --keys-dir /usr/share/apk/keys/aarch64 \
         --repository "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" \
-        libgcc linux-headers libcap libcap-dev && \
+        libgcc linux-headers libcap libcap-dev libcap-static && \
     mkdir -p /usr/aarch64-linux-musl/lib /usr/aarch64-linux-musl/include && \
     tar xzf libgcc-*.apk && \
     cp usr/lib/libgcc_s.so.1 /usr/aarch64-linux-musl/lib/ && \
     tar xzf linux-headers-*.apk && \
     cp -r usr/include/* /usr/aarch64-linux-musl/include/ && \
-    for a in libcap-2*.apk libcap-dev-*.apk; do tar xzf "$a"; done && \
+    for a in libcap-2*.apk libcap-dev-*.apk libcap-static-*.apk; do tar xzf "$a"; done && \
     cp -a usr/lib/libcap.so* usr/lib/libpsx.so* /usr/aarch64-linux-musl/lib/ 2>/dev/null || true && \
+    cp -a usr/lib/libcap.a usr/lib/libpsx.a /usr/aarch64-linux-musl/lib/ 2>/dev/null || true && \
     mkdir -p /usr/aarch64-linux-musl/lib/pkgconfig && \
     cp -a usr/lib/pkgconfig/*.pc /usr/aarch64-linux-musl/lib/pkgconfig/ && \
     ln -sf libgcc_s.so.1 /usr/aarch64-linux-musl/lib/libgcc_s.so
