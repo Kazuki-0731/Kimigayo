@@ -21,13 +21,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   数十分かけて作っていたため外した）。ベアメタル／QEMU を試したいときだけ
   手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
-- **実測値**: Standard（x86_64）**3.43MB**（2026-10-09）。
+- **実測値**: Standard（x86_64）**2.78MB**（2026-10-10）。
   起動時間とメモリは**計測方法に問題があり未測定**
   （`scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` の
   終了までを測るため、正常なイメージでは約 5,600ms になる。
   README が長く載せていた 439ms はこの `sleep` が成立しなかった場合の値）。
   **v2.0.1 の 1.17MB は Init も libc.so も入っていないイメージの値**なので、
-  現在の 3.43MB と並べて比較しない
+  現在の 2.78MB と並べて比較しない
 - 構成要素: **musl libc**（C ライブラリ）/ **Linux カーネル**（強化版）/
   **BusyBox**（コアユーティリティ）/ **OpenRC**（Init）
 

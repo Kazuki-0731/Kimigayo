@@ -4,7 +4,7 @@
 
 ## 主な特徴
 
-- 🪶 **超軽量**: ベースイメージ1-3MB（distroless的アプローチ）
+- 🪶 **超軽量**: Standard（x86_64）**2.78MB** / arm64 3.16MB（2026-10-10 実測）
 - ⚡ **高速起動**: 10秒以内のシステム起動
 - 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
 - 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除
@@ -71,15 +71,15 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ## イメージバリアント
 
-- **kimigayo-os:latest** - Standardバリアント（< 15MB）
+- **kimigayo-os:latest** - Standardバリアント（x86_64 2.78MB / arm64 3.16MB）
   - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
-- **kimigayo-os:latest-minimal** - Minimalバリアント（< 5MB）
+- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.65MB / arm64 3.02MB）
   - カーネル + musl libc + 最小限のBusyBox
   - 特化したコンテナ向けの絶対最小フットプリント
 
-- **kimigayo-os:latest-extended** - Extendedバリアント（< 50MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.81MB / arm64 3.20MB）
   - 開発ツールと追加ユーティリティを含む
   - 開発環境と機能豊富なコンテナ向け
 

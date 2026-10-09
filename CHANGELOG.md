@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+（次のリリースに入る変更をここに書く）
+
+---
+
+## [3.0.0] "Himawari" (向日葵) - 2026-10-10
+
+**このバージョンで初めて、Kimigayo OS は Init が動く OS になった。**
+v0.1.0 から v2.0.1 までの公開イメージには OpenRC のバイナリも musl の
+`libc.so` も `/tmp` も入っておらず、Init は1つもサービスを起動できなかった。
+BusyBox は static-pie で動くため `/bin/sh` は動き、smoke テストは通っていた。
+
+コードネームの運用もここから始まる（体系は
+[SPECIFICATION.md](SPECIFICATION.md) の「10.3 リリース名」）。
+
+### 実測値（2026-10-10、macOS / Apple Silicon ホスト）
+
+| バリアント | x86_64 | arm64 | アプレット |
+| --- | --- | --- | --- |
+| Minimal | **2.65MB** | 3.02MB | 370 |
+| Standard | **2.78MB** | 3.16MB | 403 |
+| Extended | **2.81MB** | 3.20MB | 413 |
+
+比較（同じホスト・同じ platform で実測）:
+`gcr.io/distroless/static-debian12` 2.11MB /
+`alpine:latest` 8.42MB / `ubuntu:24.04` 78.2MB。
+
+**6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過。**
+起動時間とメモリは計測方法に問題があるため未測定（下記）。
+
 ### Changed
 
 - **構成要素をまとめて最新化**（約9か月ぶんの滞留を解消）
@@ -32,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 外部 GitHub Action の `@master` 参照を tag 固定
   （`trivy-action@v0.36.0`・`action-shellcheck@2.0.0`）
 - **README とドキュメントの性能数値を実測値に差し替えた。**
-  Standard（x86_64）は **3.43MB**。比較対象も同じホスト・同じ platform で
+  Standard（x86_64）は **2.78MB**。比較対象も同じホスト・同じ platform で
   測り直した（`gcr.io/distroless/static-debian12` 2.11MB /
   `alpine:latest` 3.24.2 が 8.42MB / `ubuntu:24.04` 78.2MB）。
   **v2.0.1 の 1.17MB は Init も `libc.so` も入っていないイメージの値**なので、
@@ -62,16 +91,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `make show-version` に構成要素のバージョン表示を追加
 
 ### Fixed
+- **Init（OpenRC）が1つもサービスを起動できなかった。**
+  init スクリプトの shebang は `#!/usr/sbin/openrc-run`（OpenRC の prefix が
+  `/usr`）だが、rootfs には `/sbin/openrc-run` しか置いていなかったため、
+  37 本のうち 36 本が
+  `unable to exec '/etc/init.d/<name>': No such file or directory`
+  になっていた。`execve(2)` はインタプリタが見つからないとき `ENOENT` を
+  返すので、エラーは「スクリプトが無い」と読めるが実際に無いのは
+  インタプリタ。ファイルは存在し `rc-update show` も通るため気づけなかった。
+  `/usr/sbin` 側にシンボリックリンクを張って解決（サイズ増はほぼゼロ）
+- **OpenRC の `sysctl` サービスが毎回失敗していた。**
+  上流の init スクリプトは GNU procps を前提に `sysctl --system` を呼ぶが、
+  BusyBox の `sysctl` に `--system` は無く
+  `/sbin/sysctl: unrecognized option: system` で落ちていた。
+  BusyBox の `-p FILE...` に置き換え、**`/etc/sysctl.d/` の設定が初めて
+  実際に適用されるようになった**（`--privileged` 付きのコンテナで
+  `kernel.pid_max = 32768` / `vm.swappiness = 0` を実測）。
+  非特権コンテナでは `/proc/sys` が read-only なので、失敗ではなく
+  「ホストの担当」として抜ける。`bootmisc` の `mount --bind` も
+  `mount -o bind` に置き換えた
+- **arm64 の BusyBox だけ PIE でなく ASLR が効いていなかった**
+  （ELF Type=EXEC）。x86_64 は Alpine の gcc が default-PIE なので同じ
+  config から DYN (PIE) + BIND_NOW になっており、**片方だけ弱い状態に
+  気づけなかった**。musl は static-PIE 用の start file（`rcrt1.o`）を
+  持つので両立する。`-fPIE` と `-static-pie` を渡すようにし、
+  `-fno-stack-protector` も外した（`__stack_chk_fail` は musl の `libc.a`
+  にある）。`CONFIG_PIE` は BusyBox の Kconfig が `depends on !STATIC` に
+  しているため使えず、`-static-pie` を `EXTRA_LDFLAGS` に入れると
+  `ld -r` の部分リンクにも渡って落ちるので、最終リンクだけに効く
+  `CFLAGS_busybox` で渡している
+- **`/etc/os-release` が `0.1.0` と名乗っていた**（v1.0.0 / v2.0.1 を
+  公開したあとのイメージも同じ）。`/etc/motd`・`/.kimigayo-build-info`・
+  `Dockerfile.runtime` の `ARG VERSION` 既定値も `0.1.0` 直書きで、
+  `Makefile` は `--build-arg VERSION` を渡していなかった。
+  **タグ名だけ合っていて中身のメタデータがずれる**ので `docker images` では
+  気づけない。いま版は `git describe` から1箇所で決まり、
+  `verify_rootfs` が `/etc/os-release` と突合する
+- **カーネルモジュールが arch と版で絞られずコピーされていた** —
+  x86_64 / 6.6.11 のモジュールが arm64 の rootfs に入っていた
+  （`minimal-arm64` が `standard-arm64` より大きいという不自然な結果で発覚）
+- **`release.yml` が `latest-amd64` / `latest-arm64` を更新していなかった** —
+  2025-12-21 から公開済みで `docs/RELEASE_CHECKLIST.md` が案内しているのに
+  manifest ジョブが作っておらず、何度リリースしても古い内容のままだった
+- **`security.yml` の Trivy イメージスキャンが一度も走っていなかった** —
+  `if` が `schedule == '0 2 * * *' && ... && schedule == '0 2 * * 0'` という
+  自己矛盾した条件になっていた
+- **Markdown のリンク切れ 23 件**（`README.md` → 追跡していない `TODO.md` など）。
+  `.gitignore` されたファイルは手元に存在するため、ローカルではリンクを
+  辿れてしまい気づけない種類だった
 
-- **arm64 の動的リンクバイナリが1つも動かないことが判明**（未修正）。
+- **arm64 の動的リンクバイナリが1つも動かなかった。**
   `/lib/ld-musl-aarch64.so.1`（musl の `libc.so`）自身が `__letf2` を
   解決できず、OpenRC の実行ファイル4つすべてが
-  `Error relocating ...: __letf2: symbol not found` で起動しない。
+  `Error relocating ...: __letf2: symbol not found` で起動しなかった。
   `__letf2` は aarch64 の 128-bit `long double` を扱うコンパイラ
   ランタイム関数で、x86_64 は `long double` が 80-bit でハードウェア
   命令を使うため同じ問題が出ない。BusyBox は static-pie なので
-  影響を受けず smoke テストは通る。
-  経緯は `git log` のコミットメッセージを参照
+  影響を受けず smoke テストは通っていた。
+  `scripts/build-musl.sh` が LDFLAGS に共有の `-lgcc_s` を渡しており、
+  静的な `LIBCC` を打ち消していたのが原因。あわせて upstream が付けない
+  SONAME（`libc.musl-aarch64.so.1`）を設定し、`libc.so` が自己完結
+  していること・`NEEDED` を持たないことを `verify_rootfs` で検証する
 - **配布イメージに `/tmp` が無かった**（v0.1.0 以降ずっと）。
   `/run`・`/var/log`・`/var/tmp`・`/var/cache`・`/var/lib`・`/home`・`/opt`・
   `/srv`・`/mnt`・`/media`・`/usr/local/*` も同様で、`/var` には宛先の無い
@@ -83,7 +163,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/run` が無いと OpenRC が state を書けないため、Init を入れただけでは
   動かない。掃除は残したまま骨格を除外対象にし、`verify_rootfs` に
   必須ディレクトリとスティッキービットの検証を追加した。
-  **サイズへの影響はゼロ**（修正前後ともに standard 3.43MB / tarball 1.5MB）。
+  **サイズへの影響はゼロ**（修正前後ともに standard 3.43MB / tarball 1.5MB。
+  この数字は 2026-10-09 時点のもので、その後の重複ヘルパの symlink 化で
+  2.78MB になった）。
   つまりこの最適化は最初から何も削減していなかった
 - **配布イメージに OpenRC のバイナリが1つも入っていなかった**（v0.1.0 以降ずっと）。
   `scripts/build-rootfs.sh` が OpenRC の `usr/sbin` / `usr/lib` を
@@ -188,6 +270,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config.mk` の死んでいた `ISN_VERSION`
 - Git 管理下にあった `.hypothesis/` のキャッシュ59ファイルと
   `benchmark-optimized.log`（`.gitignore` に追加）
+- **CI からカーネルビルドを完全に外した。** 成果物は rootfs だけを詰めた
+  Docker イメージで**カーネルはイメージに入らない**（コンテナはホストの
+  カーネルで動く）ため、CI が毎回ビルドしてもイメージの中身は1バイトも
+  変わらないのに 1 run あたり数十分かかっていた。想定する使い方も
+  VPS 上の Docker コンテナなので、組み込み・ベアメタル起動は対象外とした。
+  `make kernel` と `manual-build.yml` の `build_kernel=true` は残してある
+- **`.kiro/specs/kimigayo-os-core/`**（`requirements.md` / `design.md` /
+  `tasks.md`）。18 箇所の参照を `SPECIFICATION.md` と
+  `docs/developer/ARCHITECTURE.md` に向け直した
+- **`src/kernel/patches/0001-security-hardening.patch`** — 中身がコメント
+  だけのプレースホルダで、毎ビルド「適用できないパッチ」として警告を
+  出すだけだった。0 件のときに再生成する処理も外した（消しても次の
+  ビルドで復活していた）
+- **OpenRC の重複ヘルパ 39 ファイル**をシンボリックリンクに置き換えた
+  （実測 816KB 削減）。上流の meson が `argv[0]` で分岐する1つの
+  プログラムを名前ごとの実コピーで install するため。
+  判定は名前のリストではなく**内容（md5）**で行うので、OpenRC を
+  上げてヘルパが増えても追従する
 
 ---
 

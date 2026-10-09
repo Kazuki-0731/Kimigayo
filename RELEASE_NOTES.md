@@ -1,5 +1,118 @@
 # Kimigayo OS Release Notes
 
+## バージョン 3.0.0 "Himawari" (向日葵) - 2026-10-10
+
+### 🌻 このバージョンで初めて Init が動きます
+
+**v0.1.0 から v2.0.1 までの公開イメージは、Init が1つもサービスを
+起動できませんでした。** OpenRC のバイナリも musl の `libc.so` も `/tmp` も
+入っておらず、BusyBox が static-pie で動くため `/bin/sh` だけは動いて
+smoke テストに通っていた、という状態でした。
+
+v3.0.0 は **6 バリアント（3 variant × 2 arch）すべてを実際に起動して
+27 項目の検査**に通しています。
+
+```console
+$ docker run --rm ishinokazuki/kimigayo-os:3.0.0 /bin/sh -c '/sbin/openrc boot'
+ * Caching service dependencies ... [ ok ]
+mtab     | * Updating /etc/mtab ... [ ok ]
+loopback | * Bringing up network interface lo ... [ ok ]
+sysctl   | * Configuring kernel parameters ... [ ok ]
+bootmisc | * Creating user login records ... [ ok ]
+```
+
+### 📦 サイズ（2026-10-10 実測、macOS / Apple Silicon ホスト）
+
+| バリアント | x86_64 | arm64 | BusyBox アプレット |
+| --- | --- | --- | --- |
+| Minimal | **2.65MB** | 3.02MB | 370 |
+| Standard | **2.78MB** | 3.16MB | 403 |
+| Extended | **2.81MB** | 3.20MB | 413 |
+
+同じホスト・同じ platform で測った比較対象:
+
+| イメージ | サイズ | シェル | Init |
+| --- | --- | --- | --- |
+| `gcr.io/distroless/static-debian12` | 2.11MB | ❌ | ❌ |
+| **Kimigayo Standard** | **2.78MB** | ✅ BusyBox | ✅ OpenRC |
+| `alpine:latest` | 8.42MB | ✅ | ❌ |
+| `ubuntu:24.04` | 78.2MB | ✅ | ❌ |
+
+**シェルと Init を備えて 2.78MB。** distroless に 0.67MB 足すだけで、
+`sh` と 403 個のコマンドとサービス管理が付きます。
+
+### 🔒 セキュリティ
+
+- **arm64 の BusyBox が PIE になりました（ASLR が有効化）。**
+  これまで arm64 だけ ELF Type=EXEC で ASLR が効いていませんでした。
+  x86_64 は Alpine の gcc が default-PIE なので同じ設定から PIE に
+  なっており、**片方だけ弱い状態に気づけていませんでした**
+- arm64 の BusyBox でスタックプロテクタ（`-fstack-protector-strong`）を
+  有効化しました
+- 全バリアントで BIND_NOW（完全な RELRO）を確認しています
+- `/etc/sysctl.d/` のカーネルパラメータが**初めて実際に適用される**
+  ようになりました（`--privileged` 付きのコンテナ、または
+  `docker run --sysctl` で。非特権コンテナでは `/proc/sys` が
+  read-only なのでホスト側の担当になります）
+
+### ⬆️ 構成要素の更新（約9か月ぶん）
+
+| | 旧 | 新 |
+| --- | --- | --- |
+| Linux カーネル | 6.6.11 | **6.18.55**（LTS、EOL 2028-12） |
+| musl libc | 1.2.4 | **1.2.6** |
+| BusyBox | 1.36.1 | **1.38.0** |
+| OpenRC | 0.52.1 | **0.63.2** |
+| ビルド環境 Alpine | 3.23 | **3.24**（LLVM 22） |
+
+**カーネルは Docker イメージに入りません**（コンテナはホストの
+カーネルで動きます）。`make kernel` でビルドできます。
+
+### 🏷️ コードネームの運用開始
+
+v3.0.0 から日本の通年の花をメジャーバージョンに割り当てます。
+体系は [SPECIFICATION.md](SPECIFICATION.md)「10.3 リリース名」。
+
+```console
+$ docker run --rm ishinokazuki/kimigayo-os:3.0.0 /bin/sh -c 'cat /etc/os-release'
+NAME="Kimigayo OS"
+VERSION="3.0.0 (Himawari)"
+PRETTY_NAME="Kimigayo OS 3.0.0 (Himawari)"
+VERSION_ID="3.0.0"
+VERSION_CODENAME=himawari
+```
+
+v1.0 と v2.0 はコードネームの運用開始前に公開済みのため名前を持ちません。
+
+### ⚠️ 既知の制限
+
+- **起動時間とメモリは未測定。** 既存の計測スクリプトは
+  `docker run -d <image> sleep 5` の終了までを測っており、起動時間に
+  なっていませんでした。過去に公開していた 439ms / 0.2MB は撤回します
+- **非特権コンテナでは一部のサービスが権限エラーを出します**
+  （`ip: RTNETLINK answers: Operation not permitted`、
+  `mount: permission denied`、`dmesg: klogctl: Operation not permitted`）。
+  これは正常な挙動で、`--privileged` または必要な capability を
+  付けると解消します
+- **Trivy のイメージスキャンは Kimigayo に対して何も検査できません。**
+  `scratch` 上の手組み rootfs でパッケージデータベースを持たないため、
+  Trivy は対象を1つも識別できません（「脆弱性 0 件」ではなく
+  「スキャンしていない」）。脆弱性の追跡は構成要素のバージョンを
+  手で突合しています
+- **組み込み・ベアメタル起動は対象外です。** 想定する使い方は
+  VPS 上の Docker コンテナです
+
+### 💥 破壊的変更
+
+- **`latest` 系タグの中身が変わります。** 2026-10-09 の事故で
+  `latest` を含む 9 タグが v0.1.1 の内容（Init なし）に差し替わって
+  いました。v3.0.0 のリリースで正しい内容に戻ります
+- **`/etc/os-release` の `VERSION_ID` が `0.1.0` から `3.0.0` に変わります。**
+  これまで v1.0.0 / v2.0.1 のイメージも `0.1.0` と名乗っていました。
+  この値でバージョンを判定している処理があれば影響します
+
+---
+
 ## バージョン 0.1.0 - Phase 1完了 (2025-12-15)
 
 ### 🎉 初回リリース
