@@ -356,6 +356,28 @@ if [ -n "$osr_code" ]; then
     fi
 fi
 
+# **イメージの LABEL が中身と一致しているか。**
+#
+# `Dockerfile.runtime` の LABEL は `--build-arg VERSION` / `IMAGE_VARIANT`
+# から作る。**渡し忘れても docker build は成功する**ので、タグ名だけ
+# 合っていて中身のメタデータがずれる。2026-10-10 まで Makefile が
+# VERSION を渡しておらず、`LABEL version` は既定値のままだった。
+#
+# 突合相手は rootfs の /etc/os-release（= 実際に配る中身）。
+label_ver="$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "version"}}' 2>/dev/null || true)"
+label_var="$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "io.kimigayo.variant"}}' 2>/dev/null || true)"
+if [ -z "$label_ver" ]; then
+    fail "image has no 'version' label"
+elif [ "$label_ver" = "dev" ] && [ -n "${EXPECT_VERSION:-}" ]; then
+    fail "LABEL version=dev (--build-arg VERSION を渡していない)"
+elif [ -n "$osr_id" ] && [ "$label_ver" != "dev" ] && [ "$label_ver" != "$osr_id" ]; then
+    fail "LABEL version=${label_ver} but /etc/os-release says ${osr_id}"
+elif [ "$label_var" != "$VARIANT" ]; then
+    fail "LABEL io.kimigayo.variant=${label_var:-（空）} but this is ${VARIANT}"
+else
+    pass "image labels match the contents (version=${label_ver} variant=${label_var})"
+fi
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------
