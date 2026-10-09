@@ -14,8 +14,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **コンテナ向けの軽量 OS**。パッケージマネージャーを意図的に持たない不変インフラ。
 
 - **成果物は Docker イメージ**（`ishinokazuki/kimigayo-os`）。rootfs だけを詰めた
-  イメージで、**カーネルはイメージに入らない**（コンテナはホストのカーネルで動く）。
-  カーネルをビルドするのはベアメタル／QEMU 検証のため
+  イメージで、**カーネルはイメージに入らない**（コンテナはホストのカーネルで動く）
+- **想定する使い方は VPS 上の Docker コンテナ。** 組み込みやベアメタル起動は
+  対象外（2026-10-10 に決定）。カーネルのビルドは `make kernel` で残して
+  あるが、**CI では一切ビルドしない**（成果物に含まれないものを毎 run
+  数十分かけて作っていたため外した）。ベアメタル／QEMU を試したいときだけ
+  手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
 - **実測値**: Standard（x86_64）**3.43MB**（2026-10-09）。
   起動時間とメモリは**計測方法に問題があり未測定**
@@ -445,9 +449,11 @@ make benchmark             # 全ベンチマーク
   | standard | 27:05 | 47:30 |
   | extended | 14:59 | 28:50 |
 
-  **ジョブの `timeout-minutes` は未設定なので既定の 360 分。**
-  最長 47 分なので余裕がある。**arm64 を開発機のネイティブビルドに
-  移す必要はない**（`platform` 固定を外す話も不要）
+  **この数字はカーネル込み。** いまは CI でカーネルを作らないので
+  これより大幅に短い（→ 下の「カーネルは CI で作らない」節）。
+  `build-workflow.yml` の `timeout-minutes` は 120 にしてある。
+  **arm64 を開発機のネイティブビルドに移す必要はない**
+  （`platform` 固定を外す話も不要）
 - **開発機でやるのは「段を絞ったビルド」まで。** 例:
   `make ARCH=x86_64 arch/x86/realmode/` のようにカーネルの一部だけ、
   あるいは `scripts/build-openrc.sh` 単体。
@@ -459,6 +465,30 @@ make benchmark             # 全ベンチマーク
   **「イメージが動いた」はカーネルを検証したことにならない**
 - ダウンロードキャッシュは named volume `kimigayo-downloads` に永続化される。
   バージョンを上げたら新しい tarball を取り直すだけで、古いものは残る
+
+### カーネルは CI で作らない
+
+**`ci.yml` はカーネルをビルドしない。** 2026-10-10 に決めた。
+
+- **理由は、成果物に入らないものを検証していたから。** Kimigayo の成果物は
+  rootfs だけを詰めた Docker イメージで、コンテナはホストのカーネルで動く。
+  CI がカーネルを作っても、できたイメージの中身は1バイトも変わらない。
+  それでいて 1 run あたり数十分増えていた
+- **想定する使い方は VPS 上の Docker コンテナ。** 組み込み・ベアメタル起動は
+  対象外なので、「カーネルが起動するか」を毎 push で見る必要がない
+- **`make kernel` は残してある。** ベアメタルや QEMU を試したくなったときに
+  ゼロから作り直さずに済むようにするため。消さない
+  （→「削除指示を受けたら」節）
+
+| やりたいこと | どうするか |
+| --- | --- |
+| 手元でカーネルを作る | `make kernel TARGET_ARCH=x86_64`（数十分〜数時間） |
+| CI でカーネルを作る | Actions から `manual-build.yml` を `build_kernel=true` で実行 |
+| カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`ci.yml` は通っても検証にならない** |
+
+**カーネル関連の変更をしたときは、`ci.yml` が緑でも「カーネルは見ていない」。**
+`versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったら、
+手で `manual-build.yml` を回すか `make kernel` を通す。
 
 ### パッチはなぜ存在するか
 
@@ -1037,13 +1067,13 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `ci.yml` | `main`/`develop` への push、`main` への PR | ShellCheck → variant × arch の matrix でビルドとテスト |
+| `ci.yml` | `main`/`develop` への push、`main` への PR | ShellCheck → リンク検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
 | `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・GitHub Release 作成・SARIF 連携 |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作る |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
-| `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
+| `manual-build.yml` | 手動のみ | variant / arch を選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
 詳細は [docs/developer/CICD_GUIDE.md](docs/developer/CICD_GUIDE.md)、
 Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/DOCKERHUB_SETUP.md)。

@@ -18,59 +18,6 @@ permissions:
   contents: read
 
 jobs:
-  # カーネルを毎回ビルドするかをここで決める。
-  # Docker イメージにカーネルは入らない（コンテナはホストのカーネルで
-  # 動く）ので、カーネルを触っていない push でフルビルドする価値は低い。
-  # 1 run あたり数十分の差になる。
-  decide:
-    name: Decide scope
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      build_kernel: ${{ steps.changed.outputs.kernel }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Check whether kernel-related files changed
-        id: changed
-        run: |
-          set -euo pipefail
-
-          # カーネルに関係するパス。ここを触ったときだけフルビルドする。
-          patterns='^(src/kernel/|scripts/build-kernel\.sh|scripts/download-kernel\.sh|scripts/apply-kernel-patches\.sh|versions\.mk|config\.mk|Dockerfile$)'
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-            head="${{ github.event.pull_request.head.sha }}"
-          else
-            base="${{ github.event.before }}"
-            head="${{ github.sha }}"
-          fi
-
-          # 新しいブランチの初回 push や force push では before が
-          # 全ゼロになる。比較できないので安全側（フルビルド）に倒す。
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] ||
-             ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            echo "比較元が取れないのでカーネルもビルドする"
-            echo "kernel=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          files="$(git diff --name-only "$base" "$head")"
-          echo "変更ファイル:"
-          echo "$files" | sed 's/^/  /'
-
-          if echo "$files" | grep -qE "$patterns"; then
-            echo "::notice::カーネル関連の変更あり -> カーネルもビルドする"
-            echo "kernel=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::カーネル関連の変更なし -> カーネルは飛ばす"
-            echo "kernel=false" >> "$GITHUB_OUTPUT"
-          fi
-
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-latest
@@ -117,9 +64,21 @@ jobs:
           docker compose run --rm -w /build/kimigayo kimigayo-build \
             pytest tests/unit tests/property -q
 
+  # **カーネルは CI でビルドしない。**
+  #
+  # Kimigayo の成果物は rootfs だけを詰めた Docker イメージで、
+  # **カーネルはイメージに入らない**（コンテナはホストのカーネルで動く）。
+  # 想定する使い方も VPS 上の Docker コンテナなので、CI が毎回
+  # カーネルを作っても検証しているものが成果物に含まれない。
+  # 一方で所要時間は 1 run あたり数十分増える（実測で arm64 standard が
+  # 47 分 → カーネル抜きで大幅短縮）。
+  #
+  # カーネルをビルドしたいときは次のどちらかで行う:
+  #   - ローカル: `make kernel TARGET_ARCH=<arch>`
+  #   - CI: Actions から manual-build.yml を build_kernel=true で実行
   build-and-verify:
     name: Build and Verify
-    needs: [shellcheck, decide]
+    needs: [shellcheck]
     strategy:
       # 1つ落ちると他の5つがキャンセルされ、何が本当に壊れているのか
       # 分からなくなる（2026-10-09 の run 37869425207 では
@@ -133,7 +92,7 @@ jobs:
     with:
       variant: ${{ matrix.variant }}
       arch: ${{ matrix.arch }}
-      build_kernel: ${{ needs.decide.outputs.build_kernel == 'true' }}
+      build_kernel: false
       upload_artifacts: false
 
   # Trivy のファイルシステムスキャンはビルド結果に依存しない。
