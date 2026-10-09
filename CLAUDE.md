@@ -3,8 +3,8 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 **このファイルが作業ルールの正本。** 変更したらここを更新し、他のファイルに
-重複させない。Claude Code 固有の設定は `.claude/`（`.gitignore` 済み、
-機密を含むため共有しない）。
+重複させない。Claude Code 固有の設定は `.claude/` に置き、**リポジトリで
+共有する**（→「Claude Code の設定を共有する」節）。
 
 ---
 
@@ -629,8 +629,106 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 - 脆弱性の報告・運用は [docs/security/](docs/security/) 配下
   （`SECURITY_POLICY.md`・`VULNERABILITY_REPORTING.md`・`HARDENING_GUIDE.md`）
 
-**機密を書かない。** `.env`（Docker Hub トークン）・`.claude/` は `.gitignore` 済み。
+**機密を書かない。** `.env`（Docker Hub トークン）は `.gitignore` 済み。
 `CLAUDE.md`・`docs/`・コミットメッセージに API キー・トークン・個人のパスを書かない。
+**`.claude/` は共有する**ので、ここにも機密を置かない
+（→「Claude Code の設定を共有する」節）。
+
+---
+
+## Claude Code の設定を共有する
+
+**`.claude/` 配下の設定はリポジトリに入れる。** Skills・Subagent・
+カスタムコマンド・Hook は**このプロジェクトの作業ルールそのもの**であり、
+技術的な内容しか含まないので共有して困らない。個人の環境に置くと、
+次に同じ作業をする人（や次のセッション）に届かない。
+
+**ここに機密を置かない。** Docker Hub トークンは `.env`（`.gitignore` 済み）。
+個人のパスも書かない。
+
+| 場所 | 中身 | Git |
+| --- | --- | --- |
+| `.claude/settings.json` | Hook の登録、`env` | 追跡 |
+| `.claude/settings.local.json` | 権限の allow リスト | 追跡（`~/.gitignore_global` を `!` で打ち消している） |
+| `.claude/hooks/*.sh` | 機械的に止めるもの | 追跡。`make shellcheck-scan` の対象 |
+| `.claude/agents/*.md` | Subagent の定義 | 追跡 |
+| `.claude/skills/*/SKILL.md` | 手順（判断を伴うもの） | 追跡 |
+| `.claude/commands/*.md` | スラッシュコマンド | 追跡 |
+| `.claude/*.md`（直下） | 個人のメモ | **無視** |
+
+### Hook — 機械的に止めるもの
+
+**人の判断が絡まないミスだけを止める**（→「判断が絡まないミスは文章に
+しない」節）。判断や例外が多いものを Hook にすると、毎回の警告がノイズに
+なり、ノイズになった警告は読まれなくなる。
+
+| Hook | いつ | 何をするか |
+| --- | --- | --- |
+| `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add をブロック |
+| `after-edit.sh` | PostToolUse(Edit\|Write) | `.sh` の構文エラーをブロック。`versions.mk` を触ったら連動先を出す。`-Wno-error` や `\|\| true` を**新しく足したら**指摘する |
+| `check-untracked.sh` | Stop | 未追跡の新規ファイルが残っていたら1度だけ止める |
+
+**通常の `git push origin main` は止めていない。** 会話での承認ルール
+（→「Git の運用ルール」節）に任せる。ここで止めると承認後も進めなくなる。
+止めているのは**外に出て取り消せないもの**（タグ・Docker Hub）だけ。
+
+> `settings.local.json` の allow リストには `Bash(git push:*)` が入っている。
+> 承認ルールとの整合は `guard-bash.sh` が取っている（Hook は権限の
+> allow より先に走り、危険な部分集合だけを止める）。
+
+### Subagent — 役割とツールを絞って任せる
+
+| Subagent | 使いどき |
+| --- | --- |
+| `rootfs-verifier` | rootfs / イメージを作った直後、リリース前。**「起動した」は検証ではない** |
+| `version-auditor` | 版上げの前後、リリース前。`versions.mk` の突合・チェックサム・上流の新版・パッチのスキップ |
+| `docs-reconciler` | 計測のあと、版上げのあと。数値とバージョンの文書間の食い違い |
+
+いずれも**調査専門で変更しない。** 直すかどうかはこちらが判断する。
+
+### Skills — 判断を伴う手順
+
+| Skill | 使いどき |
+| --- | --- |
+| `version-bump` | 構成要素のバージョンを上げる（上流調査 → チェックサム → パッチ → 検証 → 反映） |
+| `measure-and-land` | 計測して数値を着地させる |
+| `release` | リリースの準備と承認の取り方 |
+
+### カスタムコマンド
+
+| コマンド | 何をするか |
+| --- | --- |
+| `/status` | 現在地（宣言版 / 実ビルド版 / イメージ / 未 push / 未追跡 / パッチのスキップ） |
+| `/gate` | 外に出す前の品質ゲート（pytest / shellcheck / YAML・JSON / 作業ツリー） |
+| `/verify-image` | 成果物の検査（`rootfs-verifier` に投げる） |
+
+### Agent Teams
+
+**プロジェクト単位の設定ファイルは存在しない。** `.claude/teams/teams.json`
+のようなファイルは設定として認識されず、ただのファイルとして扱われる。
+再利用する役割は**Subagent の定義で表現する**（上記 3 つはそのまま
+teammate として使える）。
+
+`.claude/settings.json` の `env` で有効化してある:
+
+```json
+{ "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }
+```
+
+**実験的機能で、トークン消費が大きい。** teammate は1人ずつ独立した
+セッションなので、消費は人数に比例する。**有効なあいだは、名前を付けた
+Subagent が teammate として起動する**ため、頼んでいなくてもチームが
+できることがある。止めるなら同じ場所を `"0"` にする。
+
+向いているのは**並列に探索して突き合わせる仕事**。このリポジトリなら:
+
+- 版上げの影響調査（カーネル / musl / BusyBox / OpenRC を別々に）
+- 成果物の検査を arch × バリアントで分担
+- 原因の競合仮説を並べて互いに反証させる（arm64 の OpenRC が
+  ビルドできなかったときは原因が4つ重なっていた）
+
+**逐次の作業・同じファイルを触る作業には使わない。** 単一セッションか
+Subagent の方が速くて安い。3〜5人から始める。
 
 ---
 
