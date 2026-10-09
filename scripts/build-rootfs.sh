@@ -440,6 +440,33 @@ optimize_rootfs() {
     log ""
 }
 
+# シンボリックリンクを張り替えてコピーする
+#
+# BusyBox のアプレットは先に /bin/busybox への相対シンボリックリンクとして
+# 置かれる。そこへ同名の実バイナリを cp すると、cp はリンクを張り替えずに
+# **リンク先へ書き込む**ため /bin/busybox 本体が壊れる。
+# 実測（2026-10-09）: OpenRC の usr/sbin をコピーしただけで
+# /sbin/start-stop-daemon -> ../bin/busybox 経由で 1.1MB の busybox が
+# 57.8KB の start-stop-daemon に化け、全アプレットが死んだ。
+# GNU の cp --remove-destination は BusyBox cp に無いので使わない。
+copy_over() {
+    local src_dir="$1" dest_dir="$2"
+    [ -d "$src_dir" ] || return 0
+    mkdir -p "$dest_dir"
+
+    local src name
+    for src in "$src_dir"/*; do
+        [ -e "$src" ] || [ -L "$src" ] || continue
+        name="$(basename "$src")"
+        if [ -d "$src" ] && [ ! -L "$src" ]; then
+            copy_over "$src" "$dest_dir/$name"
+        else
+            rm -f "$dest_dir/$name"
+            cp -a "$src" "$dest_dir/$name"
+        fi
+    done
+}
+
 # Copy built components to rootfs
 copy_components() {
     log "Copying built components to rootfs..."
@@ -454,12 +481,25 @@ copy_components() {
             log_info "  ✓ musl libraries copied"
         fi
 
-        # Copy headers (optional, for development)
-        if [ -d "$MUSL_INSTALL_DIR/include" ] && [ "$IMAGE_TYPE" != "minimal" ]; then
-            mkdir -p "$ROOTFS_DIR/usr/include"
-            cp -a "$MUSL_INSTALL_DIR/include"/* "$ROOTFS_DIR/usr/include/" 2>/dev/null || true
-            log_info "  ✓ musl headers copied"
+        # 共有ライブラリ本体は usr/lib に入る。
+        # musl 自身が作る /lib/ld-musl-<arch>.so.1 は /usr/lib/libc.so を指す
+        # 絶対シンボリックリンクなので、これを入れないとリンク切れになり、
+        # 動的リンクされたバイナリが一切起動しない（README の
+        # 「自分のアプリを COPY する」使い方と OpenRC が壊れる）。
+        # BusyBox は static-pie なので、入れ忘れても smoke テストは通ってしまう。
+        if [ -f "$MUSL_INSTALL_DIR/usr/lib/libc.so" ]; then
+            mkdir -p "$ROOTFS_DIR/usr/lib"
+            cp -a "$MUSL_INSTALL_DIR/usr/lib/libc.so" "$ROOTFS_DIR/usr/lib/"
+            log_info "  ✓ musl libc.so copied"
+        else
+            log_warn "  musl libc.so not found: $MUSL_INSTALL_DIR/usr/lib/libc.so"
         fi
+
+        # 静的ライブラリ（libc.a 2.5MB）・CRT オブジェクト・musl-gcc・
+        # ヘッダ（usr/include）はビルド時にだけ必要なので入れない。
+        # ここには以前 "$MUSL_INSTALL_DIR/include" を見るヘッダのコピーが
+        # あったが、musl は usr/include に入れるため条件が常に偽で、
+        # v0.1.0 以降どの版でもヘッダは入っていなかった。
     else
         log_warn "musl installation directory not found: $MUSL_INSTALL_DIR"
     fi
@@ -513,27 +553,35 @@ copy_components() {
         log_info "Copying OpenRC init system..."
 
         # Copy binaries
-        if [ -d "$OPENRC_INSTALL_DIR/bin" ]; then
-            cp -a "$OPENRC_INSTALL_DIR/bin"/* "$ROOTFS_DIR/bin/" 2>/dev/null || true
-        fi
-        if [ -d "$OPENRC_INSTALL_DIR/sbin" ]; then
-            cp -a "$OPENRC_INSTALL_DIR/sbin"/* "$ROOTFS_DIR/sbin/" 2>/dev/null || true
-        fi
+        # BusyBox のアプレットと同名のものがあるため copy_over を使う
+        # （start-stop-daemon が衝突する。OpenRC の実装を優先する）
+        copy_over "$OPENRC_INSTALL_DIR/bin" "$ROOTFS_DIR/bin"
+        copy_over "$OPENRC_INSTALL_DIR/sbin" "$ROOTFS_DIR/sbin"
+
+        # 実行ファイル本体（openrc / openrc-run / rc-update / start-stop-daemon 等
+        # 9 個）は usr/sbin に入る。prefix が /usr なので sbin/ には何も無く、
+        # ここを漏らしていたため OpenRC のバイナリが 1 つもイメージに入らないまま
+        # 「✓ OpenRC copied」と報告していた。
+        # create_config_files が作る inittab と configs/openrc/ は /sbin/openrc を
+        # 参照しているので、Alpine と同じく /sbin に置く。
+        copy_over "$OPENRC_INSTALL_DIR/usr/sbin" "$ROOTFS_DIR/sbin"
 
         # Copy libraries
-        if [ -d "$OPENRC_INSTALL_DIR/lib" ]; then
-            cp -a "$OPENRC_INSTALL_DIR/lib"/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
+        copy_over "$OPENRC_INSTALL_DIR/lib" "$ROOTFS_DIR/lib"
+
+        # 共有ライブラリ（librc.so.1 / libeinfo.so.1）も usr/lib に入る。
+        # musl の既定探索パスは /lib:/usr/local/lib:/usr/lib なので /lib で解決する。
+        # pkgconfig と usr/include はビルド時専用なので入れない。
+        if [ -d "$OPENRC_INSTALL_DIR/usr/lib" ]; then
+            find "$OPENRC_INSTALL_DIR/usr/lib" -maxdepth 1 -name 'lib*.so*' \
+                -exec cp -a {} "$ROOTFS_DIR/lib/" \; 2>/dev/null || true
         fi
 
         # Copy init scripts and configuration
-        if [ -d "$OPENRC_INSTALL_DIR/etc" ]; then
-            cp -a "$OPENRC_INSTALL_DIR/etc"/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
-        fi
+        copy_over "$OPENRC_INSTALL_DIR/etc" "$ROOTFS_DIR/etc"
 
         # Copy shared data
-        if [ -d "$OPENRC_INSTALL_DIR/usr/share" ]; then
-            cp -a "$OPENRC_INSTALL_DIR/usr/share"/* "$ROOTFS_DIR/usr/share/" 2>/dev/null || true
-        fi
+        copy_over "$OPENRC_INSTALL_DIR/usr/share" "$ROOTFS_DIR/usr/share"
 
         log_info "  ✓ OpenRC copied"
     else
@@ -775,6 +823,90 @@ EOF
     log "✅ Configuration files created successfully"
 }
 
+# 入っているべきものが本当に入ったかを検証する
+#
+# 文章のルールではなく検証にしているのは、ここが「判定が常に偽」
+# 「上流の prefix が変わった」といった突合漏れで静かに壊れる箇所だから。
+# 実際に musl の libc.so と OpenRC のバイナリ 9 個が入らないまま
+# 「✅ Root filesystem build completed!」と報告され続けていた。
+# BusyBox が static-pie なので smoke テストでは露見しない。
+verify_rootfs() {
+    log "Verifying rootfs contents..."
+
+    local errors=0
+    local musl_arch="$ARCH"
+    [ "$ARCH" = "arm64" ] && musl_arch="aarch64"
+
+    # 動的リンカのリンク先が rootfs の中で解決できること。
+    # [ -e ] は絶対シンボリックリンクをホスト側で解決してしまい、
+    # Linux ホストでは glibc の /usr/lib が存在するため誤って通る。
+    # そのため readlink して rootfs 基準で確かめる。
+    local loader="$ROOTFS_DIR/lib/ld-musl-${musl_arch}.so.1"
+    if [ -L "$loader" ]; then
+        local target
+        target="$(readlink "$loader")"
+        case "$target" in
+            /*) target="${ROOTFS_DIR}${target}" ;;
+            *)  target="$(dirname "$loader")/${target}" ;;
+        esac
+        if [ ! -f "$target" ]; then
+            log_error "  ✗ /lib/ld-musl-${musl_arch}.so.1 is a dangling symlink"
+            log_error "      -> $(readlink "$loader") (not present in rootfs)"
+            errors=$((errors + 1))
+        else
+            log_info "  ✓ dynamic loader resolves inside rootfs"
+        fi
+    elif [ -f "$loader" ]; then
+        log_info "  ✓ dynamic loader present"
+    else
+        log_error "  ✗ /lib/ld-musl-${musl_arch}.so.1 missing"
+        errors=$((errors + 1))
+    fi
+
+    # BusyBox 本体。存在だけでなくサイズも見る。
+    # /bin/busybox は全アプレットのシンボリックリンク先なので、同名の実
+    # バイナリを cp されるとリンク越しに中身を上書きされ、存在チェックは
+    # 通るのに全コマンドが死ぬ（→ copy_over の説明）。
+    if [ ! -f "$ROOTFS_DIR/bin/busybox" ]; then
+        log_error "  ✗ /bin/busybox missing"
+        errors=$((errors + 1))
+    else
+        local bb_rootfs bb_src
+        bb_rootfs="$(wc -c < "$ROOTFS_DIR/bin/busybox" | tr -d ' ')"
+        bb_src=0
+        if [ -f "$BUSYBOX_INSTALL_DIR/bin/busybox" ]; then
+            bb_src="$(wc -c < "$BUSYBOX_INSTALL_DIR/bin/busybox" | tr -d ' ')"
+        fi
+        if [ "$bb_src" -gt 0 ] && [ "$bb_rootfs" -lt $((bb_src * 8 / 10)) ]; then
+            log_error "  ✗ /bin/busybox looks overwritten: ${bb_rootfs} bytes"
+            log_error "      expected around ${bb_src} bytes (${BUSYBOX_INSTALL_DIR}/bin/busybox)"
+            errors=$((errors + 1))
+        else
+            log_info "  ✓ /bin/busybox present (${bb_rootfs} bytes)"
+        fi
+    fi
+
+    # OpenRC。create_config_files が作る inittab が参照するパスで確認する
+    local rc_missing=""
+    local f
+    for f in openrc openrc-run rc-update start-stop-daemon; do
+        [ -f "$ROOTFS_DIR/sbin/$f" ] || rc_missing="${rc_missing} ${f}"
+    done
+    if [ -n "$rc_missing" ]; then
+        log_error "  ✗ OpenRC binaries missing from /sbin:${rc_missing}"
+        errors=$((errors + 1))
+    else
+        log_info "  ✓ OpenRC binaries present in /sbin"
+    fi
+
+    if [ "$errors" -gt 0 ]; then
+        log_error "rootfs verification failed (${errors} problem(s))"
+        return 1
+    fi
+
+    log "✅ rootfs verification passed"
+}
+
 # Generate rootfs metadata
 generate_metadata() {
     log "Generating rootfs metadata..."
@@ -867,6 +999,24 @@ main() {
         log_info "✓ BusyBox found at: ${BUSYBOX_INSTALL_DIR}/bin/busybox"
     fi
 
+    # Check OpenRC
+    #
+    # build-rootfs.sh は musl と BusyBox しか面倒を見ていなかったため、
+    # build-system/Makefile の init ターゲットを通らない経路
+    # （make build-rootfs / make ci-build-local / rootfs 単体実行）では
+    # OpenRC がビルドされず、copy_components が log_warn を出すだけで
+    # init の無いイメージが出来上がっていた。
+    local OPENRC_CHECK_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
+    if ! kimigayo_is_built "$OPENRC_CHECK_DIR" "$OPENRC_VERSION"; then
+        log_warn "OpenRC ${OPENRC_VERSION} not built yet, building..."
+        bash "${SCRIPT_DIR}/download-openrc.sh" || { log_error "Failed to download OpenRC"; exit 1; }
+        ARCH=$ARCH MUSL_INSTALL_DIR="${MUSL_INSTALL_DIR}" \
+            bash "${SCRIPT_DIR}/build-openrc.sh" || { log_error "Failed to build OpenRC"; exit 1; }
+    else
+        log_info "✓ OpenRC ${OPENRC_VERSION} found at: ${OPENRC_CHECK_DIR}"
+    fi
+    export OPENRC_INSTALL_DIR="${OPENRC_CHECK_DIR}"
+
     log "✅ All required components ready"
     log ""
 
@@ -877,6 +1027,7 @@ main() {
     create_config_files
     set_permissions
     optimize_rootfs
+    verify_rootfs || exit 1
     generate_metadata
     calculate_size
 
