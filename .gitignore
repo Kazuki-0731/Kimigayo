@@ -17,11 +17,32 @@
 .claude/shell-snapshots/
 .claude/todos/
 
-# 作業メモはリポジトリに入れない。
-# git log が「メモを更新した」コミットで埋まるのを避けるため。
-# 経緯の正本は git log とコミットメッセージ、仕様の正本は .kiro/specs/。
-/TODO.md
-/NEXT.md
+# メモ・下書きはリポジトリに入れない（機密扱い）。
+#
+# 「いま何が書かれているか」では判断できない。**次に何が書かれるか
+# 分からない**のが理由で、判断すべきはファイルの性格。メモの置き場には
+# あとで資格情報・第三者の情報が書き込まれ得る。このリポジトリは
+# 公開されているので、入ってから気づくのでは遅い。
+#
+# ここは「入れ忘れ」を防げないので、強制は
+# .claude/hooks/guard-memo-files.sh（判定は memo-paths.py）が行う。
+# 新しい名前のメモを作ってもそちらが止める。
+# パターンを増やすときは両方を更新する。
+# → CLAUDE.md「メモは機密扱いにする」節
+TODO.md
+NEXT.md
+MEMO.md
+NOTES.md
+SCRATCH.md
+WIP.md
+DRAFT.md
+IDEAS.md
+*-memo.md
+*_memo.md
+*-scratch.md
+*.local.json
+*.local.yml
+*.local.yaml
 
 # Build artifacts
 /build/

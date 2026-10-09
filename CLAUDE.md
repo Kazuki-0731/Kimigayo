@@ -645,6 +645,59 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 
 ---
 
+## メモは機密扱いにする
+
+**メモ・下書きのファイルはリポジトリに入れない。**
+判断基準は**「いま何が書かれているか」ではなく「次に何が書かれるか
+分からないこと」**。メモの置き場にはあとで資格情報・第三者の情報・
+社外に出せない情報が書き込まれ得る。**このリポジトリは公開されている**ので、
+入ってから気づくのでは遅い。
+
+対象（名前に関わらず、性格がメモなら対象）:
+
+| 置き場 | 例 |
+| --- | --- |
+| `TODO.md` / `NEXT.md` | 経緯・現在地・判断待ち |
+| `.claude/` 直下の `*.md` | `question.md`・`error.md` など会話の下書き |
+| `MEMO*` / `NOTES*` / `SCRATCH*` / `WIP*` / `DRAFT*` / `IDEA*` | 名前で分かるもの |
+| `*.local.json` など | 個人の環境設定（→「Claude Code の設定を共有する」節） |
+
+**強制は機械チェックで行う**（文章のルールは守れない。
+→「判断が絡まないミスは文章にしない」節）:
+
+- **`.claude/hooks/guard-memo-files.sh`** が `git add` の名指しと
+  `git commit` 時のステージを検査して止める。**`git add -f` も
+  `git add .` 経由も捕まる**
+- 判定は **`.claude/hooks/memo-paths.py`**。
+  **部分一致は使えない**（このリポジトリには `memory.py`・
+  `memory_benchmark.py`・`benchmark-memory.sh` があり `memo` を含む。
+  `RELEASE_NOTES.md` も `NOTES` を含むが実ドキュメント）。
+  basename に対する厳密な規則だけを使い、
+  **追跡中の全ファイルに誤爆しないことを実測で確認してから変える**:
+
+  ```bash
+  git ls-files | python3 .claude/hooks/memo-paths.py   # 何も出なければ OK
+  ```
+
+- `.gitignore` にも同じパターンを書いてあるが、そちらは補助。
+  **パターンを増やすときは両方を更新する**
+
+### メモに書くべきでないもの
+
+**他の人に残す必要がある内容をメモに書かない。** そこは追跡されないので
+消えるし、公開もされない。置き場はこう分ける:
+
+| 内容 | 置き場 |
+| --- | --- |
+| 踏んだ罠・症状と原因 | `docs/troubleshooting/` |
+| 手順 | `docs/developer/` |
+| 変更の経緯・理由 | コミットメッセージ |
+| リリースの記録 | `CHANGELOG.md` / `RELEASE_NOTES.md` |
+| 要求・設計・タスク | `.kiro/specs/kimigayo-os-core/` |
+| 作業ルール | この `CLAUDE.md` |
+
+---
+
 ## Claude Code の設定を共有する
 
 **`.claude/` 配下の設定はリポジトリに入れる。** Skills・Subagent・
