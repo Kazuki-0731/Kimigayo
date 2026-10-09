@@ -417,18 +417,29 @@ trivy-fs-scan:
 	@trivy fs --severity CRITICAL,HIGH,MEDIUM --scanners vuln,config,secret,license .
 
 # ShellCheckで静的解析
+# CI の shellcheck ジョブ（ludeeus/action-shellcheck, severity: warning）と
+# 同じ条件でローカルに回す。
+# shellcheck が入っていなければ Docker イメージで代替する
+# （ビルド環境イメージにも Alpine の shellcheck は入っていない）。
+# 以前は -exec shellcheck {} \; だったため、警告が出ても make が成功していた。
 shellcheck-scan:
-	@echo "=== Running ShellCheck on scripts ==="
+	@echo "=== Running ShellCheck on scripts (severity: warning) ==="
 	@echo ""
-	@if ! command -v shellcheck &> /dev/null; then \
-		echo "❌ Error: ShellCheck is not installed"; \
+	@if command -v shellcheck > /dev/null 2>&1; then \
+		shellcheck --severity=warning scripts/*.sh scripts/lib/*.sh; \
+	elif command -v docker > /dev/null 2>&1; then \
+		echo "shellcheck が無いので Docker イメージで実行します"; \
+		docker run --rm -v "$(CURDIR):/mnt" -w /mnt koalaman/shellcheck:stable \
+			--severity=warning scripts/*.sh scripts/lib/*.sh; \
+	else \
+		echo "❌ Error: ShellCheck も Docker も見つかりません"; \
 		echo ""; \
 		echo "Install ShellCheck:"; \
 		echo "  macOS: brew install shellcheck"; \
 		echo "  Linux: apt install shellcheck"; \
 		exit 1; \
 	fi
-	@find scripts -name "*.sh" -type f -exec echo "Checking: {}" \; -exec shellcheck {} \;
+	@echo "✅ ShellCheck: 警告なし"
 
 # 総合セキュリティスキャン
 security-scan: trivy-scan trivy-fs-scan shellcheck-scan
