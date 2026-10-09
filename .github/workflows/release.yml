@@ -111,15 +111,25 @@ jobs:
 
       - name: Build build-environment image
         run: docker compose build
+        env:
+          KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
 
       # ci.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
       # release で落ちる（逆も）ことになる。
       # カーネルはイメージに入らないので作らない。
+      #
+      # **KIMIGAYO_VERSION を渡す。** これが rootfs の /etc/os-release・
+      # /etc/motd・/.kimigayo-build-info に入る版になる。渡さないと
+      # docker-compose.yml の既定値 `dev` が使われ、**公開イメージが
+      # `dev` と名乗る**（2026-10-10 まで 0.1.0 直書きで同じことが
+      # 起きていた）。さらに下の docker build が渡す LABEL version とも
+      # 食い違い、verify-image.sh の突合で落ちる。
       - name: Build Kimigayo OS rootfs
         run: |
           set -euo pipefail
           docker compose run --rm \
             -e IMAGE_TYPE=${{ matrix.variant }} \
+            -e KIMIGAYO_VERSION=${{ needs.meta.outputs.version }} \
             kimigayo-build \
             make build-no-kernel TARGET_ARCH=${{ matrix.arch }} IMAGE_TYPE=${{ matrix.variant }}
 
@@ -230,7 +240,11 @@ jobs:
 
       # ここを通らなければ push しない。
       # 以前は tarball が小さいと exit 0 でスキップしていた。
+      # EXPECT_VERSION を渡すと、LABEL version / os-release の VERSION_ID が
+      # この版と一致しなければ落ちる。リリースで版の渡し忘れを通さないため。
       - name: Verify image by running it
+        env:
+          EXPECT_VERSION: ${{ needs.meta.outputs.version }}
         run: |
           bash scripts/verify-image.sh \
             "${{ steps.tags.outputs.primary }}" \
