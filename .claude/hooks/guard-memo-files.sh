@@ -63,7 +63,7 @@ explain() {
       手順                docs/developer/
       変更の経緯          コミットメッセージ
       リリースの記録      CHANGELOG.md / RELEASE_NOTES.md
-      要求・設計・タスク  .kiro/specs/kimigayo-os-core/
+      仕様・設計          SPECIFICATION.md / docs/developer/ARCHITECTURE.md
 EOF
 }
 

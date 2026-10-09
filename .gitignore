@@ -100,3 +100,7 @@ __pycache__/
 # この probe が実際にリンクまで成功し、-o が無いため cwd（リポジトリ直下）に
 # a.out を落とす。成果物ではないので追跡しない。
 /a.out
+
+# Kiro の仕様ディレクトリは削除した（履歴から復元可能）。
+# 仕様は SPECIFICATION.md、設計は docs/developer/ARCHITECTURE.md。
+.kiro/

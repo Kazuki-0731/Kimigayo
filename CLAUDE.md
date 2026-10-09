@@ -29,7 +29,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 詳細は [README.md](README.md)・[SPECIFICATION.md](SPECIFICATION.md)・
 [docs/developer/ARCHITECTURE.md](docs/developer/ARCHITECTURE.md)。
-要求・設計・タスクは [.kiro/specs/kimigayo-os-core/](.kiro/specs/kimigayo-os-core/)。
+仕様は [SPECIFICATION.md](SPECIFICATION.md)、設計は
+[docs/developer/ARCHITECTURE.md](docs/developer/ARCHITECTURE.md)。
 
 ---
 
@@ -103,7 +104,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 依頼者も間違えることがある
 
 **ユーザー自身も、指示の内容やこれまでの経緯を勘違いしたり忘れたりする
-ことがある。** コード・`git log`・ドキュメント・`.kiro/specs/`・過去のルール
+ことがある。** コード・`git log`・ドキュメント・`SPECIFICATION.md`・過去のルール
 （この `CLAUDE.md`・Memory）と食い違う指示や発言を受けたら、黙って従わず、
 根拠となる情報源を示した上で聞き返す・指摘する。ユーザーの発言だからといって
 無条件に正しいとは限らない。**この確認作業自体が、ユーザー自身のヒューマン
@@ -160,7 +161,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | やること | 提案に留めること |
 | --- | --- |
-| `.kiro/specs/`・`docs/` 配下の作成・更新 | **実装（コードを書く）** |
+| `SPECIFICATION.md`・`docs/` 配下の作成・更新 | **実装（コードを書く）** |
 | 設計に必要な調査・実測 | **既存コードの変更** |
 | ドキュメントどうしのリンク整合 | **設計方針そのものの変更**（既存の決定を覆す場合） |
 
@@ -744,7 +745,7 @@ make check-links        # scripts/check-links.py
 | 手順 | `docs/developer/` |
 | 変更の経緯・理由 | コミットメッセージ |
 | リリースの記録 | `CHANGELOG.md` / `RELEASE_NOTES.md` |
-| 要求・設計・タスク | `.kiro/specs/kimigayo-os-core/` |
+| 仕様・設計 | `SPECIFICATION.md` / `docs/developer/ARCHITECTURE.md` |
 | 作業ルール | この `CLAUDE.md` |
 
 ---
@@ -953,7 +954,8 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 - **何をやったか**は `git log --oneline` を見る。1修正=1コミットで理由つきに
   残してある。`TODO.md` に作業履歴を書かない（git log と二重管理になる）
-- **要求・設計・タスクの正本は [.kiro/specs/kimigayo-os-core/](.kiro/specs/kimigayo-os-core/)。**
+- **仕様の正本は [SPECIFICATION.md](SPECIFICATION.md)、設計は
+  [docs/developer/ARCHITECTURE.md](docs/developer/ARCHITECTURE.md)。**
   `TODO.md` はそこと二重管理にせず、「いま手を動かしている話」に絞る
 - **リリースの記録は [CHANGELOG.md](CHANGELOG.md) と [RELEASE_NOTES.md](RELEASE_NOTES.md)。**
   `make changelog` で生成できる。**タグを打つ前に必ず更新する**
@@ -1023,7 +1025,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | `docs/security/` | ポリシー・監査・ハードニング・脆弱性報告 |
 | `docs/troubleshooting/`, `docs/development/` | **実際に踏んだ罠の記録。版上げの前に読む** |
 | `docs/maintainer/` | ISSUE_TRIAGE・MAINTENANCE_SCHEDULE |
-| `.kiro/specs/kimigayo-os-core/` | requirements / design / tasks（仕様の正本） |
+| `SPECIFICATION.md` | 仕様の正本 |
 | `.github/workflows/` | ci / release / security / base-image-update / dependency-review |
 
 ## CI/CD

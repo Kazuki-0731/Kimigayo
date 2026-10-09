@@ -88,7 +88,7 @@ done
 | `versions.mk` | 構成要素の版（プロジェクト版は `git describe` 由来） |
 | `Dockerfile` の `LABEL version` | 実態とずれていた前例あり |
 | `README.md` | 数値・バージョン表記（**英語セクションも**） |
-| `.kiro/specs/kimigayo-os-core/tasks.md` | 進捗 |
+| `SPECIFICATION.md` | 仕様の変更があれば |
 
 **破壊的変更・既知の問題を隠さないこと。** 前の版に無かった制約
 （例: イメージサイズが 1.17MB → 3.43MB になった理由は

@@ -173,8 +173,7 @@ format: sarif, table
 ### プロジェクト管理
 
 - ✅ [SPECIFICATION.md](../SPECIFICATION.md) - 仕様書
-- ✅ [.kiro/specs/kimigayo-os-core/design.md](../.kiro/specs/kimigayo-os-core/design.md) - 設計書
-- ✅ [.kiro/specs/kimigayo-os-core/tasks.md](../.kiro/specs/kimigayo-os-core/tasks.md) - タスク管理
+- ✅ [docs/developer/ARCHITECTURE.md](developer/ARCHITECTURE.md) - アーキテクチャ
 
 **結論:** ✅ **ドキュメントは完全です**
 

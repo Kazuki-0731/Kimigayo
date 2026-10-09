@@ -444,7 +444,7 @@ systemd-analyze  # systemd環境の場合
 - [BUILD_GUIDE.md](BUILD_GUIDE.md) - ビルド詳細
 - [API_REFERENCE.md](API_REFERENCE.md) - API仕様
 - [SPECIFICATION.md](../../SPECIFICATION.md) - プロジェクト仕様
-- [design.md](../../.kiro/specs/kimigayo-os-core/design.md) - 設計書
+- [SPECIFICATION.md](../../SPECIFICATION.md) - 仕様
 
 ---
 

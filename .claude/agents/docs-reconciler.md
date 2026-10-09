@@ -76,9 +76,9 @@ grep -rhoE 'make [a-z][a-z0-9-]+' --include='*.md' . | awk '{print $2}' | sort -
 
 ### 4. 仕様の正本との二重管理
 
-要求・設計・タスクの正本は `.kiro/specs/kimigayo-os-core/` です。
+仕様の正本は `SPECIFICATION.md`、設計は `docs/developer/ARCHITECTURE.md`。
 `TODO.md` がそこと二重管理になっていないか、
-`.kiro/specs/kimigayo-os-core/tasks.md` の進捗が古くないかを見ます。
+`CHANGELOG.md` の `[Unreleased]` が実態と合っているかを見ます。
 
 `TODO.md` に作業履歴が書かれていたら指摘します（`git log` と二重管理になる）。
 
