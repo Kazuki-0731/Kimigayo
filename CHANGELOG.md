@@ -63,6 +63,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **配布イメージに `/tmp` が無かった**（v0.1.0 以降ずっと）。
+  `/run`・`/var/log`・`/var/tmp`・`/var/cache`・`/var/lib`・`/home`・`/opt`・
+  `/srv`・`/mnt`・`/media`・`/usr/local/*` も同様で、`/var` には宛先の無い
+  `lock -> ../run/lock` と `run -> ../run` だけが残っていた。
+  `optimize_rootfs` の `find -type d -empty -delete` が無条件だったため、
+  `create_directory_structure` が作り `set_permissions` が 1777 を付けた
+  FHS の骨格を、空だからという理由で全部消していた
+  （混入は 2025-12-21 の「rootfsサイズ最適化」= v0.1.0 の前日）。
+  `/run` が無いと OpenRC が state を書けないため、Init を入れただけでは
+  動かない。掃除は残したまま骨格を除外対象にし、`verify_rootfs` に
+  必須ディレクトリとスティッキービットの検証を追加した。
+  **サイズへの影響はゼロ**（修正前後ともに standard 3.43MB / tarball 1.5MB）。
+  つまりこの最適化は最初から何も削減していなかった
 - **配布イメージに OpenRC のバイナリが1つも入っていなかった**（v0.1.0 以降ずっと）。
   `scripts/build-rootfs.sh` が OpenRC の `usr/sbin` / `usr/lib` を
   コピー対象にしていなかった（OpenRC の prefix は `/usr` なので
