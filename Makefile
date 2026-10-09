@@ -422,15 +422,19 @@ trivy-fs-scan:
 # shellcheck が入っていなければ Docker イメージで代替する
 # （ビルド環境イメージにも Alpine の shellcheck は入っていない）。
 # 以前は -exec shellcheck {} \; だったため、警告が出ても make が成功していた。
+# 検査対象。.claude/hooks/ も含める（Claude Code のフックは
+# このリポジトリの作業ルールの一部であり、壊れると静かに効かなくなる）。
+SHELLCHECK_TARGETS := scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
+
 shellcheck-scan:
 	@echo "=== Running ShellCheck on scripts (severity: warning) ==="
 	@echo ""
 	@if command -v shellcheck > /dev/null 2>&1; then \
-		shellcheck --severity=warning scripts/*.sh scripts/lib/*.sh; \
+		shellcheck --severity=warning $(SHELLCHECK_TARGETS); \
 	elif command -v docker > /dev/null 2>&1; then \
 		echo "shellcheck が無いので Docker イメージで実行します"; \
 		docker run --rm -v "$(CURDIR):/mnt" -w /mnt koalaman/shellcheck:stable \
-			--severity=warning scripts/*.sh scripts/lib/*.sh; \
+			--severity=warning $(SHELLCHECK_TARGETS); \
 	else \
 		echo "❌ Error: ShellCheck も Docker も見つかりません"; \
 		echo ""; \
