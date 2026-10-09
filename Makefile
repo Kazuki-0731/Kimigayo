@@ -13,7 +13,7 @@ KIMIGAYO_VERSION ?= $(shell bash scripts/get-version.sh 2>/dev/null || echo dev)
 export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
-.PHONY: build-rootfs package-rootfs build-image test-integration test-smoke ci-build-local ci-build-all
+.PHONY: build-rootfs package-rootfs build-image verify-image test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
@@ -283,10 +283,19 @@ test-integration:
 	fi
 
 # Dockerイメージビルド
+# ARCH -> Docker の platform 表記
+DOCKER_PLATFORM = $(if $(filter arm64,$(ARCH)),linux/arm64,linux/amd64)
+
 build-image: package-rootfs
 	@echo ""
 	@echo "=== Building Docker image ==="
+	@# --platform と TARBALL_PATH は必須。
+	@# 省略すると (1) arm64 の rootfs を amd64 のイメージとして包んでしまい、
+	@# (2) Dockerfile.runtime の既定 TARBALL_PATH=output/*.tar.gz が
+	@# 別のバリアント／アーキの tarball を拾う。
 	@docker build -f Dockerfile.runtime \
+		--platform $(DOCKER_PLATFORM) \
+		--build-arg TARBALL_PATH=output/$(TARBALL_NAME) \
 		-t kimigayo-os:$(VARIANT)-$(ARCH) \
 		-t kimigayo-os:$(VERSION)-$(VARIANT)-$(ARCH) \
 		-t $(DOCKER_IMAGE_TAG) \
@@ -295,23 +304,19 @@ build-image: package-rootfs
 	@echo "✓ Docker image built: kimigayo-os:$(VARIANT)-$(ARCH)"
 	@echo "✓ Tagged for Docker Hub: $(DOCKER_IMAGE_TAG)"
 
-# スモークテスト
-test-smoke: build-image
-	@echo ""
-	@echo "=== Running smoke tests ==="
-	@echo "Inspecting built image..."
-	@docker run --rm kimigayo-os:$(VARIANT)-$(ARCH) ls -la / || echo "Failed to list root directory"
-	@echo ""
-	@echo "Test 1: Verify image can start..."
-	@docker run --rm kimigayo-os:$(VARIANT)-$(ARCH) /bin/sh -c "echo 'Container started successfully'"
-	@echo ""
-	@echo "Test 2: Verify basic commands work..."
-	@docker run --rm kimigayo-os:$(VARIANT)-$(ARCH) /bin/sh -c "ls / && pwd"
-	@echo ""
-	@echo "Test 3: Verify BusyBox is available..."
-	@docker run --rm kimigayo-os:$(VARIANT)-$(ARCH) /bin/sh -c "busybox --help" | head -5
-	@echo ""
-	@echo "✓ All smoke tests passed"
+# 既にあるイメージを検証する（ビルドしない）
+verify-image:
+	@bash scripts/verify-image.sh kimigayo-os:$(VARIANT)-$(ARCH) $(VARIANT) $(ARCH)
+
+# スモークテスト = イメージを作って検証する
+#
+# 以前はここに「/bin/sh が動く」「ls が動く」「busybox --help が動く」の
+# 3つだけを並べていた。BusyBox は static-pie なのでこの3つは
+# OpenRC・libc.so・/tmp が1つも入っていなくても通る。実際に
+# v0.1.0〜v2.0.1 の公開済み4タグすべてがその状態で通過していた。
+# 検証の実体は scripts/verify-image.sh に移し、CI・release・ローカルの
+# 3経路から同じものを呼ぶ（YAML に埋めると経路ごとにずれる）。
+test-smoke: build-image verify-image
 
 # 完全なCI/CDビルド（ローカル実行）
 ci-build-local: build-rootfs package-rootfs test-integration build-image test-smoke
