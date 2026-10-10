@@ -4,8 +4,8 @@
 
 ## 主な特徴
 
-- 🪶 **超軽量**: Standard（x86_64）**2.78MB** / arm64 3.16MB（2026-10-10 実測）
-- 🪶 **常駐メモリ 232KB**（Alpine 280KB / Ubuntu 316KB。2026-10-10 実測）
+- 🪶 **超軽量**: Standard（x86_64）**2.76MB** / arm64 3.13MB（v3.0.1、2026-10-11 実測）
+- 🪶 **常駐メモリ 232KB**（Alpine 276KB / Ubuntu 24.04 312KB。同条件で 2026-10-11 実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE でビルド、ASLR / DEP 対応
 - 🛡️ **最小攻撃面**: パッケージマネージャーを持たない（`apk` も `dpkg` も無い）
 - 🏗️ **3 バリアント**: minimal / standard / extended から選べる
@@ -72,15 +72,15 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ## イメージバリアント
 
-- **kimigayo-os:latest** - Standardバリアント（x86_64 2.78MB / arm64 3.16MB）
+- **kimigayo-os:latest** - Standardバリアント（x86_64 2.76MB / arm64 3.13MB）
   - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
-- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.65MB / arm64 3.02MB）
+- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.62MB / arm64 2.98MB）
   - musl libc + 最小限のBusyBox + OpenRC
   - 特化したコンテナ向けの絶対最小フットプリント
 
-- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.81MB / arm64 3.20MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.78MB / arm64 3.17MB）
   - 開発ツールと追加ユーティリティを含む
   - 開発環境と機能豊富なコンテナ向け
 
@@ -88,21 +88,21 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ### バージョン指定タグ（本番ではこれを使ってください）
 ```
-kimigayo-os:3.0.0               # Standardバリアント
-kimigayo-os:3.0.0-minimal       # Minimalバリアント
-kimigayo-os:3.0.0-extended      # Extendedバリアント
+kimigayo-os:3.0.1               # Standardバリアント
+kimigayo-os:3.0.1-minimal       # Minimalバリアント
+kimigayo-os:3.0.1-extended      # Extendedバリアント
 ```
 
 ### アーキテクチャ指定タグ
 
-**バリアント名が必要です**（`3.0.0-amd64` というタグはありません）。
+**バリアント名が必要です**（`3.0.1-amd64` というタグはありません）。
 
 ```
-kimigayo-os:3.0.0-standard-amd64    # x86_64
-kimigayo-os:3.0.0-standard-arm64    # ARM64
+kimigayo-os:3.0.1-standard-amd64    # x86_64
+kimigayo-os:3.0.1-standard-arm64    # ARM64
 ```
 
-バリアント名なしのタグ（`3.0.0`・`latest` など）はマルチアーキの
+バリアント名なしのタグ（`3.0.1`・`latest` など）はマルチアーキの
 マニフェストなので、`docker pull` が自動で合うものを選びます。
 
 ### ローリングタグ（リリースごとに更新）
