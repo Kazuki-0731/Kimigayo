@@ -681,26 +681,54 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 
 | Metric | Measured | Target | Status |
 |--------|----------|--------|---------|
-| Image Size (Minimal, x86_64) | **2.65MB** | < 5MB | ✅ **53% of target** |
-| Image Size (Standard, x86_64) | **2.78MB** | < 5MB | ✅ **56% of target** |
-| Image Size (Extended, x86_64) | **2.81MB** | < 5MB | ✅ **56% of target** |
-| Boot Time | not measured | < 10s | ⏳ benchmark needs fixing |
-| Memory Usage | not measured | < 128MB | ⏳ pending |
-| BusyBox Performance | not measured | Alpine equivalent | ⏳ pending |
+| Image size (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **53% of target** / 60% |
+| Image size (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **56% of target** / 63% |
+| Image size (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **56% of target** / 64% |
+| Boot time | not measured | < 10s | ⏳ benchmark needs fixing |
+| Memory usage | not measured | < 128MB | ⏳ pending |
+| BusyBox performance | not measured | Alpine equivalent | ⏳ pending |
 
-**Measurement conditions** (sizes): 2026-10-09, as reported by
-`docker images`, x86_64 (`--platform linux/amd64`), host is macOS on Apple
-Silicon (arm64) under QEMU emulation, build environment based on Alpine 3.24,
+All six images (x86_64 and arm64) were measured on 2026-10-10, and every
+variant passes all 27 checks in `scripts/verify-image.sh`.
+
+<details>
+<summary><b>Per-variant breakdown, and where the bytes go</b></summary>
+
+**Measurement conditions**: 2026-10-10, as reported by `docker images`.
+Host is macOS on Apple Silicon (arm64); x86_64 runs under QEMU emulation
+via `--platform linux/amd64`. Build environment is based on Alpine 3.24,
 with kernel 6.18.55 / musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
-**arm64 is not measured yet.** The three variants differ only in the number of
-BusyBox applets (370 / 403 / 413), a span of 170KB.
+
+| Variant | BusyBox applets | BusyBox binary | tarball | image |
+| --- | --- | --- | --- | --- |
+| Minimal (x86_64) | 370 | 1,067KB | 1.4MB | **2.65MB** |
+| Standard (x86_64) | 403 | 1,202KB | 1.4MB | **2.78MB** |
+| Extended (x86_64) | 413 | 1,231KB | 1.5MB | **2.81MB** |
+| Minimal (arm64) | 370 | 1,144KB | 1.5MB | **3.02MB** |
+| Standard (arm64) | 403 | 1,292KB | 1.6MB | **3.16MB** |
+| Extended (arm64) | 413 | 1,324KB | 1.6MB | **3.20MB** |
+
+**The three variants differ only in the number of BusyBox applets — a span of
+just 164KB on x86_64.** Most of the image is musl's `libc.so`, the BusyBox
+binary and OpenRC (9 binaries, 2 shared libraries and the helpers), all of
+which are present in every variant.
+
+**arm64 is 0.37-0.39MB larger than x86_64 because of the BusyBox binary**
+(aarch64 uses fixed-width instructions, so the same code takes more space;
+this also includes the static-PIE and stack-protector work done in v3.0.0
+to enable ASLR).
 
 > v2.0.1 (2026-01-16) reported 1.17MB for Standard. That figure was measured on
 > images that **did not actually contain musl's `libc.so` or any OpenRC binary**
 > (fixed on 2026-10-09), so it is not the same thing as today's 2.78MB.
+>
 > The old boot time and memory figures (439ms / 0.2MB) have been withdrawn:
 > `scripts/benchmark-startup.sh` times `docker run -d <image> sleep 5` until it
-> exits, which takes about 5,600ms on a working image.
+> exits, which takes about 5,600ms on a working image. The 439ms figure is what
+> you get when that `sleep` never runs, so it is not a boot time at all. The
+> measurement method itself needs to be reworked.
+
+</details>
 
 ### 🚀 Quick Start
 
