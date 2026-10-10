@@ -706,6 +706,7 @@ copy_components() {
 
         log_info "  ✓ OpenRC copied"
 
+        remove_unusable_init_scripts || return 1
         patch_openrc_for_busybox || return 1
     else
         log_warn "OpenRC installation directory not found: $OPENRC_INSTALL_DIR"
@@ -781,6 +782,71 @@ replace_line_in_file() {
         log_error "    $needle"
         return 1
     fi
+}
+
+# Kimigayo では絶対に動かない init スクリプトを落とす。
+#
+# OpenRC は上流で、どのディストリでも使えるように init スクリプトを
+# 一式同梱している。Kimigayo の想定（AWS/GCP のコンテナ）では、その
+# うち次の9本は**1度も実行されない**:
+#
+#   - 呼ぶバイナリがイメージに無い（パッケージマネージャーが無いので
+#     後から入ることもない）:
+#       agetty       /sbin/agetty        端末のログインプロンプト
+#       consolefont  /usr/bin/setfont    コンソールのフォント
+#       numlock      /usr/bin/setleds    コンソールの NumLock
+#       runsvdir     /usr/bin/runsvdir   runit（別の Init）の監視
+#   - 別の Init システム用の連携:
+#       s6-svscan                        s6（別の Init）の監視
+#       user                             ユーザー単位の OpenRC セッション
+#   - コンテナでは意味が無い:
+#       net-online                       ネットワーク疎通待ち
+#       osclock                          「時計は OS 任せ」と宣言するだけ
+#       swclock                          RTC が無いマシンで時計を合わせる
+#
+# **どれもランレベルに登録されていない**ので、消しても起動の挙動は
+# 1ミリも変わらない（2026-10-10 に削除版をビルドして実測。
+# sysinit/boot/default はいずれも rc=0、起動サービス数も rc-update show の
+# 行数も特権ありの sysctl 適用も、元のイメージと完全に一致した）。
+#
+# **サイズ目的ではない**（約12KB しか減らない）。目的は、root で
+# 解釈・実行されるシェルスクリプトを減らすことと、`/etc/init.d` を
+# 見たときに「実際に動くもの」だけが並んでいる状態にすること。
+#
+# **`keyword -docker` が付いているだけのものは消さない。**
+# fsck・hwclock・modules・localmount などは Docker では飛ばされるが、
+# ベアメタルや特権コンテナでは正規に機能する OpenRC の構成要素。
+KIMIGAYO_UNUSABLE_INIT_SCRIPTS="agetty consolefont net-online numlock osclock runsvdir s6-svscan swclock user"
+
+remove_unusable_init_scripts() {
+    local initd="$ROOTFS_DIR/etc/init.d"
+    [ -d "$initd" ] || return 0
+
+    log_info "Removing init scripts that can never run on Kimigayo..."
+
+    local removed=0 still_enabled=""
+    for name in $KIMIGAYO_UNUSABLE_INIT_SCRIPTS; do
+        [ -e "$initd/$name" ] || continue
+
+        # ランレベルに登録されているものを黙って消すと起動が壊れる。
+        # 上流が構成を変えた場合に気づけるよう、ここで止める。
+        if find "$ROOTFS_DIR/etc/runlevels" -name "$name" 2>/dev/null | grep -q .; then
+            still_enabled="$still_enabled $name"
+            continue
+        fi
+
+        rm -f "$initd/$name"
+        removed=$((removed + 1))
+    done
+
+    if [ -n "$still_enabled" ]; then
+        log_error "These init scripts are registered in a runlevel but were listed as unusable:${still_enabled}"
+        log_error "OpenRC's layout changed. Review KIMIGAYO_UNUSABLE_INIT_SCRIPTS before continuing."
+        return 1
+    fi
+
+    log_info "  ✓ Removed ${removed} init script(s) that cannot run here"
+    return 0
 }
 
 patch_openrc_for_busybox() {

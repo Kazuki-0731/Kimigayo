@@ -223,10 +223,16 @@ case "$out" in
     *"notexec=none failed=none"*)
         # 本数の下限も見る。init スクリプトが丸ごと入らなくなる事故
         # （OpenRC のコピー漏れ）を「0 本中 0 本成功」で通さないため。
-        if [ "${total_scripts:-0}" -ge 30 ]; then
+        #
+        # 2026-10-10 に下限を 30 から 25 に下げた。build-rootfs.sh の
+        # remove_unusable_init_scripts が、Kimigayo では動かない9本
+        # （agetty・s6-svscan など）を落とすようにしたため、36 本から
+        # 27 本になった。下限はコピー漏れを捕まえるためのもので、
+        # 正確な本数を固定する意図はない。
+        if [ "${total_scripts:-0}" -ge 25 ]; then
             pass "all ${total_scripts} init scripts are executable and run"
         else
-            fail "too few init scripts: ${total_scripts} (expected >= 30)"
+            fail "too few init scripts: ${total_scripts} (expected >= 25)"
             show_output "$out"
         fi
         ;;
@@ -445,6 +451,23 @@ if in_image 'ls -l /etc/shadow' | grep -q '^-rw-------'; then
     pass "/etc/shadow is 0600"
 else
     fail "/etc/shadow has unexpected permissions: $(in_image 'ls -l /etc/shadow')"
+fi
+
+# build-rootfs.sh の remove_unusable_init_scripts が落としたはずの init
+# スクリプトが復活していないか。OpenRC を上げたときや、コピー順を変えた
+# ときに黙って戻る。どれも root で実行されるシェルスクリプトなので、
+# 「消したつもりで入っている」状態を検知できるようにしておく。
+unusable="agetty consolefont net-online numlock osclock runsvdir s6-svscan swclock user"
+revived=""
+for name in $unusable; do
+    if in_image "test -e /etc/init.d/$name && echo yes" | grep -q yes; then
+        revived="$revived $name"
+    fi
+done
+if [ -z "$revived" ]; then
+    pass "no init scripts that cannot run here"
+else
+    fail "init scripts that should have been removed are present:${revived}"
 fi
 
 # ---------------------------------------------------------------------------
