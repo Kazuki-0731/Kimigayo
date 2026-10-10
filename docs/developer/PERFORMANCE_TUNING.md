@@ -442,7 +442,9 @@ OpenRC が `default` ランレベルを完走するまでは **0.77 秒**。
 
 ### コマンド実行性能
 
-BusyBox のアプレットは Alpine の BusyBox 比 **0.96〜1.01x**（同等）。
+BusyBox のアプレットは Alpine の BusyBox 比 **0.90〜1.12x**。
+**走るたびに同じコマンドが ±10% 前後するので有意差なし**
+（→ [docs/benchmarks/busybox.md](../benchmarks/busybox.md)）。
 
 ### 機能比較
 

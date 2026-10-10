@@ -44,7 +44,7 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | イメージサイズ (Extended) | **2.78MB** / arm64 **3.17MB** | < 50MB | ✅ **目標の6%** / 6% |
 | 起動時間 | **0.61秒** | < 10秒 | ✅ **目標の6%** |
 | 常駐メモリ | **232KB** | < 128MB | ✅ **目標の0.2%** |
-| BusyBoxコマンド性能 | Alpine比 **0.96〜1.01x** | Alpine同等 | ✅ **誤差範囲内** |
+| BusyBoxコマンド性能 | Alpine比 **0.90〜1.12x** | Alpine同等 | ✅ **有意差なし** |
 
 目標値は [SPECIFICATION.md](SPECIFICATION.md) §8.3 の定義
 （Minimal 5MB / Standard 15MB / Extended 50MB）。
@@ -73,7 +73,7 @@ Alpine 3.24 ベースのビルド環境 /
 | サイズ | `docker inspect` のバイト数を 10 進 MB に換算。x86_64 は `--platform linux/amd64`（QEMU エミュレーション）|
 | 起動時間 | `docker run --rm <image> /bin/true` の実時間、10 回の中央値。arm64 ネイティブ |
 | 常駐メモリ | `sleep` で常駐させたコンテナの `docker stats`。**37 標本すべて 232KB**（`docker stats` が返す `0B` は捨てている。90 秒間で 53 回返った）。arm64 ネイティブ |
-| コマンド性能 | `ls`・`grep`・`find`・`awk`・`sort`・`cat`・`wc`・`head` の 8 つを Alpine と同条件で実行（`scripts/benchmark-busybox.sh`）|
+| コマンド性能 | `ls`・`grep`・`find`・`awk`・`sort`・`cat`・`wc`・`head` の 8 つを Alpine と同条件で実行（`scripts/benchmark-busybox.sh`）。**同じコマンドが走るたびに 0.90〜1.12x の間で前後する**ので、どちらが速いとは言えない |
 
 **OpenRC が default ランレベルを完走するまでは 0.77 秒**
 （`docker run --rm <image> /sbin/openrc default`、arm64、10 回の中央値）。
@@ -742,7 +742,7 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 | Image size (Extended) | **2.78MB** / arm64 **3.17MB** | < 50MB | ✅ **6% of target** / 6% |
 | Boot time | **0.61s** | < 10s | ✅ **6% of target** |
 | Resident memory | **232KB** | < 128MB | ✅ **0.2% of target** |
-| BusyBox performance | **0.96-1.01x** of Alpine | Alpine equivalent | ✅ **within noise** |
+| BusyBox performance | **0.90-1.12x** of Alpine | Alpine equivalent | ✅ **no measurable difference** |
 
 Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
 (Minimal 5MB / Standard 15MB / Extended 50MB). **In practice all three
@@ -770,7 +770,7 @@ musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
 | Size | `docker inspect` byte count converted to decimal MB; x86_64 under QEMU via `--platform linux/amd64` |
 | Boot time | wall time of `docker run --rm <image> /bin/true`, median of 10, native arm64 |
 | Resident memory | `docker stats` of an idle container. **All 37 samples read 232KB**; the `0B` readings `docker stats` returns are discarded (53 of them over 90 seconds). Native arm64 |
-| Command performance | `ls`, `grep`, `find`, `awk`, `sort`, `cat`, `wc` and `head` run against Alpine under identical conditions (`scripts/benchmark-busybox.sh`) |
+| Command performance | `ls`, `grep`, `find`, `awk`, `sort`, `cat`, `wc` and `head` run against Alpine under identical conditions (`scripts/benchmark-busybox.sh`). **The same command swings between 0.90x and 1.12x from run to run**, so neither is measurably faster |
 
 **OpenRC reaches the `default` runlevel in 0.77s**
 (`docker run --rm <image> /sbin/openrc default`, native arm64, median of 10).

@@ -23,7 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
 - **実測値**（2026-10-10）: Standard は x86_64 **2.78MB** / arm64 **3.16MB**、
-  起動 **0.62秒**、常駐メモリ **232KB**、BusyBox は Alpine 比 **0.96〜1.01x**。
+  起動 **0.61秒**、常駐メモリ **232KB**、BusyBox は Alpine 比
+  **0.90〜1.12x**（走るたびに前後し有意差なし）。
   **起動時間はイメージの差が出ない**（Alpine も Ubuntu も 0.61 秒）。
   測っている時間のほとんどが Docker のコンテナ生成なので、
   **「軽いから起動が速い」とは書かない**。差が出るのは常駐メモリの方
