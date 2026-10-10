@@ -5,19 +5,20 @@
 ## 主な特徴
 
 - 🪶 **超軽量**: Standard（x86_64）**2.78MB** / arm64 3.16MB（2026-10-10 実測）
-- ⚡ **高速起動**: 10秒以内のシステム起動
-- 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
-- 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除
-- 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
-- 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
+- 🪶 **常駐メモリ 232KB**（Alpine 280KB / Ubuntu 316KB。2026-10-10 実測）
+- 🔒 **セキュリティ強化**: 全実行ファイルを PIE でビルド、ASLR / DEP 対応
+- 🛡️ **最小攻撃面**: パッケージマネージャーを持たない（`apk` も `dpkg` も無い）
+- 🏗️ **3 バリアント**: minimal / standard / extended から選べる
 - 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
 
 ## 基盤技術
 
-- Linuxカーネル（強化版）
 - musl libc
 - BusyBox
 - OpenRC initシステム
+
+**イメージに入っているのは rootfs だけです。**
+カーネルは含まれません（コンテナはホストのカーネルで動きます）。
 
 ## ドキュメント
 
@@ -76,7 +77,7 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
   - 汎用コンテナベースイメージとして推奨
 
 - **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.65MB / arm64 3.02MB）
-  - カーネル + musl libc + 最小限のBusyBox
+  - musl libc + 最小限のBusyBox + OpenRC
   - 特化したコンテナ向けの絶対最小フットプリント
 
 - **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.81MB / arm64 3.20MB）
@@ -85,41 +86,61 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ## タグ一覧
 
-### バージョン指定タグ
+### バージョン指定タグ（本番ではこれを使ってください）
 ```
-kimigayo-os:0.1.0               # Standardバリアント、バージョン0.1.0
-kimigayo-os:0.1.0-minimal       # Minimalバリアント、バージョン0.1.0
-kimigayo-os:0.1.0-extended      # Extendedバリアント、バージョン0.1.0
+kimigayo-os:3.0.0               # Standardバリアント
+kimigayo-os:3.0.0-minimal       # Minimalバリアント
+kimigayo-os:3.0.0-extended      # Extendedバリアント
 ```
 
 ### アーキテクチャ指定タグ
+
+**バリアント名が必要です**（`3.0.0-amd64` というタグはありません）。
+
 ```
-kimigayo-os:0.1.0-amd64         # x86_64アーキテクチャ
-kimigayo-os:0.1.0-arm64         # ARM64アーキテクチャ
+kimigayo-os:3.0.0-standard-amd64    # x86_64
+kimigayo-os:3.0.0-standard-arm64    # ARM64
 ```
 
-### ローリングタグ（自動更新）
+バリアント名なしのタグ（`3.0.0`・`latest` など）はマルチアーキの
+マニフェストなので、`docker pull` が自動で合うものを選びます。
+
+### ローリングタグ（リリースごとに更新）
 ```
-kimigayo-os:latest              # 最新安定版Standardバリアント
-kimigayo-os:latest-minimal      # 最新安定版Minimalバリアント
-kimigayo-os:latest-extended     # 最新安定版Extendedバリアント
-kimigayo-os:stable              # 最新安定版リリース（latestのエイリアス）
-kimigayo-os:edge                # 最新開発ビルド（不安定版）
+kimigayo-os:latest              # 最新Standardバリアント
+kimigayo-os:latest-minimal      # 最新Minimalバリアント
+kimigayo-os:latest-extended     # 最新Extendedバリアント
+kimigayo-os:latest-amd64        # 最新Standardのx86_64
+kimigayo-os:latest-arm64        # 最新StandardのARM64
 ```
 
 ## セキュリティ
 
-### イメージ署名
+### 完全性の検証
 
-すべての公式イメージは以下を使用して署名されます:
-- Docker Content Trust（DCT）
-- 追加検証用のCosign
+**イメージ署名（Docker Content Trust / Cosign）は未実装です。**
+検証したい場合は次の2つを使ってください。
+
+- **ダイジェスト指定での pull**: タグではなくダイジェストで固定する
+
+  ```bash
+  docker pull ishinokazuki/kimigayo-os@sha256:<digest>
+  ```
+
+- **GitHub Release のハッシュ**: rootfs の tarball には `SHA256SUMS` と
+  `SHA512SUMS` が添付されています
 
 ### 脆弱性スキャン
 
-イメージは以下で自動スキャンされます:
-- Trivy
-- 結果はGitHub Securityタブに公開
+ソースツリーとビルド環境は Trivy で自動スキャンし、結果を GitHub の
+Security タブに公開しています。
+
+**ただしイメージ自体のスキャンは成立しません。** Kimigayo は
+パッケージマネージャーを持たずパッケージデータベースも無いため、
+Trivy はイメージ内のソフトウェアを1つも識別できません
+（「脆弱性 0 件」ではなく「スキャン対象を認識できない」状態です）。
+構成要素（musl / BusyBox / OpenRC / カーネル）の脆弱性は、
+バージョンを手で追跡しています。
 
 ### 更新ポリシー
 

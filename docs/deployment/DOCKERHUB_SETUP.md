@@ -11,22 +11,13 @@
 
 ### リポジトリ説明文
 
-Kimigayo OSは、Docker環境向けに設計された軽量・高速・セキュアなコンテナ向けOSです。セキュリティファーストの原則と最小限のフットプリントで構築され、コンテナ化されたアプリケーションとマイクロサービスの優れた基盤を提供します。
+**正本は [DOCKERHUB_README.md](../../DOCKERHUB_README.md)。**
+Docker Hub の Overview に貼る文章はこのファイルだけで管理する。
+ここに写すと2か所に分かれて必ず食い違うので、写さない。
 
-**主な特徴:**
-- 🪶 **超軽量**: ベースイメージ5MB未満
-- ⚡ **高速起動**: 10秒以内のシステム起動
-- 🔒 **セキュリティ強化**: ASLR、DEP、PIE、seccomp-BPFをデフォルトで有効化
-- 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除
-- 🏗️ **モジュラー設計**: 必要なコンポーネントのみを選択可能
-- 🔁 **再現可能ビルド**: 検証のためのビット同一なビルド出力
-- 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
-
-**基盤技術:**
-- Linuxカーネル（強化版）
-- musl libc
-- BusyBox
-- OpenRC initシステム
+> 2026-10-10 まで、この手順書に説明文の写しが2か所あり、どちらも
+> 実装されていない機能（seccomp のデフォルト有効化・Cosign 署名・
+> `stable` タグ）を宣伝していた。
 
 ## タグ戦略
 
@@ -46,7 +37,7 @@ Kimigayo OSは、Docker環境向けに設計された軽量・高速・セキュ
 
 1. **Minimal**（`-minimal`接尾辞）
    - サイズ: < 5MB
-   - 含まれるもの: カーネル + musl libc + 最小限のBusyBox
+   - 含まれるもの: musl libc + 最小限のBusyBox + OpenRC
    - 用途: 特化したコンテナ向けの絶対最小フットプリント
 
 2. **Standard**（接尾辞なし、デフォルト）
@@ -61,48 +52,51 @@ Kimigayo OSは、Docker環境向けに設計された軽量・高速・セキュ
 
 #### タグの例
 
+**`release.yml` が実際に作るタグだけを書く。** 増やすときは
+ワークフローを先に直す（書いただけのタグは永久に現れない）。
+
 ```
-# バージョン指定タグ
-kimigayo-os:0.1.0               # Standardバリアント、バージョン0.1.0
-kimigayo-os:0.1.0-minimal       # Minimalバリアント、バージョン0.1.0
-kimigayo-os:0.1.0-extended      # Extendedバリアント、バージョン0.1.0
+# バージョン指定（マルチアーキのマニフェスト）
+kimigayo-os:3.0.0               # Standardバリアント
+kimigayo-os:3.0.0-minimal
+kimigayo-os:3.0.0-extended
 
-# アーキテクチャ指定タグ
-kimigayo-os:0.1.0-amd64         # x86_64アーキテクチャ
-kimigayo-os:0.1.0-arm64         # ARM64アーキテクチャ
+# バリアント + アーキテクチャ（単一プラットフォーム）
+kimigayo-os:3.0.0-standard-amd64
+kimigayo-os:3.0.0-minimal-arm64
 
-# バリアントとアーキテクチャの組み合わせ
-kimigayo-os:0.1.0-minimal-amd64
-kimigayo-os:0.1.0-extended-arm64
-
-# ローリングタグ（自動更新）
-kimigayo-os:latest              # 最新安定版Standardバリアント
-kimigayo-os:latest-minimal      # 最新安定版Minimalバリアント
-kimigayo-os:latest-extended     # 最新安定版Extendedバリアント
-kimigayo-os:stable              # 最新安定版リリース（latestのエイリアス）
-kimigayo-os:edge                # 最新開発ビルド（不安定版）
+# ローリングタグ（リリースごとに更新。全12本）
+kimigayo-os:latest              # standard のマニフェスト
+kimigayo-os:latest-minimal
+kimigayo-os:latest-extended
+kimigayo-os:latest-amd64        # standard のアーキ別
+kimigayo-os:latest-arm64
+kimigayo-os:latest-standard-amd64
+kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 ```
+
+> **`3.0.0-amd64` のようなバリアント名なしのアーキ別タグは存在しない。**
+> バージョン指定でアーキを固定するならバリアント名が必要。
+>
+> **`stable` と `edge` も存在しない。** 2026-10-10 までこの手順書が
+> 両方を案内していたが、`release.yml` に生成箇所が無く、Docker Hub の
+> タグ一覧にも1度も現れていない。
 
 ### タグ付けワークフロー
 
-1. **開発ビルド**（`edge`タグ）
-   - `main`ブランチへのコミット毎にプッシュ
-   - 本番環境での使用は非推奨
-   - フォーマット: `edge`、`edge-minimal`、`edge-extended`
+**Docker Hub へ push するのは `v*.*.*` タグを打ったときだけ。**
+`main` へのコミットでは `ci.yml` が走るが、イメージは公開されない。
 
-2. **ベータ/RCリリース**
-   - テスト用のプレリリースバージョン
-   - フォーマット: `0.1.0-beta.1`、`1.0.0-rc.2`
+1. **安定版リリース**
+   - `git tag -a v3.0.1` → push で `release.yml` が走る
+   - バージョン指定タグ（10本）と `latest` 系（12本）を更新する
+   - フォーマット: `3.0.0`、`3.0.1`
 
-3. **安定版リリース**
-   - 本番環境対応バージョン
-   - フォーマット: `0.1.0`、`1.0.0`
-   - `latest`および`stable`としてもタグ付け
+2. **手動リリース**
+   - Actions から `release.yml` を `workflow_dispatch` で実行する
+   - `tag` を指定しなければバージョンは `edge` になる（通常は使わない）
 
-4. **パッチアップデート**
-   - バグ修正とセキュリティパッチ
-   - フォーマット: `1.0.1`、`1.0.2`
-   - `latest`タグを自動更新
+**プレリリース（beta / rc）は運用していない。**
 
 ## リポジトリセットアップ手順
 
@@ -143,102 +137,38 @@ kimigayo-os:edge                # 最新開発ビルド（不安定版）
 
 ### ステップ4: Docker Hub README
 
-Docker Hub READMEには以下を含めます:
+[DOCKERHUB_README.md](../../DOCKERHUB_README.md) の中身をそのまま
+Docker Hub の Overview に貼る。**ここに文章を写さない**（上記参照）。
 
-```markdown
-# Kimigayo OS
-
-軽量・高速・セキュアなコンテナ向けOS
-
-## クイックスタート
-
-### イメージの取得
+Docker Hub の Overview は API からも更新できる:
 
 ```bash
-# Standardバリアント（推奨）
-docker pull kimigayo-os:latest
-
-# Minimalバリアント
-docker pull kimigayo-os:latest-minimal
-
-# Extendedバリアント
-docker pull kimigayo-os:latest-extended
+# .env の DOCKER_HUB_ACCESS_TOKEN を使う（トークンはコミットしない）
+curl -s -X PATCH \
+  -H "Authorization: Bearer ${DOCKER_HUB_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data "$(python3 -c 'import json,sys; print(json.dumps({"full_description": open("DOCKERHUB_README.md").read()}))')" \
+  https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/
 ```
 
-### コンテナの実行
-
-```bash
-# 対話的シェル
-docker run -it kimigayo-os:latest /bin/sh
-
-# コマンド実行
-docker run kimigayo-os:latest uname -a
-```
-
-### ベースイメージとして使用
-
-```dockerfile
-# マルチステージビルドで必要なものを準備
-FROM alpine:3.24 AS builder
-RUN apk add --no-cache nginx
-
-# Kimigayo OSで最小ランタイム環境を構築
-FROM kimigayo-os:latest
-COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
-COPY --from=builder /usr/lib/nginx /usr/lib/nginx
-
-# アプリケーションのセットアップ
-COPY . /app
-WORKDIR /app
-
-CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
-```
-
-## イメージバリアント
-
-- **kimigayo-os:latest** - Standardバリアント（< 15MB）
-- **kimigayo-os:latest-minimal** - Minimalバリアント（< 5MB）
-- **kimigayo-os:latest-extended** - Extendedバリアント（< 50MB）
-
-## ドキュメント
-
-- [インストールガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/INSTALLATION.md)
-- [クイックスタートガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/user/QUICKSTART.md)
-- [セキュリティガイド](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/SECURITY_GUIDE.md)
-
-## 機能
-
-- ✅ 超軽量（< 5MBベースイメージ）
-- ✅ 高速起動（< 10秒）
-- ✅ デフォルトでセキュリティ強化
-- ✅ 再現可能ビルド
-- ✅ マルチアーキテクチャサポート（x86_64、ARM64）
-- ✅ Distroless的アプローチ（最小攻撃面）
-- ✅ 実績ある技術に基づく（musl libc、BusyBox、OpenRC）
-
-## ライセンス
-
-[LICENSE](https://github.com/kimigayo-os/kimigayo/blob/main/LICENSE)ファイルを参照してください。
-
-## サポート
-
-- GitHub Issues: https://github.com/kimigayo-os/kimigayo/issues
-- セキュリティ問題: [SECURITY.md](https://github.com/kimigayo-os/kimigayo/blob/main/docs/security/VULNERABILITY_REPORTING.md)を参照
-```
 
 ## セキュリティに関する考慮事項
 
 ### イメージ署名
 
-すべての公式イメージは以下を使用して署名されます:
-- Docker Content Trust（DCT）
-- 追加検証用のCosign
+**未実装。** Docker Content Trust も Cosign も `release.yml` に
+工程が無い。利用者に案内できるのはダイジェスト指定での pull と、
+GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` だけ。
 
 ### 脆弱性スキャン
 
-イメージは以下で自動スキャンされます:
-- Trivy
-- 結果はGitHub Securityタブに公開
+ソースツリーとビルド環境は Trivy で自動スキャンし、結果を
+GitHub の Security タブに公開している。
+
+**イメージ自体のスキャンは成立しない。** パッケージデータベースを
+持たないため Trivy が対象を1つも識別できない（「脆弱性 0 件」ではなく
+「スキャン対象を認識できない」）。構成要素の脆弱性はバージョンを
+手で追跡する（→ `security-review` skill）。
 
 ### 更新ポリシー
 
