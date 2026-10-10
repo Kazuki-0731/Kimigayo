@@ -83,7 +83,7 @@ done
 
 | ファイル | 何を書くか |
 | --- | --- |
-| `CHANGELOG.md` | `[Unreleased]` を新しい版見出しに移す。`make changelog` で生成も可 |
+| `CHANGELOG.md` | `[Unreleased]` を新しい版見出しに移す。**手で書く**（`make changelog` は `build/` に下書きを出すだけ。`CHANGELOG.md` は書き換えない） |
 | `RELEASE_NOTES.md` | 利用者向けの要点 |
 | `versions.mk` | 構成要素の版（プロジェクト版は `git describe` 由来） |
 | `Dockerfile` の `LABEL version` | 実態とずれていた前例あり |

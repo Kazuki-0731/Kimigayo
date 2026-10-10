@@ -82,7 +82,7 @@ help:
 	@echo "📌 バージョン管理:"
 	@echo "  make version      - バージョン番号を取得"
 	@echo "  make show-version - バージョン情報を表示"
-	@echo "  make changelog    - CHANGELOG.mdを生成"
+	@echo "  make changelog    - CHANGELOGの下書きをbuild/に出す（CHANGELOG.mdは書き換えない）"
 	@echo ""
 	@echo "⚡ ベンチマーク:"
 	@echo "  make benchmark            - 全ベンチマーク実行"

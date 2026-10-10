@@ -1060,7 +1060,10 @@ Subagent の方が速くて安い。3〜5人から始める。
   [docs/developer/ARCHITECTURE.md](docs/developer/ARCHITECTURE.md)。**
   `TODO.md` はそこと二重管理にせず、「いま手を動かしている話」に絞る
 - **リリースの記録は [CHANGELOG.md](CHANGELOG.md) と [RELEASE_NOTES.md](RELEASE_NOTES.md)。**
-  `make changelog` で生成できる。**タグを打つ前に必ず更新する**
+  **手で書く。** `make changelog` は
+  `build/CHANGELOG.generated.md` に下書きを出すだけで、
+  `CHANGELOG.md` は書き換えない（2026-10-11 までは `cat > CHANGELOG.md`
+  で丸ごと上書きする作りだった）。**タグを打つ前に必ず更新する**
   （2026-10-09 まで 0.1.0 止まりで、v2.0.1 までの 2 回のリリースが抜けていた）
 - **作業の区切りごとに `TODO.md`・`NEXT.md` を更新する。** とくに次の場合は必ず:
   - フェーズが進んだ（調査 → 変更 → ビルド検証）

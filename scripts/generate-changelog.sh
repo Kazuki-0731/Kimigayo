@@ -1,119 +1,113 @@
 #!/bin/bash
-# Generate CHANGELOG.md from git commits using conventional commits format
+# Generate a CHANGELOG draft from git commit subjects.
+#
+# **This never writes CHANGELOG.md.** Until 2026-10-11 it did, with
+# `cat > CHANGELOG.md`, which would have destroyed the hand-written entries
+# (every release section in CHANGELOG.md explains *why* a change was made;
+# a commit subject cannot carry that). The draft goes to build/ and you copy
+# the lines you want.
+#
+# Classification follows the emoji table in CLAUDE.md. Commits whose emoji is
+# not in the table land in "Uncategorized" instead of being dropped - the old
+# version only knew 7 prefixes, so 🧹 📊 🔧 ⚡ ⬆️ 🐳 ✅ commits disappeared
+# silently.
 
-set -e
+set -euo pipefail
 
-# Colors
 GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-CHANGELOG_FILE="${PROJECT_ROOT}/CHANGELOG.md"
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
+OUTPUT_FILE="${OUTPUT_FILE:-${BUILD_DIR}/CHANGELOG.generated.md}"
 
-# Get all tags sorted by version
-TAGS=$(git tag --sort=-version:refname)
+mkdir -p "$(dirname "$OUTPUT_FILE")"
 
-echo -e "${GREEN}Generating CHANGELOG.md...${NC}"
+# Keep a Changelog section <- emoji (CLAUDE.md "Git の運用ルール")
+section_of() {
+    case "$1" in
+        ✨*)                 echo "Added" ;;
+        🐛*)                 echo "Fixed" ;;
+        🔒*)                 echo "Security" ;;
+        🧹*)                 echo "Removed" ;;
+        ♻️*|♻*|⚡*|⬆️*|⬆*)  echo "Changed" ;;
+        📝*)                 echo "Documentation" ;;
+        🔧*|🐳*|👷*|🏗️*|🏗*) echo "Build/CI" ;;
+        ✅*)                 echo "Tests" ;;
+        📊*)                 echo "Measurements" ;;
+        *)                   echo "Uncategorized" ;;
+    esac
+}
 
-# Start CHANGELOG
-cat > "$CHANGELOG_FILE" <<EOF
-# Changelog
+SECTIONS=(Added Changed Fixed Removed Security Documentation Build/CI Tests Measurements Uncategorized)
 
-All notable changes to Kimigayo OS will be documented in this file.
+# Emit one version block for a commit range.
+emit_range() {
+    local heading="$1" range="$2"
+    local subject section
+    local -A bucket=()
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+    while IFS= read -r subject; do
+        [ -n "$subject" ] || continue
+        # Skip merge commits - they describe no change of their own.
+        case "$subject" in 🔀*|Merge\ *) continue ;; esac
+        section="$(section_of "$subject")"
+        # Strip the leading emoji and the space after it.
+        bucket["$section"]+="- ${subject#* }"$'\n'
+    done < <(git log "$range" --no-merges --pretty=format:'%s')
+
+    echo "$heading" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+    for section in "${SECTIONS[@]}"; do
+        [ -n "${bucket[$section]:-}" ] || continue
+        echo "### $section" >> "$OUTPUT_FILE"
+        printf '%s' "${bucket[$section]}" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
+    done
+}
+
+echo -e "${GREEN}Generating CHANGELOG draft...${NC}"
+
+cat > "$OUTPUT_FILE" <<EOF
+# Changelog draft ($(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S %Z'))
+
+**This is a draft, not CHANGELOG.md.** Commit subjects say *what* changed;
+CHANGELOG.md has to say *why*. Copy the lines you need and write the reason.
 
 EOF
 
-# If no tags exist, show unreleased changes
-if [ -z "$TAGS" ]; then
-    echo "## [Unreleased] - $(date +%Y-%m-%d)" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
+# Release tags only. \`git describe\` uses the same pattern (scripts/get-version.sh).
+mapfile -t TAGS < <(git tag --list 'v[0-9]*' --sort=-version:refname)
 
-    # Get all commits
-    git log --pretty=format:"- %s (%h)" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
+if [ "${#TAGS[@]}" -eq 0 ]; then
+    emit_range "## [Unreleased]" "HEAD"
 else
-    # Process each tag
-    PREVIOUS_TAG=""
-    for TAG in $TAGS; do
-        VERSION="${TAG#v}"
-        TAG_DATE=$(git log -1 --format=%ai "$TAG" | cut -d' ' -f1)
-
-        echo "## [$VERSION] - $TAG_DATE" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        # Get commits between tags
-        if [ -z "$PREVIOUS_TAG" ]; then
-            # First tag - get all commits up to this tag
-            COMMIT_RANGE="$TAG"
-        else
-            # Get commits between tags
-            COMMIT_RANGE="$TAG..$PREVIOUS_TAG"
-        fi
-
-        # Categorize commits by conventional commit types
-        echo "### Added" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^feat" --grep="^✨" | sed 's/^feat: /- /' | sed 's/^✨ /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        echo "### Changed" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^refactor" --grep="^♻️" | sed 's/^refactor: /- /' | sed 's/^♻️ /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        echo "### Fixed" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^fix" --grep="^🐛" | sed 's/^fix: /- /' | sed 's/^🐛 /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        echo "### Security" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^security" --grep="^🔒" | sed 's/^security: /- /' | sed 's/^🔒 /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        echo "### Documentation" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^docs" --grep="^📝" | sed 's/^docs: /- /' | sed 's/^📝 /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        echo "### Build/CI" >> "$CHANGELOG_FILE"
-        git log "$COMMIT_RANGE" --pretty=format:"%s" --grep="^build" --grep="^ci" --grep="^🏗️" --grep="^👷" | sed 's/^build: /- /' | sed 's/^ci: /- /' | sed 's/^🏗️ /- /' | sed 's/^👷 /- /' >> "$CHANGELOG_FILE" 2>/dev/null || true
-        echo "" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-
-        PREVIOUS_TAG="$TAG"
-    done
-
-    # Add unreleased changes if any
-    LATEST_TAG=$(echo "$TAGS" | head -1)
-    UNRELEASED_COUNT=$(git rev-list "$LATEST_TAG"..HEAD --count)
-
+    UNRELEASED_COUNT="$(git rev-list "${TAGS[0]}"..HEAD --count)"
     if [ "$UNRELEASED_COUNT" -gt 0 ]; then
-        # Create temporary file for unreleased section
-        TEMP_FILE=$(mktemp)
-
-        # Copy header
-        head -7 "$CHANGELOG_FILE" > "$TEMP_FILE"
-        echo "" >> "$TEMP_FILE"
-
-        # Add unreleased section
-        echo "## [Unreleased] - $(date +%Y-%m-%d)" >> "$TEMP_FILE"
-        echo "" >> "$TEMP_FILE"
-
-        echo "### Added" >> "$TEMP_FILE"
-        git log "$LATEST_TAG"..HEAD --pretty=format:"%s" --grep="^feat" --grep="^✨" | sed 's/^feat: /- /' | sed 's/^✨ /- /' >> "$TEMP_FILE" 2>/dev/null || true
-        echo "" >> "$TEMP_FILE"
-        echo "" >> "$TEMP_FILE"
-
-        # Append rest of changelog (skip first 7 lines which are the header)
-        tail -n +8 "$CHANGELOG_FILE" >> "$TEMP_FILE"
-        mv "$TEMP_FILE" "$CHANGELOG_FILE"
+        emit_range "## [Unreleased] (${UNRELEASED_COUNT} commits since ${TAGS[0]})" "${TAGS[0]}..HEAD"
     fi
+
+    for i in "${!TAGS[@]}"; do
+        tag="${TAGS[$i]}"
+        next=$(( i + 1 ))
+        tag_date="$(git log -1 --format=%ai "$tag" | cut -d' ' -f1)"
+        if [ "$next" -lt "${#TAGS[@]}" ]; then
+            emit_range "## [${tag#v}] - ${tag_date}" "${TAGS[$next]}..${tag}"
+        else
+            emit_range "## [${tag#v}] - ${tag_date}" "$tag"
+        fi
+    done
 fi
 
-echo -e "${GREEN}✓ CHANGELOG.md generated successfully${NC}"
-echo "Location: $CHANGELOG_FILE"
+uncategorized="$(grep -c '^### Uncategorized$' "$OUTPUT_FILE" || true)"
+
+echo -e "${GREEN}✓ draft written${NC}"
+echo "  $OUTPUT_FILE"
+if [ "$uncategorized" -gt 0 ]; then
+    echo -e "${YELLOW}  ! ${uncategorized} version(s) have Uncategorized commits.${NC}"
+    echo -e "${YELLOW}    Their emoji is not in the CLAUDE.md table - check it before copying.${NC}"
+fi
+echo ""
+echo "CHANGELOG.md is not touched. Copy what you need by hand."
