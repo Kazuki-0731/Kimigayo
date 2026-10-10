@@ -645,7 +645,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [仕様書](SPECIFICATION.md) - プロジェクト仕様
 - [アーキテクチャ](docs/developer/ARCHITECTURE.md) - 詳細設計
 - [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - v0.1.0 公開時の記録（現在の手順書ではありません）
-- [v1.0.0リリース計画](docs/V1_RELEASE_PLAN.md) - 正式版リリースに向けたロードマップ
+- [v1.0.0リリース計画](docs/V1_RELEASE_PLAN.md) - 2025-12 時点の計画（v1.0.0 は公開済み。現在は v3.0.x）
 
 #### GitHub Actions ワークフロー
 
