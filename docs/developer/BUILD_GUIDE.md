@@ -403,13 +403,22 @@ ls build/tmp/
 
 ### ビルドのステップ実行
 
+個別ターゲットは**ビルドコンテナ内**の `build-system/Makefile` にあります。
+ホストの `Makefile` には無いので、ホストで叩くと
+`No rule to make target` になります。
+
 ```bash
-# ステップごとにビルド
-make kernel
-make rootfs
-make bootloader
-make create-image
+# ステップごとにビルド（コンテナ内）
+docker compose run --rm kimigayo-build make musl      # [1/4]
+docker compose run --rm kimigayo-build make kernel    # [2/4] 成果物には入らない
+docker compose run --rm kimigayo-build make busybox   # [3/4]
+docker compose run --rm kimigayo-build make init      # [4/4]
+docker compose run --rm kimigayo-build make rootfs
 ```
+
+`make bootloader` と `make create-image` は存在しません
+（ベアメタル起動は対象外。→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2）。
+イメージ化はホスト側の `make package-rootfs` → `make build-image` です。
 
 ## パフォーマンス最適化
 

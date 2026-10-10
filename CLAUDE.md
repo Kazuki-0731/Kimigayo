@@ -16,8 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **成果物は Docker イメージ**（`ishinokazuki/kimigayo-os`）。rootfs だけを詰めた
   イメージで、**カーネルはイメージに入らない**（コンテナはホストのカーネルで動く）
 - **想定する使い方は VPS 上の Docker コンテナ。** 組み込みやベアメタル起動は
-  対象外（2026-10-10 に決定）。カーネルのビルドは `make kernel` で残して
-  あるが、**CI では一切ビルドしない**（成果物に含まれないものを毎 run
+  対象外（2026-10-10 に決定）。カーネルのビルド手段は残してあるが
+  （**ホストではなくビルドコンテナ内の** `make kernel`）、
+  **CI では一切ビルドしない**（成果物に含まれないものを毎 run
   数十分かけて作っていたため外した）。ベアメタル／QEMU を試したいときだけ
   手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
@@ -507,19 +508,24 @@ make benchmark             # 全ベンチマーク
   それでいて 1 run あたり数十分増えていた
 - **想定する使い方は VPS 上の Docker コンテナ。** 組み込み・ベアメタル起動は
   対象外なので、「カーネルが起動するか」を毎 push で見る必要がない
-- **`make kernel` は残してある。** ベアメタルや QEMU を試したくなったときに
-  ゼロから作り直さずに済むようにするため。消さない
+- **カーネルのビルド手段は残してある。** ベアメタルや QEMU を試したく
+  なったときにゼロから作り直さずに済むようにするため。消さない
   （→「削除指示を受けたら」節）
+- **`kernel` ターゲットがあるのは `build-system/Makefile`。**
+  ホストの `Makefile` には無いので、**ホストで `make kernel` を叩くと
+  `No rule to make target 'kernel'` になる**（`musl`・`busybox`・`init`・
+  `rootfs` も同じ）。compose の `working_dir` が
+  `/build/kimigayo/build-system` なので、コンテナ内では解決する
 
 | やりたいこと | どうするか |
 | --- | --- |
-| 手元でカーネルを作る | `make kernel TARGET_ARCH=x86_64`（数十分〜数時間） |
+| 手元でカーネルを作る | `docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64`（数十分〜数時間）。**ホストの `make kernel` は存在しない** |
 | CI でカーネルを作る | Actions から `manual-build.yml` を `build_kernel=true` で実行 |
 | カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`ci.yml` は通っても検証にならない** |
 
 **カーネル関連の変更をしたときは、`ci.yml` が緑でも「カーネルは見ていない」。**
 `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったら、
-手で `manual-build.yml` を回すか `make kernel` を通す。
+手で `manual-build.yml` を回すか、コンテナ内で `make kernel` を通す。
 
 ### パッチはなぜ存在するか
 

@@ -234,9 +234,11 @@ Kimigayo の想定は VPS やクラウド上の Docker コンテナであり、
 
 **カーネルのビルドは、この手順に含まれない。** 成果物の Docker
 イメージは rootfs だけを詰めたもので、コンテナはホストのカーネルで
-動く。カーネルは `make kernel` で手元で作れるようにしてあるが、
-CI では一切ビルドしない（→ [CLAUDE.md](CLAUDE.md)「カーネルは CI で
-作らない」）。
+動く。手元で作りたいときは
+`docker compose run --rm kimigayo-build make kernel` で作れるが
+（`kernel` ターゲットはビルドコンテナ内の `build-system/Makefile` にある。
+ホストの `Makefile` には無い）、CI では一切ビルドしない
+（→ [CLAUDE.md](CLAUDE.md)「カーネルは CI で作らない」）。
 
 ## 10. 命名規則とブランディング
 
