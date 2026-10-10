@@ -28,8 +28,12 @@ JSON_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.json"
 MD_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.md"
 
 # Images to compare
-# Use explicit version tags for Kimigayo OS
-KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-2.0.1}"
+#
+# **版を直書きしないこと。** 2026-10-10 まで既定値が `2.0.1` に
+# 固定されており、環境変数を渡さずに実行すると v3.0.0 を測っている
+# つもりで **v2.0.1 のイメージを引いて比較していた**。
+# 版の正本は git describe（→ scripts/get-version.sh）。
+KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-$(bash "${PROJECT_ROOT}/scripts/get-version.sh" 2>/dev/null || echo latest)}"
 IMAGES=(
     "ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-arm64"
     "alpine:latest"
