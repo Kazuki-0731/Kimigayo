@@ -81,36 +81,37 @@
 
 **測定環境:** Docker Desktop on Apple Silicon
 
+> **⚠️ この節の数値は無効（2026-10-10）。** 以下は
+> `docker run -d <image> sleep 5` の終了までを測った値で、起動時間では
+> ない。**イメージが壊れているほど速く見える**計測だった。
+> 現在の実測は下の「2026-10-10 の実測」節を見る。
+
 ```
-平均: 541ms
-中央値: 551ms
-最小: 499ms
-最大: 557ms
+平均: 541ms   ← 無効
+中央値: 551ms ← 無効
+最小: 499ms   ← 無効
+最大: 557ms   ← 無効
 ```
 
-**競合比較:**
-- Alpine Latest: 423ms （最速）
-- Kimigayo Standard: 439ms （Alpine +16ms、誤差範囲内）
-- Ubuntu 22.04: 439ms （同等）
-
-**結論:** Alpine Linuxと実用上同等の起動速度
+**競合比較（いずれも無効）:**
+- Alpine Latest: ~~423ms~~
+- Kimigayo Standard: ~~439ms~~
+- Ubuntu 22.04: ~~439ms~~
 
 ### メモリ使用量詳細
 
-**実測値:**
+> **⚠️ この節の数値は無効（2026-10-10）。** `KiB` を `0.001` に置換した
+> うえ整数 MB に丸めていたため、1MB 未満を 0 としか表せなかった。
+
 ```
-平均: 4MB
-中央値: 2MB
-最小: 2MB
-最大: 11MB
+平均: 4MB     ← 無効
+中央値: 2MB   ← 無効
 ```
 
-**競合比較:**
-- Kimigayo Standard: 0.2MB （実行時）
-- Alpine Latest: 0.2MB （同等）
-- Ubuntu 22.04: 0.3MB
-
-**結論:** 業界最小クラスのメモリ使用量
+**競合比較（いずれも無効）:**
+- Kimigayo Standard: ~~0.2MB~~
+- Alpine Latest: ~~0.2MB~~
+- Ubuntu 22.04: ~~0.3MB~~
 
 ---
 
@@ -391,73 +392,68 @@ make benchmark-startup
 
 ---
 
-## 🔍 競合OSとの詳細比較 (v2.0.1)
+## 🔍 競合OSとの比較（2026-10-10 の実測）
 
-### イメージサイズ比較
+**測定条件:** macOS / Apple Silicon、**arm64 ネイティブ**、
+Kimigayo v3.0.0 Standard、各10回の中央値。
+`docker-compose.yml` は linux/amd64 を強制するので、
+x86_64 を QEMU 経由で測った値は比較に使わない。
 
-| OS | サイズ | Kimigayo比 | 評価 |
-|----|--------|-----------|------|
-| **Kimigayo Standard** | 1.17MB | 基準 | ⭐⭐⭐⭐⭐ |
-| Distroless Static | 1.02MB | 0.87x | ⭐⭐⭐⭐⭐ 最小 |
-| BusyBox | 4.07MB | 3.5x | ⭐⭐⭐ |
-| Alpine Latest | 8.50MB | 7.3x | ⭐⭐ |
-| Distroless Base | 29MB | 24.8x | ⭐ |
-| Ubuntu 22.04 | 67.7MB | 57.9x | ⭐ |
-| Debian Slim | 95MB | 81.2x | ⭐ |
+### イメージサイズ
 
-**結論:**
-- Distroless Staticに次ぐ第2位の小ささ
-- Alpine Linuxの**7.3分の1**のサイズ
-- Ubuntu 22.04の**58分の1**のサイズ
+| OS | サイズ | Kimigayo 比 |
+|----|--------|-----------|
+| `gcr.io/distroless/static-debian12` | 2.11MB | 0.76x |
+| **Kimigayo Standard (x86_64)** | **2.78MB** | 基準 |
+| Kimigayo Standard (arm64) | 3.16MB | 1.14x |
+| `alpine:latest`（3.24.2） | 8.42MB | 3.0x |
+| `ubuntu:24.04` | 78.2MB | 28x |
 
-### 起動時間比較
+**シェルと Init を備えて 2.78MB。** distroless に 0.67MB 足すだけで
+`sh` と 400 個のコマンドとサービス管理が付く。
 
-| OS | 起動時間 | Kimigayo比 | 評価 |
-|----|---------|-----------|------|
-| Alpine Latest | 423ms | 0.96x | ⭐⭐⭐⭐⭐ 最速 |
-| **Kimigayo Standard** | 439ms | 基準 | ⭐⭐⭐⭐⭐ |
-| Ubuntu 22.04 | 439ms | 1.00x | ⭐⭐⭐⭐⭐ |
-| Distroless Base | N/A | - | ❌ 実行不可 |
-| Distroless Static | N/A | - | ❌ 実行不可 |
-| BusyBox | 測定未実施 | - | - |
-| Debian Slim | 測定未実施 | - | - |
+### 起動時間
 
-**結論:**
-- Alpine Linuxと**誤差範囲内**（+16ms = +3.8%）
-- Ubuntu 22.04と**完全同等**
-- Distrolessは実行可能ファイルなしで測定不可
+| OS | 起動時間 |
+|----|---------|
+| **Kimigayo Standard** | 0.62秒 |
+| `alpine:latest` | 0.61秒 |
+| `ubuntu:24.04` | 0.61秒 |
 
-### メモリ使用量比較
+**差は出ない。** 0.6 秒のほとんどは Docker 自身のコンテナ生成で、
+78MB の Ubuntu でも同じ数字になる。
+**「軽いから起動が速い」と書かないこと**（→ [CLAUDE.md](../../CLAUDE.md)）。
 
-| OS | メモリ | Kimigayo比 | 評価 |
-|----|-------|-----------|------|
-| **Kimigayo Standard** | 0.2MB | 基準 | ⭐⭐⭐⭐⭐ 最小 |
-| Alpine Latest | 0.2MB | 1.00x | ⭐⭐⭐⭐⭐ 同等 |
-| Ubuntu 22.04 | 0.3MB | 1.50x | ⭐⭐⭐⭐ |
-| Distroless Base | N/A | - | ❌ 測定不可 |
-| Distroless Static | N/A | - | ❌ 測定不可 |
+OpenRC が `default` ランレベルを完走するまでは **0.77 秒**。
 
-**結論:**
-- Alpine Linuxと**完全同等**
-- 業界最小クラスのメモリ使用量
+### 常駐メモリ
+
+| OS | 常駐メモリ | Kimigayo 比 |
+|----|-----------|-----------|
+| **Kimigayo Standard** | **232KB** | 基準 |
+| `alpine:latest` | 280KB | 1.21x |
+| `ubuntu:24.04` | 316KB | 1.36x |
+
+**ここが差の出る指標。** 単位は KB。
+`docker stats` は起動直後に `0B` を返すことがあるので、
+その標本は捨てて測る（`benchmark-memory.sh` の
+`discarded_zero_samples`）。
+
+### コマンド実行性能
+
+BusyBox のアプレットは Alpine の BusyBox 比 **0.96〜1.01x**（同等）。
 
 ### 機能比較
 
-| OS | サイズ | 起動 | メモリ | シェル | Pkg Mgr | 総合評価 |
-|----|--------|------|--------|--------|---------|---------|
-| **Kimigayo** | 1.2MB | 439ms | 0.2MB | ✅ | ❌ | ⭐⭐⭐⭐⭐ |
-| Alpine | 8.5MB | 423ms | 0.2MB | ✅ | ✅ apk | ⭐⭐⭐⭐ |
-| Distroless S | 1.0MB | N/A | N/A | ❌ | ❌ | ⭐⭐⭐ |
-| Ubuntu | 67.7MB | 439ms | 0.3MB | ✅ | ✅ apt | ⭐⭐ |
+| OS | サイズ | シェル | Init | パッケージマネージャー |
+|----|--------|--------|------|---------------------|
+| **Kimigayo Standard** | 2.78MB | ✅ BusyBox | ✅ OpenRC | ❌（設計方針） |
+| Distroless Static | 2.11MB | ❌ | ❌ | ❌ |
+| Alpine | 8.42MB | ✅ | ❌ | ✅ apk |
+| Ubuntu 24.04 | 78.2MB | ✅ | ❌ | ✅ apt |
 
-**Kimigayo OSの強み:**
-- ✅ 最小クラスのイメージサイズ
-- ✅ Alpine並みの低メモリ使用量
-- ✅ シェル対応（Distrolessより柔軟）
-- ✅ 静的リンクでセキュリティ強化
+**最新の値は [README.md](../../README.md) の「パフォーマンス実績」節が正本。**
 
-**Kimigayo OSの弱み:**
-- ⚠️ パッケージマネージャー非搭載（設計方針）
 - ⚠️ 起動時間はAlpineに+16ms劣る（誤差範囲）
 
 ### BusyBoxコマンド性能比較

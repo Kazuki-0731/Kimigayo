@@ -16,9 +16,14 @@ Kimigayo OSは3つのバリアントを提供しています:
 
 | バリアント | イメージ名 | サイズ | 用途 |
 |-----------|-----------|--------|------|
-| **Minimal** | `ishinokazuki/kimigayo-os:latest-minimal` | ~5MB | 最小限の環境、組み込み、マイクロサービス |
-| **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | ~10MB | 一般的な用途、開発、本番環境 |
-| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | ~20MB | 開発ツール付き、デバッグ、フル機能 |
+| **Minimal** | `ishinokazuki/kimigayo-os:latest-minimal` | 2.65MB | 最小限の環境、特化したコンテナ |
+| **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | 2.78MB | 一般的な用途、開発、本番環境 |
+| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.81MB | 開発ツール付き、デバッグ、フル機能 |
+
+（x86_64、2026-10-10 実測。arm64 は +0.4MB 程度。
+最新は [README.md](../../README.md) の「パフォーマンス実績」節）
+
+**組み込みは対象外です**（→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2）。
 
 ### アーキテクチャ対応
 
