@@ -314,7 +314,7 @@ jq '.results | to_entries | .[] | {command: .key, speedup: .value.speedup}' \
 ## 関連ドキュメント
 
 <!-- startup.md / memory.md / size.md / comparison.md は未作成。
-     起動時間とメモリは計測方法に問題があり再測定待ち
+     起動時間とメモリは 2026-10-10 に計測方法を直して実測済み
      （→ README.md「パフォーマンス実績」節）。 -->
 
 - [ライフサイクルベンチマーク](./lifecycle.md)

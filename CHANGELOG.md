@@ -8,7 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-（次のリリースに入る変更をここに書く）
+### Fixed
+
+- **起動時間とメモリのベンチマークが測るものを間違えていたのを直した。**
+  `scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` の
+  **終了まで**を測っており、正常なイメージほど必ず約 5,600ms になっていた
+  （公開していた 439ms はこの `sleep` が成立しなかった値で、
+  **イメージが壊れているほど速く見える**計測だった）。
+  いまは `docker run --rm <image> /bin/true` の実時間を測り、
+  `MODE=init` で `openrc default` の完走までも測れる
+- **`scripts/benchmark-memory.sh` の単位換算を直した。**
+  `KiB` を `0.001` に置換したうえ整数 MB に丸めており、
+  **1MB 未満を 0 としか表せなかった**（公開していた 0.2MB）。
+  単位を見て KB に正規化するようにし、KB で保持する。
+  どちらも `PLATFORM` を受け取れるようにした（arm64 ネイティブで測るため）
+
+### Added
+
+- **起動時間・メモリ・コマンド性能の実測値**（2026-10-10、arm64 ネイティブ、
+  中央値10回）。Standard は起動 **0.62秒** / 常駐 **232KB** /
+  BusyBox は Alpine 比 **0.96〜1.01x**。OpenRC の `default` 完走までは 0.77 秒。
+  比較: Alpine 0.61秒 / 280KB、Ubuntu 24.04 0.61秒 / 316KB
+- **「起動時間はイメージでは変わらない」という結論**を README に明記した。
+  0.6 秒のほとんどは Docker のコンテナ生成で、101MB の Ubuntu でも同じ。
+  **軽さを起動時間の速さとして宣伝しない**
 
 ---
 
@@ -35,7 +58,8 @@ BusyBox は static-pie で動くため `/bin/sh` は動き、smoke テストは�
 `alpine:latest` 8.42MB / `ubuntu:24.04` 78.2MB。
 
 **6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過。**
-起動時間とメモリは計測方法に問題があるため未測定（下記）。
+起動時間とメモリはリリース時点では計測方法に問題があるため未測定だった
+（下記）。**2026-10-10 中に計測方法を直して実測した** → [Unreleased]。
 
 ### Changed
 

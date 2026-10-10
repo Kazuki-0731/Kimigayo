@@ -86,9 +86,13 @@ v1.0 と v2.0 はコードネームの運用開始前に公開済みのため名
 
 ### ⚠️ 既知の制限
 
-- **起動時間とメモリは未測定。** 既存の計測スクリプトは
-  `docker run -d <image> sleep 5` の終了までを測っており、起動時間に
-  なっていませんでした。過去に公開していた 439ms / 0.2MB は撤回します
+- **起動時間とメモリはリリース時点では未測定でした。** 既存の計測
+  スクリプトは `docker run -d <image> sleep 5` の終了までを測っており、
+  起動時間になっていませんでした。過去に公開していた 439ms / 0.2MB は
+  撤回します。
+  **※ 2026-10-10 中に計測方法を直し、実測しました**（arm64 ネイティブで
+  起動 0.62 秒 / 常駐 232KB / BusyBox は Alpine 比 0.96〜1.01x）。
+  最新の値は [README.md](README.md) の「パフォーマンス実績」節にあります
 - **非特権コンテナでは一部のサービスが権限エラーを出します**
   （`ip: RTNETLINK answers: Operation not permitted`、
   `mount: permission denied`、`dmesg: klogctl: Operation not permitted`）。

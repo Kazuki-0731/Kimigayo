@@ -42,21 +42,37 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | イメージサイズ (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **目標の53%** / 60% |
 | イメージサイズ (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **目標の56%** / 63% |
 | イメージサイズ (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **目標の56%** / 64% |
-| 起動時間 | 未測定 | < 10秒 | ⏳ 計測方法の修正待ち |
-| メモリ使用量 | 未測定 | < 128MB | ⏳ 再測定待ち |
-| BusyBoxコマンド性能 | 未測定 | Alpine同等 | ⏳ 再測定待ち |
+| 起動時間 | **0.62秒** | < 10秒 | ✅ **目標の6%** |
+| メモリ使用量 | **232KB** | < 128MB | ✅ **目標の0.2%** |
+| BusyBoxコマンド性能 | Alpine比 **0.96〜1.01x** | Alpine同等 | ✅ **誤差範囲内** |
 
-2026-10-10 に x86_64 / arm64 の 6 イメージすべてを実測。
-6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過している。
+2026-10-10 実測。サイズは 6 イメージすべて、起動時間・メモリ・コマンド性能は
+arm64 ネイティブの Standard。6 バリアントすべてが
+`scripts/verify-image.sh` の 27 項目を通過している。
+
+> **起動時間の 0.62 秒は「Kimigayo が速い」という意味ではない。**
+> 同じ方法で測ると Alpine も Ubuntu も 0.61 秒で、**イメージによる差は
+> 出ない**（→「競合OS比較」節）。この 0.6 秒のほとんどは Docker 自身の
+> コンテナ生成で、イメージの中身はほとんど効かない。
+> 差が出るのはメモリの方（Kimigayo 232KB / Alpine 280KB / Ubuntu 316KB）。
 
 <details>
 <summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
 
-**測定条件**: 2026-10-10 / `docker images` の報告値 /
-ホストは macOS（Apple Silicon, arm64）で、x86_64 は
-`--platform linux/amd64` による QEMU エミュレーション /
+**測定条件**: 2026-10-10 / ホストは macOS（Apple Silicon, arm64）/
 Alpine 3.24 ベースのビルド環境 /
 カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
+
+| 何を | どう測ったか |
+| --- | --- |
+| サイズ | `docker images` の報告値。x86_64 は `--platform linux/amd64`（QEMU エミュレーション）|
+| 起動時間 | `docker run --rm <image> /bin/true` の実時間、10 回の中央値。arm64 ネイティブ |
+| メモリ | `sleep` で常駐させたコンテナの `docker stats` の値、10 回の中央値。arm64 ネイティブ |
+| コマンド性能 | `ls`・`grep`・`find`・`awk`・`sort`・`cat`・`wc`・`head` の 8 つを Alpine と同条件で実行（`scripts/benchmark-busybox.sh`）|
+
+**OpenRC が default ランレベルを完走するまでは 0.77 秒**
+（`docker run --rm <image> /sbin/openrc default`、arm64、10 回の中央値）。
+`/bin/true` の 0.62 秒との差 0.15 秒が Init の分。
 
 | バリアント | BusyBox アプレット | BusyBox 本体 | tarball | イメージ |
 | --- | --- | --- | --- | --- |
@@ -82,11 +98,14 @@ v3.0.0 で ASLR のため static-PIE 化とスタックプロテクタを有効�
 > 「Init システムが入っていない状態」の数字で、現在の 2.78MB と
 > 同じものを測った値ではない。
 >
-> **起動時間とメモリの旧値（439ms / 0.2MB）は撤回した。**
+> **起動時間とメモリの旧値（439ms / 0.2MB）は破棄した。計測が壊れていた。**
 > `scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` の
-> 終了までを測っており、正常なイメージでは約 5,600ms になる（実測）。
-> 439ms はこの `sleep` が成立しなかった場合の値で、起動時間ではない。
-> 計測方法ごと見直す必要がある。
+> 終了までを測っており、正常なイメージほど必ず約 5,600ms になっていた
+> （439ms はこの `sleep` が成立しなかった＝コンテナが即死したときの値で、
+> **イメージが壊れているほど速く見える**計測だった）。
+> `scripts/benchmark-memory.sh` は `KiB` を `0.001` に置換したうえ
+> 結果を整数 MB に丸めており、**1MB 未満を 0 としか表せなかった**。
+> 2026-10-10 に両方を書き直し、測り直したのが上の値。
 
 </details>
 
@@ -552,22 +571,31 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 ### 🌟 競合OS比較
 
-**サイズは 2026-10-10 に同じホスト（macOS / Apple Silicon、
-`--platform linux/amd64`）で `docker images` の値を実測。
-起動時間とメモリは計測方法に問題があり再測定待ち**
-（→「パフォーマンス実績」節）。
+**2026-10-10 に同じホスト（macOS / Apple Silicon）で実測。**
+サイズは x86_64（`--platform linux/amd64`、QEMU）と arm64 の両方、
+**起動時間とメモリは arm64 ネイティブ**（QEMU を挟むと時間の比較に
+ならないため）。測り方は「パフォーマンス実績」節の折りたたみを参照。
 
-| OS | サイズ | 起動時間 | メモリ | シェル | パッケージマネージャー | Init |
+| OS | サイズ (x86_64 / arm64) | 起動時間 | メモリ | シェル | パッケージマネージャー | Init |
 |----|-------|---------|-------|-------|---------------------|------|
-| **Kimigayo Minimal** | **2.65MB** | 未測定 | 未測定 | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Standard** | **2.78MB** | 未測定 | 未測定 | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Extended** | **2.81MB** | 未測定 | 未測定 | ✅ BusyBox | ❌ | ✅ OpenRC |
-| `gcr.io/distroless/static-debian12` | 2.11MB | 未測定 | 未測定 | ❌ | ❌ | ❌ |
-| `alpine:latest`（3.24.2） | 8.42MB | 未測定 | 未測定 | ✅ ash | ✅ apk | ❌ |
-| `ubuntu:24.04` | 78.2MB | 未測定 | 未測定 | ✅ bash | ✅ apt | ❌ |
+| **Kimigayo Minimal** | **2.65** / **3.02MB** | 0.63秒 | **232KB** | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Standard** | **2.78** / **3.16MB** | 0.62秒 | **232KB** | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Extended** | **2.81** / **3.20MB** | 0.60秒 | 240KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| `gcr.io/distroless/static-debian12` | 2.11 / 2.11MB | — | — | ❌ | ❌ | ❌ |
+| `alpine:latest`（3.24.2） | 8.42 / 8.66MB | 0.61秒 | 280KB | ✅ ash | ✅ apk | ❌ |
+| `ubuntu:24.04` | 78.2 / 101MB | 0.61秒 | 316KB | ✅ bash | ✅ apt | ❌ |
+
+> **起動時間に差は出ていない**（0.60〜0.63秒）。測っている時間のほとんどは
+> Docker のコンテナ生成で、イメージの中身はほとんど効かない。
+> **101MB の Ubuntu でも同じ**になるので、「軽いから起動が速い」とは
+> 言えない。差が出るのは常駐メモリの方で、Kimigayo は Ubuntu の約 73%。
+>
+> distroless は実行ファイルを1つも持たないため、この方法では起動時間も
+> メモリも測れない（`/bin/true` すら無い）。これは欠陥ではなく設計。
 
 #### vs Alpine Linux
-- ✅ **約3倍軽量**: 2.78MB vs 8.42MB
+- ✅ **約3倍軽量**: 2.78MB vs 8.42MB（x86_64。arm64 でも 3.16 vs 8.66MB）
+- ✅ **常駐メモリが少ない**: 232KB vs 280KB（arm64）
 - ✅ **パッケージマネージャーなし**: セキュリティ優先の設計（Alpine は apk を含む）
 - ✅ **Init を同梱**: OpenRC 0.63.2（Alpine のイメージには Init が入っていない）
 - ✅ **不変インフラ**: ビルド時に全て決定、実行時の変更を排除
@@ -687,20 +715,37 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 | Image size (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **53% of target** / 60% |
 | Image size (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **56% of target** / 63% |
 | Image size (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **56% of target** / 64% |
-| Boot time | not measured | < 10s | ⏳ benchmark needs fixing |
-| Memory usage | not measured | < 128MB | ⏳ pending |
-| BusyBox performance | not measured | Alpine equivalent | ⏳ pending |
+| Boot time | **0.62s** | < 10s | ✅ **6% of target** |
+| Memory usage | **232KB** | < 128MB | ✅ **0.2% of target** |
+| BusyBox performance | **0.96-1.01x** of Alpine | Alpine equivalent | ✅ **within noise** |
 
-All six images (x86_64 and arm64) were measured on 2026-10-10, and every
-variant passes all 27 checks in `scripts/verify-image.sh`.
+Measured on 2026-10-10: sizes for all six images, and boot time, memory and
+command performance for Standard on native arm64. Every variant passes all 27
+checks in `scripts/verify-image.sh`.
+
+> **The 0.62s boot time does not mean Kimigayo is fast.** Measured the same
+> way, Alpine and Ubuntu both come out at 0.61s — **the image makes no
+> measurable difference**. Almost all of that 0.6s is Docker creating the
+> container. Memory is where the difference actually shows
+> (Kimigayo 232KB / Alpine 280KB / Ubuntu 316KB).
 
 <details>
 <summary><b>Per-variant breakdown, and where the bytes go</b></summary>
 
-**Measurement conditions**: 2026-10-10, as reported by `docker images`.
-Host is macOS on Apple Silicon (arm64); x86_64 runs under QEMU emulation
-via `--platform linux/amd64`. Build environment is based on Alpine 3.24,
-with kernel 6.18.55 / musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
+**Measurement conditions**: 2026-10-10, host is macOS on Apple Silicon
+(arm64). Build environment is based on Alpine 3.24, with kernel 6.18.55 /
+musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
+
+| What | How |
+| --- | --- |
+| Size | as reported by `docker images`; x86_64 under QEMU via `--platform linux/amd64` |
+| Boot time | wall time of `docker run --rm <image> /bin/true`, median of 10, native arm64 |
+| Memory | `docker stats` of an idle container, median of 10 samples, native arm64 |
+| Command performance | `ls`, `grep`, `find`, `awk`, `sort`, `cat`, `wc` and `head` run against Alpine under identical conditions (`scripts/benchmark-busybox.sh`) |
+
+**OpenRC reaches the `default` runlevel in 0.77s**
+(`docker run --rm <image> /sbin/openrc default`, native arm64, median of 10).
+The 0.15s over `/bin/true` is what the init system costs.
 
 | Variant | BusyBox applets | BusyBox binary | tarball | image |
 | --- | --- | --- | --- | --- |
@@ -725,11 +770,14 @@ to enable ASLR).
 > images that **did not actually contain musl's `libc.so` or any OpenRC binary**
 > (fixed on 2026-10-09), so it is not the same thing as today's 2.78MB.
 >
-> The old boot time and memory figures (439ms / 0.2MB) have been withdrawn:
-> `scripts/benchmark-startup.sh` times `docker run -d <image> sleep 5` until it
-> exits, which takes about 5,600ms on a working image. The 439ms figure is what
-> you get when that `sleep` never runs, so it is not a boot time at all. The
-> measurement method itself needs to be reworked.
+> The old boot time and memory figures (439ms / 0.2MB) were discarded — the
+> benchmarks were broken. `scripts/benchmark-startup.sh` timed
+> `docker run -d <image> sleep 5` until it exited, which always takes about
+> 5,600ms on a working image; 439ms is what you get when that `sleep` never
+> runs, so **the more broken the image, the faster it looked**.
+> `scripts/benchmark-memory.sh` replaced `KiB` with `0.001` and then rounded to
+> whole megabytes, so **anything under 1MB came out as 0**. Both were rewritten
+> on 2026-10-10 and re-measured; the numbers above are from that run.
 
 </details>
 

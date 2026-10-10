@@ -21,13 +21,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   数十分かけて作っていたため外した）。ベアメタル／QEMU を試したいときだけ
   手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
-- **実測値**: Standard（x86_64）**2.78MB**（2026-10-10）。
-  起動時間とメモリは**計測方法に問題があり未測定**
-  （`scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` の
-  終了までを測るため、正常なイメージでは約 5,600ms になる。
-  README が長く載せていた 439ms はこの `sleep` が成立しなかった場合の値）。
+- **実測値**（2026-10-10）: Standard は x86_64 **2.78MB** / arm64 **3.16MB**、
+  起動 **0.62秒**、常駐メモリ **232KB**、BusyBox は Alpine 比 **0.96〜1.01x**。
+  **起動時間はイメージの差が出ない**（Alpine も Ubuntu も 0.61 秒）。
+  測っている時間のほとんどが Docker のコンテナ生成なので、
+  **「軽いから起動が速い」とは書かない**。差が出るのは常駐メモリの方
+  （Alpine 280KB / Ubuntu 316KB）。
   **v2.0.1 の 1.17MB は Init も libc.so も入っていないイメージの値**なので、
-  現在の 2.78MB と並べて比較しない
+  現在の 2.78MB と並べて比較しない。
+  **旧値 439ms / 0.2MB は計測が壊れていたため破棄済み**
+  （`benchmark-startup.sh` は `sleep 5` の終了を、`benchmark-memory.sh` は
+  `KiB` を潰した値を測っていた。2026-10-10 に両方書き直した）
 - 構成要素: **musl libc**（C ライブラリ）/ **Linux カーネル**（強化版）/
   **BusyBox**（コアユーティリティ）/ **OpenRC**（Init）
 

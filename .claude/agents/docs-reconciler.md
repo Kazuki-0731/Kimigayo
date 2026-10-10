@@ -17,9 +17,11 @@ color: blue
 - README は v2.0.1 の実績を書き、`git tag` も `v2.0.1` まであるのに
   `CHANGELOG.md` は 0.1.0 止まり、`Dockerfile` の `LABEL version` も `0.1.0`
 - `DEVELOPMENT.md` に**存在しない** `src/pkg/` や `make all`・`make iso` が書かれていた
-- README が長く載せていた起動時間 439ms は、ベンチマークスクリプトが
-  測り間違えた値だった（`docker run -d <image> sleep 5` の終了までを
-  測っており、正常なイメージでは約 5,600ms になる）
+- README が長く載せていた起動時間 439ms とメモリ 0.2MB は、ベンチマーク
+  スクリプトが測り間違えた値だった（起動は `docker run -d <image> sleep 5`
+  の終了まで、メモリは `KiB` を潰して整数 MB に丸めていた）。
+  **2026-10-10 に両方を直して実測済み**（arm64 ネイティブで 0.62 秒 /
+  232KB）。**この 2 つの旧値がまだ生きた数値として載っている箇所を探す**
 - **v2.0.1 の 1.17MB は OpenRC も `libc.so` も `/tmp` も入っていない
   イメージの値**で、現在の 2.78MB と同じものを測った数字ではない
 
