@@ -72,7 +72,7 @@ echo -e "${NC}"
 # Check if image exists
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo -e "${RED}Error: Docker image not found: $IMAGE_NAME${NC}"
-    echo "Please run scripts/build-docker-image.sh first"
+    echo "Please run: make package-rootfs && make build-image"
     exit 1
 fi
 
