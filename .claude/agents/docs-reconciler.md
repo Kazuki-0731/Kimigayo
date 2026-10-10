@@ -68,10 +68,40 @@ grep -rhoE '\[[^]]+\]\(([^)#]+)\)' --include='*.md' . |
   while read -r p; do [ -e "$p" ] || echo "リンク切れ: $p"; done
 
 # make ターゲット
-make help 2>/dev/null | grep -oE '^\s+[a-z][a-z0-9-]+' | tr -d ' ' | sort -u > /tmp/_t
-grep -rhoE 'make [a-z][a-z0-9-]+' --include='*.md' . | awk '{print $2}' | sort -u |
+# **Makefile は2つある。** ホストの Makefile と build-system/Makefile で、
+# 中身が違う。片方だけ見ると誤報になる。
+{ grep -oE '^[a-zA-Z0-9_-]+:' Makefile
+  grep -oE '^[a-zA-Z0-9_-]+:' build-system/Makefile; } | tr -d ':' | sort -u > /tmp/_t
+grep -rhoE 'make [a-z][a-z0-9_-]+' --include='*.md' . | grep -v '^./build' |
+  sed 's/^make //' | sort -u |
   while read -r t; do grep -qx "$t" /tmp/_t || echo "存在しないターゲット: make $t"; done
 ```
+
+> **`make help` の出力で判定しないこと。** 2026-10-10 にこの方法で
+> 「`make kernel` は存在しない」と報告しましたが、**誤りでした**。
+> `kernel`・`musl`・`busybox`・`init`・`rootfs` は
+> `build-system/Makefile` にあり、compose の `working_dir` が
+> `/build/kimigayo/build-system` なのでコンテナ内では動きます。
+>
+> **ただしホストでは動きません。** ドキュメントが
+> `make kernel` とだけ書いていたら、それは
+> 「`docker compose run --rm kimigayo-build make kernel` の誤り」として
+> 報告します。**「存在しない」と「ホストでは動かない」を区別する。**
+>
+> `menuconfig`・`oldconfig`・`olddefconfig`・`mrproper` は
+> カーネル／BusyBox のソースツリーで叩く上流のターゲットなので、
+> Kimigayo のターゲットが無くても誤報です。
+
+**実例（2026-10-11 に修正した 12 件）:**
+`build-minimal` / `build-standard` / `build-extended`（実際は
+`IMAGE_TYPE=` 変数）、`build-all-arch` / `build-multi-arch`、
+`lint` / `static-analysis`（実際は `shellcheck-scan` / `security-scan`）、
+`coverage`、`docs`、`integration-test`（実際は `test-integration`）、
+`build-all`、`kernel-config` / `kernel-menuconfig` / `kernel-defconfig`、
+`setup-cross-arm64` / `setup-cross-riscv`、`bootloader` / `create-image`。
+**変数も同様**: `BUILD_TYPE` / `JOBS` / `PACKAGE_LIST` / `KERNEL_CONFIG` は
+存在せず、実在するのは `TARGET_ARCH` / `IMAGE_TYPE` / `VARIANT` /
+`BUILD_JOBS` / `DEBUG` / `SECURITY_HARDENING`。
 
 `git ls-files` にあるかどうかで判定します。`build/` や `output/` の
 生成物への言及は、未ビルドでも「無い」とは言えないので区別します。
@@ -93,7 +123,22 @@ grep -rhoE 'make [a-z][a-z0-9-]+' --include='*.md' . | awk '{print $2}' | sort -
 - 「Init システム: OpenRC」が売りだが、**配布イメージに1つも
   入っていなかった**（v0.1.0〜v2.0.1）
 - パッケージマネージャーが無いのは**意図した設計**であって欠落ではない。
-  これを「問題」として挙げないこと
+  これを「問題」として挙げないこと。
+  **ただし「無い」と書いてあることと「無い」ことは別です**  —
+  v3.0.0 までのイメージには `dpkg`・`dpkg-deb`・`rpm` が入っていました
+  （BusyBox の config の書き忘れ）。文書の主張は成果物で確かめる
+- **宣伝されている仕組みの「受け取り側」を探す。** 2026-10-11 に
+  `DOCKERHUB_README.md` から削除したもの: 「seccomp をデフォルトで
+  有効化」（rootfs にプロファイルが無い）、「Cosign で署名」
+  （`release.yml` に工程が無い）、「再現可能ビルド＝ビット同一」
+  （`REPRODUCIBLE_BUILD` を誰も設定しておらず、`config.mk` 自体が
+  include されていない）、「`stable` / `edge` タグ」（Docker Hub に
+  存在しない）
+- **`config.mk` を実装の根拠にしないこと。** どこからも include されて
+  いないので、中の変数はすべて無効です。強化フラグの実体は
+  `scripts/build-{musl,busybox,openrc}.sh` に直書きされています
+- **公開面の文書は優先度が高い。** `DOCKERHUB_README.md` は Docker Hub の
+  Overview、`README.md` は GitHub のトップ。間違いがそのまま宣伝になる
 
 ## 報告のしかた
 

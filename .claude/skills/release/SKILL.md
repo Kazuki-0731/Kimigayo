@@ -90,6 +90,31 @@ done
 | `README.md` | 数値・バージョン表記（**英語セクションも**） |
 | `SPECIFICATION.md` | 仕様の変更があれば |
 
+### 公開面の文書が実装と合っているか
+
+**`DOCKERHUB_README.md` は Docker Hub の Overview にそのまま出ます。**
+CI は中身を検証しないので、実装していない機能が宣伝されたまま残ります。
+
+```bash
+# 宣伝している仕組みの「受け取り側」があるか
+grep -rn 'seccomp' scripts/ configs/ Dockerfile*          # プロファイルは rootfs に入るか
+grep -rn -i 'cosign\|content trust' .github/workflows/release.yml
+grep -rn 'REPRODUCIBLE_BUILD' Makefile build-system/Makefile scripts/
+# 案内しているタグが実在するか
+curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?page_size=100' |
+    python3 -I -c 'import json,sys; print(sorted(t["name"] for t in json.load(sys.stdin)["results"]))'
+```
+
+> 2026-10-11 に削除したもの: 「seccomp-BPF をデフォルトで有効化」
+> 「Cosign で署名」「再現可能ビルド＝ビット同一」「`stable` / `edge`
+> タグ」「Minimal はカーネル込み」。**どれも一度も実装されていません。**
+> セキュリティパッチの期限も、`SECURITY_POLICY.md`（Critical 7日）より
+> 厳しい「24〜48時間」を公開面だけで約束していました。
+
+**`CHANGELOG.md` を `make changelog` で上書きしないこと。**
+このコマンドは `build/CHANGELOG.generated.md` に下書きを出すだけです
+（2026-10-11 まで `cat > CHANGELOG.md` で全消しする作りでした）。
+
 **破壊的変更・既知の問題を隠さないこと。** 前の版に無かった制約
 （例: イメージサイズが 1.17MB → 2.78MB になった理由は
 **v2.0.1 に Init も libc も入っていなかったから**）は明記します。

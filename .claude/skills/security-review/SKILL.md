@@ -128,6 +128,26 @@ SECURITY_CFLAGS  := -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2
 SECURITY_LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 ```
 
+> **`config.mk` はどこからも include されていません**（2026-10-11 に確認）。
+> `Makefile` も `build-system/Makefile` も `include config.mk` を持たず、
+> スクリプトも source していません。**上の変数は1つも効いていません。**
+>
+> 実際にフラグを渡しているのは3箇所で、それぞれ別の文字列です:
+>
+> | | 置き場 |
+> | --- | --- |
+> | musl | `scripts/build-musl.sh` の `CFLAGS_SECURITY` / `LDFLAGS_SECURITY` |
+> | BusyBox | `scripts/build-busybox.sh` の `CONFIG_EXTRA_CFLAGS` と `export CFLAGS` |
+> | OpenRC | `scripts/build-openrc.sh` の `export CFLAGS` / `LDFLAGS` |
+>
+> **`-Wl,-z,noexecstack` は `config.mk` にしかありません。**
+> ただし成果物は実際に非実行スタックです（lld の既定）。
+> こちらが保証しているわけではないので、ELF を見て確かめます。
+>
+> **再現可能ビルドは一度も効いていません。**
+> `REPRODUCIBLE_BUILD=yes` のときだけ `SOURCE_DATE_EPOCH` と
+> prefix-map が入る作りですが、この変数をどこも設定していません。
+
 成果物の ELF を見て確かめます。
 
 ```bash
