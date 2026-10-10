@@ -40,11 +40,15 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | 指標 | 実測値 | 目標値 | 達成状況 |
 |------|-------|--------|---------|
 | イメージサイズ (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **目標の53%** / 60% |
-| イメージサイズ (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **目標の56%** / 63% |
-| イメージサイズ (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **目標の56%** / 64% |
+| イメージサイズ (Standard) | **2.78MB** / arm64 **3.16MB** | < 15MB | ✅ **目標の19%** / 21% |
+| イメージサイズ (Extended) | **2.81MB** / arm64 **3.20MB** | < 50MB | ✅ **目標の6%** / 6% |
 | 起動時間 | **0.62秒** | < 10秒 | ✅ **目標の6%** |
 | メモリ使用量 | **232KB** | < 128MB | ✅ **目標の0.2%** |
 | BusyBoxコマンド性能 | Alpine比 **0.96〜1.01x** | Alpine同等 | ✅ **誤差範囲内** |
+
+目標値は [SPECIFICATION.md](SPECIFICATION.md) §8.3 の定義
+（Minimal 5MB / Standard 15MB / Extended 50MB）。
+**実際には 3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っている。**
 
 2026-10-10 実測。サイズは 6 イメージすべて、起動時間・メモリ・コマンド性能は
 arm64 ネイティブの Standard。6 バリアントすべてが
@@ -713,11 +717,15 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 | Metric | Measured | Target | Status |
 |--------|----------|--------|---------|
 | Image size (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **53% of target** / 60% |
-| Image size (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **56% of target** / 63% |
-| Image size (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **56% of target** / 64% |
+| Image size (Standard) | **2.78MB** / arm64 **3.16MB** | < 15MB | ✅ **19% of target** / 21% |
+| Image size (Extended) | **2.81MB** / arm64 **3.20MB** | < 50MB | ✅ **6% of target** / 6% |
 | Boot time | **0.62s** | < 10s | ✅ **6% of target** |
 | Memory usage | **232KB** | < 128MB | ✅ **0.2% of target** |
 | BusyBox performance | **0.96-1.01x** of Alpine | Alpine equivalent | ✅ **within noise** |
+
+Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
+(Minimal 5MB / Standard 15MB / Extended 50MB). **In practice all three
+variants come in under 5MB — the strictest of the three targets.**
 
 Measured on 2026-10-10: sizes for all six images, and boot time, memory and
 command performance for Standard on native arm64. Every variant passes all 27
