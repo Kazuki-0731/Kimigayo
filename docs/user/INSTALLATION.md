@@ -41,7 +41,7 @@ Dockerを使用したインストールが最も簡単です。
 #### 前提条件
 - Docker 20.10以降がインストールされていること
 
-#### Minimalイメージ（5MB以下）
+#### Minimalイメージ（2.62MB / arm64 2.98MB）
 
 ```bash
 # Kimigayo OS Minimalイメージをpull
@@ -51,7 +51,7 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 docker run -it ishinokazuki/kimigayo-os:latest-minimal
 ```
 
-#### Standardイメージ（推奨）
+#### Standardイメージ（2.76MB / arm64 3.13MB、推奨）
 
 ```bash
 # Kimigayo OS Standardイメージをpull
@@ -61,7 +61,7 @@ docker pull ishinokazuki/kimigayo-os:latest
 docker run -it ishinokazuki/kimigayo-os:latest
 ```
 
-#### Extendedイメージ
+#### Extendedイメージ（2.78MB / arm64 3.17MB）
 
 ```bash
 # Kimigayo OS Extendedイメージをpull
@@ -80,14 +80,14 @@ docker run -it ishinokazuki/kimigayo-os:latest-extended
 docker volume create kimigayo-data
 
 # ボリュームをマウントして起動
-docker run -it -v kimigayo-data:/data kimigayo/kimigayo-os:standard
+docker run -it -v kimigayo-data:/data ishinokazuki/kimigayo-os:latest
 ```
 
 #### デーモンモードでの起動
 
 ```bash
 # バックグラウンドで起動
-docker run -d --name kimigayo-app kimigayo/kimigayo-os:standard
+docker run -d --name kimigayo-app ishinokazuki/kimigayo-os:latest
 
 # コンテナに接続
 docker exec -it kimigayo-app /bin/sh
@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
       - name: kimigayo-os
-        image: kimigayo/kimigayo-os:standard
+        image: ishinokazuki/kimigayo-os:latest
         resources:
           requests:
             memory: "128Mi"
@@ -136,22 +136,8 @@ kubectl get pods
 kubectl logs -l app=kimigayo-os
 ```
 
-#### Helmチャートの使用
-
-```bash
-# Helmリポジトリの追加
-helm repo add kimigayo https://charts.kimigayo-os.org
-helm repo update
-
-# Kimigayo OSのインストール
-helm install my-kimigayo kimigayo/kimigayo-os
-
-# カスタム設定でインストール
-helm install my-kimigayo kimigayo/kimigayo-os \
-  --set image.tag=standard \
-  --set replicaCount=3 \
-  --set resources.requests.memory=128Mi
-```
+**Helm チャートは配布していません。** Helm で管理したい場合は、上の
+Deployment マニフェストを自分のチャートに取り込んでください。
 
 ### Podman環境
 
@@ -159,10 +145,10 @@ Podmanを使用する場合（Dockerとほぼ同じコマンド）：
 
 ```bash
 # イメージをpull
-podman pull kimigayo/kimigayo-os:standard
+podman pull ishinokazuki/kimigayo-os:latest
 
 # コンテナを起動
-podman run -it kimigayo/kimigayo-os:standard
+podman run -it ishinokazuki/kimigayo-os:latest
 
 # システムdサービスとして実行
 podman generate systemd --name kimigayo-app > /etc/systemd/system/kimigayo-app.service
@@ -176,52 +162,89 @@ systemctl enable --now kimigayo-app
 コンテナ起動後、以下の設定を行います：
 
 ```bash
-# ホスト名の設定
+# ホスト名の設定（コンテナでは docker run --hostname の方が確実）
 echo "kimigayo" > /etc/hostname
+```
 
-# タイムゾーンの設定
-ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+**タイムゾーンのデータベースは入っていません。** `/usr/share/zoneinfo` が
+無いので `ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime` は使えません。
+必要な場合は、必要なゾーンだけをビルド時に持ち込みます。
+
+```dockerfile
+FROM alpine:3.24 AS tz
+RUN apk add --no-cache tzdata
+
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+ENV TZ=Asia/Tokyo
 ```
 
 ### ユーザーの作成
 
 ```bash
-# 新しいユーザーを追加
+# 新しいユーザーを追加（BusyBox の adduser）
 adduser username
-
-# sudoグループに追加（必要に応じて）
-adduser username wheel
 ```
+
+**`sudo` と `wheel` グループはありません。** `sudo` は入っておらず、
+`/etc/group` にも `wheel` がないので `adduser username wheel` は失敗します。
+権限を落として実行したいときは、コンテナの外から指定してください。
+
+```bash
+docker run -it --user 1000:1000 ishinokazuki/kimigayo-os:latest
+```
+
+root へ昇格する必要がある場合は BusyBox の `su` を使います。
 
 ### 追加ソフトウェアのインストール
 
 Kimigayo OSはdistroless設計を採用しており、パッケージマネージャは含まれていません。追加ソフトウェアが必要な場合は、マルチステージビルドを使用してください。
 
-```bash
-# マルチステージビルドの例
-FROM alpine:3.24 AS builder
-RUN apk add --no-cache vim curl wget
+**実行ファイルだけを `COPY` しても動きません。** 共有ライブラリを
+一緒に持ち込む必要があります。足りないと実行時に
+`Error relocating ...: symbol not found` で落ちます。
+**依存は手で列挙せず `ldd` で解決します**（上流の更新で依存が増えても追従できます）。
 
-FROM ishinokazuki/kimigayo-os:latest
-COPY --from=builder /usr/bin/vim /usr/bin/vim
-COPY --from=builder /usr/bin/curl /usr/bin/curl
-COPY --from=builder /usr/bin/wget /usr/bin/wget
+```dockerfile
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache curl
+
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp /usr/bin/curl /stage/usr/bin/ \
+    && ldd /usr/bin/curl \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' \
+       | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+# 版を固定する。latest は毎リリースで中身が変わります。
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY --from=builder /stage/ /
 ```
+
+`vi`・`wget`・`awk`・`sed` は Standard と Extended に**最初から入っています**
+（BusyBox のアプレット）。持ち込みが必要なのは `curl` のように
+BusyBox に無いものだけです。動く例は
+[examples/](../../examples/)（nginx / Node.js / Python）にあります。
 
 ### ネットワーク設定
 
-```bash
-# ネットワークインターフェースの確認
-ip link show
+**ネットワークはコンテナランタイムが設定します。** イメージには
+`/etc/network/interfaces` が置かれていますが、**それを読む `networking`
+サービスがイメージに入っていない**ので、ここを書き換えても何も起きません。
 
-# 静的IPの設定（必要に応じて）
-cat > /etc/network/interfaces << EOF
-auto eth0
-iface eth0 inet static
-    address 192.168.1.100
-    netmask 255.255.255.0
-    gateway 192.168.1.1
-EOF
+```bash
+# コンテナ内から確認する
+ip link show
+ip addr show
+```
+
+静的 IP が必要なときは、コンテナの外から指定します。
+
+```bash
+docker network create --subnet 192.168.100.0/24 kimigayo-net
+docker run -it --network kimigayo-net --ip 192.168.100.10 \
+  ishinokazuki/kimigayo-os:latest
 ```
 
 ## トラブルシューティング
@@ -246,13 +269,16 @@ docker stats
 # ネットワークインターフェースの確認
 ip link show
 
-# DHCPクライアントの起動
-dhclient eth0
+# DHCPクライアントの起動（BusyBox は udhcpc。dhclient は入っていません）
+udhcpc -i eth0
 
-# Dockerネットワークの確認
+# Dockerネットワークの確認（ホスト側で実行）
 docker network ls
 docker network inspect bridge
 ```
+
+通常の `docker run` では**ランタイムが IP を割り当てるので `udhcpc` を
+自分で叩く必要はありません。**
 
 ### ソフトウェアのインストール方法
 
@@ -271,10 +297,10 @@ sudo systemctl restart docker
 
 # プロキシ設定の確認（必要に応じて）
 docker info | grep -i proxy
-
-# 別のレジストリを試す
-docker pull ghcr.io/kimigayo/kimigayo-os:standard
 ```
+
+**配布先は Docker Hub の `ishinokazuki/kimigayo-os` だけです。**
+GitHub Container Registry（`ghcr.io`）には公開していません。
 
 ## パフォーマンスチューニング
 
@@ -282,20 +308,20 @@ docker pull ghcr.io/kimigayo/kimigayo-os:standard
 
 ```bash
 # 最大メモリを512MBに制限
-docker run -it --memory=512m kimigayo/kimigayo-os:standard
+docker run -it --memory=512m ishinokazuki/kimigayo-os:latest
 
 # スワップを無効化
-docker run -it --memory=512m --memory-swap=512m kimigayo/kimigayo-os:standard
+docker run -it --memory=512m --memory-swap=512m ishinokazuki/kimigayo-os:latest
 ```
 
 ### CPU制限の設定
 
 ```bash
 # CPU使用率を50%に制限
-docker run -it --cpus=0.5 kimigayo/kimigayo-os:standard
+docker run -it --cpus=0.5 ishinokazuki/kimigayo-os:latest
 
 # 特定のCPUコアに固定
-docker run -it --cpuset-cpus=0,1 kimigayo/kimigayo-os:standard
+docker run -it --cpuset-cpus=0,1 ishinokazuki/kimigayo-os:latest
 ```
 
 ## セキュリティ設定
@@ -304,14 +330,14 @@ docker run -it --cpuset-cpus=0,1 kimigayo/kimigayo-os:standard
 
 ```bash
 # ルートファイルシステムを読み取り専用に
-docker run -it --read-only --tmpfs /tmp kimigayo/kimigayo-os:standard
+docker run -it --read-only --tmpfs /tmp ishinokazuki/kimigayo-os:latest
 ```
 
 ### 非rootユーザーでの実行
 
 ```bash
 # 特定のユーザーIDで実行
-docker run -it --user 1000:1000 kimigayo/kimigayo-os:standard
+docker run -it --user 1000:1000 ishinokazuki/kimigayo-os:latest
 ```
 
 ## サポート
