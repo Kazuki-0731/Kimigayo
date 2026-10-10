@@ -460,12 +460,15 @@ make build  # コンテナ内でビルド
 | **Standard** | **2.78MB**（403 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
 | **Extended** | **2.81MB**（413 アプレット） | 開発環境、豊富なツール | `ishinokazuki/kimigayo-os:latest-extended` |
 
-いずれも x86_64 / 2026-10-09 実測。
+いずれも x86_64 / 2026-10-10 実測。arm64 は Minimal 3.02MB /
+Standard 3.16MB / Extended 3.20MB（→「パフォーマンス実績」節）。
 
-> Docker Hub 上のイメージは v2.0.1 のままで、上の実測値は
-> ローカルビルドのもの。構成要素の更新はまだ公開していない。
+> 上のタグはいずれも **v3.0.0 "Himawari"（2026-10-10 公開）**を指す。
+> `latest` 系はマルチアーキで、`linux/amd64` と `linux/arm64` の
+> どちらを引いても同じ版が来る。版を固定したいときは
+> `3.0.0-standard` のように版番号つきのタグを使う。
 
-**比較**（2026-10-09 に同じホスト・`--platform linux/amd64` で
+**比較**（2026-10-10 に同じホスト・`--platform linux/amd64` で
 `docker images` の値を実測。Kimigayo Standard = 2.78MB）:
 
 | イメージ | サイズ | Kimigayo 比 |
@@ -549,7 +552,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 ### 🌟 競合OS比較
 
-**サイズは 2026-10-09 に同じホスト（macOS / Apple Silicon、
+**サイズは 2026-10-10 に同じホスト（macOS / Apple Silicon、
 `--platform linux/amd64`）で `docker images` の値を実測。
 起動時間とメモリは計測方法に問題があり再測定待ち**
 （→「パフォーマンス実績」節）。
