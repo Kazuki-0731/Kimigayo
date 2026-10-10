@@ -207,26 +207,28 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
 
     # Kimigayo OS単体測定データ
     if command -v jq > /dev/null 2>&1; then
-        avg=$(jq -r '.results.average_mb' "$INPUT_DIR/benchmark-memory.json")
-        median=$(jq -r '.results.median_mb' "$INPUT_DIR/benchmark-memory.json")
-        min=$(jq -r '.results.min_mb' "$INPUT_DIR/benchmark-memory.json")
-        max=$(jq -r '.results.max_mb' "$INPUT_DIR/benchmark-memory.json")
+        # 単位は KB。2026-10-10 に benchmark-memory.sh を KB 保持に変えた
+        # （MB の整数では 1MB 未満の常駐を 0 としか表せなかったため）。
+        avg=$(jq -r '.results.average_kb' "$INPUT_DIR/benchmark-memory.json")
+        median=$(jq -r '.results.median_kb' "$INPUT_DIR/benchmark-memory.json")
+        min=$(jq -r '.results.min_kb' "$INPUT_DIR/benchmark-memory.json")
+        max=$(jq -r '.results.max_kb' "$INPUT_DIR/benchmark-memory.json")
     else
-        avg=$(grep -o '"average_mb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
-        median=$(grep -o '"median_mb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
-        min=$(grep -o '"min_mb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
-        max=$(grep -o '"max_mb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
+        avg=$(grep -o '"average_kb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
+        median=$(grep -o '"median_kb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
+        min=$(grep -o '"min_kb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
+        max=$(grep -o '"max_kb": [0-9]*' "$INPUT_DIR/benchmark-memory.json" | cut -d: -f2 | tr -d ' ')
     fi
 
     echo "**Kimigayo OS単体測定:**" >> "$OUTPUT_FILE"
-    echo "- 平均: ${avg}MB | 中央値: ${median}MB | 最小: ${min}MB | 最大: ${max}MB" >> "$OUTPUT_FILE"
+    echo "- 平均: ${avg}KB | 中央値: ${median}KB | 最小: ${min}KB | 最大: ${max}KB" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
-    # 目標値評価
-    if [ $avg -lt 128 ]; then
+    # 目標値評価（128MB = 131072KB）
+    if [ "$avg" -lt 131072 ]; then
         echo "✅ **目標達成:** 平均メモリ使用量が128MB以下です" >> "$OUTPUT_FILE"
     else
-        echo "⚠️ **警告:** 平均メモリ使用量が128MBを超えています (${avg}MB)" >> "$OUTPUT_FILE"
+        echo "⚠️ **警告:** 平均メモリ使用量が128MBを超えています (${avg}KB)" >> "$OUTPUT_FILE"
     fi
     echo "" >> "$OUTPUT_FILE"
 fi
