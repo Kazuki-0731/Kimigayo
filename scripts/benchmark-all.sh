@@ -73,11 +73,11 @@ run_step "[3/6] メモリ使用量ベンチマーク" \
     "${BASH:-bash}" "$SCRIPT_DIR/benchmark-memory.sh"
 
 run_step "[4/6] コンテナライフサイクルベンチマーク" \
-    env BENCHMARK_ITERATIONS=5 \
+    env BENCHMARK_ITERATIONS=5 OUTPUT_DIR="$OUTPUT_DIR" \
     "${BASH:-bash}" "$SCRIPT_DIR/benchmark-lifecycle.sh"
 
 run_step "[5/6] BusyBoxコマンドベンチマーク" \
-    env BENCHMARK_ITERATIONS=5 \
+    env BENCHMARK_ITERATIONS=5 OUTPUT_DIR="$OUTPUT_DIR" \
     "${BASH:-bash}" "$SCRIPT_DIR/benchmark-busybox.sh"
 
 run_step "[6/6] OS間比較ベンチマーク" \

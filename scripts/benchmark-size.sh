@@ -84,10 +84,18 @@ for entry in "${VALID_IMAGES[@]}"; do
     name="${entry%%:*}"
     image="${entry#*:}"
 
-    # サイズを取得（MB単位とKB単位）
+    # サイズを取得
+    #
+    # **10 進（1000 で割る）にする。** `docker images` の表示も 10 進で、
+    # README と比較表もその値を載せている。2026-10-11 まで 1024 で割って
+    # いたため、`docker images` が 78.2MB と言う Ubuntu を 74MB と報告して
+    # いた（MiB と MB の混在）。
+    #
+    # **整数にしない。** 2.11MB の distroless と 2.76MB の Kimigayo が
+    # どちらも「2MB」になり、比較の意味が無くなる。
     size_bytes=$(docker image inspect "$image" --format='{{.Size}}' 2>/dev/null || echo "0")
-    size_mb=$((size_bytes / 1024 / 1024))
-    size_kb=$((size_bytes / 1024))
+    size_mb=$(awk -v b="$size_bytes" 'BEGIN { printf "%.2f", b / 1000 / 1000 }')
+    size_kb=$(awk -v b="$size_bytes" 'BEGIN { printf "%.0f", b / 1000 }')
 
     echo "$size_mb:$size_kb:$name:$image" >> "$tmpfile"
 
@@ -99,7 +107,8 @@ for entry in "${VALID_IMAGES[@]}"; do
 done
 
 # サイズでソート
-sort -t: -k1 -n "$tmpfile" > "${tmpfile}.sorted"
+# 小数を含むので -n ではなく -g（一般数値）で並べる
+sort -t: -k1 -g "$tmpfile" > "${tmpfile}.sorted"
 
 # 結果表示
 echo -e "${BOLD}ベンチマーク結果（サイズ順）${NC}"
@@ -112,19 +121,22 @@ printf "%s\n" "$(printf '=%.0s' {1..50})"
 # Kimigayo Minimalのサイズを基準として取得
 kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
 
+# サイズが小数になったので、比較率も表示も整数前提にしない
+# （`[ 2.98 -gt 0 ]` は `integer expected`、`printf %10d` は
+# `invalid number` で落ちる。2026-10-11 に踏んだ）。
 while IFS=: read -r size size_kb name image _unused; do
     # 比較率を計算
     if [ "$name" = "Kimigayo Minimal" ]; then
         comparison="(基準)"
-    elif [ -n "$kimigayo_minimal_size" ] && [ "$kimigayo_minimal_size" -gt 0 ]; then
-        ratio=$((size * 100 / kimigayo_minimal_size))
-        comparison="${ratio}%"
+    elif [ -n "$kimigayo_minimal_size" ] &&
+         awk -v b="$kimigayo_minimal_size" 'BEGIN { exit !(b > 0) }'; then
+        comparison="$(awk -v s="$size" -v b="$kimigayo_minimal_size" \
+            'BEGIN { printf "%.0f%%", s * 100 / b }')"
     else
         comparison="-"
     fi
 
-    # Display without color variable
-    printf "%-${max_name_len}s  %10d  %10s\n" "$name" "$size" "$comparison"
+    printf "%-${max_name_len}s  %10s  %10s\n" "$name" "$size" "$comparison"
 done < "${tmpfile}.sorted"
 
 echo ""
@@ -175,10 +187,15 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     done < "${tmpfile}.sorted"
 fi
 
-# 目標値チェック（Minimal < 5MB）
+# 目標値チェック（Minimal < 5MB。SPECIFICATION.md 8.3）
+#
+# **`[ "2.98" -lt 5 ]` は `integer expected` で失敗する。** 失敗すると
+# else に落ちて「5MB を超えています (2.98MB)」と出し、exit 1 を返す。
+# サイズを小数にした 2026-10-11 に実際にこれを踏んだ
+# （benchmark-all.sh が「1/6 が失敗」と報告した原因）。
 kimigayo_minimal_size=$(grep "Kimigayo Minimal" "${tmpfile}.sorted" | cut -d: -f1 || echo "")
 if [ -n "$kimigayo_minimal_size" ]; then
-    if [ "$kimigayo_minimal_size" -lt 5 ]; then
+    if awk -v s="$kimigayo_minimal_size" 'BEGIN { exit !(s < 5) }'; then
         echo -e "${GREEN}✓ 目標達成: Kimigayo Minimalが5MB以下です (${kimigayo_minimal_size}MB)${NC}"
         exit 0
     else

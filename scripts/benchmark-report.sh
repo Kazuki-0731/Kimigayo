@@ -296,7 +296,7 @@ if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq >
         elif (.key | contains("alpine")) then .short_name = "Alpine Latest"
         elif (.key | contains("distroless/static")) then .short_name = "Distroless Static"
         elif (.key | contains("distroless/base")) then .short_name = "Distroless Base"
-        elif (.key | contains("ubuntu")) then .short_name = "Ubuntu 22.04"
+        elif (.key | contains("ubuntu")) then .short_name = "Ubuntu 24.04"
         else .short_name = .key end |
 
         # サイズのフォーマット
@@ -341,18 +341,86 @@ cat >> "$OUTPUT_FILE" <<'EOF'
 - `busybox.json` - BusyBoxコマンド性能測定
 - `comparison_*.json` - OS間比較ベンチマーク
 
-## 🎯 パフォーマンス目標
-
-| 指標 | 目標値 | 現在の状態 |
-|------|--------|-----------|
-| イメージサイズ (Minimal) | < 5MB | 確認中 |
-| 起動時間 | < 10秒 | 確認中 |
-| メモリ使用量 | < 128MB | 確認中 |
-
 ---
 
 *このレポートは自動生成されました*
 EOF
+
+# ---------------------------------------------------------------------------
+# パフォーマンス目標の達成状況
+#
+# **「確認中」と固定文字列で書かないこと。** 2026-10-11 まで3項目すべてが
+# 「確認中」で、すぐ上に実測値が載っているのに達成状況が分からなかった。
+# 目標値は SPECIFICATION.md 8.3（Minimal 5MB / Standard 15MB /
+# Extended 50MB）と 8.1（RAM 128MB）。
+# ---------------------------------------------------------------------------
+{
+    echo ""
+    echo "## 🎯 パフォーマンス目標"
+    echo ""
+    echo "目標値は [SPECIFICATION.md](../SPECIFICATION.md) 8.3 と 8.1。"
+    echo ""
+    echo "| 指標 | 目標値 | 実測 | 達成 |"
+    echo "|------|--------|------|------|"
+} >> "$OUTPUT_FILE"
+
+emit_goal() {
+    local label="$1" target_text="$2" actual="$3" ok="$4"
+    if [ -z "$actual" ]; then
+        echo "| $label | $target_text | 未測定 | — |" >> "$OUTPUT_FILE"
+    elif [ "$ok" = "yes" ]; then
+        echo "| $label | $target_text | $actual | ✅ |" >> "$OUTPUT_FILE"
+    else
+        echo "| $label | $target_text | $actual | ❌ |" >> "$OUTPUT_FILE"
+    fi
+}
+
+if command -v jq > /dev/null 2>&1 && [ -f "$INPUT_DIR/benchmark-size.json" ]; then
+    for v in minimal standard extended; do
+        case "$v" in
+            minimal)  limit=5 ;;
+            standard) limit=15 ;;
+            extended) limit=50 ;;
+        esac
+        mb=$(jq -r --arg v "$v" '
+            .results | to_entries[]
+            | select(.key | ascii_downcase | contains($v))
+            | .value.size_mb' "$INPUT_DIR/benchmark-size.json" 2>/dev/null | head -1)
+        if [ -n "$mb" ] && [ "$mb" != "null" ]; then
+            if awk -v a="$mb" -v l="$limit" 'BEGIN { exit !(a < l) }'; then ok=yes; else ok=no; fi
+            emit_goal "イメージサイズ ($v)" "< ${limit}MB" "${mb}MB" "$ok"
+        else
+            emit_goal "イメージサイズ ($v)" "< ${limit}MB" "" ""
+        fi
+    done
+fi
+
+if [ -f "$INPUT_DIR/benchmark-startup.json" ] && command -v jq > /dev/null 2>&1; then
+    ms=$(jq -r '.results.median_ms // empty' "$INPUT_DIR/benchmark-startup.json" 2>/dev/null)
+    if [ -n "$ms" ]; then
+        if [ "$ms" -lt 10000 ]; then ok=yes; else ok=no; fi
+        emit_goal "起動時間" "< 10秒" "${ms}ms" "$ok"
+    else
+        emit_goal "起動時間" "< 10秒" "" ""
+    fi
+fi
+
+if [ -f "$INPUT_DIR/benchmark-memory.json" ] && command -v jq > /dev/null 2>&1; then
+    kb=$(jq -r '.results.median_kb // empty' "$INPUT_DIR/benchmark-memory.json" 2>/dev/null)
+    if [ -n "$kb" ]; then
+        if [ "$kb" -lt 131072 ]; then ok=yes; else ok=no; fi
+        emit_goal "常駐メモリ" "< 128MB (131,072KB)" "${kb}KB" "$ok"
+    else
+        emit_goal "常駐メモリ" "< 128MB (131,072KB)" "" ""
+    fi
+fi
+
+{
+    echo ""
+    echo "> **起動時間でイメージの優劣を主張しないこと。** 測っている時間の"
+    echo "> ほとんどが Docker のコンテナ生成で、Alpine でも Ubuntu でも"
+    echo "> 同じ値になる（→ 上の機能比較表）。"
+} >> "$OUTPUT_FILE"
 
 echo -e "${GREEN}✓ レポートを $OUTPUT_FILE に保存しました${NC}"
 
