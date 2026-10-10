@@ -357,39 +357,47 @@ output/
 }
 ```
 
-## 再現可能ビルド
+## 再現可能ビルド（未達）
 
-Kimigayo OSは再現可能ビルド（Reproducible Builds）をサポートしています。
+**Kimigayo は再現可能ビルドを達成していません**（2026-10-11 に確認）。
 
-### ビルドの再現性確保
+- `config.mk` に `SOURCE_DATE_EPOCH := 0` と
+  `-fdebug-prefix-map` / `-fmacro-prefix-map` を入れる仕組みはある
+- しかし `REPRODUCIBLE_BUILD=yes` のときだけ有効で、
+  **この変数を `Makefile`・`.env.example`・compose のどこも設定していない**
+- そもそも **`config.mk` はどの Makefile からも include されていない**
+  （`grep -rn 'include.*config.mk' Makefile build-system/Makefile` が空）。
+  実際のコンパイルフラグは `scripts/build-{musl,busybox,openrc}.sh` に
+  直書きされており、そちらに再現性のための指定は無い
+- **ビット同一性を検証した記録もない**
+
+### 自分で確かめるには
 
 ```bash
-# SOURCE_DATE_EPOCHを設定して再現可能ビルド
-export SOURCE_DATE_EPOCH=1640000000
-make build
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=minimal
+cd build/rootfs && COPYFILE_DISABLE=1 tar czf /tmp/h1.tar.gz . && cd -
+sha256sum /tmp/h1.tar.gz
 
-# 2回ビルドしてハッシュを比較
-make build
-sha256sum output/kimigayo-minimal-x86_64-1.0.0.tar.gz > hash1.txt
-
-make clean
-make build
-sha256sum output/kimigayo-minimal-x86_64-1.0.0.tar.gz > hash2.txt
-
-# ハッシュが一致することを確認
-diff hash1.txt hash2.txt
+docker compose run --rm kimigayo-build make clean build IMAGE_TYPE=minimal
+cd build/rootfs && COPYFILE_DISABLE=1 tar czf /tmp/h2.tar.gz . && cd -
+sha256sum /tmp/h2.tar.gz
 ```
 
-### ビルド環境の固定
+**tar の時刻とファイル順でまず一致しません。**
+`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner` を
+付けない限り、rootfs の中身が同じでも tarball のハッシュは変わります。
+
+### ビルド環境の固定（これは効いている）
 
 ```bash
-# Dockerイメージのダイジェストを固定
-docker-compose build --pull
+# ビルド環境イメージのダイジェストを確認
+docker compose build --pull
 docker images --digests | grep kimigayo-build
-
-# Dockerfileで特定のダイジェストを使用
-# FROM alpine:3.18@sha256:...
 ```
+
+構成要素の版は [versions.mk](../../versions.mk) に固定し、
+`scripts/download-*.sh` がチェックサムを検証します。
+**「決定的な構成」までは担保していますが、「ビット同一の出力」は別の話です。**
 
 ## ビルドのデバッグ
 

@@ -217,7 +217,13 @@ distroless 的アプローチと両立しないため取り下げた。
 ### 9.1 ビルドツール
 - ビルドシステム: GNU Make + shell scripts
 - クロスコンパイル対応
-- 再現可能なビルド
+- バージョンの固定（[versions.mk](versions.mk) が単一の真実の源）
+
+**再現可能ビルドは未達**（2026-10-11 に確認）。`config.mk` に
+`SOURCE_DATE_EPOCH` と prefix-map を入れる仕組みはあるが、
+`REPRODUCIBLE_BUILD=yes` のときだけ有効で、この変数をどこも設定して
+いない。そもそも `config.mk` 自体がどの Makefile からも include されて
+いないため、ビット同一性は検証も保証もされていない。
 
 ### 9.2 ビルドプロセス
 1. musl libcのビルド
