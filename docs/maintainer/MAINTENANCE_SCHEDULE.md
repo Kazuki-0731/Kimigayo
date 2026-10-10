@@ -370,7 +370,7 @@ gh api repos/:owner/:repo/actions/workflows | jq '.workflows[] | {name, path}'
 trivy fs .
 
 # Check build status
-make build-all
+make status
 ```
 
 ---

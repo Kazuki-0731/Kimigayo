@@ -68,12 +68,13 @@ docker-compose run --rm kimigayo-build pytest tests/ -v
 #### Phase 2: カーネル設定とビルドシステム（実装中）
 
 ```bash
-# カーネル設定の生成
-docker-compose run --rm kimigayo-build make kernel-config
-
-# カーネルのビルド
-docker-compose run --rm kimigayo-build make kernel
+# カーネルのビルド（成果物の Docker イメージには入りません）
+docker compose run --rm kimigayo-build make kernel
 ```
+
+> `make kernel-config` は存在しません。カーネル設定の選び方は
+> `scripts/build-kernel.sh` が決めます（`src/kernel/config/<arch>.config`
+> があればそれを、無ければ上流の defconfig を使う）。
 
 #### Phase 3以降: コアユーティリティとライブラリ
 
@@ -103,13 +104,14 @@ make test-unit         # 単体テスト
 make test-property     # プロパティテスト
 make test-integration  # 統合テスト
 
-# 静的解析
-make lint
-make static-analysis
-
-# ドキュメント生成
-make docs
+# 静的解析（ホスト側）
+make shellcheck-scan   # scripts/ と .claude/hooks/
+make security-scan     # Trivy + ShellCheck
 ```
+
+> `make lint` / `make static-analysis` / `make docs` は存在しません。
+> 静的解析は上の2つ、カバレッジは `python3 -m pytest --cov`
+> （設定は `.coveragerc`）です。
 
 ### ビルドターゲット
 
@@ -117,16 +119,23 @@ make docs
 
 Kimigayo OSは3つのイメージバリエーションを提供します：
 
+**バリアントはターゲットではなく変数で選びます。**
+
 ```bash
-# Minimalイメージ（< 5MB）
-make build-minimal
+# コンテナ内（build-system/Makefile）
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=minimal
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=standard
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=extended
 
-# Standardイメージ（< 15MB）
-make build-standard
-
-# Extendedイメージ（< 50MB）
-make build-extended
+# ホスト側（rootfs → イメージ → smoke まで通す）
+make ci-build-local VARIANT=minimal ARCH=x86_64
+make ci-build-all ARCH=x86_64          # 3バリアントを順に
 ```
+
+既定は `VARIANT=standard` / `ARCH=x86_64`（`Makefile:211-212`）。
+
+> `make build-minimal` / `build-standard` / `build-extended` という
+> ターゲットは存在しません。
 
 各イメージの内容：
 
@@ -145,21 +154,31 @@ make build ARCH=x86_64
 # ARM64アーキテクチャ
 make build ARCH=arm64
 
-# すべてのアーキテクチャ
-make build-all-arch
 ```
+
+> `make build-all-arch` は存在しません。両アーキテクチャを作るなら
+> `ARCH` を変えて2回回すか、GitHub Actions に任せます
+> （→ [CLAUDE.md](../../CLAUDE.md)「フルビルドは GitHub Actions で回す」）。
 
 ## カスタムビルド
 
 ### カーネル設定のカスタマイズ
 
-```bash
-# カーネル設定エディタを起動
-docker-compose run --rm kimigayo-build make kernel-menuconfig
+**設定ファイルを直接編集します。**
 
-# カスタム設定ファイルを使用
-docker-compose run --rm kimigayo-build make kernel KERNEL_CONFIG=./custom-kernel.config
+```bash
+# アーキテクチャごとの設定
+vi src/kernel/config/x86_64.config
+vi src/kernel/config/arm64.config     # 無ければ上流の defconfig が使われる
+
+docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64
 ```
+
+> `make kernel-menuconfig` は存在せず、`make kernel KERNEL_CONFIG=...` も
+> 効きません（`KERNEL_CONFIG` は `scripts/build-kernel.sh` の内部変数で、
+> Makefile から渡されません）。
+> `menuconfig` を使いたいときはカーネルのソースツリーで直接叩きます
+> （`build/kernel/linux-<version>/` で `make ARCH=... menuconfig`）。
 
 カーネル設定ファイルの場所：
 - デフォルト設定: `src/kernel/config/default.config`
@@ -255,34 +274,30 @@ make build CONFIG=build/config/custom-image.yaml
 
 ### ARM64向けクロスコンパイル
 
-```bash
-# ARM64ツールチェーンのセットアップ
-docker-compose run --rm kimigayo-build make setup-cross-arm64
-
-# ARM64イメージのビルド
-docker-compose run --rm kimigayo-build make build ARCH=arm64
-```
-
-### RISC-V向けクロスコンパイル（将来対応予定）
+**クロスツールチェーンのセットアップは不要です。** ビルド環境の
+イメージ（`make docker-build`）に入っています。
 
 ```bash
-# RISC-Vツールチェーンのセットアップ
-docker-compose run --rm kimigayo-build make setup-cross-riscv
-
-# RISC-Vイメージのビルド
-docker-compose run --rm kimigayo-build make build ARCH=riscv64
+docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64
 ```
+
+> `make setup-cross-arm64` / `setup-cross-riscv` は存在しません。
+> **RISC-V は未対応**です（`SPECIFICATION.md` 8.2 の「将来的に」）。
 
 ### マルチアーキテクチャビルド
 
+**両アーキテクチャを一度に作るターゲットはありません。**
+`TARGET_ARCH` を変えて2回回します。
+
 ```bash
-# すべてのサポートアーキテクチャでビルド
-make build-multi-arch
+for a in x86_64 arm64; do
+  docker compose run --rm kimigayo-build make build TARGET_ARCH=$a
+done
 
 # 出力の確認
 ls output/
-# kimigayo-minimal-x86_64-1.0.0.tar.gz
-# kimigayo-minimal-arm64-1.0.0.tar.gz
+# kimigayo-minimal-latest-x86_64.tar.gz
+# kimigayo-minimal-latest-arm64.tar.gz
 ```
 
 ## ビルド出力
@@ -480,13 +495,15 @@ sudo usermod -aG docker $USER
 
 #### エラー: "Kernel config not found"
 
-```bash
-# デフォルトカーネル設定を生成
-make kernel-defconfig
+`src/kernel/config/<arch>.config` を置くか、置かずに上流の defconfig に
+任せます（`scripts/build-kernel.sh` が自動で判断します）。
 
-# または既存の設定をコピー
-cp /boot/config-$(uname -r) src/kernel/config/custom.config
+```bash
+# 既存の設定を持ち込む場合（ファイル名は <arch>.config）
+cp /boot/config-$(uname -r) src/kernel/config/x86_64.config
 ```
+
+> `make kernel-defconfig` は存在しません。
 
 ### ビルドログの解析
 

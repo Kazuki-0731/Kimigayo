@@ -175,8 +175,8 @@ pytest tests/property/
 # 単体テストのみ
 pytest tests/unit/
 
-# 統合テスト
-make integration-test
+# 統合テスト（Docker が必要）
+make test-integration
 ```
 
 ## プルリクエスト

@@ -165,8 +165,9 @@ tail -f /var/log/messages
 CFLAGS="-O2 -pipe -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 LDFLAGS="-Wl,-z,relro,-z,now -pie"
 
-# 静的解析ツールの使用
-make static-analysis
+# 静的解析ツールの使用（make static-analysis は存在しない）
+make shellcheck-scan
+make security-scan
 ```
 
 ## 既知の制限事項

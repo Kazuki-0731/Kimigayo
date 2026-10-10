@@ -216,22 +216,23 @@ make version
 
 #### ビルド
 
+**バリアントはターゲットではなく変数で選びます。**
+
 ```bash
-# 完全ビルド
-make build
+# コンテナ内（build-system/Makefile）
+docker compose run --rm kimigayo-build make build                      # standard
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=minimal
+docker compose run --rm kimigayo-build make build IMAGE_TYPE=extended
 
-# Minimalイメージ
-make build-minimal
-
-# Standardイメージ
-make build-standard
-
-# Extendedイメージ
-make build-extended
+# ホスト側（rootfs → イメージ → smoke）
+make ci-build-local VARIANT=minimal ARCH=x86_64
+make ci-build-all ARCH=x86_64        # 3バリアントを順に
 
 # クリーンビルド
-make clean build
+docker compose run --rm kimigayo-build make clean build
 ```
+
+> `make build-minimal` / `build-standard` / `build-extended` は存在しません。
 
 #### テスト
 
@@ -247,44 +248,54 @@ make test-property
 
 # 統合テスト
 make test-integration
+```
 
-# カバレッジレポート
-make coverage
+カバレッジは make ターゲットではありません（設定は `.coveragerc`）。
+
+```bash
+python3 -m pytest tests/unit tests/property --cov --cov-report=term-missing
 ```
 
 #### 静的解析
 
 ```bash
-# リント
-make lint
+# ShellCheck（scripts/ と .claude/hooks/）
+make shellcheck-scan
 
-# 静的解析
-make static-analysis
-
-# セキュリティスキャン
+# Trivy（イメージ + ファイルシステム）+ ShellCheck
 make security-scan
+
+# リポジトリ側の依存だけを見る
+make trivy-fs-scan
 ```
+
+> `make lint` / `make static-analysis` は存在しません。
+> **`make trivy-scan`（イメージスキャン）は何も検査できません。**
+> パッケージデータベースを持たないため Trivy が対象を識別できません。
 
 ### ビルド設定変数
 
+**実在する変数だけを挙げます。**
+
+| 変数 | 置き場 | 既定 | 用途 |
+| --- | --- | --- | --- |
+| `TARGET_ARCH` | `build-system/Makefile` | `x86_64` | `x86_64` / `arm64` |
+| `IMAGE_TYPE` | `build-system/Makefile` | `standard` | `minimal` / `standard` / `extended` |
+| `VARIANT` | `Makefile`（ホスト側） | `standard` | 同上。ホストのターゲットはこちらを使う |
+| `ARCH` | 両方 | `x86_64` | **非推奨。** `build-system` では `TARGET_ARCH` に読み替えられ警告が出る |
+| `BUILD_JOBS` | `Makefile` | `4` | 並列度 |
+| `DEBUG` | 両方 | `false` / `no` | デバッグビルド |
+| `SECURITY_HARDENING` | `build-system/Makefile` | `full` | 強化の度合い |
+| `KIMIGAYO_VERSION` | `Makefile`（`git describe` 由来） | `latest` | 成果物の版 |
+
 ```bash
-# アーキテクチャの指定
-make build ARCH=x86_64
-make build ARCH=arm64
-
-# ビルドタイプ
-make build BUILD_TYPE=debug
-make build BUILD_TYPE=release
-
-# 並列ビルド
-make build JOBS=4
-
-# パッケージリスト
-make build PACKAGE_LIST=custom.list
-
-# カーネル設定
-make build KERNEL_CONFIG=custom.config
+docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64 IMAGE_TYPE=minimal
+make ci-build-local VARIANT=minimal ARCH=x86_64 BUILD_JOBS=8
 ```
+
+> `BUILD_TYPE` / `JOBS` / `PACKAGE_LIST` / `KERNEL_CONFIG` は
+> どちらの Makefile にも存在しません。カーネル設定は
+> `src/kernel/config/<arch>.config` を置いて切り替えます。
 
 ## CLIツール
 
