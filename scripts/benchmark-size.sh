@@ -19,16 +19,28 @@ source "${PROJECT_ROOT}/scripts/lib/json.sh"
 # shellcheck source=scripts/lib/versions.sh
 source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 
-# 比較対象イメージ（カンマ区切りで名前:イメージ形式）
+# 比較対象イメージ（名前:イメージ形式）
+#
+# **公開前の版は Docker Hub に無い。** KIMIGAYO_{MINIMAL,STANDARD,EXTENDED}
+# で手元のイメージを指せるようにしておく（タグを打つ前に測るため）:
+#   KIMIGAYO_STANDARD=kimigayo-os:standard-arm64 bash scripts/benchmark-size.sh
+#
+# Ubuntu は 24.04。README と CLAUDE.md が載せている比較値がこの版なので
+# 揃える（2026-10-11 まで 22.04 を測っていて食い違っていた）。
+KIMIGAYO_MINIMAL="${KIMIGAYO_MINIMAL:-ishinokazuki/kimigayo-os:latest-minimal}"
+KIMIGAYO_STANDARD="${KIMIGAYO_STANDARD:-ishinokazuki/kimigayo-os:latest-standard}"
+KIMIGAYO_EXTENDED="${KIMIGAYO_EXTENDED:-ishinokazuki/kimigayo-os:latest-extended}"
+
 IMAGES=(
-    "Kimigayo Minimal:ishinokazuki/kimigayo-os:latest-minimal"
-    "Kimigayo Standard:ishinokazuki/kimigayo-os:latest-standard"
-    "Kimigayo Extended:ishinokazuki/kimigayo-os:latest-extended"
+    "Kimigayo Minimal:${KIMIGAYO_MINIMAL}"
+    "Kimigayo Standard:${KIMIGAYO_STANDARD}"
+    "Kimigayo Extended:${KIMIGAYO_EXTENDED}"
     "Alpine Latest:alpine:latest"
     "Alpine ${ALPINE_VERSION}:alpine:${ALPINE_VERSION}"
     "Debian Slim:debian:stable-slim"
-    "Ubuntu:ubuntu:22.04"
+    "Ubuntu:ubuntu:24.04"
     "BusyBox:busybox:latest"
+    "Distroless Static:gcr.io/distroless/static-debian12:latest"
 )
 
 echo -e "${BOLD}Kimigayo OS - ディスクサイズ比較ベンチマーク${NC}"

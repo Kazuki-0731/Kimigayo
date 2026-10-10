@@ -94,7 +94,15 @@ echo ""
 avg=$((total / ITERATIONS))
 
 # 中央値計算（ソート）
-mapfile -t sorted < <(printf '%s\n' "${times[@]}" | sort -n)
+# **`mapfile` を使わない。** macOS 標準の bash は 3.2 で `mapfile` を
+# 持たず、`mapfile: command not found` で落ちる（2026-10-10 に実際に
+# 踏んだ）。`make benchmark` は `scripts/benchmark-all.sh` 経由でこの
+# スクリプトを呼ぶので、開発機で全ベンチマークが通らなくなる。
+# bash 3.2 でも動く read ループで読む。
+sorted=()
+while IFS= read -r _line; do
+    sorted+=("$_line")
+done < <(printf '%s\n' "${times[@]}" | sort -n)
 
 if [ $((ITERATIONS % 2)) -eq 0 ]; then
     idx1=$((ITERATIONS / 2 - 1))

@@ -1,42 +1,49 @@
 # Kimigayo OS + Python
-# Python runtime based on Kimigayo OS
+#
+# **Kimigayo にはパッケージマネージャーがありません**（設計方針）。
+# `apk add` は使えないので、マルチステージビルドで Alpine 側に用意し、
+# 必要なファイルだけを COPY します。
+# → SPECIFICATION.md 3.5 / README.md「設計思想」
 
-FROM ishinokazuki/kimigayo-os:latest
+FROM alpine:3.24 AS builder
+
+RUN apk add --no-cache python3
+
+# 必要な共有ライブラリを ldd で解決して1か所に集める。
+# **手で列挙しないこと**（上流の更新で依存が増えると
+# `Error relocating ...: symbol not found` で落ちます）。
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp -a /usr/bin/python3* /stage/usr/bin/ \
+    && cp -a /usr/lib/python3* /stage/usr/lib/ \
+    && ldd "$(readlink -f /usr/bin/python3)" \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' \
+       | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+# アプリの依存を入れるならここで
+# COPY requirements.txt .
+# RUN apk add --no-cache py3-pip && pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
+
+# **版を固定する。** `latest` は毎リリースで中身が変わります。
+FROM ishinokazuki/kimigayo-os:3.0.1
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Python runtime on Kimigayo OS"
 LABEL version="1.0.0"
 
-# Install Python and pip using Alpine packages
-# Note: Kimigayo OS follows distroless design (no package manager)
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    py3-setuptools \
-    py3-wheel
+COPY --from=builder /stage/ /
 
-# Create symbolic link for python command
-RUN ln -sf /usr/bin/python3 /usr/bin/python
-
-# Upgrade pip
-RUN pip3 install --no-cache-dir --upgrade pip
-
-# Create application directory
 WORKDIR /app
 
-# Copy requirements file (if exists)
-# COPY requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
 # COPY app.py .
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Expose port (default for Flask/FastAPI)
 EXPOSE 8000
 
-# Default command
+# **root で動かさない。** Kimigayo のイメージには nobody (65534) が居ます。
+USER 65534
+
 CMD ["python3", "--version"]

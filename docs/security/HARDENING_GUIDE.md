@@ -520,6 +520,47 @@ bash alpine-linux-benchmark.sh --level 1
 cat /var/log/cis-benchmark-report.txt
 ```
 
+## Trivy の既知の指摘と、その判断（2026-10-11）
+
+**`make security-scan` が毎回出す指摘のうち、意図的に直していないものを
+記録する。** 次に走らせた人が同じ triage をやり直さないため。
+
+| 指摘 | 対象 | 判断 |
+| --- | --- | --- |
+| **DS-0002 (HIGH)** イメージのユーザーが root | `Dockerfile` | **直さない。** これはビルド環境のイメージで、`apk` やクロスコンパイル、`/build` への書き込みに root が必要。公開物ではない |
+| **DS-0002 (HIGH)** イメージのユーザーが root | `Dockerfile.runtime` | **直さない（要判断として保留）。** 公開イメージの既定ユーザーを変えると、`openrc` が動かなくなり、既存の利用者全員に影響する破壊的変更になる。**利用者側で `docker run --user 65534` か Dockerfile の `USER` を使う**ことを案内する（→ `examples/` の3つはすべて `USER 65534` にしてある） |
+| `make trivy-scan`（イメージスキャン）が何も検出しない | 公開イメージ | **仕様。** パッケージデータベースを持たないため Trivy が対象を1つも識別できない。「脆弱性 0 件」ではなく「スキャンしていない」。構成要素の版は手で追跡する（→ `security-review` skill） |
+
+### BusyBox の cpio はディレクトリを脱出できる
+
+**`busybox cpio -i` は、エントリ名の `../` を剥がしません**（2026-10-11 実測）。
+
+```console
+$ docker run --rm -v ./evil.cpio:/tmp/evil.cpio:ro <image> sh -c \
+    'mkdir -p /extract/here && cd /extract/here && busybox cpio -i -F /tmp/evil.cpio'
+$ # ../../escaped.txt というエントリが / に作られる
+```
+
+- **`tar` と `unzip` は安全。** どちらも常に `../` を剥がす
+  （`archival/tar.c` の `skip_unsafe_prefix`、`archival/unzip.c` の
+  `strip_unsafe_prefix`）
+- **`cpio` / `ar` / `rpm` は `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION`
+  に依存する。** BusyBox の既定は `n` で、Kimigayo も設定していない
+- **Alpine も同じ挙動**（同条件で実測。Alpine の BusyBox でも脱出した）
+- 影響範囲: `cpio` は standard / extended に入っている。`ar` は extended のみ。
+  `rpm` は v3.0.1 で削除済み
+
+**信頼できないアーカイブを特権で展開しないこと。** 必要なら
+`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y` を有効にしてビルドし直す
+（アプレットの挙動が変わるので、リリースの判断が必要）。
+
+関連して、2026-10-09 に **CVE-2026-108119**（BusyBox の `tar` の遅延リンク
+生成が展開先の外を検証しない、CVSS 6.3 MEDIUM）が公表された。
+1.36.1 と 1.37.0 が対象とされており、**1.38.0 が対象かは上流の一次情報で
+確認できていない**。発動条件は「信頼できない tar を特権で展開する」こと。
+
+---
+
 ## セキュリティ検証
 
 ### 設定の検証

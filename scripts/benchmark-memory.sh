@@ -108,7 +108,15 @@ docker rm "$CONTAINER_NAME" > /dev/null 2>&1
 avg=$((total_memory / count))
 
 # ソートして中央値、最小、最大を計算
-mapfile -t sorted < <(printf '%s\n' "${memory_usage[@]}" | sort -n)
+# **`mapfile` を使わない。** macOS 標準の bash は 3.2 で `mapfile` を
+# 持たず、`mapfile: command not found` で落ちる（2026-10-10 に実際に
+# 踏んだ）。`make benchmark` は `scripts/benchmark-all.sh` 経由でこの
+# スクリプトを呼ぶので、開発機で全ベンチマークが通らなくなる。
+# bash 3.2 でも動く read ループで読む。
+sorted=()
+while IFS= read -r _line; do
+    sorted+=("$_line")
+done < <(printf '%s\n' "${memory_usage[@]}" | sort -n)
 
 if [ $((count % 2)) -eq 0 ]; then
     idx1=$((count / 2 - 1))

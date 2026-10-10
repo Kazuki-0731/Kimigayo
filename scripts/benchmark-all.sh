@@ -23,6 +23,9 @@ echo "======================================"
 echo -e "${BLUE}出力ディレクトリ:${NC} $OUTPUT_DIR"
 echo ""
 
+# 子スクリプトは `${BASH}` で呼ぶ（このスクリプトと同じ interpreter）。
+# `bash` と書くと PATH の先頭が拾われ、macOS では 3.2 になる。
+#
 # 落ちたものを覚えておく。
 #
 # **`|| true` で握り潰さないこと。** 2026-10-10 まで全6ステップが
@@ -59,31 +62,31 @@ run_step() {
 
 run_step "[1/6] ディスクサイズベンチマーク" \
     env OUTPUT_FILE="$OUTPUT_DIR/benchmark-size.json" \
-    bash "$SCRIPT_DIR/benchmark-size.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-size.sh"
 
 run_step "[2/6] 起動時間ベンチマーク" \
     env OUTPUT_FILE="$OUTPUT_DIR/benchmark-startup.json" ITERATIONS=5 \
-    bash "$SCRIPT_DIR/benchmark-startup.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-startup.sh"
 
 run_step "[3/6] メモリ使用量ベンチマーク" \
     env OUTPUT_FILE="$OUTPUT_DIR/benchmark-memory.json" DURATION=10 \
-    bash "$SCRIPT_DIR/benchmark-memory.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-memory.sh"
 
 run_step "[4/6] コンテナライフサイクルベンチマーク" \
     env BENCHMARK_ITERATIONS=5 \
-    bash "$SCRIPT_DIR/benchmark-lifecycle.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-lifecycle.sh"
 
 run_step "[5/6] BusyBoxコマンドベンチマーク" \
     env BENCHMARK_ITERATIONS=5 \
-    bash "$SCRIPT_DIR/benchmark-busybox.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-busybox.sh"
 
 run_step "[6/6] OS間比較ベンチマーク" \
     env ITERATIONS=5 OUTPUT_DIR="$OUTPUT_DIR" \
-    bash "$SCRIPT_DIR/benchmark-comparison.sh"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-comparison.sh"
 
 # レポート生成。入力の JSON が欠けていても、取れたぶんだけは作る。
 run_step "ベンチマークレポート生成" \
-    bash "$SCRIPT_DIR/benchmark-report.sh" "$OUTPUT_DIR"
+    "${BASH:-bash}" "$SCRIPT_DIR/benchmark-report.sh" "$OUTPUT_DIR"
 
 echo ""
 if [ -n "$FAILED" ]; then

@@ -96,18 +96,34 @@ CMD ["./app"]
 
 ### Step 1: Create Dockerfile
 
-```dockerfile
-FROM ishinokazuki/kimigayo-os:latest
+**Kimigayo has no package manager** (that is the design, see
+[SPECIFICATION.md](../SPECIFICATION.md) 3.5). `apk`, `apt`, `dpkg` and `rpm`
+are all absent, so **`RUN apk add` fails with `apk: not found`**.
+Build in a stage that has a package manager and copy the result in.
 
-# Install your dependencies
+```dockerfile
+FROM alpine:3.24 AS builder
 RUN apk add --no-cache your-package
 
-# Copy application
+# Resolve the shared libraries with ldd instead of listing them by hand -
+# missing one shows up at runtime as
+# "Error relocating ...: symbol not found".
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp /usr/bin/your-binary /stage/usr/bin/ \
+    && ldd /usr/bin/your-binary \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /stage/ /
 COPY . /app
 WORKDIR /app
-
-# Set up runtime
 EXPOSE 8080
+
+# Do not run as root. The image ships nobody (65534).
+USER 65534
+
 CMD ["./your-app"]
 ```
 
@@ -175,20 +191,19 @@ docker run -it --rm -p 8080:8080 your-image:latest
 
 ### Performance
 
-1. **Minimize layers**
+1. **Minimize layers** (in the *builder* stage - Kimigayo has no `apk`)
    ```dockerfile
+   FROM alpine:3.24 AS builder
    RUN apk add --no-cache \
        package1 \
        package2 \
        package3
    ```
 
-2. **Clean up in same layer**
-   ```dockerfile
-   RUN apk add --no-cache build-deps && \
-       # ... build ... && \
-       apk del build-deps
-   ```
+2. **Nothing to clean up in the final image.** Build dependencies never
+   reach it, because only the files you `COPY --from=builder` do. This is
+   the point of having no package manager: there is no `apk del` step to
+   forget.
 
 3. **Use build cache**
    ```bash
