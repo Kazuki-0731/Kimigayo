@@ -470,6 +470,29 @@ else
     fail "init scripts that should have been removed are present:${revived}"
 fi
 
+# パッケージマネージャーが入っていないか（SPECIFICATION.md 2.2 / 3.5）。
+#
+# **BusyBox の既定は DPKG=y / DPKG_DEB=y / RPM=y** なので、config に
+# 書き忘れると `make oldconfig` が勝手に有効化する。v3.0.0 までの
+# 公開イメージには実際に dpkg / dpkg-deb / rpm が入っており、
+# `dpkg -i` でパッケージをインストールできた（2026-10-10 に発覚）。
+# アプレット一覧とパスの両方を見る（シンボリックリンクが無くても
+# `busybox dpkg` で呼べてしまうため）。
+pkgmgr=""
+for applet in dpkg dpkg-deb rpm apk apt apt-get opkg yum dnf pacman; do
+    if in_image "busybox --list" | grep -qx "$applet"; then
+        pkgmgr="$pkgmgr $applet(applet)"
+    fi
+    if in_image "command -v $applet" | grep -q .; then
+        pkgmgr="$pkgmgr $applet(path)"
+    fi
+done
+if [ -z "$pkgmgr" ]; then
+    pass "no package manager"
+else
+    fail "package managers are present:${pkgmgr}"
+fi
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
