@@ -144,9 +144,13 @@ Trivy はイメージ内のソフトウェアを1つも識別できません
 
 ### 更新ポリシー
 
-- **セキュリティパッチ**: 開示後24〜48時間以内にリリース
+**正本は [SECURITY_POLICY.md](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/SECURITY_POLICY.md)。**
+
+- **脆弱性報告の受領確認**: 24時間以内
+- **初期評価**: 72時間以内
+- **修正のリリース**: Critical 7日以内 / High 30日以内 / Medium 90日以内
 - **バグ修正**: 定期的なパッチリリースに含める
-- **機能更新**: SemVerマイナーバージョン増分に従う
+- **機能更新**: SemVer のマイナー版で出す
 
 ## ライセンス
 

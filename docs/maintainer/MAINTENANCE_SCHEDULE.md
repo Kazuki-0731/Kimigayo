@@ -148,7 +148,10 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 
 #### Security Patches
 - **Trigger:** CVE announcement affecting Kimigayo OS
-- **Timeline:** Within 24-48 hours
+- **Timeline:** start the assessment within 24-48 hours. The release
+  deadlines are the ones in
+  [SECURITY_POLICY.md](../security/SECURITY_POLICY.md): Critical within
+  7 days, High within 30 days, Medium within 90 days
 - **Process:**
   1. Assess impact and severity
   2. Create security advisory (private)
