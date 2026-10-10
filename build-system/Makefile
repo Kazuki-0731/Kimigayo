@@ -105,7 +105,7 @@ endif
 
 # Phony targets
 .PHONY: all build build-no-kernel clean help test docker-build docker-test \
-        kernel musl init utils rootfs iso docker-image \
+        kernel musl init utils rootfs \
         security-scan dependency-check qemu-test \
         install uninstall test-unit test-property test-integration test-musl
 
@@ -146,8 +146,6 @@ help:
 	@echo "  shell            - Enter Docker build environment"
 	@echo ""
 	@echo "Other Targets:"
-	@echo "  iso              - Generate ISO image"
-	@echo "  docker-image     - Generate Docker image"
 	@echo "  security-scan    - Run security analysis"
 	@echo "  qemu-test        - Test in QEMU"
 	@echo "  info             - Show build information"
@@ -251,18 +249,6 @@ rootfs:
 	$(Q)mkdir -p $(BUILD_DIR)/logs
 	$(Q)ARCH=$(TARGET_ARCH) IMAGE_TYPE=$(IMAGE_TYPE) bash $(SCRIPTS_DIR)/build-rootfs.sh
 	@echo "✅ Root filesystem build completed"
-
-# ISO image generation
-iso: build
-	@echo "[BUILD] ISO Image"
-	$(Q)mkdir -p $(OUTPUT_DIR)
-	@echo "  ISO generation will be implemented in Phase 8"
-
-# Docker image generation
-docker-image: build
-	@echo "[BUILD] Docker Image"
-	$(Q)mkdir -p $(OUTPUT_DIR)
-	@echo "  Docker image generation will be implemented in Phase 8"
 
 # Testing
 test:

@@ -18,13 +18,16 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Component definitions
+# Kimigayo ships no package manager (SPECIFICATION.md 3.5), so there is
+# no "pkg" component. It used to be listed here with a special case further
+# down so that it never blocked the "all built" message - it could never be
+# built because nothing builds it.
 declare -A COMPONENTS=(
     ["1"]="musl"
     ["2"]="kernel"
     ["3"]="busybox"
     ["4"]="openrc"
-    ["5"]="pkg"
-    ["6"]="rootfs"
+    ["5"]="rootfs"
 )
 
 declare -A COMPONENT_NAMES=(
@@ -32,7 +35,6 @@ declare -A COMPONENT_NAMES=(
     ["kernel"]="Linux Kernel"
     ["busybox"]="BusyBox"
     ["openrc"]="OpenRC Init"
-    ["pkg"]="Package Manager"
     ["rootfs"]="Root Filesystem"
 )
 
@@ -40,7 +42,7 @@ declare -A COMPONENT_NAMES=(
 init_status_file() {
     mkdir -p "$(dirname "$STATUS_FILE")"
     if [ ! -f "$STATUS_FILE" ]; then
-        for i in {1..6}; do
+        for i in {1..5}; do
             component="${COMPONENTS[$i]}"
             echo "${component}:pending:never" >> "$STATUS_FILE"
         done
@@ -119,7 +121,7 @@ suggest_next_action() {
         status_line=$(grep "^${component}:" "$STATUS_FILE" 2>/dev/null || echo "${component}:pending:never")
         IFS=':' read -r _ status timestamp <<< "$status_line"
 
-        if [ "$status" != "built" ] && [ "$component" != "pkg" ]; then
+        if [ "$status" != "built" ]; then
             all_built=false
             if [ -z "$first_pending" ]; then
                 first_pending="$component"
@@ -129,7 +131,7 @@ suggest_next_action() {
 
     if [ "$all_built" = true ]; then
         echo -e "${GREEN}✨ All components built successfully!${NC}"
-        echo "Next: Run 'make iso' or 'make docker-image' to create OS images"
+        echo "Next: Run 'make package-rootfs' then 'make build-image' (host)"
     elif [ -n "$first_pending" ]; then
         echo "Next: Run 'make ${first_pending}' to build the next component"
     fi
