@@ -39,21 +39,24 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 | 指標 | 実測値 | 目標値 | 達成状況 |
 |------|-------|--------|---------|
-| イメージサイズ (Minimal, x86_64) | **2.65MB** | < 5MB | ✅ **目標の53%** |
-| イメージサイズ (Standard, x86_64) | **2.78MB** | < 5MB | ✅ **目標の56%** |
-| イメージサイズ (Extended, x86_64) | **2.81MB** | < 5MB | ✅ **目標の56%** |
+| イメージサイズ (Minimal) | **2.65MB** / arm64 **3.02MB** | < 5MB | ✅ **目標の53%** / 60% |
+| イメージサイズ (Standard) | **2.78MB** / arm64 **3.16MB** | < 5MB | ✅ **目標の56%** / 63% |
+| イメージサイズ (Extended) | **2.81MB** / arm64 **3.20MB** | < 5MB | ✅ **目標の56%** / 64% |
 | 起動時間 | 未測定 | < 10秒 | ⏳ 計測方法の修正待ち |
 | メモリ使用量 | 未測定 | < 128MB | ⏳ 再測定待ち |
 | BusyBoxコマンド性能 | 未測定 | Alpine同等 | ⏳ 再測定待ち |
 
-**測定条件**（サイズ）: 2026-10-09 / `docker images` の報告値 /
-x86_64（`--platform linux/amd64`）/ ホストは macOS（Apple Silicon, arm64）で
-QEMU エミュレーション / Alpine 3.24 ベースのビルド環境 /
-カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
+2026-10-10 に x86_64 / arm64 の 6 イメージすべてを実測。
+6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過している。
 
-**x86_64 / arm64 の 6 イメージすべてを実測**（2026-10-10、
-macOS / Apple Silicon ホスト、`docker images` の値。
-6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過）。
+<details>
+<summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
+
+**測定条件**: 2026-10-10 / `docker images` の報告値 /
+ホストは macOS（Apple Silicon, arm64）で、x86_64 は
+`--platform linux/amd64` による QEMU エミュレーション /
+Alpine 3.24 ベースのビルド環境 /
+カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
 
 | バリアント | BusyBox アプレット | BusyBox 本体 | tarball | イメージ |
 | --- | --- | --- | --- | --- |
@@ -84,6 +87,8 @@ v3.0.0 で ASLR のため static-PIE 化とスタックプロテクタを有効�
 > 終了までを測っており、正常なイメージでは約 5,600ms になる（実測）。
 > 439ms はこの `sleep` が成立しなかった場合の値で、起動時間ではない。
 > 計測方法ごと見直す必要がある。
+
+</details>
 
 ### 🏗️ アーキテクチャ
 
