@@ -293,14 +293,19 @@ ls output/
 
 ```
 output/
-├── kimigayo-minimal-x86_64-1.0.0.tar.gz       # Minimalイメージ
-├── kimigayo-minimal-x86_64-1.0.0.tar.gz.sha256 # SHA-256チェックサム
-├── kimigayo-minimal-x86_64-1.0.0.tar.gz.sig   # Ed25519署名
-├── kimigayo-standard-x86_64-1.0.0.tar.gz      # Standardイメージ
-├── kimigayo-extended-x86_64-1.0.0.tar.gz      # Extendedイメージ
-├── kimigayo-1.0.0.iso                         # ブータブルISO
-└── build-report.json                          # ビルドレポート
+├── kimigayo-minimal-latest-x86_64.tar.gz      # Minimalイメージ
+├── kimigayo-standard-latest-x86_64.tar.gz     # Standardイメージ
+└── kimigayo-extended-latest-x86_64.tar.gz     # Extendedイメージ
 ```
+
+ファイル名の `latest` の位置にはプロジェクトの版が入ります
+（`KIMIGAYO_VERSION` 未指定なら `latest`）。
+
+- **ISO イメージは生成されません。** ベアメタル起動は対象外です
+  （→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2・9.2）
+- **署名ファイルは生成されません。** リリース時に `SHA256SUMS` と
+  `SHA512SUMS` が GitHub Release に添付されます
+  （→ [SPECIFICATION.md](../../SPECIFICATION.md) 5.3）
 
 ### ビルドレポート
 

@@ -52,7 +52,7 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 2026-10-10 実測。サイズは 6 イメージすべて、起動時間・メモリ・コマンド性能は
 arm64 ネイティブの Standard。6 バリアントすべてが
-`scripts/verify-image.sh` の 27 項目を通過している。
+`scripts/verify-image.sh` の 28 項目を通過している。
 
 > **起動時間の 0.62 秒は「Kimigayo が速い」という意味ではない。**
 > 同じ方法で測ると Alpine も Ubuntu も 0.61 秒で、**イメージによる差は
@@ -156,7 +156,7 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 **パッケージマネージャーを意図的に排除**することで、以下を実現：
 
 - ✅ **最小攻撃面**: パッケージインストール機能がないため、実行時の脆弱性リスクを大幅に削減
-- ✅ **超軽量**: 1-3MBの極小イメージサイズ
+- ✅ **超軽量**: 数MBのイメージサイズ（実測は「パフォーマンス実績」を参照）
 - ✅ **不変インフラ**: コンテナ時代の「Build once, run anywhere」思想に完全準拠
 - ✅ **予測可能性**: ランタイムでの変更が不可能なため、動作が完全に予測可能
 
@@ -316,11 +316,12 @@ ls -la build/rootfs/
 
 ```bash
 output/
-├── kimigayo-minimal-0.1.0-x86_64.tar.gz      # Minimal版 (約400KB)
-├── kimigayo-standard-latest-x86_64.tar.gz    # Standard版 (約1.3MB)
-├── kimigayo-minimal-0.1.0-x86_64.sha256      # SHA256チェックサム
-└── kimigayo-minimal-0.1.0-x86_64.sig         # Ed25519署名
+├── kimigayo-minimal-latest-x86_64.tar.gz     # Minimal版 (約1.3MB)
+├── kimigayo-standard-latest-x86_64.tar.gz    # Standard版 (約1.4MB)
+└── kimigayo-extended-latest-x86_64.tar.gz    # Extended版 (約1.5MB)
 ```
+
+リリース時は `SHA256SUMS` と `SHA512SUMS` が GitHub Release に添付されます。
 
 **使用方法:**
 ```bash
@@ -509,33 +510,38 @@ Standard 3.16MB / Extended 3.20MB（→「パフォーマンス実績」節）�
 - FORTIFY_SOURCE
 - RELRO (Relocation Read-Only)
 
-#### ランタイム
+#### ランタイム（イメージ側）
 
-- ASLR (Address Space Layout Randomization)
+- ASLR が効く形のバイナリ（全実行ファイルを PIE でビルド）
 - DEP (Data Execution Prevention)
-- Seccomp-BPF
-- Namespace isolation
 
-#### パッケージ署名検証
+#### ランタイム（ホストのコンテナランタイム側）
 
-Kimigayo OS は、パッケージの真正性と完全性を保証するために、二重の署名検証方式を採用しています。
+Seccomp-BPF・Namespace isolation・Capabilities の制限は、
+**イメージの属性ではなくホストの `docker run` が与えるもの**です。
+Kimigayo の成果物は rootfs だけでカーネルを含まないため、
+seccomp プロファイルの適用はホスト側で行います。
 
-**Ed25519 署名検証（推奨）**
+```bash
+docker run --rm \
+  --security-opt no-new-privileges \
+  --cap-drop ALL \
+  --read-only \
+  ishinokazuki/kimigayo-os:latest /bin/sh
+```
 
-- 🚀 **高速**: RSA より署名生成・検証が高速
-- 💾 **軽量**: 署名 64 バイト、公開鍵 32 バイト
-- 🔒 **高セキュリティ**: 128 ビットセキュリティレベル
-- 🐳 **コンテナ最適**: 最小限のリソースで動作
-- ⚡ **決定論的**: ランダム性不要で実装が簡潔
+#### 完全性の検証
 
-**レガシーサポート**
+**パッケージ署名検証はありません。** パッケージという配布単位を持たない
+ため（パッケージマネージャーを排除する設計）、検証する対象が存在しません。
+代わりに次の2点で担保しています。
 
-- GPG 署名検証（既存パッケージとの互換性）
+- **上流ソースのチェックサム検証**: ダウンロードした musl / カーネル /
+  BusyBox / OpenRC の tarball の SHA256 を、上流の公開値と突合した値で検証
+- **リリース資産のハッシュ配布**: `SHA256SUMS` と `SHA512SUMS` を
+  GitHub Release に添付
 
-**追加のセキュリティ層**
-
-- SHA-256 ハッシュ検証（改ざん検出）
-- セキュリティアップデートの優先配信
+公開イメージへの署名（Cosign / Docker Content Trust）は未実装です。
 
 ### 🎯 ターゲット環境
 
@@ -632,7 +638,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [パフォーマンス分析レポート](docs/developer/PERFORMANCE_ANALYSIS.md) - ベンチマーク結果と最適化ロードマップ
 - [パフォーマンスチューニング結果](docs/developer/PERFORMANCE_TUNING.md) - 実施した最適化と成果
 - [アーキテクチャドキュメント](docs/developer/ARCHITECTURE.md) - システム設計と内部構造
-- [API リファレンス](docs/developer/API_REFERENCE.md) - パッケージマネージャ、Init、カーネル API
+- [API リファレンス](docs/developer/API_REFERENCE.md) - Init、カーネル、ビルドシステム、CLI
 - [開発ガイド](DEVELOPMENT.md) - 開発環境セットアップ
 - [貢献ガイド](CONTRIBUTING.md) - コントリビューション方法
 - [コミットメッセージガイド](docs/developer/COMMIT_GUIDE.md) - コミット規約とCHANGELOG生成
@@ -728,7 +734,7 @@ Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
 variants come in under 5MB — the strictest of the three targets.**
 
 Measured on 2026-10-10: sizes for all six images, and boot time, memory and
-command performance for Standard on native arm64. Every variant passes all 27
+command performance for Standard on native arm64. Every variant passes all 28
 checks in `scripts/verify-image.sh`.
 
 > **The 0.62s boot time does not mean Kimigayo is fast.** Measured the same
