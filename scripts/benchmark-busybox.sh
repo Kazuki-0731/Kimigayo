@@ -81,8 +81,13 @@ calculate_median() {
 calculate_speedup() {
     local kimigayo_ms=$1
     local alpine_ms=$2
-    # Use bc for floating point division
-    echo "scale=2; $alpine_ms / $kimigayo_ms" | bc
+    # **Do not use `bc` here.** `echo "scale=2; 742/772" | bc` prints `.96`
+    # with no leading zero, and this value goes straight into the JSON as
+    # `"speedup": .96`, which is not valid JSON - the whole file becomes
+    # unparseable (found 2026-10-11). awk's printf always emits `0.96`.
+    awk -v a="$alpine_ms" -v k="$kimigayo_ms" 'BEGIN {
+        if (k + 0 == 0) { printf "0.00" } else { printf "%.2f", a / k }
+    }'
 }
 
 echo ""
@@ -379,6 +384,18 @@ txt_file="${OUTPUT_DIR}/busybox.txt"
 } > "$txt_file"
 
 log_success "Summary saved to: $txt_file"
+echo ""
+
+# Validate the JSON we just wrote. A broken number format (see
+# calculate_speedup) produced an unparseable file that sat in
+# benchmark-results/ unnoticed, so fail loudly instead.
+if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json_file" 2>/dev/null; then
+    log_success "JSON is valid: $json_file"
+else
+    log_error "Generated JSON is invalid: $json_file"
+    python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json_file" 2>&1 | tail -2
+    exit 1
+fi
 echo ""
 
 log_success "=== Benchmark Complete ==="
