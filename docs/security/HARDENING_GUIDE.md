@@ -398,9 +398,13 @@ chmod 640 /var/log/auth.log
 
 システムコールをフィルタリングして、アプリケーションのセキュリティを強化します。
 
+**プロファイルはホスト側に置きます。** Kimigayo のイメージには
+seccomp プロファイルは入っておらず（rootfs だけでカーネルも持たない）、
+適用するのは `docker run --security-opt` です。
+
 ```bash
-# Seccompプロファイルの作成例
-vi /etc/seccomp/httpd.json
+# ホスト側でプロファイルを用意する
+vi /etc/docker/seccomp/httpd.json
 ```
 
 ```json

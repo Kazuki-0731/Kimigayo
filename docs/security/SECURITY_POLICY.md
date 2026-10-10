@@ -42,7 +42,8 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
    - バッファオーバーフロー、権限昇格、情報漏洩など
 
 2. **影響を受けるコンポーネント**
-   - カーネル、パッケージマネージャ、特定のパッケージなど
+   - musl libc / BusyBox / OpenRC / Linux カーネル / ビルドスクリプト など
+     （**パッケージマネージャーは持ちません**）
 
 3. **再現手順**
    ```bash
@@ -102,8 +103,13 @@ checksec /bin/busybox
 |------|------|-----------|
 | **ASLR** | Address Space Layout Randomization | ✅ 有効 |
 | **DEP** | Data Execution Prevention (NX bit) | ✅ 有効 |
-| **Seccomp-BPF** | システムコールフィルタリング | ⚠️ アプリケーション依存 |
-| **Namespaces** | プロセス隔離 | ✅ サポート |
+| **Seccomp-BPF** | システムコールフィルタリング | **ホスト側で指定**（`docker run --security-opt seccomp=...`）|
+| **Namespaces** | プロセス隔離 | **ホスト側**（コンテナランタイムが提供）|
+
+> **後者2つはイメージの属性ではありません。** 成果物は rootfs だけで
+> カーネルを含まないため、seccomp プロファイルを適用するのも
+> namespace を張るのもホストのコンテナランタイムです。
+> イメージ側が保証できるのは上2つ（PIE による ASLR と NX）だけです。
 
 確認方法:
 ```bash
