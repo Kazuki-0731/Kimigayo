@@ -658,7 +658,6 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [貢献ガイド](CONTRIBUTING.md) - コントリビューション方法
 - [コミットメッセージガイド](docs/developer/COMMIT_GUIDE.md) - コミット規約とCHANGELOG生成
 - [仕様書](SPECIFICATION.md) - プロジェクト仕様
-- [アーキテクチャ](docs/developer/ARCHITECTURE.md) - 詳細設計
 - [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - v0.1.0 公開時の記録（現在の手順書ではありません）
 - [v1.0.0リリース計画](docs/V1_RELEASE_PLAN.md) - 2025-12 時点の計画（v1.0.0 は公開済み。現在は v3.0.x）
 
