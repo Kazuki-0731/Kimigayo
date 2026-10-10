@@ -870,8 +870,19 @@ make check-links        # scripts/check-links.py
 | `rootfs-verifier` | rootfs / イメージを作った直後、リリース前。**「起動した」は検証ではない** |
 | `version-auditor` | 版上げの前後、リリース前。`versions.mk` の突合・チェックサム・上流の新版・パッチのスキップ |
 | `docs-reconciler` | 計測のあと、版上げのあと。数値とバージョンの文書間の食い違い |
+| `spec-auditor` | 仕様を変えたあと、リリース前。**`SPECIFICATION.md`・`CLAUDE.md` の方針が実装と成果物で守られているか**。目標値・コードネーム・設計原則を実態と照合する |
+| `workflow-auditor` | ワークフローを編集したあと、リリース前、**CI が緑なのに成果物がおかしいとき**。スクリプトと Dockerfile が要求する値を各ワークフローが渡しているか |
 
 いずれも**調査専門で変更しない。** 直すかどうかはこちらが判断する。
+
+> **`spec-auditor` と `workflow-auditor` は 2026-10-10 に追加した。**
+> 同じ日に「CI が緑なのに全イメージが `variant=minimal` と名乗る」
+> 「`release.yml` が版を渡さず `os-release` が `dev` になる」
+> 「`latest-amd64` が永久に更新されない」を立て続けに踏んだため
+> （→ `workflow-auditor`）。また `SPECIFICATION.md` §8.3 の目標値が
+> バリアントごとに違うのに README が一律 `< 5MB` で達成率を出していた
+> ことも、誰も仕様と照合していなかったため気づけなかった
+> （→ `spec-auditor`）。
 
 ### Skills — 判断を伴う手順
 

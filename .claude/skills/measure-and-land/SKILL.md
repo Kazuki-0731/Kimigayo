@@ -38,6 +38,45 @@ docker ps   # ビルドコンテナは kimigayo-build-env という固定名
 
 ---
 
+## どのスクリプトが何を測るか（8本あります）
+
+**先にここを見てください。** 測りたいものに対応するスクリプトが既にあります。
+新しく書く前に、既にあるものが壊れていないかを疑ってください
+（2026-10-10 に 2 本が別物を測っていたのが見つかりました）。
+
+| スクリプト | 何を測るか | 主な入力 | 出力 |
+| --- | --- | --- | --- |
+| `benchmark-size.sh` | イメージサイズ（Kimigayo と比較対象をまとめて） | `IMAGES` 配列（スクリプト内） | `benchmark-size.json` |
+| `benchmark-startup.sh` | 起動時間。`MODE=exec` は `/bin/true`、`MODE=init` は `openrc default` の完走まで | `IMAGE` `ITERATIONS` `MODE` `PLATFORM` | `benchmark-startup.json` |
+| `benchmark-memory.sh` | 常駐メモリ（**KB**） | `IMAGE` `DURATION` `PLATFORM` | `benchmark-memory.json` |
+| `benchmark-busybox.sh` | 8 コマンド（`ls` `grep` `find` `awk` `sort` `cat` `wc` `head`）を Alpine と比較 | `IMAGE_NAME` `ALPINE_IMAGE` `BENCHMARK_ITERATIONS` | `benchmark-results/busybox.json` |
+| `benchmark-lifecycle.sh` | コンテナの作成・起動・停止・削除 | `IMAGE_NAME` `BENCHMARK_ITERATIONS` | `benchmark-results/lifecycle.json` |
+| `benchmark-comparison.sh` | Kimigayo vs Alpine / distroless / Ubuntu | `ITERATIONS` | `benchmark-results/comparison_<時刻>.{txt,json,md}` |
+| `benchmark-report.sh` | **測らない。** 上の JSON を読んで Markdown にまとめる | `$1`（既定 `benchmark-results`） | `benchmark-results/BENCHMARK_REPORT.md` |
+| `benchmark-all.sh` | 上をまとめて回す | `OUTPUT_DIR` | `benchmark-results/` 一式 |
+
+**`benchmark-report.sh` は JSON のキー名を直接読んでいます。**
+計測スクリプトの出力キーを変えるときは、必ずここも直してください
+（2026-10-10 に `average_mb` → `average_kb` で実際に壊しました）。
+
+**`benchmark-all.sh` は各ステップに `|| true` を付けています。**
+1本失敗しても最後まで走るので、**「全部成功した」とは読めません**。
+使うときは個別の JSON が生成されたかを確認してください。
+
+### 実行環境の制約（macOS の開発機）
+
+- **`mapfile` を使うスクリプトは macOS の bash 3.2 では落ちます。**
+  `/opt/homebrew/bin/bash` で実行してください
+  （`Makefile` の `benchmark-comparison` ターゲットは既にそうしています）
+- **x86_64 を QEMU で測った時間を数値として載せないこと。**
+  開発機は Apple Silicon で、`--platform linux/amd64` は
+  エミュレーションです。**サイズは比較できますが、時間は比較になりません。**
+  時間とメモリは arm64 ネイティブで測り、その旨を明記します
+- 比較対象（Alpine / Ubuntu / distroless）も**同じアーキテクチャで引き直して**
+  から測ります。`docker pull --platform linux/arm64 ...`
+
+---
+
 ## イメージサイズ
 
 これは信頼できる計測です。

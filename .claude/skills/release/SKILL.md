@@ -134,6 +134,66 @@ gh run watch
 
 ---
 
+## 6. 公開されたものを実際に引いて確かめる
+
+**`release.yml` が成功した = 中身が正しい、ではありません。**
+ワークフローは「渡された値」でイメージを作るだけなので、
+渡す値が間違っていても緑になります（→ `workflow-auditor`）。
+**Docker Hub から実際に pull して中身を見ます。**
+
+```bash
+# 1) タグが揃ったか。count フィールドは当てにならないので行数で数える
+curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?page_size=100' |
+    python3 -I -c 'import json,sys; d=json.load(sys.stdin); print(len(d["results"]), "件"); [print(t["name"], t["last_updated"][:19]) for t in sorted(d["results"], key=lambda x: x["name"])]'
+```
+
+`latest` 系は **12 タグ**です（`latest` / `latest-amd64` / `latest-arm64` /
+`latest-{minimal,standard,extended}` / `latest-{minimal,standard,extended}-{amd64,arm64}`）。
+**全部が今回のリリース時刻に更新されていること。**
+
+```bash
+# 2) マルチアーキのマニフェストが両方を指しているか
+docker buildx imagetools inspect ishinokazuki/kimigayo-os:latest | grep -E 'Platform|MediaType'
+
+# 3) 中身がタグどおりか（両アーキでやる）
+for plat in amd64 arm64; do
+    docker pull -q --platform "linux/$plat" ishinokazuki/kimigayo-os:latest
+    docker image inspect ishinokazuki/kimigayo-os:latest \
+        --format '{{index .Config.Labels "version"}} / {{index .Config.Labels "io.kimigayo.variant"}} / {{.Architecture}}'
+    docker run --rm --platform "linux/$plat" ishinokazuki/kimigayo-os:latest /bin/sh -c '
+        . /etc/os-release; echo "$VERSION_ID $VERSION_CODENAME"
+        etype=$(dd if=/bin/busybox bs=1 skip=16 count=2 2>/dev/null | od -d | head -1 | awk "{print \$2}")
+        [ "$etype" = 3 ] && echo "busybox: PIE ✓" || echo "busybox: PIE ではない ✗"
+        /sbin/openrc default >/dev/null 2>&1 && echo "init: rc=0 ✓" || echo "init: 失敗 ✗"
+    '
+done
+```
+
+**確認すること:**
+
+| | 一致していること |
+| --- | --- |
+| イメージタグ | `3.0.0` |
+| `LABEL version` | `3.0.0` |
+| `/etc/os-release` の `VERSION_ID` | `3.0.0` |
+| `LABEL io.kimigayo.variant` | そのタグのバリアント |
+| `/bin/busybox` の ELF type | `3`（DYN = PIE）|
+| `openrc default` | 終了コード 0 |
+
+**一致していなければ、タグ名だけ合っていて中身が違う状態です。**
+v0.1.0〜v2.0.1 の公開イメージは全部この状態でした（`0.1.0` と名乗っていた）。
+
+### GitHub Release も見る
+
+```bash
+gh release view v<X.Y.Z> --json tagName,isDraft,assets
+```
+
+tarball 6本（3バリアント × 2アーキ）と `SHA256SUMS` / `SHA512SUMS` の
+**計8ファイル**が付いていること。draft のままになっていないこと。
+
+---
+
 ## タグを間違えたとき
 
 ```bash
