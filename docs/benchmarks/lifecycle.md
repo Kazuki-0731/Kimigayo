@@ -108,7 +108,7 @@ make benchmark-lifecycle
 bash scripts/benchmark-lifecycle.sh
 
 # 環境変数でカスタマイズ
-IMAGE_NAME=ishinokazuki/kimigayo-os:1.0.0 \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.1 \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-lifecycle.sh
 ```
@@ -136,34 +136,37 @@ benchmark-results/
 
 ```
 === Container Lifecycle Benchmark ===
-Image: ishinokazuki/kimigayo-os:1.0.0
+Image: kimigayo-os:standard-arm64
 Iterations: 10
 
-Metric                              Average (ms)    Median (ms)
+Metric                                 Average (ms)     Median (ms)
 ----------------------------------- --------------- ---------------
-Run-to-completion                             234             230
-Container start                                89              87
-Container stop                                125             120
-Container restart                             214             210
-Container cleanup                              32              30
-Image pull (warm cache)                        45              42
+Run-to-completion                               699             696
+Container start                                 561             556
+Container stop                                10368           10365
+Container restart                             10643           10645
+Container cleanup                               299             298
+Image pull (warm cache)                        2258            2282
 
-Image size (MB)                              3.2
-Layer count                                    2
+Image size (MB)                                3.13
+Layer count                                       2
 ```
+
+（2026-10-11 実測。stop / restart の 10 秒は Docker の猶予時間 →
+上の「stop と restart の 10 秒は Kimigayo のせいではない」節）
 
 ### JSON出力例
 
 ```json
 {
-  "timestamp": "2026-01-01T12:00:00Z",
-  "image": "ishinokazuki/kimigayo-os:1.0.0",
+  "timestamp": "2026-10-11T00:52:00Z",
+  "image": "kimigayo-os:standard-arm64",
   "iterations": 10,
   "results": {
     "run_to_completion": {
-      "average_ms": 234,
-      "median_ms": 230,
-      "samples": [230, 235, 232, ...]
+      "average_ms": 699,
+      "median_ms": 696,
+      "samples": [696, 701, 712, ...]
     },
     ...
   }
@@ -174,32 +177,84 @@ Layer count                                    2
 
 ### Kimigayo OS目標値
 
-> **⚠️ 下表の実測値は v1.0.0（2026-01-01）の記録で、
-> 2026-10-10 時点では測り直していない。**
-> 同じ時期に記録された起動時間（439ms）とメモリ（0.2MB）は、
-> 計測スクリプトの誤りによる無効値だった。
-> **この表も検証できていないので引用しないこと。**
-> 測定条件（ホスト・アーキテクチャ）も記録されていない。
-> 現在の確かな値は [README.md](../../README.md) の
-> 「パフォーマンス実績」節にあるものだけ。
+### 実測値（2026-10-11、v3.0.1）
 
-| 項目 | 目標値 | 実測値（v1.0.0、未検証） | 達成 |
-|------|--------|----------------|------|
-| Run-to-completion | < 300ms | ~234ms | ✅ |
-| Container start | < 100ms | ~89ms | ✅ |
-| Container stop | < 150ms | ~125ms | ✅ |
-| Container restart | < 250ms | ~214ms | ✅ |
-| Container cleanup | < 50ms | ~32ms | ✅ |
-| Image pull (warm) | < 100ms | ~45ms | ✅ |
+**測定条件:** `kimigayo-os:standard-arm64`、macOS / Apple Silicon、
+arm64 ネイティブ、10回（warm pull のみ3回）の中央値。
+
+| 項目 | 中央値 | 何を測っているか |
+|------|--------|----------------|
+| Run-to-completion | 696ms | `docker run --rm` が返るまで |
+| Container start | 556ms | `docker run -d` が返るまで |
+| Container stop | **10,365ms** | **Docker の猶予時間**（下記）|
+| Container restart | **10,645ms** | 同上（stop を含む）|
+| Container cleanup | 298ms | `docker rm` |
+| Image pull (warm) | 2,282ms | キャッシュ済みの `docker pull` |
+
+### stop と restart の 10 秒は Kimigayo のせいではない
+
+**`docker stop` は PID 1 に SIGTERM を送り、10 秒待ってから SIGKILL します。**
+カーネルは **PID 1 についてはハンドラの無いシグナルを無視する**ので、
+`sleep 60` を PID 1 で動かしているこのベンチマークでは必ず猶予時間を
+使い切ります。
+
+同じ条件で測った比較（2026-10-11）:
+
+| | `sleep 60` を PID 1 | SIGTERM を `trap` する `sh` |
+|---|---|---|
+| Kimigayo Standard | 10,388ms | **665ms** |
+| `alpine:latest` | 10,379ms | **667ms** |
+
+**Alpine と 9ms しか違いません。** この数値はイメージの性質ではなく、
+PID 1 のシグナル処理の性質です。
+
+> **v1.0.0 の記録「Container stop < 150ms（~125ms）✅ 達成」は撤回します。**
+> この測り方では出ない値です。同じ記録にあった
+> run-to-completion ~234ms・start ~89ms も、現在の実測
+> （696ms / 556ms）と桁が合いません。測定条件が残っていないため
+> 何が違ったのか検証できません。
+
+### 利用者向けの実用上の注意
+
+**アプリケーションが SIGTERM を処理しないと、`docker stop` と
+Kubernetes の Pod 終了に毎回 10 秒かかります。**
+これは Kimigayo に限らずどのイメージでも同じですが、
+Kimigayo は Init（OpenRC）を持つので選択肢があります。
+
+```dockerfile
+# アプリを PID 1 にするなら、SIGTERM を処理する
+CMD ["/app/server"]        # server 側で SIGTERM を受けて終了する
+
+# シェル経由にするなら exec を使う（sh が PID 1 に残らないようにする）
+CMD ["/bin/sh", "-c", "exec /app/server"]
+```
+
+猶予時間を縮めるならホスト側で指定します。
+
+```bash
+docker stop --timeout 2 <container>
+docker run --stop-timeout 2 ...
+```
 
 ### 他OSとの比較
 
-| OS | Run-to-completion | Container start | Image size |
-|----|------------------|----------------|------------|
-| **Kimigayo OS** | **234ms** | **89ms** | **3.2MB** |
-| Alpine Linux | 245ms | 95ms | 7.5MB |
-| Distroless | 220ms | 85ms | 2.0MB |
-| Ubuntu | 890ms | 340ms | 78MB |
+**ライフサイクルの時間はイメージでは変わりません。**
+2026-10-11 に arm64 ネイティブで測った比較（10回の中央値）:
+
+| OS | 起動（`docker run`）| 常駐メモリ | イメージサイズ |
+|----|------------------|-----------|---------------|
+| **Kimigayo Standard** | 613ms | **232KB** | 3.13MB |
+| `alpine:latest` | 616ms | 276KB | 8.66MB |
+| `ubuntu:24.04` | 589ms | 312KB | 100.81MB |
+| `gcr.io/distroless/static-debian12` | 測定不可（実行ファイル無し）| — | 2.11MB |
+
+**100MB の Ubuntu が最速に出ています。** 測っている時間のほとんどが
+Docker 自身のコンテナ生成なので、イメージサイズは効きません。
+差が出るのは常駐メモリとサイズの方です。
+
+> **旧表（Kimigayo 234ms / Alpine 245ms / Ubuntu 890ms）は撤回します。**
+> Ubuntu が 890ms という値は再現しません（実測 589ms）。
+> 測定条件が記録されておらず、検証できません。
 
 ## CI/CD統合
 
@@ -246,11 +301,14 @@ spec:
     spec:
       containers:
       - name: app
-        image: ishinokazuki/kimigayo-os:1.0.0
-        # 起動時間: ~89ms（測定値から予測）
+        image: ishinokazuki/kimigayo-os:3.0.1
         livenessProbe:
-          initialDelaySeconds: 1  # 短い起動時間を活用
+          initialDelaySeconds: 1
           periodSeconds: 5
+        # **SIGTERM を処理しないと Pod の終了に 30 秒かかります**
+        # （Kubernetes の既定の terminationGracePeriodSeconds）。
+        # アプリ側で SIGTERM を受けて終了するのが本筋です。
+      terminationGracePeriodSeconds: 5
 ```
 
 ## トラブルシューティング
@@ -277,7 +335,7 @@ spec:
 IMAGE_NAME=kimigayo-os:local bash scripts/benchmark-lifecycle.sh
 
 # または手動でプル
-docker pull ishinokazuki/kimigayo-os:1.0.0
+docker pull ishinokazuki/kimigayo-os:3.0.1
 ```
 
 ### 権限エラー
@@ -305,7 +363,7 @@ BENCHMARK_ITERATIONS=20 make benchmark-lifecycle
 
 ```bash
 # 本番イメージを使用
-IMAGE_NAME=ishinokazuki/kimigayo-os:1.0.0-minimal \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.1-minimal \
 make benchmark-lifecycle
 ```
 
@@ -321,7 +379,7 @@ make benchmark-lifecycle
 ```bash
 # 異なるバージョン間での比較
 IMAGE_NAME=ishinokazuki/kimigayo-os:0.9.0 make benchmark-lifecycle
-IMAGE_NAME=ishinokazuki/kimigayo-os:1.0.0 make benchmark-lifecycle
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.1 make benchmark-lifecycle
 
 # benchmark-results/ディレクトリで比較
 diff benchmark-results/lifecycle_*.txt
@@ -363,6 +421,8 @@ Kubernetesでは追加のオーバーヘッドがあります：
 ## 更新履歴
 
 - **2026-01-01 (v1.0.0)**: 初版リリース（Issue #29対応）
+- **2026-10-11 (v3.0.1)**: 実測で測り直し。v1.0.0 の数値を撤回し、
+  この指標が何を測っているか（Docker のオーバーヘッド）を明記
   - 7項目の測定を実装
   - JSON/テキスト形式の出力
   - Makefile統合

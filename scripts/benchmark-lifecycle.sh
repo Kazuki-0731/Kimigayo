@@ -123,6 +123,16 @@ log_success "Container start: avg=${start_avg}ms, median=${start_median}ms"
 echo ""
 
 # 3. Container stop time
+#
+# **これは Docker の猶予時間を測っている。** `docker stop` は PID 1 に
+# SIGTERM を送って 10 秒待ち、終わらなければ SIGKILL する。
+# カーネルは **PID 1 についてはハンドラの無いシグナルを無視する**ので、
+# `sleep 60` を PID 1 で動かしているこの測り方では必ず約 10,400ms に
+# なる（2026-10-11 実測。**Alpine も 10,379ms で同じ**）。
+#
+# SIGTERM を扱うプロセスなら両者とも約 665ms。つまりこの数値は
+# **イメージの性質ではなく、PID 1 のシグナル処理の性質**。
+# v1.0.0 の記録にある「stop ~125ms」はこの方法では出ない値。
 log_info "3. Container stop time"
 stop_times=()
 for i in $(seq 1 "$ITERATIONS"); do
@@ -174,7 +184,11 @@ image_size=$(docker inspect "$IMAGE_NAME" --format '{{.Size}}')
 layer_count=$(docker inspect "$IMAGE_NAME" --format '{{len .RootFS.Layers}}')
 # bc は 1 未満のとき先頭の 0 を付けず `.84` を返し、JSON を壊す
 # （scripts/lib/json.sh の経緯を参照）。awk の printf を使う。
-image_size_mb=$(awk -v b="$image_size" 'BEGIN { printf "%.2f", b / 1048576 }')
+#
+# **単位は 10 進 MB。** 2026-10-11 まで 1048576（MiB）で割りながら
+# "MB" と表示していたため、`docker images` や benchmark-size.json
+# （どちらも 10 進）と 5% ずれていた。
+image_size_mb=$(awk -v b="$image_size" 'BEGIN { printf "%.2f", b / 1000 / 1000 }')
 log_success "Image size: ${image_size_mb}MB, Layers: $layer_count"
 echo ""
 

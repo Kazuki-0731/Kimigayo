@@ -174,12 +174,12 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
             # 比較データから対応するOSのメモリ使用量を検索
             .memory = (
                 if (.key | contains("Kimigayo")) then
-                    ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.memory_mb)
+                    ($comparison[0].results | to_entries[] | select(.key | contains("kimigayo")) | .value.memory_kb)
                 elif (.key | contains("Alpine Latest")) then
-                    ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.memory_mb)
+                    ($comparison[0].results | to_entries[] | select(.key | contains("alpine:latest")) | .value.memory_kb)
                 elif (.key | startswith("Alpine 3.")) then "測定未実施"
                 elif (.key | contains("Ubuntu")) then
-                    ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.memory_mb)
+                    ($comparison[0].results | to_entries[] | select(.key | contains("ubuntu")) | .value.memory_kb)
                 elif (.key | contains("Debian")) then "測定未実施"
                 elif (.key | contains("BusyBox")) then "測定未実施"
                 else "測定未実施"
@@ -188,7 +188,7 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
             if .memory == "N/A" or .memory == -1 then
                 "| \(.os_name) | N/A (実行可能ファイル無し) |"
             elif (.memory | type) == "number" then
-                "| \(.os_name) | \(.memory)MB |"
+                "| \(.os_name) | \(.memory)KB |"
             else
                 "| \(.os_name) | \(.memory) |"
             end' "$INPUT_DIR/benchmark-size.json" >> "$OUTPUT_FILE" 2>/dev/null
@@ -307,18 +307,23 @@ if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq >
         else .startup_str = (.value.startup_ms | tostring) + "ms" end |
 
         # メモリのフォーマット
-        if (.value.memory_mb == "N/A" or .value.memory_mb == 0 or .value.memory_mb == -1) then .memory_str = "N/A"
-        else .memory_str = (.value.memory_mb | tostring) + "MB" end |
+        if (.value.memory_kb == "N/A" or .value.memory_kb == 0 or .value.memory_kb == -1) then .memory_str = "N/A"
+        else .memory_str = (.value.memory_kb | tostring) + "KB" end |
 
         "| \(.short_name) | \(.size_str) | \(.startup_str) | \(.memory_str) | \(.value.has_shell) | \(.value.has_pkg_manager) |"' \
         "$LATEST_COMPARISON" >> "$OUTPUT_FILE" 2>/dev/null
 
     echo "" >> "$OUTPUT_FILE"
+    # **数値を直書きしないこと。** 2026-10-11 まで「最小クラスの
+    # イメージサイズ (1MB)」「Alpine並みの低メモリ使用量 (0.2MB)」と
+    # 固定文字列で書いており、どちらも無効になった旧値だった。
+    # レポートは測った値だけを載せる。
     echo "**Kimigayo OSの特徴:**" >> "$OUTPUT_FILE"
-    echo "- ✅ 最小クラスのイメージサイズ (1MB)" >> "$OUTPUT_FILE"
-    echo "- ✅ Alpine並みの低メモリ使用量 (0.2MB)" >> "$OUTPUT_FILE"
-    echo "- ✅ シェル対応（Distrolessより柔軟）" >> "$OUTPUT_FILE"
-    echo "- ⚠️ パッケージマネージャー非搭載（セキュリティ重視設計）" >> "$OUTPUT_FILE"
+    echo "- ✅ シェルと Init を備えたうえで distroless に近いサイズ" >> "$OUTPUT_FILE"
+    echo "- ✅ 常駐メモリは上の表のとおり（差が出るのはここ）" >> "$OUTPUT_FILE"
+    echo "- ⚠️ パッケージマネージャー非搭載（設計方針）" >> "$OUTPUT_FILE"
+    echo "- ⚠️ **起動時間はイメージでは変わらない。** 測っている時間の" >> "$OUTPUT_FILE"
+    echo "  ほとんどが Docker のコンテナ生成なので、Ubuntu でも同じになる" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 fi
 

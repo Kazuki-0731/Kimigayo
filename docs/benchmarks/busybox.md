@@ -259,7 +259,7 @@ BENCHMARK_ITERATIONS=20 make benchmark-busybox
 
 ```bash
 # 本番イメージを使用
-IMAGE_NAME=kimigayo-os:1.0.0-standard-x86_64 \
+IMAGE_NAME=kimigayo-os:standard-x86_64 \
 make benchmark-busybox
 ```
 
@@ -369,6 +369,8 @@ docker run --rm kimigayo-os:standard-x86_64 busybox | head -1
 ## 更新履歴
 
 - **2026-01-01 (v1.0.0)**: 初版リリース（Issue #30対応）
+- **2026-10-11 (v3.0.1)**: 実測で測り直し。v1.0.0 の数値を撤回し、
+  この指標が何を測っているか（Docker のオーバーヘッド）を明記
   - 8コマンドの測定を実装
   - Alpine Linuxとの比較機能
   - JSON/テキスト形式の出力

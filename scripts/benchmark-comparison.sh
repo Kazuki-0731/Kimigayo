@@ -34,12 +34,20 @@ MD_FILE="${OUTPUT_DIR}/comparison_${TIMESTAMP}.md"
 # つもりで **v2.0.1 のイメージを引いて比較していた**。
 # 版の正本は git describe（→ scripts/get-version.sh）。
 KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-$(bash "${PROJECT_ROOT}/scripts/get-version.sh" 2>/dev/null || echo latest)}"
+
+# **公開前の版は Docker Hub に無い。** KIMIGAYO_IMAGE で手元のイメージを
+# 指せるようにしておく（タグを打つ前に比較値が要るときのため）。
+#   KIMIGAYO_IMAGE=kimigayo-os:standard-arm64 bash scripts/benchmark-comparison.sh
+KIMIGAYO_IMAGE="${KIMIGAYO_IMAGE:-ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-arm64}"
+
+# Ubuntu は 24.04。README と CLAUDE.md が載せている比較値がこの版なので
+# 揃える（2026-10-11 まで 22.04 を測っていて食い違っていた）。
 IMAGES=(
-    "ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-arm64"
+    "$KIMIGAYO_IMAGE"
     "alpine:latest"
     "gcr.io/distroless/base-debian12:latest"
     "gcr.io/distroless/static-debian12:latest"
-    "ubuntu:22.04"
+    "ubuntu:24.04"
 )
 
 # Colors for output
@@ -106,7 +114,10 @@ for image in "${IMAGES[@]}"; do
     if docker image inspect "$image" > /dev/null 2>&1; then
         size=$(docker images "$image" --format "{{.Size}}")
         size_bytes=$(docker inspect "$image" --format "{{.Size}}")
-        size_mb=$((size_bytes / 1024 / 1024))
+        # **整数 MB にしない。** 2.76MB も 2.11MB も「2」になり、
+        # distroless との比較ができなくなる（2026-10-11 に修正）。
+        # 単位は docker images と揃えて 10 進 MB。
+        size_mb=$(awk -v b="$size_bytes" 'BEGIN { printf "%.2f", b / 1000 / 1000 }')
         image_sizes["$image"]=$size_mb
         log_result "$image: $size ($size_mb MB)"
     else
@@ -225,39 +236,37 @@ for image in "${IMAGES[@]}"; do
         continue
     fi
 
-    # Get memory usage in MB
-    mem_raw=$(docker stats --no-stream --format "{{.MemUsage}}" "$container_id" 2>/dev/null | awk '{print $1}')
+    # **KB で持つ。** 2026-10-11 まで MB 小数1桁に丸めていたため、
+    # Kimigayo 232KB・Alpine 280KB・Ubuntu 316KB がすべて「0.2 / 0.3」に
+    # なって区別が付かなかった（benchmark-memory.sh と同じ誤り）。
+    #
+    # `docker stats` はコンテナ起動直後に `0B` を返すことがある。
+    # その標本を 0 として記録すると「最小メモリ」の判定が壊れるので、
+    # 読めるまで数回試す。
+    mem_kb=0
+    for _attempt in 1 2 3 4 5; do
+        mem_raw=$(docker stats --no-stream --format "{{.MemUsage}}" "$container_id" 2>/dev/null | awk '{print $1}')
+        mem_kb=$(awk -v v="$mem_raw" 'BEGIN {
+            if (v ~ /GiB$/)      { sub(/GiB$/, "", v); printf "%.0f", v * 1024 * 1024 }
+            else if (v ~ /MiB$/) { sub(/MiB$/, "", v); printf "%.0f", v * 1024 }
+            else if (v ~ /KiB$/) { sub(/KiB$/, "", v); printf "%.0f", v }
+            else if (v ~ /B$/)   { sub(/B$/, "", v);   printf "%.0f", v / 1024 }
+            else                 { printf "0" }
+        }')
+        [ "${mem_kb:-0}" -gt 0 ] 2>/dev/null && break
+        sleep 1
+    done
 
-    # Extract numeric value and convert to MB
-    if [[ "$mem_raw" =~ ^([0-9.]+)([KMG])iB$ ]]; then
-        mem_value="${BASH_REMATCH[1]}"
-        mem_unit="${BASH_REMATCH[2]}"
-
-        case "$mem_unit" in
-            K)
-                mem_mb=$(echo "scale=2; $mem_value / 1024" | bc)
-                ;;
-            M)
-                mem_mb="$mem_value"
-                ;;
-            G)
-                mem_mb=$(echo "scale=2; $mem_value * 1024" | bc)
-                ;;
-        esac
-    elif [[ "$mem_raw" =~ ^([0-9.]+)MiB$ ]]; then
-        # Alternative format without unit letter
-        mem_mb="${BASH_REMATCH[1]}"
-    else
-        log_warning "$image: unable to parse memory usage: $mem_raw"
-        mem_mb="0"
+    if [ "${mem_kb:-0}" -le 0 ] 2>/dev/null; then
+        log_warning "$image: unable to read memory usage (last value: ${mem_raw:-none})"
+        mem_kb=0
     fi
 
-    # Round to 1 decimal place to avoid losing small values
-    memory_usage["$image"]=$(printf "%.1f" "$mem_mb" 2>/dev/null || echo "0")
+    memory_usage["$image"]=$mem_kb
 
     docker rm -f "$container_id" > /dev/null 2>&1
 
-    log_result "$image: ${memory_usage[$image]} MB"
+    log_result "$image: ${memory_usage[$image]} KB"
 done
 echo ""
 
@@ -343,7 +352,7 @@ for image in "${IMAGES[@]}"; do
       "type": "${image_type[$image]:-N/A}",
       "size_mb": ${image_sizes[$image]:-0},
       "startup_ms": $startup_val,
-      "memory_mb": $memory_val,
+      "memory_kb": $memory_val,
       "has_shell": "${has_shell[$image]:-N/A}",
       "has_pkg_manager": "${has_pkg_manager[$image]:-N/A}"
     }
@@ -368,7 +377,7 @@ cat > "$MD_FILE" <<EOF
 
 ## Performance Comparison
 
-| Image | Type | Size (MB) | Startup (ms) | Memory (MB) | Shell | Package Manager |
+| Image | Type | Size (MB) | Startup (ms) | Memory (KB) | Shell | Package Manager |
 |-------|------|-----------|--------------|-------------|-------|-----------------|
 EOF
 
@@ -389,9 +398,13 @@ cat >> "$MD_FILE" <<EOF
 
 ## Summary
 
-- **Smallest image**: $(for img in "${IMAGES[@]}"; do echo "${image_sizes[$img]:-999999} $img"; done | sort -n | head -1 | awk '{print $2}')
+- **Smallest image**: $(for img in "${IMAGES[@]}"; do echo "${image_sizes[$img]:-999999} $img"; done | sort -g | head -1 | awk '{print $2}')
 - **Fastest startup**: $(for img in "${IMAGES[@]}"; do val="${startup_times[$img]:-0}"; if [ "$val" != "-1" ] && [ "$val" != "0" ]; then echo "$val $img"; fi; done | sort -n | head -1 | awk '{print $2}')
 - **Lowest memory**: $(for img in "${IMAGES[@]}"; do val="${memory_usage[$img]:-0}"; if [ "$val" != "-1" ] && awk "BEGIN {exit !($val > 0)}"; then echo "$val $img"; fi; done | sort -n | head -1 | awk '{print $2}')
+
+**Startup time does not differ between images.** Most of the measured time is
+Docker's own container creation, so Ubuntu lands within noise of Kimigayo
+despite being ~30x larger. Memory is where the difference shows.
 
 ## Notes
 
