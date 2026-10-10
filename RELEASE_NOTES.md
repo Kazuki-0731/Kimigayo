@@ -1,5 +1,150 @@
 # Kimigayo OS Release Notes
 
+## バージョン 3.0.1 "Himawari" (向日葵) - 2026-10-11
+
+**イメージから「あってはいけないもの」を2種類外しました。**
+パッケージマネージャー（BusyBox の `dpkg` / `rpm`）と、
+Kimigayo では絶対に実行されない init スクリプト 9 本です。
+
+### 🔒 パッケージマネージャーが入っていました
+
+**v3.0.0 までの公開イメージには `dpkg` / `dpkg-deb` / `rpm` が
+入っており、実際にパッケージをインストールできました。**
+
+```console
+$ docker run --rm ishinokazuki/kimigayo-os:3.0.0 dpkg --help
+Usage: dpkg [-ilCPru] [-F OPT] PACKAGE
+Install, remove and manage Debian packages
+    -i,--install	Install the package
+```
+
+Kimigayo は**パッケージマネージャーを持たないこと**が設計の前提です
+（`SPECIFICATION.md` 2.2 / 3.5）。README でも「パッケージマネージャー
+なし」「不変インフラを徹底」と書いており、**実態と逆でした**。
+
+原因は BusyBox の config の書き忘れです。BusyBox は `dpkg`・`dpkg-deb`・
+`rpm` をいずれも**既定で有効**にしているため、config に `n` と
+書かなければ有効になります。「書かなかった」だけで入っていました。
+
+v3.0.1 では3バリアントとも明示的に無効化し、**成果物に
+パッケージマネージャーが無いことを `verify-image.sh` が検査します**
+（`apk`・`apt`・`opkg`・`yum`・`dnf`・`pacman` も同じ検査に載せました）。
+
+> `rpm2cpio` は extended に残しています。rpm を**展開**するだけで
+> インストール機能が無いため、`ar` や `unzip` と同じ扱いです。
+
+### 🧹 動かない init スクリプトを外しました
+
+OpenRC は、どのディストリでも使えるように init スクリプトを一式
+同梱しています。そのうち次の 9 本は、Kimigayo の想定
+（VPS / クラウド上の Docker コンテナ）では 1 度も実行されません。
+
+| 外したもの | 何をするものか | なぜ動かないか |
+| --- | --- | --- |
+| `agetty` | 端末のログインプロンプト | `/sbin/agetty` が無い |
+| `consolefont` | コンソールのフォント設定 | `/usr/bin/setfont` が無い |
+| `numlock` | コンソールの NumLock | `/usr/bin/setleds` が無い |
+| `runsvdir` | runit のサービス監視 | `/usr/bin/runsvdir` が無い |
+| `s6-svscan` | s6 のサービス監視 | Kimigayo は OpenRC を使う |
+| `user` | ユーザー単位の OpenRC セッション | コンテナでは使わない |
+| `net-online` | ネットワーク疎通待ち | コンテナでは不要 |
+| `osclock` | 「時計は OS 任せ」と宣言するだけ | — |
+| `swclock` | RTC が無いマシンで時計を合わせる | — |
+
+`/etc/init.d` は 36 本 → **27 本**になりました。
+
+**動作が変わらないことを実測で確認しています。** 削除版をビルドし、
+`openrc sysinit` / `boot` / `default` の終了コード、起動したサービス数、
+`rc-update show` の行数、`--privileged` での `sysctl` 適用まで、
+v3.0.0 と完全に一致しました。
+
+> **サイズのためではありません**（約 12KB しか減りません）。
+> 目的は、**root で解釈・実行されるシェルスクリプトを減らすこと**と、
+> `/etc/init.d` に実際に動くものだけが並んでいる状態にすることです。
+>
+> `keyword -docker` が付いているだけのもの（`fsck`・`hwclock`・
+> `modules`・`localmount` など 24 本）は**残しています**。
+> Docker では飛ばされますが、ベアメタルや特権コンテナでは
+> 正規に機能する OpenRC の構成要素だからです。
+
+### 📊 起動時間とメモリを実測しました（v3.0.0 では「未測定」でした）
+
+計測スクリプトが別物を測っていたのを直し、測り直しました。
+**イメージの中身は変わりません。**
+
+| 指標 | Kimigayo Standard | Alpine | Ubuntu 24.04 |
+| --- | --- | --- | --- |
+| 起動時間 | 0.62秒 | 0.61秒 | 0.61秒 |
+| 常駐メモリ | **232KB** | 280KB | 316KB |
+
+（2026-10-10、macOS / Apple Silicon、**arm64 ネイティブ**、中央値10回）
+
+**起動時間に差は出ません。** 0.6 秒のほとんどは Docker 自身の
+コンテナ生成で、101MB の Ubuntu でも同じ数字になります。
+**「軽いから起動が速い」とは言えません。** 差が出るのは常駐メモリの方です。
+
+OpenRC が `default` ランレベルを完走するまでは **0.77 秒**でした。
+
+> v2.0.1 まで公開していた **439ms / 0.2MB は撤回済み**です。
+> 起動時間は `docker run -d <image> sleep 5` の終了までを測っており、
+> **イメージが壊れているほど速く見える**計測でした。
+> メモリは `KiB` の換算を誤ったうえ整数 MB に丸めており、
+> 1MB 未満を 0 としか表せませんでした。
+
+### 📝 仕様書と公開ドキュメントの訂正
+
+**当初の計画のまま残っていた記述を落としました。**
+Kimigayo は独自のパッケージマネージャを作りません（2026-10-10 決定）。
+
+- `SPECIFICATION.md` の「Phase 2: パッケージシステム」（パッケージ
+  マネージャの設計・実装・リポジトリシステム）を取り下げ
+- 同「パッケージセキュリティ」の Ed25519 / GPG 署名検証を削除。
+  パッケージという配布単位が無いので、検証する対象が存在しません。
+  実際にやっている**上流 tarball のチェックサム検証**と
+  **リリース資産の `SHA256SUMS` / `SHA512SUMS`** に差し替えました
+- 同「独自のパッケージマネージャによる高速化」「東アジア圏の
+  ミラーサーバー最適化」を削除（どちらも存在しません）
+
+**Docker Hub の説明文にあった、実装していない機能の宣伝も消しました。**
+
+| 消した記述 | 実態 |
+| --- | --- |
+| seccomp-BPF をデフォルトで有効化 | 成果物は rootfs だけでカーネルを含まない。seccomp を適用するのはホストの `docker run` 側 |
+| 再現可能ビルド（ビット同一） | `REPRODUCIBLE_BUILD=yes` のときだけ効くフラグを、どこも設定していない |
+| イメージ署名（Docker Content Trust / Cosign） | `release.yml` に署名工程が無い |
+| Trivy でイメージを自動スキャン | パッケージデータベースが無いため対象を1つも識別できない |
+| Minimal は「カーネル + musl libc + BusyBox」 | カーネルはイメージに入らない |
+| `stable` / `edge` タグ | 生成箇所が無く、1度も公開されていない |
+
+その他:
+
+- README が「Docker Hub 上のイメージは v2.0.1 のまま」と書いたままでした
+- README の目標値が `SPECIFICATION.md` 8.3 と食い違っていました
+  （仕様は Minimal 5MB / Standard 15MB / Extended 50MB）
+- `SPECIFICATION.md` 9.2 が ISO イメージを作ると書いていました
+  （ベアメタルは対象外。`iso` ターゲットも削除しました）
+- `make kernel` をホストのコマンドとして書いていました。正しくは
+  `docker compose run --rm kimigayo-build make kernel` です
+
+### ⬆️ v3.0.0 からの移行
+
+**`dpkg` / `rpm` を使っていた場合は動かなくなります。**
+Kimigayo は設計上パッケージマネージャーを持たないので、必要なものは
+ビルド時にマルチステージビルドで入れてください。
+
+```dockerfile
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache nginx
+
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
+```
+
+それ以外は `docker pull` し直すだけです。外した init スクリプト 9 本は
+いずれも呼ぶバイナリがイメージに無いため、動作していた可能性はありません。
+
+---
+
 ## バージョン 3.0.0 "Himawari" (向日葵) - 2026-10-10
 
 ### 🌻 このバージョンで初めて Init が動きます

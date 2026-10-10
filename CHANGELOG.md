@@ -8,6 +8,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+（次のリリースに入る変更をここに書く）
+
+---
+
+## [3.0.1] "Himawari" (向日葵) - 2026-10-11
+
+**イメージから「あってはいけないもの」を2種類落とした版。**
+パッケージマネージャー（BusyBox の `dpkg` / `rpm`）と、
+Kimigayo では絶対に実行され得ない init スクリプト9本。
+残りは計測スクリプトの修正と、仕様書・ドキュメントの訂正。
+
+### Removed
+
+- **`dpkg` / `dpkg-deb` / `rpm` をイメージから外した。**
+  `SPECIFICATION.md` 2.2 / 3.5 は「パッケージマネージャーを意図的に排除」と
+  書いているのに、v3.0.0 までの公開イメージには `/bin/dpkg`・`/bin/dpkg-deb`・
+  `/bin/rpm` が入っており、**実際に `dpkg -i` でパッケージをインストールできた**。
+
+  原因は config の書き忘れ。BusyBox の `archival/Config.in` は
+  `DPKG`・`DPKG_DEB`・`RPM` をいずれも `default y` にしており、
+  `scripts/build-busybox.sh` は config の断片をコピーしたあと
+  `make oldconfig` を回すため、**書いていない項目には既定値が入る**。
+  3バリアントとも dpkg が有効になっていた（`extended.config` だけ
+  `CONFIG_RPM=n` を書いていたので rpm は無かった）。
+
+  `rpm2cpio` は展開専用でインストール機能が無いため extended に残している。
+
+- **Kimigayo では実行され得ない init スクリプト9本をイメージから外した。**
+  OpenRC はどのディストリでも使えるよう一式を同梱しているが、
+  次の9本は Kimigayo（VPS / クラウド上の Docker コンテナ）では
+  1度も実行されない。
+
+  | スクリプト | 落とした理由 |
+  | --- | --- |
+  | `agetty` | `/sbin/agetty` がイメージに無い（端末ログイン） |
+  | `consolefont` | `/usr/bin/setfont` が無い |
+  | `numlock` | `/usr/bin/setleds` が無い |
+  | `runsvdir` | `/usr/bin/runsvdir` が無い（runit 用） |
+  | `s6-svscan` | s6（別の Init）の監視を起動するもの |
+  | `user` | ユーザー単位の OpenRC セッション |
+  | `net-online` | ネットワーク疎通待ち（コンテナでは不要） |
+  | `osclock` | 「時計は OS 任せ」と宣言するだけ |
+  | `swclock` | RTC が無いマシンで時計を合わせる |
+
+  **どれもランレベルに登録されていない。** 削除版をビルドして実測し、
+  `openrc sysinit`/`boot`/`default` がいずれも rc=0、起動サービス数、
+  `rc-update show` の行数、`--privileged` での `sysctl` 適用まで
+  v3.0.0 と完全に一致することを確認した。15 本が持つ `after clock`
+  （`osclock`/`swclock` が `provide`）は順序指定で必須依存ではないため、
+  提供元を消しても依存解決は壊れない。
+
+  **サイズ目的ではない**（約 12KB）。目的は root で解釈・実行される
+  シェルスクリプトを減らすことと、`/etc/init.d` に実際に動くものだけが
+  並んでいる状態にすること。`keyword -docker` が付いているだけのもの
+  （`fsck`・`hwclock`・`modules`・`localmount` など 24 本）は**残している**
+  （ベアメタルや特権コンテナでは正規に機能するため）。
+  init スクリプトは 36 本 → **27 本**になった。
+
+- **仕様書から「独自パッケージマネージャ」前提の記述を落とした。**
+  当初は独自のパッケージマネージャを作る計画だったが取り下げた
+  （2026-10-10 決定）。要件の「Distroless + Alpine のハイブリッド
+  アプローチ」と両立しない。
+  - `SPECIFICATION.md` 7 の「Phase 2: パッケージシステム」（設計・実装・
+    ベースパッケージ・リポジトリシステム）
+  - 同 5.3「パッケージセキュリティ」の Ed25519 / GPG 署名検証。
+    パッケージという配布単位が無いので検証対象が存在しない
+  - 同 12.1 の「独自のパッケージマネージャによる高速化」
+    「東アジア圏のミラーサーバー最適化」（どちらも存在しない）
+  - 同 3.1 / 3.3 / 3.4 の「または独自マイクロカーネル」「または独自実装」
+    「または独自軽量initシステム」
+  - `scripts/build-status.sh` のコンポーネント `pkg`（Package Manager）。
+    ビルドする処理が無く、`make status` に永久に pending として出ていた
+
+- **`build-system/Makefile` の `iso` / `docker-image` ターゲットを削除した。**
+  どちらも `echo "... will be implemented in Phase 8"` だけのスタブで
+  何も生成しないのに、`make help` が機能として案内していた。
+  ISO はベアメタル起動が前提で対象外（2026-10-10 決定）。
+
 ### Fixed
 
 - **起動時間とメモリのベンチマークが測るものを間違えていたのを直した。**
@@ -22,6 +100,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **1MB 未満を 0 としか表せなかった**（公開していた 0.2MB）。
   単位を見て KB に正規化するようにし、KB で保持する。
   どちらも `PLATFORM` を受け取れるようにした（arm64 ネイティブで測るため）
+- **`scripts/benchmark-comparison.sh` が既定で v2.0.1 のイメージを引いていた。**
+  `KIMIGAYO_VERSION` の既定値が `2.0.1` に直書きされており、環境変数を
+  渡さずに実行すると、新しい版を測っているつもりで v2.0.1 を pull して
+  比較していた。`scripts/get-version.sh` から取るようにした
+- **`scripts/benchmark-all.sh` が全部落ちても「完了」と言っていた。**
+  6 ステップすべてが `|| true` で終わっており、6 本とも失敗しても
+  「✓ 全ベンチマーク完了」と表示して終了コード 0 を返していた。
+  最後まで走らせたうえで、落ちたものを名指しして非ゼロで終わるようにした
+- **README が「Docker Hub 上のイメージは v2.0.1 のまま」と書いていた。**
+  v3.0.0 を公開したあとも残っており、`latest` タグを案内する表のすぐ下に
+  あったため「このタグを引くと v2.0.1 が来る」と読めた
+- **README の目標値が `SPECIFICATION.md` 8.3 と食い違っていた。**
+  仕様は Minimal 5MB / Standard 15MB / Extended 50MB と分けているのに、
+  README は 3 バリアントとも `< 5MB` を分母に達成率を出していた
+- **`SPECIFICATION.md` 9.2 が ISO イメージを作ると書いていた。**
+  ISO はベアメタル起動が前提で、2026-10-10 に対象外と決めている
+- **`make kernel` をホストのコマンドとして書いていた。**
+  `kernel`・`musl`・`busybox`・`init`・`rootfs` が定義されているのは
+  `build-system/Makefile` で、ホストの `Makefile` には無い。
+  正しくは `docker compose run --rm kimigayo-build make kernel`。
+  `CLAUDE.md`・`SPECIFICATION.md`・`BUILD_GUIDE.md` を訂正した
+- **Docker Hub の説明文に、実装していない機能が並んでいた。**
+  - 「seccomp-BPF をデフォルトで有効化」— 成果物は rootfs だけで
+    カーネルを含まず、seccomp を適用するのはホストの runtime 側
+  - 「再現可能ビルド: ビット同一なビルド出力」— `config.mk` の
+    `REPRODUCIBLE_FLAGS` は `REPRODUCIBLE_BUILD=yes` のときだけ効くが、
+    この変数をどこも設定していない。ビット同一性の検証記録も無い
+  - 「イメージ署名: Docker Content Trust / Cosign」— `release.yml` に
+    署名工程が無い
+  - 「Trivy でイメージを自動スキャン」— パッケージデータベースを
+    持たないため対象を1つも識別できない
+  - 「Minimal は カーネル + musl libc + BusyBox」— カーネルは入らない
+  - タグ例が `0.1.0`。存在しない `stable` / `edge` と、存在しない形式
+    （`3.0.0-amd64`）を案内していた
+- **`docs/deployment/DOCKERHUB_SETUP.md` に説明文の写しが2か所あった。**
+  二重管理していたため、両方が上記の古い宣伝を抱えていた。
+  `DOCKERHUB_README.md` への参照にした
+- **`docs/developer/BUILD_GUIDE.md` が生成されないファイルを並べていた**
+  （`.sig`・ISO・`build-report.json`）。存在しない `make bootloader` /
+  `make create-image` も削除
 
 ### Added
 
@@ -32,6 +150,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **「起動時間はイメージでは変わらない」という結論**を README に明記した。
   0.6 秒のほとんどは Docker のコンテナ生成で、101MB の Ubuntu でも同じ。
   **軽さを起動時間の速さとして宣伝しない**
+- **`verify-image.sh` に検査を2つ追加**（27 → 29 項目）。
+  落としたはずの init スクリプトが復活していないか、
+  パッケージマネージャーが入っていないか。どちらも
+  「config に書き忘れる」「コピー順を変える」で黙って戻るため
+- **Subagent 2つ**: `spec-auditor`（仕様と実装・成果物の突合）、
+  `workflow-auditor`（ワークフローが build-arg / 環境変数を渡しているか）。
+  2026-10-10 に「CI が緑なのに成果物のメタデータが違う」事故を3件踏んだため
+
+### 移行時の注意
+
+- **`dpkg` / `rpm` が無くなる。** v3.0.0 までのイメージでこれらを
+  使っていた場合は動かなくなる。Kimigayo は設計上
+  パッケージマネージャーを持たないので、**必要なものはビルド時に
+  マルチステージビルドで入れる**（`SPECIFICATION.md` 3.5）
 
 ---
 
