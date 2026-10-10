@@ -332,7 +332,9 @@ CVE 情報・Alpine のパッケージ版は、コードやドキュメントに
 ## バージョンの単一の真実の源
 
 **構成要素のバージョンは [versions.mk](versions.mk) にしかない。**
-`Makefile`・`config.mk` は `include` し、`scripts/*.sh` は冒頭で読み込む。
+`Makefile` と `build-system/Makefile` が `include` し、`scripts/*.sh` は
+`scripts/lib/versions.sh` を読む（`config.mk` も `include versions.mk` を
+持つが、**その `config.mk` 自体が誰からも読まれていない**）。
 
 ```makefile
 KERNEL_VERSION  ?= 6.18.55   # LTS, EOL 2028-12
@@ -719,9 +721,23 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
 
 ## セキュリティ
 
-- **コンパイル時の強化フラグは `config.mk` に集約**（`-fPIE`・
-  `-fstack-protector-strong`・`-D_FORTIFY_SOURCE=2`・`-Wl,-z,relro,now,noexecstack`）。
+- **コンパイル時の強化フラグは `scripts/build-{musl,busybox,openrc}.sh` に
+  それぞれ直書きされている**（`-fPIE`・`-fstack-protector-strong`・
+  `-D_FORTIFY_SOURCE=2`・`-Wl,-z,relro -Wl,-z,now`）。
   **緩めるのは提案に留める**（→「指示の範囲を超えない」節）
+- **`config.mk` は読まれていない**（2026-10-11 に確認）。`Makefile` も
+  `build-system/Makefile` も `include config.mk` を持たず、スクリプトも
+  source していない。**強化フラグの正本として `config.mk` を引かないこと。**
+  中身は「こうしたい」という宣言で、効いているのは上の3スクリプト。
+  - **`-Wl,-z,noexecstack` は `config.mk` にしか無い。** ただし成果物は
+    実際に非実行スタック（`busybox`・`openrc`・`libc.so` の
+    `GNU_STACK=RW`）。lld の既定でそうなっているだけで、こちらが
+    保証しているわけではない
+  - **再現可能ビルドは一度も効いていない。** `REPRODUCIBLE_BUILD=yes` の
+    ときだけ `SOURCE_DATE_EPOCH` と prefix-map が入る作りだが、この変数を
+    どこも設定していない（`config.mk` 自体が読まれないので二重に無効）。
+    配線するとすべてのバイナリのフラグが変わるため、独立した変更として
+    フルビルドで検証する
 - `make security-scan` = Trivy（イメージ）+ Trivy（ファイルシステム）+ ShellCheck
 - **`make trivy-scan`（イメージスキャン）は何も検査していない。**
   Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
@@ -1098,7 +1114,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | 場所 | 何があるか |
 | --- | --- |
 | [versions.mk](versions.mk) | **構成要素のバージョンの単一の真実の源** |
-| `config.mk` | クロスコンパイル設定・最適化/強化フラグ・再現可能ビルド |
+| `config.mk` | **どこからも include されていない**（意図の記録のみ。実際のフラグは `scripts/build-*.sh`） |
 | `Makefile` | 入口。全量は `make help` |
 | `scripts/` | `download-*` / `apply-*-patches` / `build-*` / `test-*` / `verify-*` / `benchmark-*` |
 | `src/kernel/` | カーネル config（arch × バリアント）・パッチ・`build.py` |

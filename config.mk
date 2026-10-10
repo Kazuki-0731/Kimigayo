@@ -1,5 +1,37 @@
 # Kimigayo OS Build Configuration
 # This file contains cross-compilation and build settings
+#
+# ============================================================================
+# WARNING: nothing includes this file (verified 2026-10-11).
+# ============================================================================
+# Neither Makefile nor build-system/Makefile has `include config.mk`, and no
+# script sources it. Every variable below is therefore inert. Treat it as the
+# *intended* flag set, not as what the build uses.
+#
+# Where the flags actually come from:
+#
+#   musl     scripts/build-musl.sh    CFLAGS_SECURITY / LDFLAGS_SECURITY
+#   BusyBox  scripts/build-busybox.sh CONFIG_EXTRA_CFLAGS + exported CFLAGS
+#   OpenRC   scripts/build-openrc.sh  exported CFLAGS / LDFLAGS
+#   kernel   scripts/build-kernel.sh  KCFLAGS + src/kernel/config/*.config
+#
+# Consequences, measured rather than assumed:
+#
+#   -fPIE / -fstack-protector-strong / -D_FORTIFY_SOURCE=2
+#       applied - the three build scripts set them directly.
+#       scripts/verify-image.sh checks the ELF type of every executable.
+#   -Wl,-z,noexecstack
+#       appears only here, yet the artifacts do have a non-exec stack
+#       (GNU_STACK=RW on busybox, openrc and libc.so) because lld defaults
+#       to it. Not guaranteed by us.
+#   REPRODUCIBLE_BUILD / SOURCE_DATE_EPOCH / -f*-prefix-map
+#       never applied. REPRODUCIBLE_BUILD is not set anywhere either, so the
+#       block below could not fire even if this file were included.
+#
+# Wiring this file into the build scripts changes the flags every binary is
+# compiled with, so it needs its own change and its own full rebuild. Until
+# then, do not cite config.mk as the source of truth for hardening flags.
+# ============================================================================
 
 # Architecture-specific settings
 ifeq ($(ARCH),x86_64)

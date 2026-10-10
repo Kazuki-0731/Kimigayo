@@ -4,7 +4,7 @@
 # 他のファイルに数字を書かないこと（書くと次の更新で必ず漏れる）。
 #
 # 読み込み方:
-#   Makefile / config.mk  : include versions.mk
+#   Makefile              : include versions.mk
 #   scripts/*.sh          : source scripts/lib/versions.sh
 #
 # バージョンを上げる手順:
