@@ -14,6 +14,8 @@ OUTPUT_FILE="${OUTPUT_FILE:-benchmark-size.json}"
 
 # 比較対象の Alpine の版は versions.mk（単一の真実の源）に追従させる
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/json.sh
+source "${PROJECT_ROOT}/scripts/lib/json.sh"
 # shellcheck source=scripts/lib/versions.sh
 source "${PROJECT_ROOT}/scripts/lib/versions.sh"
 
@@ -138,6 +140,7 @@ echo "" >> "$OUTPUT_FILE"
 echo "  }" >> "$OUTPUT_FILE"
 echo "}" >> "$OUTPUT_FILE"
 
+kimigayo_validate_json "$OUTPUT_FILE" || exit 1
 echo -e "${GREEN}✓ 結果を $OUTPUT_FILE に保存しました${NC}"
 
 # CI環境の場合は環境変数にも出力

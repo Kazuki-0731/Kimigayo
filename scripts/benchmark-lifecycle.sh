@@ -8,6 +8,8 @@ set -euo pipefail
 
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/json.sh
+source "${PROJECT_ROOT}/scripts/lib/json.sh"
 OUTPUT_DIR="${PROJECT_ROOT}/benchmark-results"
 ITERATIONS="${BENCHMARK_ITERATIONS:-10}"
 IMAGE_NAME="${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest-standard}"
@@ -74,20 +76,6 @@ calculate_median() {
     else
         echo "${sorted[mid]}"
     fi
-}
-
-# Function to calculate standard deviation
-calculate_stddev() {
-    local avg=$1
-    shift
-    local sum_sq=0
-    local count=0
-    for val in "$@"; do
-        local diff=$((val - avg))
-        sum_sq=$((sum_sq + diff * diff))
-        count=$((count + 1))
-    done
-    echo "scale=2; sqrt($sum_sq / $count)" | bc
 }
 
 echo ""
@@ -184,7 +172,9 @@ echo ""
 log_info "6. Image layer information"
 image_size=$(docker inspect "$IMAGE_NAME" --format '{{.Size}}')
 layer_count=$(docker inspect "$IMAGE_NAME" --format '{{len .RootFS.Layers}}')
-image_size_mb=$(echo "scale=2; $image_size / 1048576" | bc)
+# bc は 1 未満のとき先頭の 0 を付けず `.84` を返し、JSON を壊す
+# （scripts/lib/json.sh の経緯を参照）。awk の printf を使う。
+image_size_mb=$(awk -v b="$image_size" 'BEGIN { printf "%.2f", b / 1048576 }')
 log_success "Image size: ${image_size_mb}MB, Layers: $layer_count"
 echo ""
 
@@ -264,6 +254,7 @@ cat > "$json_file" << EOF
 }
 EOF
 
+kimigayo_validate_json "$json_file" || exit 1
 log_success "Results saved to: $json_file"
 echo ""
 

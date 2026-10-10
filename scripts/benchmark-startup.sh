@@ -8,6 +8,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/json.sh
+source "${SCRIPT_DIR}/lib/json.sh"
+
 # デフォルト設定
 ITERATIONS="${ITERATIONS:-10}"
 IMAGE="${IMAGE:-ishinokazuki/kimigayo-os:latest-standard}"
@@ -133,6 +137,7 @@ cat > "$OUTPUT_FILE" <<EOF
 }
 EOF
 
+kimigayo_validate_json "$OUTPUT_FILE" || exit 1
 echo -e "${GREEN}✓ 結果を $OUTPUT_FILE に保存しました${NC}"
 
 # CI環境の場合は環境変数にも出力

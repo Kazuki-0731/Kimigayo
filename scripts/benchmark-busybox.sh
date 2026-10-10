@@ -8,6 +8,8 @@ set -euo pipefail
 
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/json.sh
+source "${PROJECT_ROOT}/scripts/lib/json.sh"
 OUTPUT_DIR="${PROJECT_ROOT}/benchmark-results"
 ITERATIONS="${BENCHMARK_ITERATIONS:-10}"
 IMAGE_NAME="${IMAGE_NAME:-ishinokazuki/kimigayo-os:latest-standard}"
@@ -386,16 +388,8 @@ txt_file="${OUTPUT_DIR}/busybox.txt"
 log_success "Summary saved to: $txt_file"
 echo ""
 
-# Validate the JSON we just wrote. A broken number format (see
-# calculate_speedup) produced an unparseable file that sat in
-# benchmark-results/ unnoticed, so fail loudly instead.
-if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json_file" 2>/dev/null; then
-    log_success "JSON is valid: $json_file"
-else
-    log_error "Generated JSON is invalid: $json_file"
-    python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json_file" 2>&1 | tail -2
-    exit 1
-fi
+kimigayo_validate_json "$json_file" || exit 1
+log_success "JSON is valid: $json_file"
 echo ""
 
 log_success "=== Benchmark Complete ==="
