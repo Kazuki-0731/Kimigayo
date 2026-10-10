@@ -1,7 +1,29 @@
-# Kimigayo OS - リリースチェックリスト
+# Kimigayo OS - リリースチェックリスト（v0.1.0 の記録）
 
 **最終更新:** 2025-12-22
 **対象バージョン:** v0.1.0
+
+> ## ⚠️ これは v0.1.0 公開時の記録です。手順書ではありません（2026-10-11 追記）
+>
+> **いまのリリース手順は
+> [.claude/skills/release/SKILL.md](../.claude/skills/release/SKILL.md)。**
+> この文書に書かれた手順をそのまま実行しないでください。
+>
+> - **`git tag -a v0.1.0` と書いてあります。** 現在は v3.0.x です
+> - **「アーティファクト（tar.gz, checksums, signatures）の添付」の
+>   signatures は存在しません。** 署名を作っていた
+>   `scripts/build-image.sh` は中身が
+>   `"signature": "placeholder_signature_phase5_..."` という偽物で、
+>   2026-10-11 に削除しました。GitHub Release に付くのは tarball 6本と
+>   `SHA256SUMS` / `SHA512SUMS` の計8ファイルです
+> - **この文書が `latest-amd64` / `latest-arm64` を引けと案内していた
+>   のに、`release.yml` はそのタグを作っていませんでした**（2026-10-10 に
+>   `release.yml` 側を直して作るようにした）。
+>   **「書いてあるタグが実在するか」は人が確認するしかありません**
+>
+> v0.1.0 当時のイメージには OpenRC も musl の `libc.so` も入っておらず、
+> この文書の「公開成功」はそれを検証できていませんでした
+> （→ [CHANGELOG.md](../CHANGELOG.md) の 3.0.0 節）。
 
 ## タスク32: 最終チェックポイント - Docker Hub公開
 

@@ -644,7 +644,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - [コミットメッセージガイド](docs/developer/COMMIT_GUIDE.md) - コミット規約とCHANGELOG生成
 - [仕様書](SPECIFICATION.md) - プロジェクト仕様
 - [アーキテクチャ](docs/developer/ARCHITECTURE.md) - 詳細設計
-- [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - Docker Hub公開状況と最終チェック
+- [リリースチェックリスト](docs/RELEASE_CHECKLIST.md) - v0.1.0 公開時の記録（現在の手順書ではありません）
 - [v1.0.0リリース計画](docs/V1_RELEASE_PLAN.md) - 正式版リリースに向けたロードマップ
 
 #### GitHub Actions ワークフロー
