@@ -498,7 +498,6 @@ docker run -it \
 ### コミュニティ
 
 - [GitHub Issues](https://github.com/Kazuki-0731/Kimigayo/issues) - バグ報告・機能リクエスト
-- [GitHub Discussions](https://github.com/Kazuki-0731/Kimigayo/discussions) - 質問・アイデア
 - [Wiki](https://github.com/Kazuki-0731/Kimigayo/wiki) - 詳細な技術情報
 
 ### 貢献

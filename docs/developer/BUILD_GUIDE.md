@@ -590,4 +590,3 @@ jobs:
 
 **質問やサポートが必要な場合**:
 - GitHub Issues: https://github.com/Kazuki-0731/Kimigayo/issues
-- Discussions: https://github.com/Kazuki-0731/Kimigayo/discussions

@@ -6,7 +6,6 @@
 Kimigayo/
 ├── .github/
 │   └── workflows/          # CI/CD設定
-│   └── specs/              # Kiro仕様
 ├── build/                  # ビルド作業ディレクトリ
 ├── docs/                   # ドキュメント
 ├── src/                    # ソースコード
@@ -73,8 +72,16 @@ make help
 make build
 
 # アーキテクチャ指定ビルド
-make build ARCH=x86_64
-make build ARCH=arm64
+# **ホストの `make build` に ARCH= を渡しても効かない。**
+# `docker compose run --rm kimigayo-build make build` へ転送していないため
+# （Makefile の build ターゲット）。compose は ARCH=x86_64 を固定しており、
+# build-system/Makefile が読むのは TARGET_ARCH。
+# arch を変えるならコンテナに直接渡す:
+docker compose run --rm kimigayo-build make build TARGET_ARCH=x86_64
+docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64
+
+# ホストの ARCH= が効くのは ci-build-local 系だけ
+make ci-build-local ARCH=arm64
 
 # テスト実行
 make test
@@ -119,7 +126,10 @@ Kimigayo OS はコンテナ向けで、成果物は rootfs の tarball と Docke
 # tests/property/test_build_constraints.py
 
 from hypothesis import given, strategies as st
-from kimigayo.build import build_base_image
+
+# 注: 下記は書き方の例。`kimigayo` という Python パッケージは
+# このリポジトリに無い（実物は src/ 配下のモジュールと
+# tests/property/test_build_constraints.py を見る）。
 
 # **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
 @given(build_config=st.builds(BuildConfig))
@@ -220,6 +230,16 @@ make trivy-fs-scan
 make shellcheck-scan
 ```
 
+> **`make trivy-scan`（イメージスキャン）は実質何も検査していない。**
+> Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
+> 持たないため、Trivy は対象を 1 つも識別できない
+> （`Target: -` / `Not scanned` / `Results: 0`）。
+> **「脆弱性 0 件」ではなく「スキャンしていない」。**
+> それでも `security-scan` は「✅ 完了」と出すので、沈黙を安全と
+> 読まないこと。脆弱性の追跡は構成要素の版を手で突合する
+> （→ `security-review` skill）。
+> **`make trivy-fs-scan` はリポジトリ側の依存を見るので有効。**
+
 依存関係のレビューは CI 側（`.github/workflows/dependency-review.yml`）で回る。
 
 ## パフォーマンス測定
@@ -258,8 +278,15 @@ make clean && make build
 # 完全リセット（ダウンロードキャッシュも消える。再取得は約150MB）
 make clean-all && make build
 
-# 個別のコンポーネントだけやり直す（コンテナ内）
-make clean-kernel && make kernel
+# 個別のコンポーネントだけやり直す
+# **ホストの Makefile に clean-kernel も kernel も無い**
+# （どちらも build-system/Makefile 側）。ホストで叩くと
+# No rule to make target になるので、コンテナに渡す:
+docker compose run --rm kimigayo-build make clean-kernel kernel
+# または make shell で入ってから叩く
+
+# musl / BusyBox / OpenRC はホストにもある
+make clean-musl && make clean-busybox && make clean-openrc
 ```
 
 **版を上げた直後にビルドが通らないときは、まずパッチの適用結果を見る。**
@@ -286,7 +313,7 @@ docker compose down -v
 `platform: linux/amd64` を固定しているため QEMU エミュレーションになる。**
 musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルドは
 非現実的なので GitHub Actions に任せる（→ [CLAUDE.md](CLAUDE.md)
-「ビルドの現実的な制約」節）。
+「フルビルドは x86_64 / arm64 とも GitHub Actions で回す（既定）」節）。
 
 ## リリースプロセス
 
@@ -300,18 +327,28 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 
 ### リリース手順
 
-1. `develop`ブランチで開発完了
-2. すべてのテストが通ることを確認
-3. バージョン番号を更新
-4. リリースノート作成
-5. `main`ブランチにマージ
-6. タグ作成: `git tag -a v1.0.0 -m "Release 1.0.0"`
-7. イメージ生成とリリース
+**`develop` ブランチは存在しない。** 作業は `main` で行う
+（`ci.yml` のトリガーには `develop` が残っているが、ブランチ自体が無い）。
+
+1. すべてのテストが通ることを確認（`make test` / `make shellcheck-scan`）
+2. 成果物を検査（`rootfs-verifier` subagent、`scripts/verify-image.sh`）
+3. **`CHANGELOG.md` と `RELEASE_NOTES.md` を手で更新**
+   （`make changelog` は `build/` に下書きを出すだけで `CHANGELOG.md` は
+   書き換えない）
+4. README・docs の数値とバージョン表記を突合
+5. **ユーザーの明示的な承認を取る**
+6. タグ作成と push: `git tag -a v3.0.1 -m "..." && git push origin v3.0.1`
+7. `release.yml` が走り Docker Hub と GitHub Release を公開
+8. **公開物を pull して中身を検証**
+
+> **`v*.*.*` タグを push した瞬間に Docker Hub の `latest` を含む
+> 公開イメージが差し替わり、取り消せない。**
+> タグとリリースは毎回承認が必須（`.claude/hooks/guard-bash.sh` が
+> 機械的に止める）。詳細は `release` skill。
 
 ## 参考資料
 
 - [SPECIFICATION.md](./SPECIFICATION.md) - プロジェクト仕様
-- [SPECIFICATION.md](./SPECIFICATION.md) - 仕様
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - 貢献ガイド
 - [Alpine Linux](https://alpinelinux.org/) - 参考ディストリビューション
 - [musl libc](https://musl.libc.org/) - Cライブラリ
@@ -320,9 +357,12 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 
 ## サポート
 
-- **Issues**: バグ報告、機能リクエスト
-- **Discussions**: 質問、アイデア共有
-- **Wiki**: 詳細なドキュメント
+- **Issues**: バグ報告、機能リクエスト、質問
+  （https://github.com/Kazuki-0731/Kimigayo/issues）
+
+**GitHub Discussions は有効にしていない**（`has_discussions=false`）。
+質問も Issue に出してください。ドキュメントは Wiki ではなく
+このリポジトリの `docs/` 配下にあります。
 
 ---
 

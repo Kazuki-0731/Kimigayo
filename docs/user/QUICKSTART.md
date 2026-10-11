@@ -353,4 +353,3 @@ find / -xdev -type f -size +10M -exec ls -lh {} \;
 
 - **GitHub リポジトリ**: https://github.com/Kazuki-0731/Kimigayo
 - **Issue 報告**: https://github.com/Kazuki-0731/Kimigayo/issues
-- **GitHub Discussions**: https://github.com/Kazuki-0731/Kimigayo/discussions
