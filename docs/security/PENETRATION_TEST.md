@@ -21,6 +21,39 @@ Kimigayo OSのペネトレーションテストは以下の目的で実施され
 - **攻撃シナリオの理解**: 実際の攻撃者の視点でシステムを評価
 - **インシデント対応の訓練**: セキュリティインシデント対応手順の検証
 
+## 攻撃面のベースライン（v3.0.1 実測、2026-10-11）
+
+**テストを始める前に、何が「無い」かを把握してください。**
+Kimigayo の攻撃面の小ささは、まず欠落によって成り立っています。
+
+| 項目 | 実測 |
+| --- | --- |
+| setuid / setgid バイナリ | **0 個**（`find / -xdev -perm /6000 -type f`）|
+| world-writable なファイル | **0 個**（`find / -xdev -type f -perm -0002`）|
+| 既定のリスニングポート | **0 個**（`netstat -tuln`）|
+| 共有ライブラリ | **3 個のみ**（musl の `libc.so`、OpenRC の `librc` / `libeinfo`）|
+| パッケージマネージャー | **無し**（`apk` / `apt` / `dpkg` / `rpm` / `yum` / `pacman`）|
+
+**イメージに入っていないもの**（権限昇格・横展開の道具として想定されるもの）:
+`sudo` / `/etc/sudoers` / `wheel` グループ / `sshd` / `/etc/ssh` /
+`iptables` / `curl` / `gcc` / `strace` / `tcpdump` / `logrotate` /
+`auditd` / `/usr/share/zoneinfo` / `/boot`。
+
+**既定の PID 1 は `/bin/sh`** で、OpenRC は起動していません。
+`/etc/init.d/` のサービスは `/sbin/init` を PID 1 にしたときだけ動きます。
+
+### 既知の弱点
+
+- **`cpio` と `ar` はディレクトリを脱出できる。**
+  `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION` が無効なため
+  `../` を剥がしません（Alpine も同じ挙動）。`tar` と `unzip` は安全。
+  → [HARDENING_GUIDE.md](HARDENING_GUIDE.md#busybox-の-cpio-はディレクトリを脱出できる)
+- **`wget` の HTTPS は v3.0.1 で落ちる**（arm64 で Segmentation fault）。
+  可用性の問題であり、情報漏洩の経路ではない。
+- **root で動く。** `Dockerfile.runtime` は `USER` を指定していません
+  （OS ベースイメージなので利用側が決める方針）。
+  テストでは `--user` を付けた場合と付けない場合の両方を見てください。
+
 ## テストスコープ
 
 ### インスコープ

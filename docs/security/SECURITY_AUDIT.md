@@ -103,9 +103,14 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 #### 5. ビルドシステム
 - [ ] 再現可能ビルドの検証
+      — **未達。`REPRODUCIBLE_BUILD` をどこも設定しておらず、
+      ビット同一性は検証も保証もされていない**
 - [ ] ビルド環境の隔離確認
 - [ ] 依存関係の完全性検証
+      — 版は [versions.mk](../../versions.mk) に単一化し、
+      チェックサムを上流（および Alpine aports）と突合している
 - [ ] サプライチェーン攻撃対策
+      — 外部 Action はコミット SHA で固定済み
 
 #### 6. Dockerイメージ
 - [ ] レイヤー構成の最適性
@@ -183,34 +188,63 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 ### GitHub Actionsによる継続的監査
 
-#### 1. ビルド時監査（docker-publish.yml）
+#### 1. PR / push 時（`ci.yml`）
+
+**外部 Action はコミット SHA で固定します**（`@master` は供給網の
+リスクかつ再現性がない）。
+
 ```yaml
 - name: Run ShellCheck (Static Analysis)
-  uses: ludeeus/action-shellcheck@master
-
-- name: Run Trivy vulnerability scanner
-  uses: aquasecurity/trivy-action@master
+  uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
   with:
-    scanners: 'vuln,config,secret'
+    additional_files: '.claude/hooks'
+    scandir: './scripts'
+
+- name: Run Trivy (filesystem)
+  uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+  with:
+    scan-type: 'fs'
     severity: 'CRITICAL,HIGH'
 ```
 
-#### 2. 定期監査（scheduled-security-scan.yml）
-- **頻度**: 週次（日曜 00:00 UTC）
-- **スコープ**: 全Dockerイメージ + ファイルシステム
-- **通知**: 脆弱性検出時にIssue自動作成
+#### 2. リリース時（`release.yml`）
+
+ShellCheck と `scripts/verify-image.sh`（29 項目）。
+**Trivy のイメージスキャンは 2026-10-09 に外しました**（下記の理由）。
+
+#### 3. 定期監査（`security.yml`）
+- **頻度**: **毎日 02:00 UTC**
+- **スコープ**: 構成要素の版確認 + **ファイルシステム**スキャン
+- **通知**: 脆弱性検出時に Issue 自動作成
+
+> **イメージの Trivy スキャンは行っていません。** Kimigayo は
+> `scratch` 上の手組み rootfs でパッケージデータベースを持たないため、
+> Trivy は対象を 1 つも識別できません
+> （実測で `Target: -` / `Not scanned` / `Metadata.OS: null` / `Results: 0`）。
+> **「脆弱性 0 件」ではなく「スキャンしていない」。**
+> 構成要素（カーネル / musl / BusyBox / OpenRC）の脆弱性追跡は
+> **版を手で突合します**（→ `security-review` skill）。
+
+#### 4. 依存レビュー（`dependency-review.yml`）
+`main` への PR と毎週月曜 04:00 UTC。`fail-on-severity: high`。
+
+#### 5. 上流更新の検知（`base-image-update.yml`）
+毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。
 
 ### ローカル監査実行
 
 ```bash
-# 総合セキュリティスキャン
+# 総合（下記のとおり trivy-scan は実質無効）
 make security-scan
 
 # 個別スキャン
-make trivy-scan          # Dockerイメージ
-make trivy-fs-scan       # ファイルシステム
-make shellcheck-scan     # シェルスクリプト
+make trivy-fs-scan       # ファイルシステム（有効）
+make shellcheck-scan     # シェルスクリプト（有効）
+make trivy-scan          # Dockerイメージ（**何も検査しない**）
 ```
+
+**`make security-scan` は `trivy-scan` が何も検査しなくても
+「✅ 完了」と出します。沈黙を安全と読まないこと。**
 
 ## 外部監査
 

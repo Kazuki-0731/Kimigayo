@@ -2,6 +2,29 @@
 
 このガイドでは、Kimigayo OSのセキュリティを最大限に強化するための設定と手順を説明します。
 
+## 前提: この文書のどこが効くか
+
+**Kimigayo OS の成果物は rootfs だけの Docker イメージです。**
+カーネルはイメージに入らず、コンテナはホストのカーネルで動きます。
+
+| 章 | コンテナ | ベアメタル／VM |
+| --- | --- | --- |
+| [コンテナセキュリティ](#コンテナセキュリティ) | **ここを読む** | — |
+| カーネル強化（sysctl・モジュール・ブートローダー）| **効かない**（ホスト側で設定）| 効く |
+| ネットワーク強化（`iptables`）| **使えない**（未収録）| 要ビルド追加 |
+| ファイルシステム強化（`/etc/fstab`）| **効かない**（`--tmpfs` を使う）| 効く |
+| アプリケーション強化（seccomp）| ランタイム側で指定 | — |
+| 監査とコンプライアンス | 一部のみ | 効く |
+
+**コンテナで実際に効く設定は[システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)に
+まとめてあります。** 迷ったらそちらを先に読んでください。
+
+> **自動強化スクリプトは配布していません。**
+> 以前この文書は `/usr/share/kimigayo/security/harden-level{1,2,3}.sh` の
+> 実行を案内していましたが、**3 本とも存在しません**
+> （リポジトリにもイメージにも無い。2026-10-11 に確認）。
+> 下記は手で設定する内容です。
+
 ## 目次
 
 - [レベル別強化設定](#レベル別強化設定)
@@ -18,25 +41,39 @@ Kimigayo OSでは、セキュリティ要件に応じて3つの強化レベル�
 
 ### レベル1: 基本強化（すべての環境に推奨）
 
-最小限の設定で最大の効果を得る基本的な強化設定です。
+**コンテナの場合** — ここが基本です。
 
 ```bash
-# 自動強化スクリプトを実行
-/usr/share/kimigayo/security/harden-level1.sh
+docker run -d \
+  --read-only --tmpfs /tmp --tmpfs /run \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --user 1000:1000 \
+  -p 127.0.0.1:8080:8080 \
+  ishinokazuki/kimigayo-os:3.0.1
 ```
 
-または手動で設定：
+| オプション | 何を防ぐか |
+| --- | --- |
+| `--read-only` | `/etc` などへの書き込み（`Read-only file system` で拒否）|
+| `--cap-drop ALL` | 不要なケーパビリティの利用 |
+| `--security-opt no-new-privileges` | setuid による特権昇格 |
+| `--user 1000:1000` | root での実行 |
+| `-p 127.0.0.1:...` | 外部への意図しない公開 |
+
+**`telnet` / `ftp` / `iptables` / `sshd` のサービスは存在しないので、
+無効化や強化の操作は不要です**（`telnet` アプレットは standard 以上に
+ありますが、クライアントのみでサーバーは動いていません）。
+
+**ベアメタル／VM の場合** — `iptables` と `sshd` をビルド時に追加した
+うえで、次を設定します。
 
 ```bash
-# 1. 不要なサービスの無効化
-rc-update del telnet default
-rc-update del ftp default
-
-# 2. ファイアウォールの有効化
+# ファイアウォールの有効化（iptables を追加した場合）
 rc-update add iptables default
 rc-service iptables start
 
-# 3. SSH強化
+# SSH強化（sshd を追加した場合）
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 rc-service sshd restart
@@ -46,12 +83,10 @@ rc-service sshd restart
 
 より厳格なセキュリティ設定を適用します。
 
-```bash
-# 自動強化スクリプトを実行
-/usr/share/kimigayo/security/harden-level2.sh
-```
-
-レベル1の設定に加えて：
+レベル1の設定に加えて、**ベアメタル／VM では**次を設定します
+（**コンテナでは `/proc/sys` が読み取り専用で `/etc/fstab` も効きません**。
+名前空間化された sysctl は `docker run --sysctl`、一時領域は
+`--tmpfs /tmp:rw,noexec,nosuid` で渡します）。
 
 ```bash
 # カーネルパラメータの強化
@@ -75,12 +110,8 @@ echo "tmpfs /var/tmp tmpfs defaults,nodev,nosuid,noexec 0 0" >> /etc/fstab
 
 最高レベルのセキュリティ設定です。パフォーマンスに影響する可能性があります。
 
-```bash
-# 自動強化スクリプトを実行
-/usr/share/kimigayo/security/harden-level3.sh
-```
-
-レベル2の設定に加えて：
+レベル2の設定に加えて、**ベアメタル／VM では**次を設定します。
+`/etc/sysctl.conf` はイメージに無いので `/etc/sysctl.d/` に置きます。
 
 ```bash
 # 完全なカーネル強化
@@ -98,6 +129,11 @@ sysctl -p
 ## カーネル強化
 
 ### カーネルパラメータの最適化
+
+> **コンテナからは設定できません**（`/proc/sys` が読み取り専用で
+> `sysctl -w` は `Read-only file system`）。名前空間化されたものだけ
+> `docker run --sysctl` で渡せます。**それ以外はホスト側で設定します。**
+
 
 ```bash
 # /etc/sysctl.d/99-security.conf を作成
@@ -165,6 +201,10 @@ sysctl -p /etc/sysctl.d/99-security.conf
 
 ### カーネルモジュールの制限
 
+> **コンテナからは操作できません**（`/lib/modules` が無く `modprobe` は
+> 失敗。`lsmod` が見せるのは**ホストの**モジュール）。ホスト側で設定します。
+
+
 ```bash
 # /etc/modprobe.d/security.conf を作成
 vi /etc/modprobe.d/security.conf
@@ -201,6 +241,11 @@ install thunderbolt /bin/true
 
 ### ブートローダーの保護
 
+> **コンテナには該当しません。** `/boot` も GRUB もイメージに存在せず、
+> `grub-mkconfig` も `grub-mkpasswd-pbkdf2` もありません。
+> 以下はこの rootfs をベアメタル／VM で起動する場合のみです。
+
+
 ```bash
 # GRUBパスワードの設定
 grub-mkpasswd-pbkdf2
@@ -228,6 +273,11 @@ chmod 600 /boot/grub/grub.cfg
 ## ネットワーク強化
 
 ### ファイアウォール（iptables）詳細設定
+
+> **`iptables` はイメージに入っていません。** コンテナでは
+> ホスト側か `-p` / `--network none` / `NetworkPolicy` で制御します。
+> 以下はベアメタル／VM で `iptables` を追加した場合の設定例です。
+
 
 ```bash
 # ファイアウォールスクリプトを作成
@@ -314,6 +364,20 @@ iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
 ## ファイルシステム強化
 
 ### パーティションのマウントオプション
+
+> **コンテナでは `/etc/fstab` は読まれません。** 同じことは
+> `docker run` 側で指定します。
+>
+> ```bash
+> docker run --read-only \
+>   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+>   --tmpfs /var/tmp:rw,noexec,nosuid,nodev,size=16m \
+>   --tmpfs /run:rw,noexec,nosuid,nodev \
+>   ishinokazuki/kimigayo-os:3.0.1
+> ```
+>
+> 以下はベアメタル／VM 向けです。
+
 
 ```bash
 # /etc/fstab を編集
@@ -468,6 +532,11 @@ docker run -d \
 ## 監査とコンプライアンス
 
 ### 監査ログの設定
+
+> **`auditd` はイメージに入っていません。** コンテナの監査は
+> ホスト側（`auditd` / `falco` など）と `docker logs` で行います。
+> 以下はベアメタル／VM 向けです。
+
 
 監査機能が必要な場合は、マルチステージビルドで組み込んでください。
 
