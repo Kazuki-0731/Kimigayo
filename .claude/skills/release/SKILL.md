@@ -33,7 +33,7 @@ v0.1.0 から v2.0.1 までの**公開済み4タグすべて**で次が同時に
 ## 1. 品質ゲート
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 522 件
+python3 -m pytest tests/unit tests/property -q     # 526 件
 make shellcheck-scan                               # scripts/ と .claude/hooks/
 make security-scan                                 # scan-image（CVE + 秘密情報）+ Trivy FS + ShellCheck
 make ci-build-local                                # Linux ホストのみ

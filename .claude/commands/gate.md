@@ -5,7 +5,7 @@ allowed-tools: Bash(python3 -m pytest:*), Bash(make shellcheck-scan), Bash(pytho
 
 ローカルで変更したものを外に出す前の最低ラインを確認する。
 
-## pytest（522 件）
+## pytest（526 件）
 
 !`python3 -m pytest tests/unit tests/property -q 2>&1 | tail -15`
 

@@ -230,10 +230,11 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
 > どちらも `vmlinuz-6.18.55-*` を生成してイメージ検証も通過）。
 > **`ci.yml` はカーネルを作らないので、緑でも検証にならない。**
 >
-> **`|| true` はまだ残っている**（`scripts/build-kernel.sh` に複数箇所）。
-> とくに `olddefconfig ... > /dev/null 2>&1 || true` は config 生成の
-> 失敗を飲み込む。外せるかは未検証なので、触るなら独立した変更として
-> 同じ手順で確認する。
+> **Kconfig の `|| true` は 2026-10-12 に外した**（`run_kconfig` が
+> 失敗したらログの末尾を出して止める）。`manual-build.yml` を
+> `build_kernel=true` で両アーキに回して確認した（c851a25、
+> x86_64 17分・arm64 59分、どちらも `vmlinuz-6.18.55-*` を生成）。残る `|| true` は進捗表示の後始末
+> （kill / wait）・診断用の find・任意の記録だけで、成否に関わらない。
 
 ### ビルド・計測
 
@@ -782,7 +783,7 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 
 ```bash
 make test                      # コンテナ内で pytest
-python3 -m pytest tests/unit -q          # 単体（269 件）
+python3 -m pytest tests/unit -q          # 単体（273 件）
 python3 -m pytest tests/property -q      # プロパティ（hypothesis、253 件）
 python3 -m pytest -m "not slow" -q       # 遅いものを除く
 pip install -r requirements-dev.txt      # pytest / hypothesis 等
@@ -845,10 +846,15 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
     届いていなかったのは Makefile 側の `CFLAGS += -fdebug-prefix-map=...`
     の方で、`scripts/build-*.sh` が `export CFLAGS="..."` で上書きして
     消していた。**2026-10-11 に 3 スクリプトで prefix-map を組み直した。**
-  - **ただしビット同一性は未検証。** `SOURCE_DATE_EPOCH` と prefix-map は
-    既知の非決定要因を 2 つ消すだけで、他に無いことの証明にはならない。
-    **「再現可能ビルド」を名乗る前に、同じコミットを 2 回ビルドして
-    `cmp` が通ることを確認する**（手順は `config.mk` の冒頭コメント）
+  - **rootfs の tarball はビット同一になった（2026-10-12）。** 同じコミット
+    （46b05da）を CI と Manual Build で別々にビルドし、standard / x86_64 の
+    tarball の SHA-256 が一致した。そこに至るまでに消した非決定要因は
+    `/.kimigayo-build-info` のビルド時刻とホスト名（いまはコミット時刻）と、
+    tar の並び順・mtime・gzip ヘッダ（CI と release で固定）。
+    **確かめたのは 1 組・1 バリアントだけで、Docker イメージの digest は
+    見ていない。** 名乗る範囲は「rootfs の tarball」に留める。
+    確かめ直すときは、同じコミットで `manual-build.yml` を回し、
+    CI の `rootfs-<variant>-<arch>` 成果物と `shasum` を比べる
 - `make security-scan` = `scan-image` + Trivy（ファイルシステム）+ ShellCheck
 - **`make trivy-scan`（イメージスキャン）は何も検査していない。**
   Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
@@ -1276,7 +1282,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 **ローカルで変更したら、外に出す前に最低これを通す:**
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 522 件
+python3 -m pytest tests/unit tests/property -q     # 526 件
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
 make security-scan                                 # scan-image + Trivy FS + ShellCheck
