@@ -1,5 +1,85 @@
 # Kimigayo OS Release Notes
 
+## バージョン 3.0.2 "Himawari" (向日葵) - 2026-10-12
+
+**既知の CVE 5 件を塞ぎ、`wget` の HTTPS を直した版です。**
+出荷するイメージそのものを CVE と照合する仕組みも入れました。
+
+### 🔒 既知の CVE 5 件にパッチを当てました
+
+v3.0.1 の公開イメージを NVD と照合すると 5 件が見つかります。
+**どれも上流がまだ修正版を出していない**ので、パッチを当てて出荷します。
+
+| CVE | 部品 | 内容 | 出どころ |
+| --- | --- | --- | --- |
+| CVE-2026-38754 | ash（`/bin/sh`） | `ifsbreakup` の範囲外アクセス | Alpine aports（sha512 で突合） |
+| CVE-2026-38755 | ash（`/bin/sh`） | 関数の無限再帰で落ちる | BusyBox の ML |
+| CVE-2026-38753 | awk | `sub` / `gsub` の use-after-free | BusyBox の ML |
+| CVE-2026-40200 | musl | `qsort` のスタック破壊 | Alpine aports（sha512 で突合） |
+| CVE-2026-6042 | musl | `iconv`（GB18030）の CPU DoS | Alpine aports（sha512 で突合） |
+
+いずれもローカルでの DoS やメモリ破壊で、リモートから突ける
+ものではありません。
+
+> **挙動の変更: ash の関数の再帰は深さ 1000 で止まります。**
+> 超えると `function recursion limit exceeded` でエラーになります
+> （以前は Segmentation fault で落ちていました）。
+
+### 🐛 `wget` の HTTPS が落ちなくなりました
+
+v3.0.1 以前の `wget https://...` は、取得に成功したあと
+Segmentation fault（終了コード 139）で落ちていました。
+BusyBox の既定で有効だった「openssl を呼ぶ経路」が原因で、
+イメージに無い `openssl` を起動しようとした子プロセスの後始末が、
+musl の上で親プロセスを落としていました。v3.0.2 では
+内蔵の TLS だけを使います。
+
+**証明書は引き続き検証しません**（BusyBox の仕様）。信頼できない経路で
+HTTPS を使うなら `curl` を持ち込んでください。
+→ [原因の詳細](docs/troubleshooting/busybox-wget-https-segfault.md)
+
+### ♻️ BusyBox を動的リンクにしました
+
+BusyBox も OpenRC と同じ `/lib/libc.so` を使います。
+静的リンクだった v3.0.1 では、x86_64 の `/bin/sh` がビルド環境の
+musl を取り込んでおり、**Kimigayo が musl に当てたパッチが効いて
+いませんでした**（今回の musl の 2 件は、取り込んだ側でたまたま
+直っていました）。イメージも 160KB 前後小さくなります。
+
+| | x86_64 | arm64 |
+| --- | --- | --- |
+| Minimal | 2.46MB | 2.82MB |
+| Standard | 2.59MB | 2.97MB |
+| Extended | 2.62MB | 3.01MB |
+
+（CI でビルドしたイメージの `docker images` の値。v3.0.1 の Standard は
+x86_64 2.76MB / arm64 3.13MB）
+
+> **`/bin/sh` も `LD_PRELOAD` / `LD_LIBRARY_PATH` に従うようになります。**
+> 他の動的リンクのバイナリと同じ扱いで、setuid のときは musl が無視します。
+
+### 🔍 出荷物を CVE と照合し、SBOM を付けます
+
+- CI（毎 push）とリリース（Docker Hub への push 前）で、イメージ内の
+  バイナリから読んだ版で SBOM（CycloneDX）を作り、Grype で照合します。
+  未対応の CVE があれば公開しません
+- **SBOM を GitHub Release に添付します**（3 バリアント × 2 アーキの 6 本）
+- イメージ内の全 ELF の PIE / RELRO / BIND_NOW / 非実行スタック、
+  出荷物の版と `versions.mk` の突合、cpio のパストラバーサル、
+  ash の再帰、wget の経路を `verify-image.sh` が毎回検査します
+- **`cpio` がアーカイブの外に書き出せなくなりました**（`../` を剥がす。
+  v3.0.1 では展開先の外にファイルを作れました）
+- 同じコミットから**バイト単位で同じ** rootfs の tarball ができるようにしました
+  （並び順・mtime・gzip ヘッダの固定、`/.kimigayo-build-info` の時刻をコミット時刻に）。
+  CI で 2 回ビルドして SHA-256 の一致を確認しています（standard / x86_64）
+
+### 📝 脆弱性の報告窓口
+
+GitHub Security Advisories に一本化しました。文書にあった
+`kimigayo-os.org` のメール窓口・PGP 鍵は実在しませんでした。
+
+---
+
 ## バージョン 3.0.1 "Himawari" (向日葵) - 2026-10-11
 
 **イメージから「あってはいけないもの」を2種類外しました。**

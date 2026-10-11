@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] "Himawari" (向日葵) - 2026-10-12
+
+**既知の CVE 5 件を塞ぎ、`wget` の HTTPS を直した版。**
+出荷物そのものを CVE と照合し、SBOM を Release に付ける仕組みも入れた。
+
 ### Security
 
 - **v3.0.1 で検出した既知の CVE 5 件すべてにパッチを当てた**（いずれも
