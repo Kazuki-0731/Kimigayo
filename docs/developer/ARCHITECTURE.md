@@ -7,10 +7,17 @@
 - [全体アーキテクチャ](#全体アーキテクチャ)
 - [レイヤー構造](#レイヤー構造)
 - [コアコンポーネント](#コアコンポーネント)
-- [パッケージ管理システム](#パッケージ管理システム)
 - [セキュリティアーキテクチャ](#セキュリティアーキテクチャ)
 - [ブートプロセス](#ブートプロセス)
 - [設計原則](#設計原則)
+- [データフロー](#データフロー)
+- [モジュール間の依存関係](#モジュール間の依存関係)
+- [参考リソース](#参考リソース)
+
+> **パッケージ管理システムの節はありません。** Kimigayo OS は
+> パッケージマネージャーを**意図的に持ちません**（→
+> [全体アーキテクチャ](#全体アーキテクチャ)）。ソフトウェアの追加は
+> ビルド時のマルチステージビルドで行います。
 
 ## 全体アーキテクチャ
 
@@ -27,7 +34,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 ├─────────────────────────────────────────────────────────┤
 │         システムユーティリティ層                         │
 │  - BusyBox (coreutils, findutils, etc.)                │
-│  - ネットワークツール (ip, ifconfig, curl)              │
+│  - ネットワークツール (ip, ifconfig, wget)              │
 │  - システム管理ツール (ps, top, free)                   │
 ├─────────────────────────────────────────────────────────┤
 │         Init システム層 (OpenRC)                        │
@@ -42,10 +49,9 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 ├═════════════════════════════════════════════════════════┤
 │                  カーネル空間                            │
 ├─────────────────────────────────────────────────────────┤
-│         Linuxカーネル (セキュリティ強化版)               │
-│  - ASLR, DEP, PIE                                       │
+│         Linuxカーネル                                   │
 │  - Namespace isolation                                  │
-│  - Seccomp-BPF                                          │
+│  - cgroup                                               │
 │  - カーネルモジュール                                   │
 ├─────────────────────────────────────────────────────────┤
 │         ハードウェア抽象化層                             │
@@ -57,6 +63,18 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 │  - x86_64, ARM64, RISC-V (将来)                        │
 └─────────────────────────────────────────────────────────┘
 ```
+
+> **この図はレイヤーの全体像で、Kimigayo が配布するものの範囲ではありません。**
+> **成果物は `Cライブラリ層` から `システムユーティリティ層` までです。**
+> カーネル空間とハードウェア抽象化層はホストが提供し、
+> **カーネルは Docker イメージに入りません。** 想定する使い方は
+> VPS 上の Docker コンテナで、ベアメタル起動は対象外です
+> （カーネルのビルド手段は QEMU やベアメタルを試すために残してありますが、
+> `ci.yml` ではビルドしません）。
+>
+> **ルートファイルシステムも、コンテナでは `overlay` です**
+> （`ext4` はこの rootfs をベアメタルや VM で使う場合の話）。
+> 下記の各層は、ベアメタルで動かした場合も含めた説明です。
 
 ## レイヤー構造
 
@@ -238,41 +256,62 @@ sed, awk, cut, sort, uniq, head, tail
 
 ### カーネル設定
 
-最小限かつセキュアなカーネル設定：
+> **このカーネルは Docker イメージに入りません。** コンテナはホストの
+> カーネルで動くので、ここに挙げた設定が効くのは、この rootfs を
+> ベアメタルや VM で使う場合だけです。コンテナでは**ホストの**
+> カーネル設定が効きます。
+
+`src/kernel/config/` の config 断片で**明示している**もの:
 
 ```ini
 # セキュリティ機能
 CONFIG_SECURITY=y
-CONFIG_SECURITY_DMESG_RESTRICT=y
 CONFIG_SECURITY_YAMA=y
 
-# ASLR/DEP
+# ASLR
 CONFIG_RANDOMIZE_BASE=y
 CONFIG_RANDOMIZE_MEMORY=y
 
 # Namespace isolation
 CONFIG_NAMESPACES=y
-CONFIG_UTS_NS=y
-CONFIG_IPC_NS=y
 CONFIG_PID_NS=y
 CONFIG_NET_NS=y
 CONFIG_USER_NS=y
-
-# Seccomp
-CONFIG_SECCOMP=y
-CONFIG_SECCOMP_FILTER=y
 
 # ファイルシステム
 CONFIG_EXT4_FS=y
 CONFIG_OVERLAY_FS=y
 CONFIG_TMPFS=y
-CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS=y        # minimal / standard のみ
 
 # ネットワーク
 CONFIG_NETFILTER=y
-CONFIG_NETFILTER_XTABLES=y
 CONFIG_IP_NF_IPTABLES=y
 ```
+
+**`defconfig` の既定で有効になっているもの**（こちらの config 断片には
+書いていないが、ビルド結果の `.config` では `y`。カーネル 6.18.55 で確認）:
+
+```ini
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_UTS_NS=y
+CONFIG_IPC_NS=y
+CONFIG_NETFILTER_XTABLES=y
+```
+
+> **BusyBox と同じで、カーネル config も「書かないと既定値が入る」。**
+> 上の 5 つは意図して選んだものではなく、既定で付いてきています。
+> 上流が既定を変えれば黙って消えるので、**保証として引かないこと。**
+
+**`CONFIG_SECURITY_DMESG_RESTRICT` は無効です**
+（ビルド結果は `# CONFIG_SECURITY_DMESG_RESTRICT is not set`）。
+`kernel.dmesg_restrict` を sysctl で設定する方針のためです。
+
+> **seccomp はカーネルが対応しているだけで、Kimigayo は
+> seccomp プロファイルを配布していません。**
+> コンテナで絞るならランタイム側で指定してください
+> （`docker run --security-opt seccomp=profile.json`）。
 
 ### BusyBoxアプレット選択
 
@@ -307,31 +346,37 @@ CONFIG_TCPDUMP=y
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 6: アプリケーション層             │
-│  - Seccomp-BPF                          │
-│  - Namespace isolation                  │
+│  Layer 5: パッケージマネージャー不在     │★ Kimigayo が担保
+│  - 追加インストール手段が無い            │
+│  - 侵入後に道具を持ち込めない            │
 ├─────────────────────────────────────────┤
-│  Layer 5: システム層                    │
-│  - ファイアウォール (iptables)          │
-│  - SELinux/AppArmor (将来)              │
-├─────────────────────────────────────────┤
-│  Layer 4: ランタイム層                  │
-│  - ASLR, DEP                            │
+│  Layer 4: コンパイル層                  │★ Kimigayo が担保
+│  - PIE, RELRO (-Wl,-z,relro -Wl,-z,now) │
+│  - FORTIFY_SOURCE                       │
 │  - Stack canaries                       │
 ├─────────────────────────────────────────┤
-│  Layer 3: コンパイル層                  │
-│  - PIE, RELRO                           │
-│  - FORTIFY_SOURCE                       │
+│  Layer 3: 最小の実行面                  │★ Kimigayo が担保
+│  - 第三者の共有ライブラリ無し            │
+│  - sshd / sudo / iptables 無し           │
 ├─────────────────────────────────────────┤
-│  Layer 2: カーネル層                    │
-│  - Kernel hardening                     │
-│  - Seccomp-BPF                          │
+│  Layer 2: カーネル層                    │ ホスト（コンテナの場合）
+│  - Namespace / cgroup                   │
+│  - ASLR                                 │
 ├─────────────────────────────────────────┤
-│  Layer 1: コンテナランタイム層          │
-│  - Docker/Podman/Kubernetes             │
-│  - ホストカーネル                       │
+│  Layer 1: コンテナランタイム層          │ 利用者が設定
+│  - --cap-drop / --read-only / --user    │
+│  - seccomp プロファイル                  │
+│  - NetworkPolicy / ポート公開            │
 └─────────────────────────────────────────┘
 ```
+
+**★ の 3 層が Kimigayo 自身が担保している部分です。**
+Layer 1 と 2 はホストと利用者の設定によります
+（→ [システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)）。
+
+**配布していないもの**: seccomp プロファイル、SELinux / AppArmor の
+ポリシー、`iptables`、Cosign による署名。
+**ファイアウォールはイメージに入っていません**（`iptables` 無し）。
 
 
 ## ブートプロセス
@@ -365,21 +410,38 @@ CONFIG_TCPDUMP=y
    └── アプリケーション実行準備完了
 ```
 
-### 起動時間最適化
+### 起動時間
 
-**目標**: 10秒以下
+**目標**: 10秒以下 / **実測**: 0.61秒（v3.0.1、arm64 ネイティブ、10回の中央値）
 
-**最適化手法**:
-1. **並列サービス起動**: 依存関係のないサービスを並列起動
-2. **不要サービスの無効化**: 最小限のサービスのみ起動
-3. **カーネルパラメータ**: `quiet splash` で起動メッセージを抑制
-4. **initrdの最小化**: 必要最小限のモジュールのみ含める
+> **これは「Kimigayo が速い」という意味ではありません。**
+> 同じ条件で測ると Alpine 0.62 秒・Ubuntu 24.04 0.59 秒で、
+> **100MB の Ubuntu がいちばん速い**という結果です。
+> 測っている時間のほとんどがコンテナランタイム自身の処理なので、
+> **イメージの中身はほとんど効きません。**
+> 差が出るのは常駐メモリ（Kimigayo 232KB / Alpine 276KB /
+> Ubuntu 312KB）とサイズの方です。
+>
+> **OpenRC が default ランレベルを完走するまでは 0.77 秒**で、
+> `/bin/true` の 0.61 秒との差が Init の分です。
+
+**コンテナでは `quiet splash` や initrd の調整は効きません**
+（ブートローダーも initrd も作っていません）。効くのは OpenRC に
+起動させるサービスの数です。
 
 ```bash
-# 起動時間の測定
-dmesg | grep "Freeing unused kernel"
-systemd-analyze  # systemd環境の場合
+# 起動時間の測定（ホスト側から）
+scripts/benchmark-startup.sh
+
+# default ランレベルまで含めて測る
+docker run --rm <image> /sbin/openrc default
 ```
+
+**`dmesg` はコンテナからは使えません**（`CAP_SYSLOG` が必要）。
+`systemd-analyze` はこのプロジェクトでは使いません（Init は OpenRC）。
+
+測定条件は [docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) に
+記録しています。
 
 ## 設計原則
 
@@ -416,9 +478,19 @@ systemd-analyze  # systemd環境の場合
 
 ### 5. パフォーマンス
 
-- 起動時間: <10秒
-- メモリ使用量: <128MB
-- イメージサイズ: Minimal <5MB
+目標値は [SPECIFICATION.md](../../SPECIFICATION.md) §8.3 の定義。
+実測は v3.0.1（2026-10-11）。
+
+| 指標 | 目標 | 実測 |
+|------|------|------|
+| 起動時間 | < 10秒 | 0.61秒 |
+| 常駐メモリ | < 128MB | 232KB |
+| イメージサイズ (Minimal) | < 5MB | 2.62MB / arm64 2.98MB |
+| イメージサイズ (Standard) | < 15MB | 2.76MB / arm64 3.13MB |
+| イメージサイズ (Extended) | < 50MB | 2.78MB / arm64 3.17MB |
+
+**3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っています。**
+起動時間の解釈は[起動時間](#起動時間)の注記を参照してください。
 
 ## データフロー
 
