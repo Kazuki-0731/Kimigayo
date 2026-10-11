@@ -103,30 +103,60 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 - ネットワークスタック
 - デバイスドライバ管理
 
-**セキュリティ機能**:
-```c
-// カーネルパラメータ例
-kernel.randomize_va_space = 2        // ASLR完全有効化
-kernel.kptr_restrict = 2             // カーネルポインタ保護
-kernel.dmesg_restrict = 1            // dmesgアクセス制限
-kernel.yama.ptrace_scope = 1         // ptrace制限
+**セキュリティ関連のカーネルパラメータ**:
+
+イメージが**実際に出荷している**のは
+`configs/sysctl/99-kimigayo-performance.conf` の内容で、
+セキュリティに関わるのは次の 3 つだけです。
+
+```ini
+kernel.randomize_va_space = 2        # ASLR 完全有効化
+fs.suid_dumpable = 0                 # setuid プロセスのコアダンプ禁止
+kernel.core_uses_pid = 1
 ```
 
+> **`kernel.kptr_restrict` / `kernel.dmesg_restrict` /
+> `kernel.yama.ptrace_scope` は出荷していません。**
+> 以前ここに「セキュリティ機能」として並んでいましたが、
+> 出荷ファイルには入っていません（2026-10-11 に突合）。
+>
+> **そもそもコンテナでは `/proc/sys` が読み取り専用で、
+> この sysctl ファイルは適用されません**（`sysctl` サービスが
+> `kernel parameters are managed by the host` と報告してスキップします）。
+> 効くのはこの rootfs をベアメタルや VM で使う場合だけです。
+
 **ファイルシステム**:
-- **ext4**: ルートファイルシステム
-- **overlay**: コンテナ用レイヤードファイルシステム
+- **overlay**: コンテナのルートファイルシステム（通常はこれ）
 - **tmpfs**: 一時ファイル用メモリファイルシステム
-- **squashfs**: 読み取り専用圧縮ファイルシステム
+- **ext4**: ベアメタル／VM でルートに使う場合
+- **squashfs**: 読み取り専用圧縮ファイルシステム（カーネル config では
+  `=m`。minimal / standard の defconfig のみ）
 
 ### 3. Cライブラリ層 (musl libc)
 
 **目的**: POSIXシステムコールのラッパー提供
 
 **musl libcの特徴**:
-- **軽量**: glibcの約1/4のサイズ
-- **高速**: 最適化されたメモリ割り当て
-- **セキュア**: バッファオーバーフロー対策
-- **静的リンク対応**: 独立した実行ファイル生成
+- **軽量**: イメージ内の `libc.so` は **954KB**（arm64, musl 1.2.6）。
+  同じ arch の Debian 12 の `libc.so.6` は 1.65MB なので**約 58%**
+  （2026-10-11 に `ls -l` で実測）
+- **1 ファイルで済む**: `libm` / `libpthread` / `libdl` が本体に入っており、
+  イメージに置く共有ライブラリが 1 つで足りる
+- **静的リンク対応**: BusyBox は static-pie でビルドしている
+- **コンパイル時の強化を有効化**: `-fPIE` /
+  `-fstack-protector-strong` / `-D_FORTIFY_SOURCE=2` /
+  `-Wl,-z,relro -Wl,-z,now`（`scripts/build-musl.sh`）
+
+> **「glibc より高速」とは書きません。** musl の malloc は実装が単純で、
+> **マルチスレッドで競合する場面では glibc より遅いことが知られています。**
+> 採用理由はサイズと依存の少なさで、速度ではありません。
+>
+> **ロケールはほぼ実装されていません**（`C` / `C.UTF-8` 相当のみ）。
+> 照合順序や月名の翻訳を libc に期待するアプリには向きません。
+>
+> **GNU 拡張がありません。** BusyBox の `vi` が glibc の GNU 正規表現
+> 拡張を使っているため、POSIX `regcomp`/`regexec` に書き換える
+> パッチを当てています（`src/busybox/patches/`）。
 
 **主要API**:
 ```c
@@ -189,7 +219,7 @@ reload() {
 }
 ```
 
-**依存関係グラフ**:
+**依存関係グラフ**（OpenRC の `depend()` の書き方の例）:
 ```
 networking
     ├── firewall
@@ -198,6 +228,15 @@ networking
     └── nginx
             └── php-fpm
 ```
+
+> **これは OpenRC 一般の例で、Kimigayo が同梱しているサービスでは
+> ありません。** `networking` / `firewall` / `sshd` / `ntpd` / `nginx` /
+> `php-fpm` はどれもイメージに入っていません。
+> **自分のサービスの `depend()` に `need net` や `after firewall` と
+> 書くと、依存が解決できず起動しません。**
+> 同梱しているのは `/etc/init.d/` の 28 個（`localmount`・`netmount`・
+> `sysctl`・`bootmisc`・`local` など）で、`default` ランレベルに
+> 登録されているのは `local` と `netmount` だけです。
 
 ### 5. システムユーティリティ層 (BusyBox)
 
@@ -333,11 +372,39 @@ CONFIG_WGET=y
 CONFIG_IFCONFIG=y
 CONFIG_ROUTE=y
 
-# デバッグツール（Extended）
-CONFIG_STRACE=y
-CONFIG_LSOF=y
-CONFIG_TCPDUMP=y
+# Extended が追加するもの（11 個）
+CONFIG_AR=y
+CONFIG_ED=y
+CONFIG_FBSET=y
+CONFIG_FDFORMAT=y
+CONFIG_FLASH_ERASEALL=y
+CONFIG_FLASH_LOCK=y
+CONFIG_FLASH_UNLOCK=y
+CONFIG_FLASHCP=y
+CONFIG_INOTIFYD=y
+CONFIG_RFKILL=y
+CONFIG_UNLZOP=y
 ```
+
+> **`strace` と `tcpdump` はどのバリアントにも入っていません。**
+> BusyBox にそのアプレット自体がなく、`CONFIG_STRACE` /
+> `CONFIG_TCPDUMP` は `src/busybox/config/` のどこにもありません
+> （2026-10-11 に突合）。以前ここに「デバッグツール（Extended）」として
+> 並んでいましたが、存在しないものでした。
+>
+> **`lsof` は Extended 専用ではありません。** `CONFIG_LSOF=y` は
+> `extended.config` にしか書かれていませんが、**実測では 3 バリアント
+> すべてに `lsof` があります**（書かなくても既定で入る）。
+>
+> **Extended と Standard の差は上の 11 個だけで、MTD/flash と
+> framebuffer 系が主です。** デバッガが必要なら、ビルド時に
+> マルチステージで持ち込んでください。
+
+> **BusyBox の config は「書かないと既定値が入る」。**
+> ここに並べたものは意図して選んだ分で、**実際のバイナリには
+> 書いていないアプレットも入ります。** 何が入っているかは
+> イメージ側で確認してください（`busybox --list`）。
+> 過去に `dpkg` と `rpm` がこの経路で入っていました。
 
 
 ## セキュリティアーキテクチャ
@@ -383,32 +450,48 @@ Layer 1 と 2 はホストと利用者の設定によります
 
 ### 起動シーケンス
 
+**既定では OpenRC は動きません。** `Dockerfile.runtime` は `ENTRYPOINT` を
+持たず `CMD ["/bin/sh"]` なので、`docker run` した場合の PID 1 は
+`/bin/sh` です。
+
 ```
 1. コンテナランタイム (Docker/Podman/Kubernetes)
-   ├── コンテナ初期化
-   └── rootfsマウント
+   ├── コンテナ初期化（namespace / cgroup）
+   ├── rootfs マウント（overlay）
+   ├── ネットワーク・/etc/hosts・/etc/resolv.conf を用意
+   └── CMD / ENTRYPOINT を PID 1 として起動
        │
-2. Linuxカーネル (ホストカーネル使用)
-   ├── ネームスペース作成
-   ├── cgroup設定
-   └── /sbin/init (OpenRC) 起動
-       │
-3. OpenRC - sysinit
-   ├── /proc, /sys, /dev マウント
-   ├── ホスト名設定
-   └── システムクロック設定
-       │
-4. OpenRC - boot
-   ├── ファイルシステムチェック
-   ├── ネットワーク初期化
-   └── 必須サービス起動
-       │
-5. OpenRC - default
-   ├── ユーザーサービス起動
-   │   ├── アプリケーションサービス
-   │   └── その他
-   └── アプリケーション実行準備完了
+2. 既定: /bin/sh が PID 1
+   └── OpenRC は起動しない（rc-service は
+       "openrc did not boot" で失敗する）
 ```
+
+**OpenRC を使う場合は `/sbin/init` を PID 1 にします**
+（`--entrypoint /sbin/init`）。`/etc/inittab` が次を順に実行します。
+
+```
+2'. /sbin/init (BusyBox init) が PID 1
+       │
+3. openrc sysinit
+   ├── /proc, /sys, /dev の確認
+   └── （/run の tmpfs マウントは権限不足で失敗する。
+        --tmpfs /run を渡せば解消）
+       │
+4. openrc boot
+   ├── sysctl（コンテナでは「ホストが管理」と報告してスキップ）
+   ├── loopback（ランタイムが済ませているため RTNETLINK で拒否される）
+   ├── mtab / bootmisc / hostname / localmount など
+   └── dmesg は CAP_SYSLOG が無く失敗する
+       │
+5. openrc default
+   ├── local
+   └── netmount
+       （既定で登録されているのはこの 2 つだけ）
+```
+
+**上記の失敗はいずれも無害で、起動は続行します。**
+実測では `openrc default` が終了コード 0 で完走します。
+詳細と対処は[システム設定ガイド](../user/CONFIGURATION.md#サービス管理)。
 
 ### 起動時間
 
@@ -494,6 +577,51 @@ docker run --rm <image> /sbin/openrc default
 
 ## データフロー
 
+### ビルド時
+
+バージョンの単一の真実の源は [versions.mk](../../versions.mk) です。
+各スクリプトはここだけを読みます（`scripts/lib/versions.sh` 経由）。
+
+```
+versions.mk ─┬→ download-musl    → build-musl     [1/4]
+             ├→ download-kernel  → apply-kernel-patches → build-kernel  [2/4]
+             ├→ download-busybox → apply-busybox-patches → build-busybox [3/4]
+             └→ download-openrc  → build-openrc   [4/4]
+                                        ↓
+                              build-rootfs.sh（build/rootfs/）
+                                        ↓
+                        package-rootfs（output/*.tar.gz）
+                                        ↓
+                    Dockerfile.runtime → Docker イメージ → 検証
+```
+
+**カーネル（[2/4]）の成果物は Docker イメージに入りません。**
+`build/kernel/output/vmlinuz-<version>-<arch>` に置かれ、
+ベアメタル／QEMU 検証でだけ使います。`ci.yml` ではビルドしません。
+
+プロジェクト自身の版は `scripts/get-version.sh`（`git describe --tags`）が
+決め、`build-rootfs.sh` の `resolve_project_version()` が 1 箇所で
+`/etc/os-release`・`/etc/motd`・`/.kimigayo-build-info` に流します。
+`verify_rootfs` がビルド中の版と `os-release` の
+`VERSION_ID` / `VERSION_CODENAME` を突合します。
+
+### 実行時
+
+```
+docker run
+    ↓
+コンテナランタイム（namespace / cgroup / overlay / ネットワーク）
+    ↓
+PID 1（既定は /bin/sh、または /sbin/init、またはアプリ本体）
+    ↓
+BusyBox アプレット ─→ musl libc（/usr/lib/libc.so）─→ ホストのカーネル
+    ↑
+OpenRC（librc / libeinfo）※ /sbin/init を PID 1 にした場合のみ
+```
+
+**イメージ内の共有ライブラリは musl の `libc.so` と OpenRC 自身の
+`librc` / `libeinfo` だけです**（第三者の共有ライブラリを持ちません）。
+`libcap` は OpenRC に静的リンクしてあります。
 
 ## モジュール間の依存関係
 
@@ -523,7 +651,6 @@ docker run --rm <image> /sbin/openrc default
 - [BUILD_GUIDE.md](BUILD_GUIDE.md) - ビルド詳細
 - [API_REFERENCE.md](API_REFERENCE.md) - API仕様
 - [SPECIFICATION.md](../../SPECIFICATION.md) - プロジェクト仕様
-- [SPECIFICATION.md](../../SPECIFICATION.md) - 仕様
 
 ---
 
