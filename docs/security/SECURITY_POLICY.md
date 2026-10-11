@@ -4,15 +4,22 @@
 
 Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用しています。すべてのコンポーネントは、初期状態から最大限のセキュリティを提供し、ユーザーが明示的に変更しない限り、安全な設定を維持します。
 
+成果物は **rootfs だけを詰めた Docker イメージ**で、カーネルを含みません。
+コンテナはホストのカーネルとコンテナランタイムの上で動くので、
+このポリシーが対象にするのはイメージの中身（musl libc / BusyBox / OpenRC と
+ビルド経路）です。
+
 ## サポートバージョン
 
-現在セキュリティアップデートの対象となっているバージョン：
+**最新のリリースだけ**がセキュリティアップデートの対象です。
+修正は新しいパッチリリース（例: 3.0.1 → 3.0.2）として出し、
+Docker Hub の `latest` 系のタグを差し替えます。
+古い版へのバックポートはしません（利用者は新しい版に上げてください）。
 
-| バージョン | サポート状況 | セキュリティアップデート |
-|-----------|-------------|------------------------|
-| 1.0.x     | ✅ サポート中 | 提供中 |
-| 0.9.x (Beta) | ⚠️ 限定サポート | 重大な脆弱性のみ |
-| < 0.9     | ❌ サポート終了 | 提供なし |
+| バージョン | サポート状況 |
+|-----------|-------------|
+| 3.0.x（最新） | ✅ サポート中 |
+| それより前（3.0.0 未満） | ❌ サポート終了 |
 
 ## 脆弱性報告
 
@@ -22,17 +29,13 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
 
 **重要**: 公開のIssue Trackerに脆弱性を報告しないでください。
 
-#### 推奨方法：セキュリティアドバイザリ（GitHub）
+**報告の窓口は GitHub Security Advisories だけです**（非公開で届きます）。
 
-1. [GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories)にアクセス
+1. [GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories/new)にアクセス
 2. "Report a vulnerability"をクリック
 3. 脆弱性の詳細を記入して送信
 
-#### 代替方法：暗号化メール
-
-- **メールアドレス**: security@kimigayo-os.org
-- **PGP公開鍵**: https://kimigayo-os.org/security/pgp-key.asc
-- **PGPフィンガープリント**: `XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX`
+メールや PGP による報告窓口はありません。
 
 ### 報告に含めるべき情報
 
@@ -42,8 +45,8 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
    - バッファオーバーフロー、権限昇格、情報漏洩など
 
 2. **影響を受けるコンポーネント**
-   - musl libc / BusyBox / OpenRC / Linux カーネル / ビルドスクリプト など
-     （**パッケージマネージャーは持ちません**）
+   - musl libc / BusyBox / OpenRC / ビルドスクリプト・ワークフロー など
+     （**パッケージマネージャーは持ちません**。カーネルはイメージに入りません）
 
 3. **再現手順**
    ```bash
@@ -51,7 +54,7 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
    ```
 
 4. **影響範囲**
-   - どのバージョンが影響を受けるか
+   - どのバージョン（イメージのタグ）が影響を受けるか
    - 悪用の条件（ローカル/リモート、認証の有無など）
 
 5. **概念実証（PoC）**（任意）
@@ -74,9 +77,29 @@ Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用し�
 
 ### セキュリティアドバイザリの購読
 
-- **メーリングリスト**: security-announce@kimigayo-os.org
-- **RSSフィード**: https://kimigayo-os.org/security/advisories.rss
-- **GitHubリポジトリWatch**: [Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories)
+- **GitHubリポジトリWatch**: リポジトリの Watch → Custom → Security alerts
+  （[Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories)）
+- **リリース**: [GitHub Releases](https://github.com/Kazuki-0731/Kimigayo/releases)。
+  修正の内容は [CHANGELOG.md](../../CHANGELOG.md) の Security 節に書きます
+
+## 構成要素の既知の脆弱性（CVE）
+
+上流（musl / BusyBox / OpenRC）の CVE は、**出荷するイメージそのもの**で
+照合します（`scripts/scan-image.sh`）。
+
+- イメージ内のバイナリを実行して読んだ版から SBOM（CycloneDX）を作り、
+  Grype で NVD の CPE と照合します
+- **CI（毎 push）と、リリースの Docker Hub への push 前**に走り、
+  未対応の CVE があれば止めます。公開中の `latest` も毎週照合します
+- 上流がまだ修正版を出していない CVE には、パッチを当てて出荷します。
+  当てたものはイメージの `/.kimigayo-build-info` の `PATCHED_CVES` に
+  記録され、照合結果から除外されます
+- **SBOM は GitHub Release に添付します**（v3.0.2 から）。
+  自分の照合器にかけて確かめられます
+
+**「0 件」は「NVD の CPE に載っている範囲で 0 件」です。** CPE の版範囲が
+不正確な CVE は取りこぼしや誤検知があり得ます。
+対応の記録は [SECURITY_AUDIT.md](SECURITY_AUDIT.md) にあります。
 
 ## セキュリティ機能
 
@@ -89,115 +112,88 @@ Kimigayo OSのすべてのバイナリは、以下のセキュリティフラグ
 | **PIE** | Position Independent Executables | ✅ 有効 |
 | **Stack Protector** | スタックバッファオーバーフロー保護 | ✅ 有効 |
 | **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ✅ レベル2 |
-| **RELRO** | Relocation Read-Only | ✅ Full RELRO |
+| **RELRO** | Relocation Read-Only | ✅ Full RELRO（BIND_NOW） |
+| **非実行スタック** | `PT_GNU_STACK` に実行権限なし | ✅ 有効 |
 
-確認方法：
+確認方法（イメージ内の**全 ELF** を検査します。イメージに `checksec` は入っていません）：
 ```bash
-# バイナリのセキュリティ機能を確認
-checksec /bin/busybox
+bash scripts/verify-image.sh <image> <variant> <arch>
 ```
 
 ### ランタイムセキュリティ
 
 | 機能 | 説明 | デフォルト |
 |------|------|-----------|
-| **ASLR** | Address Space Layout Randomization | ✅ 有効 |
-| **DEP** | Data Execution Prevention (NX bit) | ✅ 有効 |
+| **ASLR** | Address Space Layout Randomization | **ホストのカーネル**が有効なら効く（イメージ側は PIE で対応） |
+| **DEP** | Data Execution Prevention (NX bit) | **ホストのカーネル**が有効なら効く（イメージ側は非実行スタックで対応） |
 | **Seccomp-BPF** | システムコールフィルタリング | **ホスト側で指定**（`docker run --security-opt seccomp=...`）|
 | **Namespaces** | プロセス隔離 | **ホスト側**（コンテナランタイムが提供）|
 
-> **後者2つはイメージの属性ではありません。** 成果物は rootfs だけで
-> カーネルを含まないため、seccomp プロファイルを適用するのも
-> namespace を張るのもホストのコンテナランタイムです。
-> イメージ側が保証できるのは上2つ（PIE による ASLR と NX）だけです。
+> **どれもイメージの属性ではありません。** 成果物は rootfs だけで
+> カーネルを含まないため、ASLR・NX を効かせるのも、seccomp プロファイルを
+> 適用するのも namespace を張るのもホストです。
+> イメージ側が保証できるのは、それが効くようにバイナリを作ること
+> （PIE と非実行スタック）だけです。
 
-確認方法:
+確認方法（ホストの設定がコンテナからも見えます）:
 ```bash
-# ASLRの状態確認
+# ASLRの状態確認（2 = 完全なランダム化）
 cat /proc/sys/kernel/randomize_va_space
-# 2 = 完全なランダム化
-
-# カーネルセキュリティ設定の確認
-sysctl -a | grep kernel
 ```
 
 ## セキュリティ監査
 
-### 内部監査
+### 自動の検査
 
-Kimigayo OSは定期的に内部セキュリティ監査を実施しています：
-
-- **コード監査**: 四半期ごと
-- **依存関係スキャン**: 毎週（自動化）
-- **脆弱性スキャン**: 毎日（自動化）
+- **依存関係スキャン**: 毎週（`dependency-review.yml`）
+- **構成要素の版の確認・リポジトリの脆弱性スキャン**: 毎日（`security.yml`）
+- **出荷物の CVE 照合と秘密情報スキャン**: 毎 push とリリース前（上記）
 
 ### 外部監査
 
-独立した第三者によるセキュリティ監査を歓迎します。監査レポートの公開には事前承認が必要です。
-
-監査希望の連絡先: audit@kimigayo-os.org
+独立した第三者によるセキュリティ監査を歓迎します。
+GitHub Security Advisories か [Discussions](https://github.com/Kazuki-0731/Kimigayo/discussions) で連絡してください。
 
 ## セキュリティベストプラクティス
 
-### システム管理者向け
+### 利用者向け（コンテナの実行）
+
+Kimigayo OS はコンテナとして動かす前提です。強化はホスト側の
+`docker run` のオプションで行います。
 
 ```bash
-# 1. 不要なサービスを無効化
-rc-update show default
-rc-update del <unnecessary-service> default
-
-# 2. ファイアウォールを設定
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT
-iptables -A INPUT -i lo -j ACCEPT
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-rc-service iptables save
-
-# 3. SSHを強化
-vi /etc/ssh/sshd_config
-# PermitRootLogin no
-# PasswordAuthentication no
-# PubkeyAuthentication yes
-
-# 4. システムログを監視
-tail -f /var/log/messages
+docker run --rm \
+  --read-only \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --user 1000:1000 \
+  --tmpfs /tmp:rw,noexec,nosuid \
+  ishinokazuki/kimigayo-os:latest <command>
 ```
+
+- イメージは `USER` を指定していません（OS のベースイメージのため root）。
+  自分のアプリのイメージで `USER` を指定してください
+- 詳しくは [HARDENING_GUIDE.md](HARDENING_GUIDE.md)
 
 ### 開発者向け
 
 ```bash
-# セキュアなコンパイルオプション
+# セキュアなコンパイルオプション（実体は scripts/build-{musl,busybox,openrc}.sh）
 CFLAGS="-O2 -pipe -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-LDFLAGS="-Wl,-z,relro,-z,now -pie"
+LDFLAGS="-Wl,-z,relro,-z,now -Wl,-z,noexecstack -pie"
 
-# 静的解析ツールの使用（make static-analysis は存在しない）
+# 静的解析と出荷物の検査（make static-analysis は存在しない）
 make shellcheck-scan
 make security-scan
 ```
 
 ## 既知の制限事項
 
-### 現在の制限
-
-1. **Spectre/Meltdown緩和策**: カーネルパラメータで設定可能だが、パフォーマンスに影響
-2. **SELinux/AppArmor**: 現在未サポート（将来的に検討）
-3. **完全なSecureBootサポート**: 開発中
-
-### 将来の実装予定
-
-- [ ] SELinux/AppArmorのサポート
-- [ ] 完全なSecureBootサポート
-- [ ] Trusted Platform Module (TPM) 2.0サポート
-- [ ] 暗号化ファイルシステムのデフォルト対応
-
-## コンプライアンス
-
-Kimigayo OSは以下のセキュリティ標準への準拠を目指しています：
-
-- **CIS Benchmarks**: Center for Internet Security ベンチマーク
-- **STIGs**: Security Technical Implementation Guides（検討中）
-- **PCI-DSS**: Payment Card Industry Data Security Standard準拠の構成が可能
+1. **カーネルの緩和策（Spectre/Meltdown など）・SELinux/AppArmor**: ホストの設定に依存します。イメージ側では設定できません
+2. **`wget` の HTTPS**: 取得後に Segmentation fault で落ちます（調査中）。
+   → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
+3. **TLS 証明書の検証**: BusyBox の `wget` は証明書を検証しません。
+   信頼できない経路で HTTPS を使うなら `curl` などを持ち込んでください
 
 ## 参考リソース
 
@@ -208,10 +204,9 @@ Kimigayo OSは以下のセキュリティ標準への準拠を目指していま
 
 ## 連絡先
 
-- **セキュリティチーム**: security@kimigayo-os.org
-- **緊急連絡先**: emergency@kimigayo-os.org（重大な脆弱性のみ）
-- **PGP公開鍵**: https://kimigayo-os.org/security/pgp-key.asc
+- **脆弱性の報告**: [GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories/new)（非公開）
+- **質問・相談**: [GitHub Discussions](https://github.com/Kazuki-0731/Kimigayo/discussions)
 
 ---
 
-**最終更新**: 2025-12-15
+**最終更新**: 2026-10-12
