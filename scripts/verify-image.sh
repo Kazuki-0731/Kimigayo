@@ -568,6 +568,24 @@ case "$out" in
                  show_output "$out" ;;
 esac
 
+# **シェル関数の無限再帰でシェルが落ちないか（CVE-2026-38755）。**
+#
+# BusyBox 1.38.0 の ash は関数の呼び出しの深さを制限せず、
+# `f(){ f; }; f` でスタックを使い切って SIGSEGV で落ちる
+# （v3.0.1 の公開イメージで実測）。src/busybox/patches/0004-... が
+# 深さ 1000 で通常のシェルエラーにする。パッチが当たらずに
+# 黙って外れたら、ここで落ちる。深さ 500 の正当な再帰が通ることも見る
+# （上限が低すぎて既存のスクリプトを壊していないか）。
+out="$(in_image '
+/bin/sh -c "f(){ f; }; f" >/tmp/.kimigayo-rec 2>&1; echo "rc=$?"; cat /tmp/.kimigayo-rec; rm -f /tmp/.kimigayo-rec
+/bin/sh -c "n=0; g(){ n=\$((n+1)); [ \$n -lt 500 ] && g; }; g; echo depth=\$n"')"
+case "$out" in
+    *"recursion limit exceeded"*depth=500*)
+        pass "ash stops runaway function recursion with an error (CVE-2026-38755)" ;;
+    *)  fail "ash function recursion is not bounded (CVE-2026-38755 patch missing?)"
+        show_output "$out" ;;
+esac
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
