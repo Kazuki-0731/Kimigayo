@@ -251,6 +251,16 @@ jobs:
             "${{ matrix.variant }}" \
             "${{ matrix.arch }}"
 
+      # 公開するイメージそのものに鍵やトークンが紛れていないか。
+      # build-workflow.yml と同じく SCANS=secret だけ（CVE 照合の扱いは未決）。
+      # Docker Hub に出たものは取り消せないので、push の前に止める。
+      - name: Scan image for secrets
+        run: |
+          SCANS=secret bash scripts/scan-image.sh \
+            "${{ steps.tags.outputs.primary }}" \
+            "${{ matrix.variant }}" \
+            "${{ matrix.arch }}"
+
       - name: Log in to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
