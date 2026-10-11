@@ -552,6 +552,6 @@ find / -perm -4000 -o -perm -2000
 
 ## 緊急連絡先
 
-セキュリティインシデント発生時：
-- **緊急メール**: emergency@kimigayo-os.org
-- **セキュリティチーム**: security@kimigayo-os.org
+セキュリティインシデント・脆弱性の報告は
+[GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories/new)
+（非公開）だけで受け付けます。メールの窓口はありません。
