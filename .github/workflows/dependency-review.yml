@@ -94,52 +94,57 @@ jobs:
             echo "✅ No unsafe eval usage"
           fi
 
-      - name: Check component versions against CVE databases
-        run: |
-          echo "=== Checking component versions against known CVEs ==="
-
-          # Extract versions from versions.mk (single source of truth)
-          #
-          # 以前は scripts/build-rootfs.sh を grep していたが、そこに
-          # MUSL_VERSION= / BUSYBOX_VERSION= は存在せず常に空文字になっていた。
-          # OpenRC と Alpine はハードコードされた古い値（0.44+ / edge）だった。
-          # shellcheck disable=SC1091
-          source scripts/lib/versions.sh
-
-          echo "Linux kernel version: $KERNEL_VERSION"
-          echo "musl libc version:    $MUSL_VERSION"
-          echo "BusyBox version:      $BUSYBOX_VERSION"
-          echo "OpenRC version:       $OPENRC_VERSION"
-          echo "Alpine (build env):   $ALPINE_VERSION"
-
-          # Note: In production, you would query CVE databases here
-          # For now, we'll just report the versions
-          cat > dependency-versions.txt << EOF
-          Component Versions (from versions.mk):
-          - Linux kernel: $KERNEL_VERSION
-          - musl libc: $MUSL_VERSION
-          - BusyBox: $BUSYBOX_VERSION
-          - OpenRC: $OPENRC_VERSION
-          - Alpine Linux (build env): $ALPINE_VERSION
-
-          For CVE information, check:
-          - https://security.alpinelinux.org/
-          - https://www.cvedetails.com/
-          EOF
-
-          cat dependency-versions.txt
-
       - name: Upload dependency report
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: dependency-scan-report
-          path: |
-            trivy-results.sarif
-            dependency-versions.txt
+          path: trivy-results.sarif
           retention-days: 30
 
+  # **公開中のイメージ**の構成要素を CVE と照合する。
+  #
+  # 以前ここには「Check component versions against CVE databases」という
+  # ステップがあったが、CVE データベースを一切照会しておらず
+  # （"In production, you would query CVE databases here"）、
+  # versions.mk の版を表示しているだけだった。しかも versions.mk は
+  # 宣言であって、出荷物の版ではない。
+  #
+  # いまは Docker Hub から実際に pull し、イメージ内のバイナリから読んだ版で
+  # SBOM を作って Grype で照合する（scripts/scan-image.sh）。
+  # 新しい CVE はコードが変わらなくても出るので、push ではなく定期で回す。
+  # 見つかれば失敗し、create-security-issue が Issue を起票する。
+  #
+  # 構成要素の版はバリアント・アーキで共通なので、latest（standard /
+  # amd64）だけを見る。
+  published-image-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Pull the published image
+        run: docker pull --platform linux/amd64 ishinokazuki/kimigayo-os:latest
+
+      - name: Scan the published image (CVE + secrets)
+        env:
+          SBOM_OUT: ${{ github.workspace }}/sbom/kimigayo-latest-x86_64.cdx.json
+        run: |
+          bash scripts/scan-image.sh ishinokazuki/kimigayo-os:latest standard x86_64
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sbom-published-latest
+          path: sbom/
+          retention-days: 30
+          if-no-files-found: ignore
+
   create-security-issue:
-    needs: vulnerability-scan
+    needs: [vulnerability-scan, published-image-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: failure() && github.event_name == 'schedule'
