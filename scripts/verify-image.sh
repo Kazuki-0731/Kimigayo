@@ -541,6 +541,33 @@ else
     log_error "      古いビルド結果がスキップ判定をすり抜けた疑い（CLAUDE.md「版を上げたら build/ の残骸を疑う」節）"
 fi
 
+# **cpio がアーカイブの外に書き出さないか（パストラバーサル）。**
+#
+# BusyBox の既定は CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=n で、
+# `../` を含むメンバー名をそのまま展開する。v3.0.1 までの公開イメージは
+# この状態で、展開先の外にファイルを作れた（2026-10-11 に実測）。
+# いまは config で有効にしてあるが、config は「書かないと既定値が入る」
+# ので、行が消えれば黙って戻る。実際に脱出を試みて確かめる。
+#
+# v3.0.1 の公開イメージで ESCAPED、修正後で CONTAINED になることを確認済み。
+out="$(in_image '
+rm -rf /tmp/.kimigayo-cpio
+mkdir -p /tmp/.kimigayo-cpio/src/d /tmp/.kimigayo-cpio/dst/d
+cd /tmp/.kimigayo-cpio/src/d && echo x > ../escape
+echo ../escape | cpio -o -H newc > /tmp/.kimigayo-cpio/a.cpio 2>/dev/null
+cd /tmp/.kimigayo-cpio/dst/d && cpio -i < /tmp/.kimigayo-cpio/a.cpio >/dev/null 2>&1
+if [ ! -s /tmp/.kimigayo-cpio/a.cpio ]; then echo NOARCHIVE
+elif [ -e /tmp/.kimigayo-cpio/dst/escape ]; then echo ESCAPED
+else echo CONTAINED; fi
+rm -rf /tmp/.kimigayo-cpio')"
+case "$out" in
+    *CONTAINED*) pass "cpio refuses to extract outside the target (../ is stripped)" ;;
+    *ESCAPED*)   fail "cpio extracted '../escape' outside the target directory"
+                 log_error "      src/busybox/config/*.config の CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y を確認" ;;
+    *)           fail "cpio traversal check could not run"
+                 show_output "$out" ;;
+esac
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
