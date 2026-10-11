@@ -598,6 +598,24 @@ case "$out" in
         show_output "$out" ;;
 esac
 
+# **wget の HTTPS が openssl 経由の経路を持っていないか。**
+#
+# BusyBox の既定は CONFIG_FEATURE_WGET_OPENSSL=y で、wget は HTTPS のたびに
+# `openssl s_client` を vfork で起動しようとする。イメージに openssl は無く、
+# exec に失敗した子の exit() が musl の exit ロックを親に残すので、
+# 取得に成功したあと親が SIGSEGV（rc=139）で落ちる（v3.0.1 で実測）。
+# config は「書かないと既定値が入る」ので、行が消えれば黙って戻る。
+# ネットワークに頼らず決められるよう、経路の有無をバイナリの文字列で見る
+# （v3.0.1 の /bin/busybox には "s_client" があり、修正後は無い）。
+if in_image "busybox --list" | grep -qx wget; then
+    if in_image "grep -q s_client /bin/busybox && echo FOUND" | grep -q FOUND; then
+        fail "wget still tries 'openssl s_client' for HTTPS (crashes with SIGSEGV on musl)"
+        log_error "      src/busybox/config/*.config に '# CONFIG_FEATURE_WGET_OPENSSL is not set' を確認"
+    else
+        pass "wget uses the internal TLS only (no openssl helper)"
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
