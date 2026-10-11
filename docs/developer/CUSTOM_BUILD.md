@@ -129,7 +129,7 @@ CMD ["/usr/local/bin/myapp"]
 
 ```dockerfile
 # ビルドステージ
-FROM golang:1.21-alpine AS builder
+FROM golang:1-alpine AS builder   # 版は自分のプロジェクトに合わせる
 
 WORKDIR /build
 
@@ -164,7 +164,7 @@ ENTRYPOINT ["/usr/local/bin/app"]
 
 ```dockerfile
 # ビルドステージ
-FROM rust:1.75-alpine AS builder
+FROM rust:1-alpine AS builder     # 版は自分のプロジェクトに合わせる
 
 RUN apk add --no-cache musl-dev
 
@@ -368,6 +368,9 @@ USER nobody
 
 EXPOSE 8080
 
+# wget は Standard / Extended にはあるが **Minimal には無い**。
+# Minimal をベースにするなら、アプリ自身にヘルスチェック用の
+# サブコマンドを持たせるか、wget を持ち込む。
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["/bin/sh", "-c", "wget -q --spider http://localhost:8080/health || exit 1"]
 
@@ -524,11 +527,14 @@ FROM --platform=$BUILDPLATFORM ishinokazuki/kimigayo-os:latest AS base
 ARG TARGETARCH
 ARG TARGETOS
 
-FROM base AS builder
+# **ビルドステージに Kimigayo を使わないこと。**
+# コンパイラもパッケージマネージャーも入っていないので、
+# ここで何かをビルドすることはできない。
+FROM alpine:3.24 AS builder
 
-# アーキテクチャに応じたビルド
+ARG TARGETARCH
 COPY build-${TARGETARCH}.sh /tmp/
-RUN sh /tmp/build-${TARGETARCH}.sh
+RUN apk add --no-cache build-base && sh /tmp/build-${TARGETARCH}.sh
 
 FROM base
 
@@ -536,6 +542,9 @@ COPY --from=builder /build/output /usr/local/bin/app
 
 CMD ["/usr/local/bin/app"]
 ```
+
+**`$TARGETARCH` / `$TARGETPLATFORM` は BuildKit が渡す値です。**
+使う側のステージで `ARG TARGETARCH` を宣言しないと空になります。
 
 ### 5. Lintとセキュリティスキャン
 
