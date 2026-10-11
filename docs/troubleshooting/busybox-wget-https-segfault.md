@@ -16,8 +16,8 @@ Segmentation fault
 ```
 
 **発見**: 2026-10-11（v3.0.1 公開後のドキュメント監査中）。
-**状態**: **原因は特定済み（静的リンク）。未修正。**
-**static-pie は意図した設計なので、直すには設計判断が必要。**
+**状態**: **未修正・原因調査中。** クラッシュは Kimigayo の BusyBox バイナリに
+ついてくる（musl でもリンク方法でもない）。容疑は config か clang。
 
 ---
 
@@ -69,74 +69,71 @@ if (pid == 0) {
 **だから `ssl_client` 単体が動くことは、`wget` の HTTPS が動く根拠に
 ならない。** 通る経路が違う。
 
-## 原因は static リンク（2026-10-11 に切り分け完了）
+## 原因の切り分け（途中。静的リンクではなかった）
 
-**上流 1.38.0 の回帰ではない。静的リンクが BusyBox の内蔵 TLS を壊している。**
+> **2026-10-11 の初版で「原因は静的リンク」と書いたが、誤りだった。**
+> BusyBox を動的リンクにしてビルドし直しても同じように落ちた。
+> 以下は訂正後の切り分け結果。
 
-同じ BusyBox 1.38.0 を 3 通りで比較した（すべて arm64 ネイティブ、
-`wget -O/dev/null https://example.com`）:
+### 1. 版とリンク方法を Alpine と比べた
 
-| ビルド | ELF type | 結果 |
+すべて arm64 ネイティブ、`wget -O/dev/null https://example.com`:
+
+| ビルド | ELF | 結果 |
 | --- | --- | --- |
-| **Alpine edge の動的リンク** 1.38.0 | 3（DYN、動的）| **rc=0。正常に完走** |
-| **Alpine edge の `busybox-static`** 1.38.0 | 3（static-pie）| **rc=1。** TLS の note 直後に失敗し、データは届かない |
-| **Kimigayo v3.0.1** 1.38.0 | 3（static-pie）| **rc=139（SIGSEGV）。** データは届いたあとに落ちる |
+| Alpine edge の動的リンク 1.38.0 | 動的 | **rc=0（正常）** |
+| Alpine edge の `busybox-static` 1.38.0 | static-pie | rc=1（TLS の note 直後に失敗）|
+| Kimigayo v3.0.1 | static-pie | **rc=139（SIGSEGV）** |
+| **Kimigayo を動的リンクにしたもの**（実験ブランチ）| **動的** | **rc=139（SIGSEGV）** |
 
-```console
-# Alpine の動的リンク — 通る
-/ # busybox wget -O/dev/null https://example.com
-'/dev/null' saved          → rc=0
+**動的にしても落ちる。** 当初は上 3 行だけを見て「動的なら通る＝
+静的リンクが原因」と結論したが、Kimigayo 側の動的版を作って
+確かめていなかった。Alpine の `busybox-static` が rc=1 で失敗するのは
+別の問題（静的リンクで何かが壊れる）で、**Kimigayo の SIGSEGV とは
+症状も原因も違う。**
 
-# Alpine の static-pie — 通らない（きれいに失敗）
-/ # busybox.static wget -O/dev/null https://example.com
-Connecting to example.com (172.66.147.243:443)
-wget: note: TLS certificate validation not implemented
-                           → rc=1
+### 2. BusyBox と musl を Alpine と入れ替えた
 
-# Kimigayo の static-pie — 通らない（落ちる）
-/ # wget -O/dev/null https://example.com
-'/dev/null' saved
-Segmentation fault         → rc=139
-```
-
-**結論:**
-
-- **動的リンクなら動く。静的リンクだと 2 つの独立したビルドで両方とも
-  失敗する。** したがって Kimigayo 固有の設定ミスではなく、
-  **BusyBox 1.38.0 の内蔵 TLS と静的リンクの組み合わせの問題。**
-- Kimigayo の方が先に進む（データを取得してから落ちる）のは、
-  フラグや musl の版の違いによる症状の差。**根は同じ。**
-- **以前ここに「版 1.37.0 vs 1.38.0」と「動的 vs static-pie」の
-  どちらが原因か未確定と書いていたが、決着した**（Alpine edge が
-  1.38.0 の動的と静的の両方を提供しているので比較できた）。
-
-## どう扱うか
-
-**static-pie は意図した設計。** README が「BusyBox は static-pie」と
-書いているとおり、第三者の共有ライブラリを持たないことが
-この OS の売りの一部で、**動的リンクへの変更は設計判断になる。**
-
-| 選択肢 | 影響 |
+| 組み合わせ | 結果 |
 | --- | --- |
-| **現状を受け入れて明記する**（採用中）| `wget` の HTTPS は使えない。HTTP は正常。HTTPS が必要なら `curl` を持ち込む |
-| BusyBox を動的リンクにする | **設計変更。** イメージに共有ライブラリが増え、「第三者の共有ライブラリ無し」が崩れる。**ユーザーの承認が必要** |
-| 上流に報告する | 静的リンク時の TLS の不具合として報告する価値がある。Alpine の `busybox-static` でも再現するので、こちらの環境依存ではないと示せる |
+| **Kimigayo の BusyBox** × Alpine の musl | **rc=139（落ちる）** |
+| Alpine の BusyBox × **Kimigayo の musl** | rc=1（`Address not available`。落ちない）|
 
-**次にやること:** 上流（`busybox.net` の bug tracker / メーリングリスト）に
-既知の報告があるか確認し、無ければ報告する。
-**報告には Alpine の `busybox-static` での再現を添える**
-（第三者の環境で再現することが伝わる）。
+**SIGSEGV は Kimigayo の BusyBox バイナリについてくる。musl ではない。**
+（2 行目の `Address not available` は別件。名前解決で得た IPv6 アドレスに
+つなぎに行っている疑い。Kimigayo の BusyBox ではこのエラーは出ない）
 
-```bash
-# 報告用の最小再現（Kimigayo 不要）
-docker run --rm alpine:edge sh -c \
-  'apk add --no-cache busybox-static >/dev/null &&
-   busybox.static wget -O/dev/null https://example.com; echo rc=$?'
-# => rc=1
-docker run --rm alpine:edge sh -c \
-  'busybox wget -O/dev/null https://example.com; echo rc=$?'
-# => rc=0
-```
+### 3. 残っている容疑
+
+Alpine の BusyBox と Kimigayo の BusyBox の違い:
+
+| 違い | Alpine | Kimigayo |
+| --- | --- | --- |
+| コンパイラ（arm64）| gcc | **clang（LLVM でクロスビルド）** |
+| config | Alpine のもの | `src/busybox/config/*.config` |
+| パッチ | Alpine のもの | `0001-vi-musl-libc-compatibility.patch`（vi のみ）|
+| フラグ | Alpine の既定 | `-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE` |
+
+**gdb の下では落ちずに止まった**（ptrace で挙動が変わる）。
+タイミング依存の可能性がある。
+
+**次にやる実験**（1 つずつ潰す）:
+
+1. **x86_64 をネイティブで試す。** x86_64 は gcc でビルドしている。
+   手元（Apple Silicon）では QEMU なので `Connection reset by peer`
+   （rc=1）になり判断できない。GitHub Actions の `ubuntu-latest` で
+   `docker run` すればネイティブで確かめられる。
+   **x86_64 で通れば clang が容疑者、落ちれば config が容疑者。**
+2. **Alpine の config で Kimigayo の BusyBox をビルドする。**
+   config とコンパイラを分離できる。
+3. ストリップ前のバイナリ（`busybox_unstripped`）で gdb を使い、
+   落ちる関数を特定する。
+
+### どう扱うか（現時点）
+
+**原因が分かるまで、利用者には「`wget` の HTTPS は使えない、
+`curl` を持ち込む」と案内する。** 動的リンク化は原因ではなかったので、
+これを理由に BusyBox のリンク方法を変える根拠にはならない。
 
 ## 回避策（利用者向け）
 

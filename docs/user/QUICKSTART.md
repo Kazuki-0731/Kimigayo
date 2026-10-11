@@ -156,14 +156,13 @@ wget -O- http://example.com
 > Standard と Extended の両方で再現します。
 > **HTTP（`http://`）は正常です。**
 >
-> **原因は静的リンクです。** BusyBox 1.38.0 の内蔵 TLS は
-> 静的リンクすると動かず、Alpine の `busybox-static` でも同じように
-> 失敗します（動的リンク版は正常）。Kimigayo は設計として
-> BusyBox を static-pie でビルドしているため、この影響を受けます。
+> **原因は調査中です。** クラッシュは Kimigayo の BusyBox バイナリ自体に
+> 起因し、musl やリンク方法（静的・動的）ではないところまで
+> 切り分けています。
 >
 > **HTTPS の取得が必要な場合は、ビルド時に `curl` を持ち込んでください**
 > （→[ソフトウェアの追加](#ソフトウェアの追加)）。
-> 切り分けの詳細と上流への報告用の最小再現は
+> 切り分けの経過は
 > [docs/troubleshooting/busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)。
 
 ## ソフトウェアの追加
