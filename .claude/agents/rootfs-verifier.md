@@ -106,7 +106,7 @@ cat "$ROOTFS/.kimigayo-build-info"
 ### 8. セキュリティの回帰（イメージがあるとき）
 
 **まず `scripts/verify-image.sh <image> <variant> <arch>` を回します。**
-次の3つはそこに入っており、手で再現しなくてよい:
+次の4つはそこに入っており、手で再現しなくてよい:
 
 - **全 ELF の強化**（PIE / RELRO / BIND_NOW / 非実行スタック）。
   BusyBox だけでなく OpenRC・librc・libeinfo・libc.so も見る
@@ -115,10 +115,13 @@ cat "$ROOTFS/.kimigayo-build-info"
   （BusyBox 1.38.0 のつもりで 1.36.1 が残った前例）
 - **cpio のパストラバーサル**。`../` を含むアーカイブが展開先の外に
   書き出さないこと（v3.0.1 の公開イメージは外に書き出す＝修正前）
+- **ash の関数の無限再帰**（CVE-2026-38755）。`f(){ f; }; f` がエラーで
+  止まること（v3.0.1 は Segmentation fault で落ちる＝パッチ前）
 
 秘密情報と CVE は `scripts/scan-image.sh`（`make scan-image`）。
 CVE が出ても**不合格とは書かず**、件数と ID を「要確認」として報告する
-（影響の判断は `security-review` skill の担当）。
+（影響の判断は `security-review` skill の担当。CI と release は CVE が
+出た時点でジョブを落とすので、ここでは原因の特定に絞る）。
 
 ## 報告のしかた
 

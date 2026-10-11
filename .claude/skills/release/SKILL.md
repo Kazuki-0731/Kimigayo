@@ -234,8 +234,9 @@ cosign verify "ishinokazuki/kimigayo-os:<X.Y.Z>" \
 gh release view v<X.Y.Z> --json tagName,isDraft,assets
 ```
 
-tarball 6本（3バリアント × 2アーキ）と `SHA256SUMS` / `SHA512SUMS` の
-**計8ファイル**が付いていること。draft のままになっていないこと。
+tarball 6本（3バリアント × 2アーキ）と `SHA256SUMS` / `SHA512SUMS`、
+SBOM（`kimigayo-<variant>-<ver>-<arch>.cdx.json`）6本の**計14ファイル**が
+付いていること（v3.0.1 までは SBOM が無く 8 ファイル）。draft のままになっていないこと。
 
 ---
 

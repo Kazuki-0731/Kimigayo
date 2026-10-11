@@ -57,7 +57,8 @@ SCANS=vuln bash scripts/scan-image.sh <image> <variant> <arch>
 
 | どこで走るか | 何を見るか |
 | --- | --- |
-| `build-workflow.yml`（毎 push） | 秘密情報だけ（`SCANS=secret`） |
+| `build-workflow.yml`（毎 push） | CVE + 秘密情報。SBOM を成果物に残す |
+| `release.yml`（Docker Hub への push 前） | CVE + 秘密情報。SBOM を GitHub Release に添付 |
 | `dependency-review.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。失敗すると Issue が立つ |
 
 **照合が効いていることは古い版で確かめてあります**（BusyBox 1.36.1 /
