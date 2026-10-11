@@ -95,15 +95,14 @@ strategy:
 イメージを作ったあと、verify-image ジョブで次の2つを実行します
 （どちらも失敗すればジョブが落ちます）:
 
-1. `scripts/verify-image.sh` — イメージを起動しての検証（31 項目）
-2. `SCANS=secret bash scripts/scan-image.sh` — 出荷物の秘密情報スキャン
-   （Trivy の secret スキャナで rootfs を見る）
+1. `scripts/verify-image.sh` — イメージを起動しての検証（32 項目）
+2. `bash scripts/scan-image.sh` — 出荷物の秘密情報スキャン（Trivy の
+   secret スキャナで rootfs を見る）と CVE 照合（出荷物の版から SBOM を作り
+   Grype で照合する）。SBOM は `sbom-<variant>-<arch>` の成果物として残ります
 
-> **CVE 照合（`SCANS=vuln`）はここではまだ走らせていません。**
-> パッチの無い BusyBox の CVE が 2 件（CVE-2026-38753 / 38755）残っており、
-> 入れるとどの push も落ちるためです。公開イメージに対する CVE 照合は
-> [7. Dependency Review](#7-dependency-review-githubworkflowsdependency-reviewyml)
-> が毎週行います。
+> **NVD に新しい CVE が載ると、コードを変えていない push でも落ちます。**
+> 出荷物に未対応の CVE があるという信号なので、握り潰さずに
+> パッチを当てるか版を上げます（`security-review` skill）。
 
 ### 4. Manual Build (`.github/workflows/manual-build.yml`)
 
@@ -300,7 +299,7 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
       "${{ matrix.arch }}"
 ```
 
-**検証の実体は `scripts/verify-image.sh`**（31 項目）で、`ci.yml` と
+**検証の実体は `scripts/verify-image.sh`**（32 項目）で、`ci.yml` と
 ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
@@ -308,8 +307,8 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
 > **`release.yml` に Trivy も pytest も統合テストもありません。**
 > Trivy のイメージスキャンは、パッケージデータベースが無く
 > 何も識別できないため 2026-10-09 に外しました。
-> `release.yml` でも push の前に `SCANS=secret` で
-> `scripts/scan-image.sh` を走らせます（CVE 照合はまだ走らせない）。
+> `release.yml` でも push の前に `scripts/scan-image.sh` で秘密情報と
+> CVE を照合し、作った SBOM を GitHub Release に添付します。
 > pytest は `ci.yml` 側で回ります。
 > 以前は検証に `continue-on-error` が付いており、
 > tarball が小さくても `exit 0` でスキップしていました。
@@ -502,7 +501,8 @@ Trivy は**リポジトリ**に対してだけ使います（`ci.yml`・`securit
 
 | どこで | 何を | 失敗したら |
 | --- | --- | --- |
-| `build-workflow.yml`（ビルドごと） | `SCANS=secret`（秘密情報のみ） | ジョブが落ちる |
+| `build-workflow.yml`（ビルドごと） | CVE 照合 + 秘密情報 | ジョブが落ちる |
+| `release.yml`（Docker Hub への push 前） | CVE 照合 + 秘密情報。SBOM を Release に添付 | push しない |
 | `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | Issue を起票 |
 
 ## リリースプロセス
@@ -542,7 +542,7 @@ git push origin v3.0.2
 1. 版の解決（`scripts/get-version.sh`）
 2. ShellCheck
 3. 全バリアント・全アーキテクチャをビルド（6 ジョブ）
-4. **イメージを起動して検証**（`scripts/verify-image.sh`、31 項目）
+4. **イメージを起動して検証**（`scripts/verify-image.sh`、32 項目）
 5. 検証を通ったものだけ Docker Hub にプッシュ
 6. マルチアーキテクチャマニフェスト作成
 7. **Cosign のキーレス署名**（v3.0.2 から）

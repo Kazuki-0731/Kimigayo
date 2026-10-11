@@ -15,7 +15,8 @@
 >   `scripts/build-image.sh` は中身が
 >   `"signature": "placeholder_signature_phase5_..."` という偽物で、
 >   2026-10-11 に削除しました。GitHub Release に付くのは tarball 6本と
->   `SHA256SUMS` / `SHA512SUMS` の計8ファイルです
+>   `SHA256SUMS` / `SHA512SUMS`、SBOM（`*.cdx.json`）6本の計14ファイルです
+>   （SBOM は v3.0.2 から）
 > - **この文書が `latest-amd64` / `latest-arm64` を引けと案内していた
 >   のに、`release.yml` はそのタグを作っていませんでした**（2026-10-10 に
 >   `release.yml` 側を直して作るようにした）。

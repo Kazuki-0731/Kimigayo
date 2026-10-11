@@ -213,8 +213,9 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 #### 2. リリース時（`release.yml`）
 
-ShellCheck と `scripts/verify-image.sh`（31 項目）、push 前に
-`SCANS=secret` の `scripts/scan-image.sh`（秘密情報）。
+ShellCheck と `scripts/verify-image.sh`（32 項目）、push 前に
+`scripts/scan-image.sh`（CVE 照合 + 秘密情報）。作った SBOM（CycloneDX）は
+GitHub Release に添付します。
 **Trivy のイメージスキャンは 2026-10-09 に外しました**（下記の理由）。
 
 `verify-image.sh` のうちセキュリティに関わる検査:
@@ -225,15 +226,16 @@ ShellCheck と `scripts/verify-image.sh`（31 項目）、push 前に
   `versions.mk` の突合（`scripts/lib/image-components.sh`）
 - cpio のパストラバーサルの回帰テスト（v3.0.1 の公開イメージは
   `ESCAPED` で落ちる。現在の `main` は `CONTAINED`）
+- ash の関数の無限再帰がエラーで止まるか（CVE-2026-38755 の回帰。
+  v3.0.1 は Segmentation fault で落ちる）
 - setuid/setgid・`/etc/shadow` の権限・パッケージマネージャーの不在 など
 
 #### 2b. ビルドごと（`build-workflow.yml`）
 
 `ci.yml`・`manual-build.yml` が呼ぶビルド本体で、`verify-image.sh` の
-あとに `SCANS=secret` で `scripts/scan-image.sh` を実行します
-（rootfs の秘密情報。見つかればジョブが落ちる）。
-**CVE 照合はここでは走らせていません。** 公開中の版に既知の CVE があり、
-扱いが決まるまでどの push も落ちるためです。
+あとに `scripts/scan-image.sh` を実行します
+（CVE 照合と rootfs の秘密情報。見つかればジョブが落ちる）。
+NVD に新しい CVE が載ると、コードを変えていない push でも落ちます。
 
 #### 3. 定期監査（`security.yml`）
 - **頻度**: **毎日 02:00 UTC**
@@ -264,21 +266,22 @@ ShellCheck と `scripts/verify-image.sh`（31 項目）、push 前に
 #### 検出された CVE と対応（2026-10-11）
 
 v3.0.1 の公開イメージで `scan-image.sh` が 5 件を検出しました。
-3 件は `main` でパッチを当てています（次のリリースから効く）。
+5 件すべてに `main` でパッチを当てています（次のリリースから効く）。
 
 | 構成要素 | CVE | 内容 | 対応 |
 | --- | --- | --- | --- |
 | BusyBox 1.38.0 | CVE-2026-38754 | ash の `ifsbreakup` の範囲外アクセス | **パッチ済み**（`src/busybox/patches/0002-...`、Alpine aports と同じもの） |
 | musl 1.2.6 | CVE-2026-40200 | `qsort` のスタック破壊（64bit では非現実的） | **パッチ済み**（`src/libc/patches/0001-...`） |
 | musl 1.2.6 | CVE-2026-6042 | `iconv` の GB18030 による CPU DoS | **パッチ済み**（`src/libc/patches/0002-...`） |
-| BusyBox 1.38.0 | CVE-2026-38753 | awk の use-after-free | 未対応。修正は ML に投稿されているが、Alpine aports にもリリースにも入っていない |
-| BusyBox 1.38.0 | CVE-2026-38755 | ash の関数の無限再帰によるスタック枯渇 | 同上 |
+| BusyBox 1.38.0 | CVE-2026-38753 | awk の use-after-free | **パッチ済み**（`src/busybox/patches/0003-...`）。Alpine にも無いため BusyBox の ML の修正を読んで取り込んだ |
+| BusyBox 1.38.0 | CVE-2026-38755 | ash の関数の無限再帰によるスタック枯渇 | **パッチ済み**（`src/busybox/patches/0004-...`、同上）。深さ 1000 で打ち切る |
 
 パッチ済みの CVE はイメージの `/.kimigayo-build-info` の `PATCHED_CVES` に
 記録され、`scan-image.sh` はそれを照合結果から除外します（除外したものは
 ログに出します）。**パッチ前に出した v3.0.1 の公開イメージには記録が無いので、
 5 件とも検出されます。** このため `published-image-scan` は次のリリースまで
-失敗し、その後も未対応の 2 件で失敗します。
+失敗します。**CI（毎 push）とリリース（push 前）でも CVE を照合する**ので、
+未対応の CVE があるイメージは公開されません。
 
 #### 5. 上流更新の検知（`base-image-update.yml`）
 毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。

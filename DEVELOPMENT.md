@@ -262,12 +262,10 @@ make trivy-scan          # Kimigayo は識別されない（下記）
 | `SBOM_OUT` | `build/sbom/kimigayo-<variant>-<arch>.cdx.json` | SBOM の出力先 |
 | `FAIL_ON` | `low` | この深刻度以上の CVE で失敗する（Grype の `--fail-on`） |
 
-> **いまの構成要素では CVE 照合が失敗する。**
-> 2026-10-11 に v3.0.1 で 5 件を検出し、うち 3 件（CVE-2026-38754 /
-> CVE-2026-40200 / CVE-2026-6042）は `main` でパッチを当てた。
+> **v3.0.1 の公開イメージでは CVE 照合が失敗する。**
+> 2026-10-11 に 5 件を検出し、`main` で 5 件ともパッチを当てた。
 > パッチ済みの CVE は照合結果から除外される（`/.kimigayo-build-info` の
-> `PATCHED_CVES`）。BusyBox の CVE-2026-38753 / 38755 は修正がリリースに
-> 無く未対応（→ [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md)）。
+> `PATCHED_CVES`）。→ [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md)
 
 > **`make trivy-scan`（イメージスキャン）は実質何も検査していない。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
@@ -281,9 +279,8 @@ make trivy-scan          # Kimigayo は識別されない（下記）
 CI 側では次のように回る:
 
 - **ビルドごと** — `build-workflow.yml` の verify-image ジョブが
-  `SCANS=secret` で `scan-image.sh` を実行する（失敗すればジョブも落ちる）。
-  **CVE 照合は push ごとにはまだ走らせていない**（公開中の版に既知 CVE があり、
-  扱いが決まるまでどの push も落ちるため）
+  `scan-image.sh` で CVE と秘密情報を見る（失敗すればジョブも落ちる）。
+  `release.yml` も Docker Hub への push 前に同じものを走らせる
 - **毎週月曜 04:00 UTC と手動** — `dependency-review.yml` の
   `published-image-scan` ジョブが Docker Hub の `latest` を pull し、
   `scan-image.sh`（CVE + 秘密情報）を回す。失敗すれば

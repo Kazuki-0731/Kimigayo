@@ -10,13 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **既知の CVE 3 件にパッチを当てた**（いずれも上流のリリースにはまだ
-  入っていない修正。Alpine aports と sha512 で突合して取り込んだ）。
+- **v3.0.1 で検出した既知の CVE 5 件すべてにパッチを当てた**（いずれも
+  上流のリリースにはまだ入っていない修正）。
   - CVE-2026-38754: ash（`/bin/sh`）の `ifsbreakup` の範囲外アクセス
   - CVE-2026-40200: musl の `qsort` のスタック破壊（64bit では非現実的）
   - CVE-2026-6042: musl の `iconv`（GB18030）で CPU を食い潰す DoS
-- 未対応: BusyBox の CVE-2026-38753（awk）と CVE-2026-38755（ash の再帰）。
-  修正は BusyBox の ML に投稿済みだが、リリースにも Alpine にも入っていない。
+  - CVE-2026-38753: awk の `sub` / `gsub` の use-after-free
+  - CVE-2026-38755: ash の関数の無限再帰で `/bin/sh` が落ちる
+  上の 3 件は Alpine aports と sha512 で突合して取り込んだ。下の 2 件は
+  Alpine にも無いため、BusyBox の ML に投稿された修正を読んで取り込んだ。
+- **挙動の変更: ash の関数の再帰は深さ 1000 で打ち切られる。**
+  超えると `function recursion limit exceeded` でエラーになる
+  （以前は Segmentation fault で落ちていた）。
+- **出荷前に CVE を照合する。** CI とリリースの両方で、出荷物の版から
+  作った SBOM を Grype で照合し、未対応の CVE があれば止める。
+  **SBOM（CycloneDX）を GitHub Release に添付する。**
 - **ビルド後の検査を追加した。** イメージ内の全 ELF の PIE / RELRO /
   BIND_NOW / 非実行スタック、出荷物の版と `versions.mk` の突合、cpio の
   パストラバーサルの回帰テスト（`scripts/verify-image.sh`）。
