@@ -602,7 +602,7 @@ cat /var/log/cis-benchmark-report.txt
 
 > **`make scan-image` の CVE 照合は、v3.0.1 の公開イメージで 5 件を検出している**
 > （BusyBox 1.38.0 に 3 件・musl 1.2.6 に 2 件、2026-10-11）。
-> 対応は未決。一覧は [SECURITY_AUDIT.md](SECURITY_AUDIT.md#検出済みで未対応の-cve2026-10-11v301-の公開イメージ) にある。
+> うち 3 件は `main` でパッチ済み。一覧と対応は [SECURITY_AUDIT.md](SECURITY_AUDIT.md#検出された-cve-と対応2026-10-11) にある。
 
 ### BusyBox の cpio はディレクトリを脱出できた（v3.0.1 まで。修正済み）
 

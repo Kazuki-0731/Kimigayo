@@ -261,21 +261,24 @@ ShellCheck と `scripts/verify-image.sh`（31 項目）、push 前に
 > CVE データベースを照会せず、`versions.mk` の版を表示するだけでした
 > （2026-10-11 に置き換え）。
 
-#### 検出済みで未対応の CVE（2026-10-11、v3.0.1 の公開イメージ）
+#### 検出された CVE と対応（2026-10-11）
 
-`scan-image.sh` による照合で次の 5 件が検出されています。
-**対応（パッチを当てるか等）は未決です。**
+v3.0.1 の公開イメージで `scan-image.sh` が 5 件を検出しました。
+3 件は `main` でパッチを当てています（次のリリースから効く）。
 
-| 構成要素 | CVE | 内容 | 補足 |
+| 構成要素 | CVE | 内容 | 対応 |
 | --- | --- | --- | --- |
-| BusyBox 1.38.0 | CVE-2026-38753 | awk の use-after-free | |
-| BusyBox 1.38.0 | CVE-2026-38754 | ash の `ifsbreakup` のヒープオーバーフロー | Alpine aports は `0040-ash-fix-out-of-bounds-read-in-ifsbreakup.patch` を持つ |
-| BusyBox 1.38.0 | CVE-2026-38755 | ash の `evalcommand` | |
-| musl 1.2.6 | CVE-2026-40200 | `qsort` | 64bit では非現実的。Alpine aports はパッチ済み（pkgrel=5） |
-| musl 1.2.6 | CVE-2026-6042 | `iconv` の GB18030 による DoS | Alpine aports はパッチ済み（pkgrel=5） |
+| BusyBox 1.38.0 | CVE-2026-38754 | ash の `ifsbreakup` の範囲外アクセス | **パッチ済み**（`src/busybox/patches/0002-...`、Alpine aports と同じもの） |
+| musl 1.2.6 | CVE-2026-40200 | `qsort` のスタック破壊（64bit では非現実的） | **パッチ済み**（`src/libc/patches/0001-...`） |
+| musl 1.2.6 | CVE-2026-6042 | `iconv` の GB18030 による CPU DoS | **パッチ済み**（`src/libc/patches/0002-...`） |
+| BusyBox 1.38.0 | CVE-2026-38753 | awk の use-after-free | 未対応。修正は ML に投稿されているが、Alpine aports にもリリースにも入っていない |
+| BusyBox 1.38.0 | CVE-2026-38755 | ash の関数の無限再帰によるスタック枯渇 | 同上 |
 
-このため `make scan-image`（CVE 照合を含む）と `published-image-scan` は
-現時点で失敗します。
+パッチ済みの CVE はイメージの `/.kimigayo-build-info` の `PATCHED_CVES` に
+記録され、`scan-image.sh` はそれを照合結果から除外します（除外したものは
+ログに出します）。**パッチ前に出した v3.0.1 の公開イメージには記録が無いので、
+5 件とも検出されます。** このため `published-image-scan` は次のリリースまで
+失敗し、その後も未対応の 2 件で失敗します。
 
 #### 5. 上流更新の検知（`base-image-update.yml`）
 毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。

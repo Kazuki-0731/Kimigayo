@@ -262,10 +262,12 @@ make trivy-scan          # Kimigayo は識別されない（下記）
 | `SBOM_OUT` | `build/sbom/kimigayo-<variant>-<arch>.cdx.json` | SBOM の出力先 |
 | `FAIL_ON` | `low` | この深刻度以上の CVE で失敗する（Grype の `--fail-on`） |
 
-> **v3.0.1 と同じ版の構成要素では CVE 照合が失敗する。**
-> 2026-10-11 の照合で、BusyBox 1.38.0 に 3 件（CVE-2026-38753 /
-> 38754 / 38755）、musl 1.2.6 に 2 件（CVE-2026-40200 / CVE-2026-6042）が
-> 検出されている。**対応は未決**（→ [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md)）。
+> **いまの構成要素では CVE 照合が失敗する。**
+> 2026-10-11 に v3.0.1 で 5 件を検出し、うち 3 件（CVE-2026-38754 /
+> CVE-2026-40200 / CVE-2026-6042）は `main` でパッチを当てた。
+> パッチ済みの CVE は照合結果から除外される（`/.kimigayo-build-info` の
+> `PATCHED_CVES`）。BusyBox の CVE-2026-38753 / 38755 は修正がリリースに
+> 無く未対応（→ [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md)）。
 
 > **`make trivy-scan`（イメージスキャン）は実質何も検査していない。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを

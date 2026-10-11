@@ -252,7 +252,8 @@ jobs:
             "${{ matrix.arch }}"
 
       # 公開するイメージそのものに鍵やトークンが紛れていないか。
-      # build-workflow.yml と同じく SCANS=secret だけ（CVE 照合の扱いは未決）。
+      # build-workflow.yml と同じく SCANS=secret だけ。CVE 照合は、パッチの
+      # 無い BusyBox の CVE が残っていて必ず落ちるので、まだ入れていない。
       # Docker Hub に出たものは取り消せないので、push の前に止める。
       - name: Scan image for secrets
         run: |

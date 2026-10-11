@@ -100,8 +100,8 @@ strategy:
    （Trivy の secret スキャナで rootfs を見る）
 
 > **CVE 照合（`SCANS=vuln`）はここではまだ走らせていません。**
-> 公開中の版に既知の CVE が 5 件あり、扱いが決まるまでどの push も
-> 落ちるためです。公開イメージに対する CVE 照合は
+> パッチの無い BusyBox の CVE が 2 件（CVE-2026-38753 / 38755）残っており、
+> 入れるとどの push も落ちるためです。公開イメージに対する CVE 照合は
 > [7. Dependency Review](#7-dependency-review-githubworkflowsdependency-reviewyml)
 > が毎週行います。
 
@@ -168,8 +168,8 @@ PR を作成します。**この PR は「上流が動いた」という一次�
 > 表示するだけでした（2026-10-11 に `published-image-scan` に置き換え）。
 
 > **2026-10-11 時点の公開イメージ（v3.0.1）では、このジョブは失敗します。**
-> BusyBox 1.38.0 に 3 件、musl 1.2.6 に 2 件の既知 CVE が検出されており、
-> 対応は未決です（→ [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)）。
+> 既知の CVE が 5 件検出されます。3 件は `main` でパッチ済みで次のリリースから
+> 除外されますが、パッチの無い 2 件は残ります（→ [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)）。
 
 ## ビルドプロセス
 
