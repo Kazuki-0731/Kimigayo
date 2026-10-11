@@ -190,7 +190,7 @@ make security-scan
 ## 既知の制限事項
 
 1. **カーネルの緩和策（Spectre/Meltdown など）・SELinux/AppArmor**: ホストの設定に依存します。イメージ側では設定できません
-2. **`wget` の HTTPS**: 取得後に Segmentation fault で落ちます（調査中）。
+2. **`wget` の HTTPS**: v3.0.1 以前は取得後に Segmentation fault で落ちます（v3.0.2 で修正）。
    → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 3. **TLS 証明書の検証**: BusyBox の `wget` は証明書を検証しません。
    信頼できない経路で HTTPS を使うなら `curl` などを持ち込んでください

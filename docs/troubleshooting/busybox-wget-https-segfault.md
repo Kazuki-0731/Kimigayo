@@ -1,4 +1,4 @@
-# `wget` の HTTPS が Segmentation fault で落ちる（v3.0.1）
+# `wget` の HTTPS が Segmentation fault で落ちる（v3.0.1、解決済み）
 
 **症状**: `wget https://...` が**本文のダウンロードには成功したあと**、
 Segmentation fault（終了コード 139）で落ちる。HTTP は正常。
@@ -16,152 +16,99 @@ Segmentation fault
 ```
 
 **発見**: 2026-10-11（v3.0.1 公開後のドキュメント監査中）。
-**状態**: **未修正・原因調査中。** クラッシュは Kimigayo の BusyBox バイナリに
-ついてくる（musl でもリンク方法でもない）。容疑は config か clang。
+**状態**: **原因を特定し、`main` で修正済み（2026-10-12）。v3.0.2 から直る。**
+v3.0.1 以前の公開イメージでは再現する。
 
 ---
 
-## 分かっていること（すべて実測）
+## 原因
 
-| 条件 | 結果 |
-| --- | --- |
-| `wget https://example.com`（arm64 ネイティブ）| **rc=139（SIGSEGV）** |
-| `wget https://cloudflare.com` | rc=139（ホストに依らない）|
-| `wget http://example.com` | **rc=0（HTTP は正常）** |
-| `wget -O/tmp/out https://example.com` | rc=139 だが **577 バイトが正しく保存されている** |
-| Standard / Extended | **両方で再現** |
-| x86_64（Apple Silicon 上の QEMU）| `error getting response: Connection reset by peer`（rc=1）|
-| `ssl_client` を単体でパイプして使う | **rc=0（落ちない）** |
-| Alpine 3.24 の BusyBox で同じ取得 | **rc=0（落ちない）** |
+**BusyBox の `CONFIG_FEATURE_WGET_OPENSSL`（既定 `y`）と、musl の `exit()` の
+組み合わせ。** config に書いていなかったので既定の `y` が入っていた。
 
-**データは壊れていない。** 本文は正しく取得・保存されており、
-落ちるのは取得後の後片付け。**可用性の問題であって、取得内容の
-完全性や機密性の問題ではない。** ただし終了コードが 139 になるので、
-**シェルスクリプトで `wget` の成功判定に使えない。**
+1. `FEATURE_WGET_OPENSSL` が有効だと、wget は HTTPS のたびにまず
+   `openssl s_client` を **`xvfork()`** で起動しようとする
+   （`networking/wget.c` の `spawn_https_helper_openssl()`）
+2. イメージに `openssl` は無いので exec に失敗し、子は
+   `xfunc_die()` → **`exit()`** を呼ぶ（`_exit()` ではない）。
+   wget は `child_failed` を見て内蔵 TLS に切り替え、取得は成功する
+3. musl の `exit()` は、同じスレッドからの二重呼び出しを検出するため、
+   ロックに**自分のスレッド ID** を書く。**vfork の子は親とメモリを
+   共有している**ので、このロックが親のスレッド ID のまま残る
+4. 取得が終わって親が `exit()` すると、ロックが自分の ID なので
+   「二重呼び出し」と判定され、`a_crash()`（アドレス 0 への書き込み）で落ちる
 
-**落ちるのは親プロセス。** バックグラウンドで走らせて `wait` すると
-139 が返り、ジョブ制御の通知も同じジョブに対して出る。
+**glibc にはこのロックが無い**ので、glibc 環境では表に出ない。
+Alpine の BusyBox が落ちないのは、Alpine は
+`0017-properly-fix-wget-https-support.patch` で経路を変えており、
+この経路を通らないため。
 
-## BusyBox の HTTPS の仕組み（1.38.0）
+### どう突き止めたか
 
-`networking/wget.c` の `spawn_ssl_client()`（L769）は、
-**`BB_MMU` が有効な環境では `ssl_client` を exec しない。**
-`fork` した子プロセスが**プロセス内で** TLS を処理する。
+- **gdb の下では落ちずに止まる。** vfork と ptrace の相性で挙動が変わるため、
+  gdb では追えなかった
+- 動的リンクにした BusyBox に、SIGSEGV のハンドラを持つ共有ライブラリを
+  `LD_PRELOAD` で差し込み、落ちた瞬間のレジスタを出した:
 
-```c
-pid = BB_MMU ? xfork() : xvfork();
-if (pid == 0) {
-    /* Child */
-    ...
-    if (BB_MMU) {
-        tls_state_t *tls = new_tls_state();
-        tls->ifd = tls->ofd = network_fd;
-        tls_handshake(tls, servername);
-        tls_run_copy_loop(tls, flags);
-        exit(0);
-    } else {
-        /* ここは no-MMU 環境だけ。ssl_client を exec する */
-    }
-}
-/* Parent */
+  ```
+  SEGV pid=16 addr=0
+  pc  /lib/ld-musl-aarch64.so.1  exit+0x78
+  lr  busybox_unstripped         0xf6d4   ← xfunc_die の `bl exit` の直後
+  ```
+
+  `addr=0` かつ `exit` の中なので、musl の `a_crash()` と分かる。
+  あとは `exit()` を二重に呼ぶ経路を探して、vfork の子に行き着いた
+
+## 修正
+
+`src/busybox/config/{standard,extended}.config` に明示した
+（minimal は `wget` を持たない）:
+
+```
+CONFIG_FEATURE_WGET_HTTPS=y
+# CONFIG_FEATURE_WGET_OPENSSL is not set
 ```
 
-**だから `ssl_client` 単体が動くことは、`wget` の HTTPS が動く根拠に
-ならない。** 通る経路が違う。
+HTTPS は内蔵の TLS（**fork** した子で処理する）だけを使う。
+arm64 ネイティブで、動的リンク・静的リンクとも
+`example.com` / `cloudflare.com` に 12/12 回 rc=0 を確認した。
 
-## 原因の切り分け（途中。静的リンクではなかった）
+**回帰は `scripts/verify-image.sh` が見る。** ネットワークに頼らず決められるよう、
+`/bin/busybox` に openssl を呼ぶ経路の文字列（`s_client`）が残っていないかを
+調べる（v3.0.1 では見つかり、修正後は無い）。
 
-> **2026-10-11 の初版で「原因は静的リンク」と書いたが、誤りだった。**
-> BusyBox を動的リンクにしてビルドし直しても同じように落ちた。
-> 以下は訂正後の切り分け結果。
+## 誤っていた切り分け（記録）
 
-### 1. 版とリンク方法を Alpine と比べた
+最初の調査では原因を2回取り違えた。同じ遠回りをしないために残す。
 
-すべて arm64 ネイティブ、`wget -O/dev/null https://example.com`:
-
-| ビルド | ELF | 結果 |
-| --- | --- | --- |
-| Alpine edge の動的リンク 1.38.0 | 動的 | **rc=0（正常）** |
-| Alpine edge の `busybox-static` 1.38.0 | static-pie | rc=1（TLS の note 直後に失敗）|
-| Kimigayo v3.0.1 | static-pie | **rc=139（SIGSEGV）** |
-| **Kimigayo を動的リンクにしたもの**（実験ブランチ）| **動的** | **rc=139（SIGSEGV）** |
-
-**動的にしても落ちる。** 当初は上 3 行だけを見て「動的なら通る＝
-静的リンクが原因」と結論したが、Kimigayo 側の動的版を作って
-確かめていなかった。Alpine の `busybox-static` が rc=1 で失敗するのは
-別の問題（静的リンクで何かが壊れる）で、**Kimigayo の SIGSEGV とは
-症状も原因も違う。**
-
-### 2. BusyBox と musl を Alpine と入れ替えた
-
-| 組み合わせ | 結果 |
+| 当時の仮説 | なぜ誤りだったか |
 | --- | --- |
-| **Kimigayo の BusyBox** × Alpine の musl | **rc=139（落ちる）** |
-| Alpine の BusyBox × **Kimigayo の musl** | rc=1（`Address not available`。落ちない）|
+| 静的リンクが原因 | 動的リンクにしても落ちた。Alpine の動的版と比べただけで、Kimigayo の動的版を作って確かめていなかった |
+| arm64 の clang が原因 | GitHub Actions のネイティブ x86_64（gcc でビルド）でも落ちた。手元の x86_64 は QEMU で `Connection reset by peer` になり判断できていなかった |
+| `FEATURE_WGET_OPENSSL` を切っても落ちる | **試験が無効だった。** config に行が無い項目を `sed` で書き換えようとして何も変わらず、`oldconfig` が既定値 `y` を入れ直していた |
 
-**SIGSEGV は Kimigayo の BusyBox バイナリについてくる。musl ではない。**
-（2 行目の `Address not available` は別件。名前解決で得た IPv6 アドレスに
-つなぎに行っている疑い。Kimigayo の BusyBox ではこのエラーは出ない）
+**BusyBox の config は「書かないと既定値が入る」。** `DPKG`・`RPM`
+（v3.0.0 までパッケージマネージャーが入っていた）、
+`FEATURE_PATH_TRAVERSAL_PROTECTION`（cpio が展開先を脱出できた）に続いて
+3 件目。項目を切り替えて試すときは、**`oldconfig` のあとの `.config` を
+grep して、本当に切り替わったかを確かめる。**
 
-### 3. 残っている容疑
-
-Alpine の BusyBox と Kimigayo の BusyBox の違い:
-
-| 違い | Alpine | Kimigayo |
-| --- | --- | --- |
-| コンパイラ（arm64）| gcc | **clang（LLVM でクロスビルド）** |
-| config | Alpine のもの | `src/busybox/config/*.config` |
-| パッチ | Alpine のもの | `0001-vi-musl-libc-compatibility.patch`（vi のみ）|
-| フラグ | Alpine の既定 | `-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE` |
-
-**gdb の下では落ちずに止まった**（ptrace で挙動が変わる）。
-タイミング依存の可能性がある。
-
-**次にやる実験**（1 つずつ潰す）:
-
-1. **x86_64 をネイティブで試す。** x86_64 は gcc でビルドしている。
-   手元（Apple Silicon）では QEMU なので `Connection reset by peer`
-   （rc=1）になり判断できない。GitHub Actions の `ubuntu-latest` で
-   `docker run` すればネイティブで確かめられる。
-   **x86_64 で通れば clang が容疑者、落ちれば config が容疑者。**
-2. **Alpine の config で Kimigayo の BusyBox をビルドする。**
-   config とコンパイラを分離できる。
-3. ストリップ前のバイナリ（`busybox_unstripped`）で gdb を使い、
-   落ちる関数を特定する。
-
-### どう扱うか（現時点）
-
-**原因が分かるまで、利用者には「`wget` の HTTPS は使えない、
-`curl` を持ち込む」と案内する。** 動的リンク化は原因ではなかったので、
-これを理由に BusyBox のリンク方法を変える根拠にはならない。
-
-## 回避策（利用者向け）
+## v3.0.1 以前を使っている場合の回避策
 
 - **HTTP で済むなら HTTP を使う**（rc=0 で正常）
-- **HTTPS が必要なら `curl` をビルド時に持ち込む。**
-  `curl` はどのバリアントにも入っていない。
+- 取得そのものは成功している（データは壊れていない）。終了コードが
+  139 になるので、**シェルスクリプトで成功判定に使えない**
+- **`curl` をビルド時に持ち込む**（どのバリアントにも入っていない）。
   手順は [examples/](../../examples/) と
   [インストールガイド](../user/INSTALLATION.md#追加ソフトウェアのインストール)
 
-```dockerfile
-FROM alpine:3.24 AS builder
-RUN apk add --no-cache curl
-RUN mkdir -p /stage/usr/bin /stage/usr/lib \
-    && cp /usr/bin/curl /stage/usr/bin/ \
-    && ldd /usr/bin/curl \
-       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
-       | grep -v 'ld-musl' | sort -u \
-       | xargs -I{} cp -L {} /stage/usr/lib/
-
-FROM ishinokazuki/kimigayo-os:3.0.1
-COPY --from=builder /stage/ /
-```
+**証明書は検証しない。** BusyBox の wget は修正後も
+`TLS certificate validation not implemented` のまま（上流の仕様）。
+信頼できない経路で HTTPS を使うなら `curl` などを持ち込む。
 
 ## 関連
 
 - 公開文書への記載: [docs/user/QUICKSTART.md](../user/QUICKSTART.md) の
-  「基本コマンド > ネットワーク」に既知の問題として書いてある
+  「基本コマンド > ネットワーク」
 - `ssl_client` は `CONFIG_SSL_CLIENT`（既定 `y`、`select TLS`）で入る。
-  `src/busybox/config/*.config` に明示していないので**既定で入っている**
-  （BusyBox の config は「書かないと既定値が入る」。
-  → [CLAUDE.md](../../CLAUDE.md)）
+  内蔵 TLS の経路では使われない

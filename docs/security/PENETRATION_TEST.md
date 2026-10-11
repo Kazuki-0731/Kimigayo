@@ -48,8 +48,10 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
   `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION` が無効なため
   `../` を剥がしません（Alpine も同じ挙動）。`tar` と `unzip` は安全。
   → [HARDENING_GUIDE.md](HARDENING_GUIDE.md#busybox-の-cpio-はディレクトリを脱出できる)
-- **`wget` の HTTPS は v3.0.1 で落ちる**（arm64 で Segmentation fault）。
-  可用性の問題であり、情報漏洩の経路ではない。
+- **`wget` の HTTPS は v3.0.1 以前で、取得後に Segmentation fault で落ちる**
+  （x86_64 / arm64 とも。v3.0.2 で修正）。可用性の問題であり、情報漏洩の
+  経路ではない。**証明書は検証しない**（BusyBox の仕様。中間者攻撃に弱い）。
+  → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 - **root で動く。** `Dockerfile.runtime` は `USER` を指定していません
   （OS ベースイメージなので利用側が決める方針）。
   テストでは `--user` を付けた場合と付けない場合の両方を見てください。

@@ -150,20 +150,16 @@ wget -O- http://example.com
 通常の `docker run` では付きません）。疎通確認には `nslookup` を使うか、
 `--cap-add NET_RAW` を付けて起動してください。
 
-> **既知の問題: `wget` の HTTPS は使えません。**
-> arm64 では本文のダウンロード自体は成功するものの、直後に
-> Segmentation fault（終了コード 139）になります。
-> Standard と Extended の両方で再現します。
-> **HTTP（`http://`）は正常です。**
+> **既知の問題（v3.0.1 以前）: `wget` の HTTPS は、取得に成功したあと
+> Segmentation fault（終了コード 139）で落ちます。** HTTP は正常です。
+> 原因は BusyBox の config（`FEATURE_WGET_OPENSSL`）で、
+> **v3.0.2 で直ります**
+> （→[原因と修正](../troubleshooting/busybox-wget-https-segfault.md)）。
 >
-> **原因は調査中です。** クラッシュは Kimigayo の BusyBox バイナリ自体に
-> 起因し、musl やリンク方法（静的・動的）ではないところまで
-> 切り分けています。
->
-> **HTTPS の取得が必要な場合は、ビルド時に `curl` を持ち込んでください**
+> **`wget` は TLS 証明書を検証しません**（`TLS certificate validation
+> not implemented`。BusyBox の仕様で、v3.0.2 以降も同じ）。
+> 信頼できない経路で HTTPS を使うなら、ビルド時に `curl` を持ち込んでください
 > （→[ソフトウェアの追加](#ソフトウェアの追加)）。
-> 切り分けの経過は
-> [docs/troubleshooting/busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)。
 
 ## ソフトウェアの追加
 
