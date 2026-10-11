@@ -113,6 +113,25 @@ check_prerequisites() {
     log_info "Prerequisites check completed"
 }
 
+# Kconfig を回す（mrproper / olddefconfig）。失敗したらビルドを止める。
+#
+# 2026-10-12 まで `> /dev/null 2>&1 || true` で失敗を飲み込んでいた。
+# olddefconfig が落ちると、src/kernel/config/ の取捨選択や
+# 強化の項目が反映されないまま先へ進み、それでも「完了」と報告する。
+# 出力は普段は捨て、失敗したときだけ末尾を見せる。
+# arm64 は本体のビルドと同じく LLVM=1 で回す（Kconfig はコンパイラを
+# 試して項目を決めるので、本体と違うコンパイラで決めると食い違う）。
+run_kconfig() {
+    local log="${PROJECT_ROOT}/build/kernel-kconfig.log"
+    local llvm=()
+    [ "$ARCH" = "arm64" ] && llvm=(LLVM=1)
+    if ! make ARCH="$KERNEL_ARCH" "${llvm[@]}" "$@" > "$log" 2>&1; then
+        log_error "make $* failed (log: $log)"
+        tail -30 "$log"
+        exit 1
+    fi
+}
+
 # Generate kernel config
 generate_kernel_config() {
     log_build "Generating kernel configuration for $ARCH"
@@ -122,7 +141,7 @@ generate_kernel_config() {
     # Clean the source tree if it's dirty
     if [ -f .config ] || [ -d include/config ]; then
         log_info "Cleaning kernel source tree..."
-        make ARCH="$KERNEL_ARCH" mrproper > /dev/null 2>&1 || true
+        run_kconfig mrproper
         log_info "Source tree cleaned"
     fi
 
@@ -132,7 +151,7 @@ generate_kernel_config() {
         log_info "Using custom kernel config: $custom_config"
         cp "$custom_config" .config
         # Apply old config to update for current kernel version without prompts
-        make ARCH="$KERNEL_ARCH" olddefconfig > /dev/null 2>&1 || true
+        run_kconfig olddefconfig
     else
         log_info "Using default kernel config: $KERNEL_CONFIG"
         # For ARM64 with LLVM, use LLVM=1
@@ -225,11 +244,7 @@ apply_security_hardening() {
 
     # Update config without interactive prompts
     log_info "Finalizing kernel configuration..."
-    if [ "$ARCH" = "arm64" ]; then
-        make ARCH="$KERNEL_ARCH" LLVM=1 KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
-    else
-        make ARCH="$KERNEL_ARCH" KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
-    fi
+    run_kconfig KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig
     log_info "Kernel configuration finalized"
 }
 
@@ -438,8 +453,9 @@ install_kernel() {
     esac
 
     # Copy System.map and config
-    cp System.map "$KERNEL_OUTPUT_DIR/System.map-${KERNEL_VERSION}-${ARCH}" 2>/dev/null || true
-    cp .config "$KERNEL_OUTPUT_DIR/config-${KERNEL_VERSION}-${ARCH}" 2>/dev/null || true
+    # どちらもビルドが成功すれば必ずある。無ければ何かが壊れている
+    cp System.map "$KERNEL_OUTPUT_DIR/System.map-${KERNEL_VERSION}-${ARCH}"
+    cp .config "$KERNEL_OUTPUT_DIR/config-${KERNEL_VERSION}-${ARCH}"
 
     # Install modules (if built)
     if make modules_install INSTALL_MOD_PATH="$KERNEL_OUTPUT_DIR/modules" ARCH="$KERNEL_ARCH" 2>/dev/null; then
