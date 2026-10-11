@@ -14,48 +14,128 @@
 
 ## GitHub Actionsワークフロー
 
-Kimigayo OSは以下のGitHub Actionsワークフローを使用しています:
+Kimigayo OS は以下の 7 つのワークフローを使用しています。
 
-### 1. Docker Build and Push (`.github/workflows/docker-publish.yml`)
+| ワークフロー | トリガー | 役割 |
+|------------|---------|------|
+| `ci.yml` | `main` / `develop` への push、`main` への PR | 日常の検証 |
+| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub への公開** |
+| `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
+| `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
+| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャンと Issue 起票 |
+| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
+| `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）|
 
-**トリガー:**
-- タグプッシュ (`v*.*.*`)
-- 手動実行 (workflow_dispatch)
+### 1. CI (`.github/workflows/ci.yml`)
+
+**トリガー:** `main` / `develop` への push、`main` への PR
 
 **処理内容:**
-1. マルチアーキテクチャ・マルチバリアントビルド
-2. セキュリティスキャン（ShellCheck, Trivy）
-3. 統合テスト実行
-4. Docker Hubへプッシュ
-5. マルチアーキテクチャマニフェスト作成
-6. GitHub Releasesの作成
+1. ShellCheck（`scripts/` と `.claude/hooks`）
+2. リンク検査（`scripts/check-links.py`）
+3. pytest（単体 + プロパティ）
+4. variant × arch の matrix でビルドとイメージ検証
 
 **マトリックス戦略:**
 ```yaml
 strategy:
+  fail-fast: false
   matrix:
     variant: [minimal, standard, extended]
     arch: [x86_64, arm64]
 ```
 
-これにより、6つのイメージが並列ビルドされます:
-- minimal-x86_64
-- minimal-arm64
-- standard-x86_64
-- standard-arm64
-- extended-x86_64
-- extended-arm64
+これにより 6 つのイメージが並列でビルドされます。
+**`fail-fast: false` は意図的です。** 以前は 1 つの失敗が兄弟ジョブを
+キャンセルして、本当の失敗を隠していました。
 
-### 2. Scheduled Security Scan (`.github/workflows/scheduled-security-scan.yml`)
+> **`ci.yml` はカーネルをビルドしません**（2026-10-10 に外しました）。
+> 成果物は rootfs だけを詰めた Docker イメージで、コンテナはホストの
+> カーネルで動くため、CI がカーネルを作ってもイメージの中身は
+> 1 バイトも変わりません。それでいて 1 run あたり数十分かかっていました。
+>
+> **したがってカーネル関連の変更は `ci.yml` が緑でも検証されていません。**
+> `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったときは、
+> `manual-build.yml` を `build_kernel=true` で手動実行するか、
+> コンテナ内で `make kernel` を通してください。
+
+### 2. Release (`.github/workflows/release.yml`)
 
 **トリガー:**
-- 週次スケジュール（毎週日曜 00:00 UTC）
+- タグ push (`v*.*.*`)
+- 手動実行 (workflow_dispatch、`tag` を入力)
+
+**処理内容:**
+1. 版の解決（`scripts/get-version.sh`）
+2. ShellCheck
+3. マルチアーキテクチャ・マルチバリアントビルド（6 ジョブ）
+4. イメージ検証と Docker Hub への push
+5. マルチアーキテクチャマニフェスト作成
+6. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`）
+7. SARIF 連携・通知
+
+> **`CHANGELOG.md` は自動生成されません。手で書きます。**
+> `make changelog` は `build/CHANGELOG.generated.md` に下書きを出すだけで、
+> `CHANGELOG.md` を書き換えません。**タグを打つ前に必ず更新してください**
+> （2026-10-09 まで 0.1.0 止まりで、2 回のリリースが抜けていました）。
+
+> **タグを push した瞬間に Docker Hub の `latest` を含む公開イメージが
+> 差し替わります。** 取り消せないので、タグとリリースは毎回明示的な承認を
+> 取ってください（`.claude/hooks/guard-bash.sh` が機械的に止めます）。
+
+### 3. Build Workflow (`.github/workflows/build-workflow.yml`)
+
+**トリガー:** 他のワークフローからの `workflow_call` のみ
+
+`ci.yml` と `release.yml` と `manual-build.yml` が共有するビルド本体です。
+入力に `variant` / `arch` / `build_kernel` / `upload_artifacts` を取ります。
+`build_kernel` の既定は `false` です。
+
+### 4. Manual Build (`.github/workflows/manual-build.yml`)
+
+**トリガー:** 手動のみ（workflow_dispatch）
+
+variant と arch を選んでビルドします。**カーネルを CI でビルドする
+唯一の経路**で、`build_kernel=true` を指定します。
+
+```bash
+gh workflow run manual-build.yml \
+  -f variant=standard -f arch=x86_64 -f build_kernel=true
+```
+
+### 5. Security Scan (`.github/workflows/security.yml`)
+
+**トリガー:**
+- 毎日 02:00 UTC
 - 手動実行
 
 **処理内容:**
-1. 全イメージバリアントのTrivyスキャン
-2. ファイルシステムスキャン
-3. 脆弱性検出時にIssue自動作成
+1. 構成要素の版の確認
+2. 脆弱性スキャン（Trivy）
+3. 脆弱性検出時に Issue を自動作成
+
+> **イメージの Trivy スキャンは実質的に何も検査していません。**
+> Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
+> 持たないため、Trivy は対象を 1 つも識別できません
+> （`Target: -` / `Not scanned` / `Results: 0`）。
+> **「脆弱性 0 件」ではなく「スキャンしていない」**という意味です。
+> 脆弱性の追跡は構成要素の版を手で突合します。
+> ファイルシステムスキャン（`trivy-fs-scan`）はリポジトリ側の依存を
+> 見るので有効です。
+
+### 6. Base Image Update (`.github/workflows/base-image-update.yml`)
+
+**トリガー:** 毎週月曜 03:00 UTC、手動（`force_rebuild` を入力）
+
+上流（カーネル / musl / BusyBox / OpenRC / Alpine）の更新を検知して
+PR を作成します。**この PR は「上流が動いた」という一次情報**なので、
+バージョン更新の起点として先に見てください。
+
+### 7. Dependency Review (`.github/workflows/dependency-review.yml`)
+
+**トリガー:** `main` への PR、毎週月曜 04:00 UTC、手動
+
+依存のレビューを行います（`fail-on-severity: high`）。
 
 ## ビルドプロセス
 
@@ -230,21 +310,27 @@ shellcheck scripts/*.sh
 
 ### ShellCheck（静的解析）
 
+**外部 Action は必ずコミット SHA で固定します。** `@master` 参照は
+供給網のリスクであり、再現性もありません（2026-10-09 に固定しました）。
+
 ```yaml
 - name: Run ShellCheck (Static Analysis)
-  uses: ludeeus/action-shellcheck@master
-  continue-on-error: true
+  uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
   with:
+    additional_files: '.claude/hooks'
     scandir: './scripts'
     severity: warning
     ignore_paths: build output
 ```
 
+`.claude/hooks` も検査対象です（Hook はこのプロジェクトの作業ルール
+そのものなので、`scripts/` と同じ基準で静的解析します）。
+
 ### Trivy（脆弱性スキャン）
 
 ```yaml
 - name: Run Trivy vulnerability scanner
-  uses: aquasecurity/trivy-action@master
+  uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
   with:
     image-ref: ${{ steps.trivy_tag.outputs.tag }}
     format: 'sarif'
@@ -257,7 +343,7 @@ shellcheck scripts/*.sh
 
 ```yaml
 - name: Upload Trivy results to GitHub Security tab
-  uses: github/codeql-action/upload-sarif@v4
+  uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
   with:
     sarif_file: 'trivy-results.sarif'
 ```
@@ -300,9 +386,11 @@ git push origin v0.2.0
 2. テスト実行
 3. セキュリティスキャン
 4. Docker Hubにプッシュ
-5. CHANGELOG.md生成
-6. GitHub Releasesを作成
-7. リリースアセット（tar.gz, SHA256SUMS, SHA512SUMS）を添付
+5. GitHub Releasesを作成
+6. リリースアセット（tar.gz, SHA256SUMS, SHA512SUMS）を添付
+
+**`CHANGELOG.md` は自動生成されません。** タグを打つ前に手で更新して
+おいてください（→ [2. Release](#2-release-githubworkflowsreleaseyml)）。
 
 #### 3. リリースノートの確認
 
@@ -317,7 +405,7 @@ GitHub Releasesページで以下を確認:
 
 ```bash
 # GitHub CLI を使用
-gh workflow run docker-publish.yml -f tag=v0.2.0
+gh workflow run release.yml -f tag=v0.2.0
 ```
 
 または、GitHubのActionsタブから手動実行。
@@ -459,14 +547,14 @@ jobs:
         run: docker build -t myapp:scan .
 
       - name: Run Trivy scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: myapp:scan
           format: 'sarif'
           output: 'trivy-results.sarif'
 
       - name: Upload to Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: 'trivy-results.sarif'
 ```
