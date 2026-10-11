@@ -44,11 +44,27 @@ null
 **リポジトリ側**の依存（`requirements-dev.txt` など）を見るので意味があります。
 `make trivy-scan`（イメージスキャン）に意味はありません。
 
-> **着地させるべき構造的な対策: SBOM を出す。**
-> SPDX か CycloneDX で構成要素（musl / BusyBox / OpenRC とその版）を
-> 宣言すれば、利用者側のスキャナが突合できるようになります。
-> 現在このリポジトリは SBOM を生成していません。
-> 提案するときは「やりますか？」で止めること（スコープ拡大）。
+**代わりの手段は `make scan-image`（`scripts/scan-image.sh`）です**
+（2026-10-11 に追加）。イメージ内のバイナリを実行して版を読み、
+CycloneDX の SBOM を作って Grype で NVD の CPE と照合します。
+秘密情報は Trivy の secret スキャナで rootfs を見ます
+（こちらはパッケージ DB が無くても効く）。
+
+```bash
+make scan-image VARIANT=standard ARCH=x86_64      # CVE + 秘密情報
+SCANS=vuln bash scripts/scan-image.sh <image> <variant> <arch>
+```
+
+| どこで走るか | 何を見るか |
+| --- | --- |
+| `build-workflow.yml`（毎 push） | 秘密情報だけ（`SCANS=secret`） |
+| `dependency-review.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。失敗すると Issue が立つ |
+
+**照合が効いていることは古い版で確かめてあります**（BusyBox 1.36.1 /
+musl 1.2.4 / OpenRC 0.40 で既知の 12 件が出る）。
+**「0 件」は「NVD の CPE に載っている範囲で 0 件」です。** Alpine だけが
+知っている修正や、CPE の版範囲が雑な CVE は取りこぼす／誤検知するので、
+§2 の手での確認は残ります。
 
 ---
 
@@ -73,10 +89,23 @@ null
 
 ---
 
-## 2. CVE を追跡する（手で、版ごとに）
+## 2. CVE を追跡する（scan-image の結果を確かめる）
 
-スキャナが使えないので、**構成要素の版を自分で突合します。**
-版は `versions.mk` が単一の真実の源。
+**まず `make scan-image` を回し、出た CVE を1件ずつ下の一次情報で
+確かめます。** スキャナが出すのは「版が範囲に入っている」までで、
+影響があるか・修正があるかは人が見ます。
+出荷物の版が `versions.mk` と一致していることは `verify-image.sh` が
+見ています（読み取り元は `scripts/lib/image-components.sh`）。
+
+**Alpine aports のパッチを必ず見ます。** 上流が新版を出していなくても、
+Alpine が CVE パッチを当てていることがあります
+（2026-10-11: musl 1.2.6 の CVE-2026-40200 / CVE-2026-6042 は
+`main/musl` の pkgrel=5 でパッチ済み、Kimigayo は未適用）。
+
+```bash
+curl -s https://git.alpinelinux.org/aports/plain/main/musl/APKBUILD | grep -n 'CVE'
+curl -s https://git.alpinelinux.org/aports/plain/main/busybox/APKBUILD | sed -n '/^source=/,/"$/p'
+```
 
 ```bash
 make print-versions
@@ -140,15 +169,17 @@ SECURITY_LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 > | BusyBox | `scripts/build-busybox.sh` の `CONFIG_EXTRA_CFLAGS` と `export CFLAGS` |
 > | OpenRC | `scripts/build-openrc.sh` の `export CFLAGS` / `LDFLAGS` |
 >
-> **`-Wl,-z,noexecstack` は `config.mk` にしかありません。**
-> ただし成果物は実際に非実行スタックです（lld の既定）。
-> こちらが保証しているわけではないので、ELF を見て確かめます。
+> **`-Wl,-z,noexecstack` は 2026-10-11 に3スクリプトへ明示した**
+> （それまでは `config.mk` にしか無く、lld の既定に頼っていた）。
 >
-> **再現可能ビルドは一度も効いていません。**
-> `REPRODUCIBLE_BUILD=yes` のときだけ `SOURCE_DATE_EPOCH` と
-> prefix-map が入る作りですが、この変数をどこも設定していません。
+> **再現可能ビルドの配線はある**（`build-system/Makefile` の
+> `REPRODUCIBLE_BUILD ?= yes` と `SOURCE_DATE_EPOCH := 0`）。
+> ただしビット同一性は未検証（→ CLAUDE.md「セキュリティ」節）。
 
-成果物の ELF を見て確かめます。
+**PIE / RELRO / BIND_NOW / 非実行スタックは `verify-image.sh` が
+イメージ内の全 ELF で自動検査しています**（`scripts/check-elf-hardening.py`、
+2026-10-11 から。v3.0.1 では 29 個すべて合格）。CI・release で毎回走るので、
+手で見るのは `NEEDED`（不要な動的依存）と、検査が落ちたときの原因調査です。
 
 ```bash
 # ビルド環境のコンテナに readelf があるので、tarball から取り出して見る

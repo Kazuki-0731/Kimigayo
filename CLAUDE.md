@@ -456,7 +456,7 @@ make info                  # ビルド設定を表示
 
 make ci-build-local        # rootfs → 統合テスト → イメージ → smoke（GitHub Actions 相当）
 make test                  # pytest
-make security-scan         # Trivy + ShellCheck
+make security-scan         # scan-image（CVE + 秘密情報）+ Trivy FS + ShellCheck
 make benchmark             # 全ベンチマーク
 ```
 
@@ -835,16 +835,25 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
     既知の非決定要因を 2 つ消すだけで、他に無いことの証明にはならない。
     **「再現可能ビルド」を名乗る前に、同じコミットを 2 回ビルドして
     `cmp` が通ることを確認する**（手順は `config.mk` の冒頭コメント）
-- `make security-scan` = Trivy（イメージ）+ Trivy（ファイルシステム）+ ShellCheck
+- `make security-scan` = `scan-image` + Trivy（ファイルシステム）+ ShellCheck
 - **`make trivy-scan`（イメージスキャン）は何も検査していない。**
   Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
   持たないため、Trivy は対象を1つも識別できない（実測で
   `Target: -` / `Not scanned` / `Metadata.OS: null` / `Results: 0`）。
   **「脆弱性 0 件」ではなく「スキャンしていない」。**
-  それでも `security-scan` は「✅ 完了」と出すので、沈黙を安全と
-  読まないこと。脆弱性の追跡は構成要素の版を手で突合する
-  （→ `security-review` skill）。`trivy-fs-scan` はリポジトリ側の
-  依存を見るので有効
+  2026-10-11 に `security-scan` から外した。`trivy-fs-scan` は
+  リポジトリ側の依存を見るので有効
+- **出荷物の脆弱性は `make scan-image`（`scripts/scan-image.sh`）で見る。**
+  イメージ内のバイナリから読んだ版で SBOM を作り、Grype で NVD の CPE と
+  照合する。**「0 件」は「CPE の範囲で 0 件」で、Alpine だけが持つ
+  修正は見えない**ので、出た CVE は `security-review` skill で確かめる。
+  毎 push で走るのは秘密情報だけで、CVE は `dependency-review.yml` が
+  毎週、公開中の `latest` を照合する
+- **ビルド後の検査は `scripts/verify-image.sh` に集める**（CI・release・
+  ローカル共通）。強化まわりでは、全 ELF の PIE / RELRO / BIND_NOW /
+  非実行スタック、出荷物の版と `versions.mk` の突合、cpio の
+  パストラバーサル回帰を見る。**ビルド前の検査（ShellCheck・Trivy FS・
+  Dependency Review）だけでは、出荷物に何が入ったかは分からない**
 - `.github/workflows/security.yml` が毎日 02:00 UTC に走り、
   `base-image-update.yml` が毎週月曜に上流の版を確認する。
   **これらが作る PR / Issue は「上流が動いた」という一次情報**なので、
@@ -1255,7 +1264,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 python3 -m pytest tests/unit tests/property -q     # 522 件
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
-make security-scan                                 # Trivy
+make security-scan                                 # scan-image + Trivy FS + ShellCheck
 ```
 
 **バージョンを上げたときは追加で:**
