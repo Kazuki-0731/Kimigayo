@@ -14,7 +14,7 @@ export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
 .PHONY: build-rootfs package-rootfs build-image verify-image check-links test-integration test-smoke ci-build-local ci-build-all
-.PHONY: docker-hub-login push-image ci-build-push security-scan trivy-scan version show-version changelog
+.PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
 
@@ -53,8 +53,9 @@ help:
 	@echo "  make push-image          - イメージをDocker Hubにプッシュ"
 	@echo ""
 	@echo "🔒 セキュリティスキャン:"
-	@echo "  make trivy-scan          - Trivyで脆弱性スキャン"
-	@echo "  make security-scan       - 総合セキュリティスキャン（Trivy）"
+	@echo "  make scan-image          - 成果物の CVE 照合（SBOM + Grype）と秘密情報スキャン"
+	@echo "  make trivy-scan          - Trivyでイメージスキャン（Kimigayo は識別されない）"
+	@echo "  make security-scan       - 総合セキュリティスキャン（scan-image + Trivy FS + ShellCheck）"
 	@echo ""
 	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
 	@echo "    1. .envファイルを作成: cp .env.example .env"
@@ -391,7 +392,17 @@ ci-build-push: ci-build-local push-image
 # セキュリティスキャン
 # ============================================================================
 
+# 成果物そのものの脆弱性・秘密情報スキャン
+#
+# イメージ内のバイナリを実行して版を読み、その版から SBOM を作って
+# Grype で CVE と照合する。秘密情報は Trivy で rootfs を見る。
+# 下の trivy-scan はパッケージ DB が無い Kimigayo を識別できないので、
+# 脆弱性の検査としてはこちらを使う（→ scripts/scan-image.sh の冒頭）。
+scan-image:
+	@bash scripts/scan-image.sh kimigayo-os:$(VARIANT)-$(ARCH) $(VARIANT) $(ARCH)
+
 # Trivyで脆弱性スキャン（イメージ）
+# **Kimigayo では何も識別できない**（Target: - / Not scanned）。scan-image を使う。
 trivy-scan:
 	@echo "=== Running Trivy vulnerability scan ==="
 	@echo "Image: kimigayo-os:$(VARIANT)-$(ARCH)"
@@ -465,7 +476,9 @@ shellcheck-scan:
 	@echo "✅ ShellCheck: 警告なし"
 
 # 総合セキュリティスキャン
-security-scan: trivy-scan trivy-fs-scan shellcheck-scan
+# trivy-scan は Kimigayo を識別できず「完了」とだけ出すので外し、
+# 出荷物を実際に照合する scan-image に置き換えた。
+security-scan: scan-image trivy-fs-scan shellcheck-scan
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════════╗"
 	@echo "║              ✅ セキュリティスキャン完了                         ║"
