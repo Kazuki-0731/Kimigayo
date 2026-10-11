@@ -4,8 +4,8 @@
 
 ## 主な特徴
 
-- 🪶 **超軽量**: Standard（x86_64）**2.76MB** / arm64 3.13MB（v3.0.1、2026-10-11 実測）
-- 🪶 **常駐メモリ 232KB**（Alpine 276KB / Ubuntu 24.04 312KB。同条件で 2026-10-11 実測）
+- 🪶 **超軽量**: Standard（x86_64）**2.60MB** / arm64 2.98MB（v3.0.2、2026-10-12 実測）
+- 🪶 **常駐メモリ 288KB**（Alpine 272KB / Ubuntu 24.04 312KB と同程度。同条件で 2026-10-12 実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE でビルド、ASLR / DEP 対応
 - 🛡️ **最小攻撃面**: パッケージマネージャーを持たない（`apk` も `dpkg` も無い）
 - 🏗️ **3 バリアント**: minimal / standard / extended から選べる
@@ -72,15 +72,15 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ## イメージバリアント
 
-- **kimigayo-os:latest** - Standardバリアント（x86_64 2.76MB / arm64 3.13MB）
+- **kimigayo-os:latest** - Standardバリアント（x86_64 2.60MB / arm64 2.98MB）
   - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
-- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.62MB / arm64 2.98MB）
+- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.46MB / arm64 2.83MB）
   - musl libc + 最小限のBusyBox + OpenRC
   - 特化したコンテナ向けの絶対最小フットプリント
 
-- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.78MB / arm64 3.17MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.62MB / arm64 3.01MB）
   - 開発ツールと追加ユーティリティを含む
   - 開発環境と機能豊富なコンテナ向け
 
@@ -88,21 +88,21 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 ### バージョン指定タグ（本番ではこれを使ってください）
 ```
-kimigayo-os:3.0.1               # Standardバリアント
-kimigayo-os:3.0.1-minimal       # Minimalバリアント
-kimigayo-os:3.0.1-extended      # Extendedバリアント
+kimigayo-os:3.0.2               # Standardバリアント
+kimigayo-os:3.0.2-minimal       # Minimalバリアント
+kimigayo-os:3.0.2-extended      # Extendedバリアント
 ```
 
 ### アーキテクチャ指定タグ
 
-**バリアント名が必要です**（`3.0.1-amd64` というタグはありません）。
+**バリアント名が必要です**（`3.0.2-amd64` というタグはありません）。
 
 ```
-kimigayo-os:3.0.1-standard-amd64    # x86_64
-kimigayo-os:3.0.1-standard-arm64    # ARM64
+kimigayo-os:3.0.2-standard-amd64    # x86_64
+kimigayo-os:3.0.2-standard-arm64    # ARM64
 ```
 
-バリアント名なしのタグ（`3.0.1`・`latest` など）はマルチアーキの
+バリアント名なしのタグ（`3.0.2`・`latest` など）はマルチアーキの
 マニフェストなので、`docker pull` が自動で合うものを選びます。
 
 ### ローリングタグ（リリースごとに更新）
@@ -118,7 +118,7 @@ kimigayo-os:latest-arm64        # 最新StandardのARM64
 
 ### 完全性の検証
 
-**Cosign のキーレス署名を v3.0.2 から行います。**
+**v3.0.2 から Cosign でキーレス署名しています。** 検証には **cosign v3 以降**が必要です（v2 では `no signatures found` になります）。
 
 ```bash
 cosign verify ishinokazuki/kimigayo-os:latest \
