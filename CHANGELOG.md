@@ -33,6 +33,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cpio` / `unzip` のパストラバーサル対策
   （`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y`）を有効にした。
   v3.0.1 では `../` を含むアーカイブが展開先の外に書き出せた。
+- 脆弱性の報告窓口を GitHub Security Advisories に一本化した。
+  文書にあった `kimigayo-os.org` のメール窓口・PGP 鍵は実在しなかった。
+  `.github/SECURITY.md` を置いた。
+
+### Fixed
+
+- **`wget` の HTTPS が、取得に成功したあと Segmentation fault（終了コード 139）で
+  落ちていたのを直した**（x86_64 / arm64 とも）。BusyBox の既定で有効だった
+  `FEATURE_WGET_OPENSSL` が、イメージに無い `openssl` を vfork で起動しようとし、
+  失敗した子の `exit()` が musl の exit ロックを親に残していた。
+  HTTPS は内蔵の TLS だけで処理する。**証明書は引き続き検証しない**（BusyBox の仕様）。
+- カーネルのビルド（`make kernel`、CI では作らない）で、Kconfig
+  （`olddefconfig`）の失敗を飲み込んでいたのを止めた。
+
+### Changed
+
+- **BusyBox を動的リンクにした**（`/lib/libc.so` を OpenRC と共有）。
+  静的リンクでは x86_64 の BusyBox がビルド環境の `libc.a` を取り込み、
+  Kimigayo が musl に当てたパッチが `/bin/sh` に効いていなかった。
+  イメージは 165〜169KB 小さくなる。
+  静的リンクが必要なら `BUSYBOX_LINK=static` でビルドできる。
+  **`/bin/sh` も `LD_PRELOAD` / `LD_LIBRARY_PATH` に従うようになる**
+  （他の動的リンクのバイナリと同じ。setuid では musl が無視する）。
 
 ---
 
