@@ -218,10 +218,21 @@ v0.1.0〜v2.0.1 の公開イメージは全部この状態でした（`0.1.0` �
 **「署名ジョブが緑」ではなく、実際に `cosign verify` が通ることを見ます。**
 
 ```bash
-cosign verify "ishinokazuki/kimigayo-os:<X.Y.Z>" \
+# cosign は v3 以降で検証する。release.yml は v3 で署名しており、
+# v3 の形式（OCI referrers）は v2 から見えず `no signatures found` になる
+# （v3.0.2 で v2.4.1 を使って一度これに引っかかった）
+docker run --rm ghcr.io/sigstore/cosign/cosign:v3.0.6 verify "ishinokazuki/kimigayo-os:<X.Y.Z>" \
   --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+### Docker Hub の Overview を更新する
+
+`DOCKERHUB_README.md` は自動では同期されない
+（手順は `docs/deployment/DOCKERHUB_SETUP.md` のステップ4）。
+**`.env` の push 用アクセストークンでは API の更新が 403 になる**
+（v3.0.2 で確認。ログインは通るが説明文の書き換え権限が無い）。
+ユーザーに Web から貼ってもらうか、説明文を書き換えられる権限のトークンを用意してもらう。
 
 **`latest` 系も含めて確認します。** `sign` ジョブはタグを全部並べて
 ダイジェストに解決し、重複を落としてから署名します。
