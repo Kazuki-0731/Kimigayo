@@ -7,7 +7,7 @@
 #   「ビルドが成功した」「イメージが起動した」は検証ではない。
 #   v0.1.0 から v2.0.1 までの公開済み4タグすべてで、OpenRC のバイナリが
 #   1つも入らず、musl の libc.so も /tmp も無い状態のまま smoke テストに
-#   通っていた（BusyBox は static-pie なので /bin/sh は動く）。
+#   通っていた（当時の BusyBox は static-pie なので /bin/sh は動いた）。
 #
 #   さらに arm64 では musl の libc.so 自身が __letf2 を解決できず、
 #   動的リンクのバイナリが全滅していたが、rootfs の検査（verify_rootfs）も
@@ -140,12 +140,24 @@ case "$bb_size" in
         # アプレットは /bin/busybox への相対シンボリックリンクなので、
         # 同名の実バイナリを cp されると本体が上書きされる。
         # 1.1MB が 57.8KB の start-stop-daemon に化けた事故がある。
-        if [ "$bb_size" -ge 1000000 ]; then
+        #
+        # 閾値は 500,000。以前は 1,000,000 だったが、それは静的リンク
+        # （libc を内包）前提の値で、動的リンクの minimal は 890KB になる。
+        # 事故の 57.8KB とは桁が違うので 500KB でも十分に検知できる。
+        # 「本当に BusyBox か」は下の識別検査で直接確かめる。
+        if [ "$bb_size" -ge 500000 ]; then
             pass "/bin/busybox is $bb_size bytes"
         else
-            fail "/bin/busybox is only $bb_size bytes (expected >= 1000000; overwritten?)"
+            fail "/bin/busybox is only $bb_size bytes (expected >= 500000; overwritten?)"
         fi
         ;;
+esac
+
+# 本当に BusyBox か（上書き事故をサイズではなく中身で見る）
+bb_banner="$(in_image '/bin/busybox 2>&1 | head -1')"
+case "$bb_banner" in
+    "BusyBox v"*) pass "/bin/busybox identifies as BusyBox (${bb_banner%% multi-call*})" ;;
+    *) fail "/bin/busybox does not identify as BusyBox (got '${bb_banner}')" ;;
 esac
 
 applets="$(in_image 'busybox --list | wc -l' | tr -d ' ')"
@@ -157,7 +169,7 @@ case "$applets" in
         else
             fail "$applets applets, outside ${APPLET_MIN}-${APPLET_MAX} for $VARIANT"
             log_error "      バリアントの取り違えか、BusyBox のビルドがスキップされた疑い"
-            log_error "      （.kimigayo-build-version は '1.38.0+<variant>' の形式）"
+            log_error "      （.kimigayo-build-version は '1.38.0+<variant>+<link>+<hash>' の形式）"
         fi
         ;;
 esac

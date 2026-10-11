@@ -558,7 +558,8 @@ copy_components() {
         # 絶対シンボリックリンクなので、これを入れないとリンク切れになり、
         # 動的リンクされたバイナリが一切起動しない（README の
         # 「自分のアプリを COPY する」使い方と OpenRC が壊れる）。
-        # BusyBox は static-pie なので、入れ忘れても smoke テストは通ってしまう。
+        # BusyBox が static-pie だった v3.0.1 までは、入れ忘れても smoke テストは
+        # 通ってしまった（いまの BusyBox は動的リンクなので /bin/sh から動かない）。
         if [ -f "$MUSL_INSTALL_DIR/usr/lib/libc.so" ]; then
             mkdir -p "$ROOTFS_DIR/usr/lib"
             cp -a "$MUSL_INSTALL_DIR/usr/lib/libc.so" "$ROOTFS_DIR/usr/lib/"
@@ -1188,7 +1189,7 @@ EOF
 # 「上流の prefix が変わった」といった突合漏れで静かに壊れる箇所だから。
 # 実際に musl の libc.so と OpenRC のバイナリ 9 個が入らないまま
 # 「✅ Root filesystem build completed!」と報告され続けていた。
-# BusyBox が static-pie なので smoke テストでは露見しない。
+# 当時の BusyBox は static-pie だったので smoke テストでは露見しなかった。
 verify_rootfs() {
     log "Verifying rootfs contents..."
 
