@@ -1490,15 +1490,30 @@ generate_metadata() {
         esac
     done
 
+    # BUILD_DATE はビルドした時刻ではなく**ソースのコミット時刻**。
+    #
+    # 2026-10-12 に同じコミットを CI で 2 回ビルドして突き合わせたところ、
+    # rootfs の 667 ファイル中 666 がバイト単位で一致し、違ったのは
+    # このファイルだけだった（ビルド時刻と、使い捨てコンテナの
+    # ホスト名 BUILD_HOST）。どちらも同じソースからは毎回違う値になり、
+    # 中身の再現性を確かめる妨げにしかならないので、コミット時刻にし、
+    # BUILD_HOST は消した。git が使えないときだけ現在時刻に戻す。
+    local build_date
+    if ! build_date="$(TZ=UTC git -C "$PROJECT_ROOT" -c safe.directory='*' \
+            log -1 --format=%cd --date=format-local:'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null)" \
+            || [ -z "$build_date" ]; then
+        build_date="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        log_warn "  git が使えないので BUILD_DATE に現在時刻を使う（再現性は無くなる）"
+    fi
+
     cat > "$metadata_file" << EOF
 # Kimigayo OS Build Information
-BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+BUILD_DATE=${build_date}
 BUILD_ARCH=$ARCH
 IMAGE_TYPE=$IMAGE_TYPE
 VERSION=${OS_VERSION}
 CODENAME=${OS_CODENAME}
 BUILDER=$(whoami)
-BUILD_HOST=$(hostname)
 PATCHED_CVES=${patched}
 EOF
 
