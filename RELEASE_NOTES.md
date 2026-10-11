@@ -536,7 +536,7 @@ Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
 ### 報告方法
 - **GitHub Issues**: https://github.com/Kazuki-0731/Kimigayo/issues
-- **セキュリティ脆弱性**: security@kimigayo-os.org（PGP推奨）
+- **セキュリティ脆弱性**: [GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories/new)（非公開）
 - **一般的な質問**: GitHub Discussions
 
 ### コントリビューション
@@ -557,10 +557,9 @@ Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
 ## 🔗 リンク
 
-- **公式サイト**: https://kimigayo-os.org（予定）
 - **GitHubリポジトリ**: https://github.com/Kazuki-0731/Kimigayo
-- **ドキュメント**: https://docs.kimigayo-os.org（予定）
-- **パッケージリポジトリ**: https://packages.kimigayo-os.org（予定）
+- **ドキュメント**: https://github.com/Kazuki-0731/Kimigayo/tree/main/docs
+- **Docker Hub**: https://hub.docker.com/r/ishinokazuki/kimigayo-os
 
 ---
 
