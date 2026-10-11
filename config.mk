@@ -21,12 +21,14 @@
 #       applied - the three build scripts set them directly.
 #       scripts/verify-image.sh checks the ELF type of every executable.
 #   -Wl,-z,noexecstack
-#       appears only here, yet the artifacts do have a non-exec stack
-#       (GNU_STACK=RW on busybox, openrc and libc.so) because lld defaults
-#       to it. Not guaranteed by us.
-#   -Wl,-z,noexecstack
-#       as of 2026-10-11 the three build scripts pass it explicitly, so the
-#       non-exec stack is now stated by us rather than inherited from lld.
+#       used to appear only here. The artifacts did have a non-exec stack,
+#       but only because lld defaults to it - not because we asked.
+#       Since 2026-10-11 the three build scripts pass it explicitly.
+#       Measured on the rebuilt x86_64 busybox:
+#           GNU_STACK ... RW   (no E)
+#           Type: DYN (Position-Independent Executable file)
+#           GNU_RELRO present, BIND_NOW present
+#           size unchanged at 1186 KB, 411 applets
 #   REPRODUCIBLE_BUILD / SOURCE_DATE_EPOCH
 #       REPRODUCIBLE_BUILD *is* set: build-system/Makefile line 51 has
 #       `REPRODUCIBLE_BUILD ?= yes` and line 93 `export SOURCE_DATE_EPOCH := 0`.
