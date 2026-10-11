@@ -34,6 +34,21 @@ if [ -z "$MUSL_INSTALL_DIR" ]; then
     MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
 fi
 
+# Reproducible build flags.
+#
+# build-system/Makefile sets REPRODUCIBLE_BUILD ?= yes and exports
+# SOURCE_DATE_EPOCH := 0; that export does reach this script (which is why
+# `busybox | head -1` reports a 1970-01-01 build date). What did NOT reach it
+# was the Makefile's `CFLAGS += -fdebug-prefix-map=...`, because the CFLAGS
+# assignments further down overwrite CFLAGS wholesale. Rebuild them here.
+#
+# This alone does not make the build bit-for-bit reproducible; that has never
+# been verified. See the header of config.mk for how to prove it.
+CFLAGS_REPRODUCIBLE=""
+if [ "${REPRODUCIBLE_BUILD:-yes}" = "yes" ]; then
+    CFLAGS_REPRODUCIBLE="-fdebug-prefix-map=${PROJECT_ROOT:-$PWD}=. -fmacro-prefix-map=${PROJECT_ROOT:-$PWD}=."
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -273,7 +288,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # `built-in.o` を作る**部分リンク（ld -r）にも渡る**ので
     #     ld.lld: error: -r and -pie may not be used together
     # で落ちる（実測）。最終リンクだけに効く CFLAGS_busybox で渡す（下記）。
-    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fstack-protector-strong -fPIE\"|" .config
+    sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fstack-protector-strong -fPIE ${CFLAGS_REPRODUCIBLE}\"|" .config
     # Add EXTRA_LDFLAGS - use lld linker only (no -nodefaultlibs, let toolchain handle linking)
     sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld\"|" .config
     # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
@@ -349,7 +364,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
     fi
 
-    export CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR}"
+    export CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR} ${CFLAGS_REPRODUCIBLE}"
 
     # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
     # clang automatically uses compiler-rt builtins for 128-bit float operations
@@ -372,7 +387,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         log_info "  placed ${crt} in the musl sysroot"
     done
 
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -383,8 +398,8 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using -rtlib=compiler-rt (clang uses compiler-rt builtins directly)"
 else
     # For x86_64: use stack protector (GCC has proper support)
-    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 ${CFLAGS_REPRODUCIBLE}"
+    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 fi
 
 # Ensure we're using the correct compiler

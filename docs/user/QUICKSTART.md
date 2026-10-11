@@ -150,15 +150,20 @@ wget -O- http://example.com
 通常の `docker run` では付きません）。疎通確認には `nslookup` を使うか、
 `--cap-add NET_RAW` を付けて起動してください。
 
-> **既知の問題: `wget` の HTTPS は v3.0.1 では使えません。**
-> arm64 ネイティブでは、本文のダウンロード自体は成功するものの直後に
-> Segmentation fault（終了コード 139）になります。Standard と Extended の
-> 両方で再現します。x86_64（Apple Silicon 上の QEMU エミュレーション）では
-> `error getting response: Connection reset by peer`（終了コード 1）で
-> 失敗しました。**HTTP（`http://`）は両方とも正常です。**
-> HTTPS の取得が必要な場合は、ビルド時に `curl` を持ち込んでください
+> **既知の問題: `wget` の HTTPS は使えません。**
+> arm64 では本文のダウンロード自体は成功するものの、直後に
+> Segmentation fault（終了コード 139）になります。
+> Standard と Extended の両方で再現します。
+> **HTTP（`http://`）は正常です。**
+>
+> **原因は静的リンクです。** BusyBox 1.38.0 の内蔵 TLS は
+> 静的リンクすると動かず、Alpine の `busybox-static` でも同じように
+> 失敗します（動的リンク版は正常）。Kimigayo は設計として
+> BusyBox を static-pie でビルドしているため、この影響を受けます。
+>
+> **HTTPS の取得が必要な場合は、ビルド時に `curl` を持ち込んでください**
 > （→[ソフトウェアの追加](#ソフトウェアの追加)）。
-> 切り分けの詳細は
+> 切り分けの詳細と上流への報告用の最小再現は
 > [docs/troubleshooting/busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)。
 
 ## ソフトウェアの追加

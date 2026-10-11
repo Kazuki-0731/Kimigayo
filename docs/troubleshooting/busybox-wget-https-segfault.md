@@ -16,7 +16,8 @@ Segmentation fault
 ```
 
 **発見**: 2026-10-11（v3.0.1 公開後のドキュメント監査中）。
-**状態**: 未修正。原因の切り分けは下記まで進んでいる。
+**状態**: **原因は特定済み（静的リンク）。未修正。**
+**static-pie は意図した設計なので、直すには設計判断が必要。**
 
 ---
 
@@ -68,39 +69,74 @@ if (pid == 0) {
 **だから `ssl_client` 単体が動くことは、`wget` の HTTPS が動く根拠に
 ならない。** 通る経路が違う。
 
-## 切り分けが必要な点
+## 原因は static リンク（2026-10-11 に切り分け完了）
 
-Alpine と Kimigayo の差は**2つある。どちらが原因か未確定。**
+**上流 1.38.0 の回帰ではない。静的リンクが BusyBox の内蔵 TLS を壊している。**
 
-| | Alpine 3.24 | Kimigayo v3.0.1 |
+同じ BusyBox 1.38.0 を 3 通りで比較した（すべて arm64 ネイティブ、
+`wget -O/dev/null https://example.com`）:
+
+| ビルド | ELF type | 結果 |
 | --- | --- | --- |
-| BusyBox の版 | **1.37.0** | **1.38.0** |
-| リンク方法 | **動的**（`libc.musl-aarch64.so.1`）| **static-pie** |
+| **Alpine edge の動的リンク** 1.38.0 | 3（DYN、動的）| **rc=0。正常に完走** |
+| **Alpine edge の `busybox-static`** 1.38.0 | 3（static-pie）| **rc=1。** TLS の note 直後に失敗し、データは届かない |
+| **Kimigayo v3.0.1** 1.38.0 | 3（static-pie）| **rc=139（SIGSEGV）。** データは届いたあとに落ちる |
 
-**次にやるべき実験**（どちらの差が効いているかを1つずつ潰す）:
+```console
+# Alpine の動的リンク — 通る
+/ # busybox wget -O/dev/null https://example.com
+'/dev/null' saved          → rc=0
 
-1. **1.38.0 を動的リンクでビルドして同じ取得をする。**
-   落ちなければ static-pie 側の問題。落ちれば 1.38.0 の回帰。
-2. **1.37.0 を static-pie でビルドして同じ取得をする。**
-   落ちれば static-pie 側の問題。落ちなければ 1.38.0 の回帰。
+# Alpine の static-pie — 通らない（きれいに失敗）
+/ # busybox.static wget -O/dev/null https://example.com
+Connecting to example.com (172.66.147.243:443)
+wget: note: TLS certificate validation not implemented
+                           → rc=1
 
-```bash
-# 版を変える場合は versions.mk を書き換える（直書きしない）
-# config を変えただけではビルドがスキップされるので成果物を消す
-rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
-docker compose run --rm -T kimigayo-build make busybox \
-  TARGET_ARCH=x86_64 IMAGE_TYPE=standard
+# Kimigayo の static-pie — 通らない（落ちる）
+/ # wget -O/dev/null https://example.com
+'/dev/null' saved
+Segmentation fault         → rc=139
 ```
 
-**`-T` を忘れないこと**（`docker-compose.yml` が `tty: true` なので、
-パイプに繋ぐと出力が消える）。
+**結論:**
 
-3. 上流に同じ報告があるかを確認する（`busybox.net` の bug tracker、
-   `busybox` メーリングリスト）。1.38.0 は比較的新しいので、
-   既知の回帰である可能性がある。
+- **動的リンクなら動く。静的リンクだと 2 つの独立したビルドで両方とも
+  失敗する。** したがって Kimigayo 固有の設定ミスではなく、
+  **BusyBox 1.38.0 の内蔵 TLS と静的リンクの組み合わせの問題。**
+- Kimigayo の方が先に進む（データを取得してから落ちる）のは、
+  フラグや musl の版の違いによる症状の差。**根は同じ。**
+- **以前ここに「版 1.37.0 vs 1.38.0」と「動的 vs static-pie」の
+  どちらが原因か未確定と書いていたが、決着した**（Alpine edge が
+  1.38.0 の動的と静的の両方を提供しているので比較できた）。
 
-**デバッガはイメージに入っていない。** `gdb` を使うなら
-マルチステージで持ち込むか、ビルド環境側で再現させる。
+## どう扱うか
+
+**static-pie は意図した設計。** README が「BusyBox は static-pie」と
+書いているとおり、第三者の共有ライブラリを持たないことが
+この OS の売りの一部で、**動的リンクへの変更は設計判断になる。**
+
+| 選択肢 | 影響 |
+| --- | --- |
+| **現状を受け入れて明記する**（採用中）| `wget` の HTTPS は使えない。HTTP は正常。HTTPS が必要なら `curl` を持ち込む |
+| BusyBox を動的リンクにする | **設計変更。** イメージに共有ライブラリが増え、「第三者の共有ライブラリ無し」が崩れる。**ユーザーの承認が必要** |
+| 上流に報告する | 静的リンク時の TLS の不具合として報告する価値がある。Alpine の `busybox-static` でも再現するので、こちらの環境依存ではないと示せる |
+
+**次にやること:** 上流（`busybox.net` の bug tracker / メーリングリスト）に
+既知の報告があるか確認し、無ければ報告する。
+**報告には Alpine の `busybox-static` での再現を添える**
+（第三者の環境で再現することが伝わる）。
+
+```bash
+# 報告用の最小再現（Kimigayo 不要）
+docker run --rm alpine:edge sh -c \
+  'apk add --no-cache busybox-static >/dev/null &&
+   busybox.static wget -O/dev/null https://example.com; echo rc=$?'
+# => rc=1
+docker run --rm alpine:edge sh -c \
+  'busybox wget -O/dev/null https://example.com; echo rc=$?'
+# => rc=0
+```
 
 ## 回避策（利用者向け）
 
