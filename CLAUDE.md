@@ -455,6 +455,25 @@ make benchmark             # 全ベンチマーク
   （`DOCKER_HUB_ACCESS_TOKEN` が入るため**絶対にコミットしない**）
 - **`make build` はホストではなくコンテナ内で走る**
   （`docker compose run --rm kimigayo-build make build`）。
+- **`docker compose run` を手で叩くときは `-T` を付ける。**
+  `docker-compose.yml` が `tty: true` / `stdin_open: true` を持つため、
+  **出力をパイプやファイルに繋ぐと中身が消える**。
+  外部コマンドの出力が丸ごと失われ、**`echo` と `pwd`（シェル組み込み）
+  だけが通るので「コンテナは動いている」ように見える**。
+  スクリプトは走らずに終了コード 0 を返すことがあり、気づきにくい
+  （2026-10-11 に実際に踏んだ。BusyBox のビルドが何も出力せず
+  成果物も作らないまま成功扱いになった）。
+
+  ```bash
+  docker compose run --rm -T kimigayo-build make busybox TARGET_ARCH=x86_64
+  #                     ^^ これが無いとパイプ時に出力が消える
+  ```
+
+  `make shell` のような対話用途では付けない（TTY が必要）。
+- **`scripts/build-*.sh` を直接叩かない。** `MUSL_INSTALL_DIR` などを
+  Makefile が渡しているので、素で呼ぶと `unbound variable` で落ちる。
+  `make musl` / `make busybox` / `make openrc` を使う
+  （いずれも `build-system/Makefile` 側なのでコンテナ内）。
 - **`make ci-build-local` は macOS ホストでは通らない。**
   ホスト側で `scripts/build-rootfs.sh` を直接叩き、その中で
   `build-musl.sh` 等を**実際に呼んでビルドしに行く**（成果物があることを
@@ -618,6 +637,20 @@ make benchmark             # 全ベンチマーク
 > いま `.kimigayo-build-version` には `1.38.0+standard` のように入る。
 > **バリアントを切り替えて測るときは、スキップされていないことを確認する。**
 
+> **スタンプは `src/*/config/` の編集を検知しない。**
+> `1.38.0+extended` のまま config を書き換えても、版とバリアントの
+> 文字列が同じなのでビルドはスキップされる。
+> **config を変えたときは、その成果物を手で捨ててからビルドする**
+> （2026-10-11 に実際に踏んだ）。
+>
+> ```bash
+> rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
+> docker compose run --rm -T kimigayo-build make busybox \
+>   TARGET_ARCH=x86_64 IMAGE_TYPE=extended
+> ```
+>
+> 同じことがカーネル config（`src/kernel/config/`）にも言える。
+
 > **`scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
 > `log_warn` して `return 0` する。つまり当たらないパッチは黙ってスキップされ、
 > ビルドは成功したように見える。** バージョンを上げたら
@@ -643,9 +676,21 @@ make benchmark             # 全ベンチマーク
 `.kimigayo-build-version` と `versions.mk` を突合し、違っていれば
 インストール先とビルドディレクトリの両方を捨てて作り直す。**
 それでも想定外の残骸は出るので、**版上げ直後にビルドが妙な挙動をしたら
-まず `make clean-<component>` を試す**（`clean-musl` / `clean-kernel` /
-`clean-busybox` / `clean-openrc`）。`make clean-all` は
-`build/downloads/` まで消して約150MBの再取得を招くので最後の手段。
+まず `clean-<component>` を試す**（`clean-musl` / `clean-kernel` /
+`clean-busybox` / `clean-openrc`）。
+
+**この4つは `build-system/Makefile` 側にしかない。**
+ホストの `Makefile` が持つのは `clean` / `clean-cache` / `clean-all` の
+3つだけなので、**ホストで `make clean-busybox` を叩くと
+`No rule to make target` になる**（`kernel` などと同じ）。
+
+```bash
+docker compose run --rm kimigayo-build make clean-busybox
+# または make shell で入ってから叩く
+```
+
+`make clean-all` は `build/downloads/` まで消して約150MBの再取得を
+招くので最後の手段。
 
 ### musl を作り直したら、それにリンクしているものも作り直す
 
@@ -669,7 +714,7 @@ rm -rf build/musl-install-aarch64 build/musl-build-aarch64 \
        build/openrc-install-arm64 build/openrc-build-arm64 build/openrc-cross-arm64
 ```
 
-`make clean-musl` だけでは足りない。
+`clean-musl`（コンテナ内）だけでは足りない。
 **「ビルドは通ったのに実行すると落ちる」ときは、まず成果物の日時を見る。**
 
 ```bash

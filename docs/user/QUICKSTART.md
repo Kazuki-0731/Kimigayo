@@ -158,6 +158,8 @@ wget -O- http://example.com
 > 失敗しました。**HTTP（`http://`）は両方とも正常です。**
 > HTTPS の取得が必要な場合は、ビルド時に `curl` を持ち込んでください
 > （→[ソフトウェアの追加](#ソフトウェアの追加)）。
+> 切り分けの詳細は
+> [docs/troubleshooting/busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)。
 
 ## ソフトウェアの追加
 
