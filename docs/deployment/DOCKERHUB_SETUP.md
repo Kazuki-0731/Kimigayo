@@ -156,9 +156,12 @@ curl -s -X PATCH \
 
 ### イメージ署名
 
-**未実装。** Docker Content Trust も Cosign も `release.yml` に
-工程が無い。利用者に案内できるのはダイジェスト指定での pull と、
-GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` だけ。
+**v3.0.2 から Cosign のキーレス署名を行う**（`release.yml` の `sign` ジョブ。
+Sigstore OIDC、Rekor の透明性ログに載る）。**検証には cosign v3 以降が要る。**
+署名は v3 の形式で置いてあり、cosign v2 では `no signatures found` になる
+（2026-10-12 に v2.4.1 と v3.0.6 で確かめた）。Docker Content Trust は使わない。
+v3.0.1 以前は未署名なので、ダイジェスト指定での pull と、
+GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` を案内する。
 
 ### 脆弱性スキャン
 
