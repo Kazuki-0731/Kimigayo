@@ -38,7 +38,9 @@ jobs:
       upload_artifacts: true
 
   # security ジョブは外した。
-  # make security-scan は trivy-scan（イメージスキャン）を含むが、
+  # 当時の make security-scan は trivy-scan（イメージスキャン）を含んでいたが
+  # （2026-10-11 に scan-image へ置き換え。いまは build-workflow.yml が
+  # 秘密情報スキャンを走らせる）、
   # Kimigayo は scratch 上の手組み rootfs でパッケージデータベースを
   # 持たないため Trivy は対象を1つも識別できない（実測で
   # Target: - / Not scanned / Metadata.OS: null / Results: 0）。
