@@ -8,7 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-（次のリリースに入る変更をここに書く）
+### Security
+
+- **既知の CVE 3 件にパッチを当てた**（いずれも上流のリリースにはまだ
+  入っていない修正。Alpine aports と sha512 で突合して取り込んだ）。
+  - CVE-2026-38754: ash（`/bin/sh`）の `ifsbreakup` の範囲外アクセス
+  - CVE-2026-40200: musl の `qsort` のスタック破壊（64bit では非現実的）
+  - CVE-2026-6042: musl の `iconv`（GB18030）で CPU を食い潰す DoS
+- 未対応: BusyBox の CVE-2026-38753（awk）と CVE-2026-38755（ash の再帰）。
+  修正は BusyBox の ML に投稿済みだが、リリースにも Alpine にも入っていない。
+- **ビルド後の検査を追加した。** イメージ内の全 ELF の PIE / RELRO /
+  BIND_NOW / 非実行スタック、出荷物の版と `versions.mk` の突合、cpio の
+  パストラバーサルの回帰テスト（`scripts/verify-image.sh`）。
+  出荷物の版から SBOM を作って CVE と照合し、秘密情報を探す
+  `scripts/scan-image.sh`（`make scan-image`）。
+- `cpio` / `unzip` のパストラバーサル対策
+  （`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y`）を有効にした。
+  v3.0.1 では `../` を含むアーカイブが展開先の外に書き出せた。
 
 ---
 
