@@ -4,12 +4,61 @@
 
 ## 📋 目次
 
+- [先に読む2つの落とし穴](#先に読む2つの落とし穴)
 - [基本的なカスタマイズ](#基本的なカスタマイズ)
 - [マルチステージビルド](#マルチステージビルド)
 - [イメージバリアントの作成](#イメージバリアントの作成)
 - [セキュリティ強化](#セキュリティ強化)
 - [サイズ最適化](#サイズ最適化)
 - [ベストプラクティス](#ベストプラクティス)
+
+## 先に読む2つの落とし穴
+
+### 1. 動的リンクの実行ファイルは共有ライブラリも要る
+
+**このベースイメージには musl libc しか入っていません**
+（`/usr/lib/libc.so` だけです）。他のイメージから動的リンクの実行ファイルを
+`COPY` すると、実行時に落ちます。
+
+```
+Error relocating /usr/bin/node: ...: symbol not found
+```
+
+**依存は手で列挙しないこと。** `node` は 18 本の共有ライブラリに依存していて
+（icu・openssl・brotli・simdjson など）、数え漏らすと実行時に初めて分かります。
+**`ldd` で解決すれば、上流の更新で依存が増えても追従できます。**
+
+```dockerfile
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache nodejs
+
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp /usr/bin/node /stage/usr/bin/ \
+    && ldd /usr/bin/node \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' \
+       | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY --from=builder /stage/ /
+```
+
+**静的リンクできるならその方が確実です**（Go・Rust の musl ターゲット、
+C/C++ の `-static`）。このガイドの Go / Rust / C++ の例はいずれも
+静的リンクなので、この問題は起きません。
+
+動く例は [examples/](../../examples/)（nginx / Node.js / Python）にあります。
+
+### 2. `latest` は毎リリースで中身が変わる
+
+このガイドの例は読みやすさのために `latest` を使っていますが、
+**実運用では版を固定してください。**
+
+```dockerfile
+FROM ishinokazuki/kimigayo-os:3.0.1          # 推奨
+FROM ishinokazuki/kimigayo-os:3.0.1-minimal
+```
 
 ## 基本的なカスタマイズ
 
@@ -203,7 +252,9 @@ CMD ["/usr/local/bin/myapp"]
 
 # ----------------------------------------
 
-# Extended: デバッグツール付き
+# Extended: Standard に 11 アプレットを追加したもの
+# （ar / ed / fbset / fdformat / flash_* / flashcp / inotifyd / rfkill / unlzop）
+# strace や gdb のようなデバッガは入っていません。
 FROM ishinokazuki/kimigayo-os:latest-extended AS extended
 
 COPY myapp /usr/local/bin/myapp
@@ -492,12 +543,18 @@ CMD ["/usr/local/bin/app"]
 # Dockerfile Lint
 docker run --rm -i hadolint/hadolint < Dockerfile
 
-# イメージスキャン
-docker scan myapp:latest
-
 # Trivyスキャン
 trivy image myapp:latest
 ```
+
+> **`docker scan` は廃止されています**（`docker scout` に置き換わりました）。
+>
+> **Kimigayo をベースにしたイメージのスキャンには注意が必要です。**
+> パッケージデータベースを持たないため、Trivy はベース側の構成要素を
+> 1 つも識別できません（`Target: -` / `Results: 0`）。
+> **「脆弱性 0 件」ではなく「スキャンしていない」**という意味です。
+> 自分で持ち込んだ実行ファイルとライブラリの追跡は、持ち込み元
+> （Alpine のパッケージ版など）を手で突合してください。
 
 ### 6. ドキュメント化
 

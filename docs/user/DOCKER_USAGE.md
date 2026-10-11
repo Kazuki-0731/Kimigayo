@@ -18,7 +18,7 @@ Kimigayo OSは3つのバリアントを提供しています:
 |-----------|-----------|--------|------|
 | **Minimal** | `ishinokazuki/kimigayo-os:latest-minimal` | 2.62MB | 最小限の環境、特化したコンテナ |
 | **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | 2.76MB | 一般的な用途、開発、本番環境 |
-| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.78MB | 開発ツール付き、デバッグ、フル機能 |
+| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.78MB | Standard + 11 アプレット（MTD/flash・framebuffer 系）|
 
 （x86_64、v3.0.1 を 2026-10-11 実測。arm64 は +0.36〜0.39MB。
 最新は [README.md](../../README.md) の「パフォーマンス実績」節）
@@ -447,7 +447,7 @@ COPY --from=builder /usr/bin/curl /usr/bin/curl
 
 - **Minimal**: マイクロサービス、最小限のフットプリントが必要な場合
 - **Standard**: 一般的な用途（推奨）
-- **Extended**: 開発・デバッグ、フル機能が必要な場合
+- **Extended**: `ar`・`ed`・`fbset`・`fdformat`・`flash_*`・`flashcp`・`inotifyd`・`rfkill`・`unlzop` が必要な場合。**Standard との差はこの 11 個だけで、`strace` や `gdb` のようなデバッガは入っていません**
 
 迷ったら**Standard**を選択してください。
 

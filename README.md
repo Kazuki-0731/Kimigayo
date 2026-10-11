@@ -487,7 +487,7 @@ make build  # コンテナ内でビルド
 | -------------- | ------ | ---- | -------------- |
 | **Minimal** | **2.62MB**（367 アプレット） | コンテナ、最小限の環境 | `ishinokazuki/kimigayo-os:latest-minimal` |
 | **Standard** | **2.76MB**（400 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
-| **Extended** | **2.78MB**（411 アプレット） | 開発環境、豊富なツール | `ishinokazuki/kimigayo-os:latest-extended` |
+| **Extended** | **2.78MB**（411 アプレット） | MTD/flash・framebuffer を扱う場合 | `ishinokazuki/kimigayo-os:latest-extended` |
 
 いずれも x86_64 / v3.0.1 を 2026-10-11 実測。arm64 は Minimal 2.98MB /
 Standard 3.13MB / Extended 3.17MB（→「パフォーマンス実績」節）。
