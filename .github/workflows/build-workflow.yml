@@ -207,6 +207,17 @@ jobs:
             "${{ inputs.variant }}" \
             "${{ inputs.arch }}"
 
+      # 出荷物そのものの秘密情報スキャン（scripts/scan-image.sh）。
+      # CVE 照合（SCANS=vuln）はここではまだ走らせていない。
+      # 公開中の版に既知の CVE があり、どの push も落ちるため。
+      # 公開イメージに対する CVE 照合は dependency-review.yml が毎週行う。
+      - name: Scan image for secrets
+        run: |
+          SCANS=secret bash scripts/scan-image.sh \
+            "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
+            "${{ inputs.variant }}" \
+            "${{ inputs.arch }}"
+
       - name: Report image size
         if: success()
         run: |
