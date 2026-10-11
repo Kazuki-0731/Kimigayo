@@ -46,13 +46,20 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 - **Workflow:** `.github/workflows/dependency-review.yml`
 - **Schedule:** Weekly on Monday at 04:00 UTC
 - **Actions:**
-  - Run filesystem vulnerability scan
+  - Run filesystem vulnerability scan (`vulnerability-scan`)
   - Check for hardcoded secrets
   - Check for insecure downloads
-  - Verify component versions
   - Upload scan results to Security tab
+  - Pull the published image (`ishinokazuki/kimigayo-os:latest`) and match
+    its shipped component versions against CVEs, plus scan it for secrets
+    (`published-image-scan` → `scripts/scan-image.sh`)
+  - Create a GitHub issue if a scheduled run fails (`create-security-issue`)
 
-**Manual Review Required:** Review Security tab for findings
+**Manual Review Required:** Review Security tab for findings, and the
+issue / SBOM artifact (`sbom-published-latest`) if `published-image-scan` failed.
+As of 2026-10-11 it fails on v3.0.1 (5 known CVEs in BusyBox 1.38.0 /
+musl 1.2.6, handling undecided — see
+[SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)).
 
 #### Issue Triage
 - **Schedule:** Every Monday morning
@@ -99,7 +106,8 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 - **Actions:**
   - Review all security findings from past month
   - Verify all patches applied
-  - Check CVE databases for affected components
+  - Match shipped components against CVEs: `make scan-image`
+    (SBOM from the versions read out of the image + Grype)
   - Update SECURITY.md if needed
   - Review access controls and permissions
 
@@ -368,6 +376,7 @@ gh api repos/:owner/:repo/actions/workflows | jq '.workflows[] | {name, path}'
 
 # Run local security scan
 trivy fs .
+make scan-image    # CVE + secrets on kimigayo-os:$(VARIANT)-$(ARCH)
 
 # Check build status
 make status

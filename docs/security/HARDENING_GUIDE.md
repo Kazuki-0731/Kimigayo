@@ -598,7 +598,11 @@ cat /var/log/cis-benchmark-report.txt
 | --- | --- | --- |
 | **DS-0002 (HIGH)** イメージのユーザーが root | `Dockerfile` | **直さない。** これはビルド環境のイメージで、`apk` やクロスコンパイル、`/build` への書き込みに root が必要。公開物ではない |
 | **DS-0002 (HIGH)** イメージのユーザーが root | `Dockerfile.runtime` | **直さない（要判断として保留）。** 公開イメージの既定ユーザーを変えると、`openrc` が動かなくなり、既存の利用者全員に影響する破壊的変更になる。**利用者側で `docker run --user 65534` か Dockerfile の `USER` を使う**ことを案内する（→ `examples/` の3つはすべて `USER 65534` にしてある） |
-| `make trivy-scan`（イメージスキャン）が何も検出しない | 公開イメージ | **仕様。** パッケージデータベースを持たないため Trivy が対象を1つも識別できない。「脆弱性 0 件」ではなく「スキャンしていない」。構成要素の版は手で追跡する（→ `security-review` skill） |
+| `make trivy-scan`（イメージスキャン）が何も検出しない | 公開イメージ | **仕様。** パッケージデータベースを持たないため Trivy が対象を1つも識別できない。「脆弱性 0 件」ではなく「スキャンしていない」。2026-10-11 に `security-scan` から外し、出荷物の CVE 照合は `make scan-image`（イメージ内のバイナリから読んだ版で SBOM を作り Grype で照合）に置き換えた |
+
+> **`make scan-image` の CVE 照合は、v3.0.1 の公開イメージで 5 件を検出している**
+> （BusyBox 1.38.0 に 3 件・musl 1.2.6 に 2 件、2026-10-11）。
+> 対応は未決。一覧は [SECURITY_AUDIT.md](SECURITY_AUDIT.md#検出済みで未対応の-cve2026-10-11v301-の公開イメージ) にある。
 
 ### BusyBox の cpio はディレクトリを脱出できた（v3.0.1 まで。修正済み）
 
@@ -646,6 +650,13 @@ cd /work/target/dest && busybox cpio -iv -F /work/evil.cpio
 
 **v3.0.1 以前のイメージを使っているあいだは、信頼できないアーカイブを
 特権で展開しないこと。**
+
+**回帰テストは `scripts/verify-image.sh` に入っている。** イメージ内で
+`../escape` を含む cpio を実際に作って展開し、展開先の外にファイルが
+できたら `ESCAPED` で失敗する。v3.0.1 の公開イメージは `ESCAPED`、
+現在の `main` からビルドしたイメージは `CONTAINED` になる。
+config の行が消えると既定値（`n`）に黙って戻るため、config ではなく
+挙動を見ている。
 
 関連して、2026-10-09 に **CVE-2026-108119**（BusyBox の `tar` の遅延リンク
 生成が展開先の外を検証しない、CVSS 6.3 MEDIUM）が公表された。

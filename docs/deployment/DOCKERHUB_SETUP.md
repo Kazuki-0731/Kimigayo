@@ -165,10 +165,15 @@ GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` だけ。
 ソースツリーとビルド環境は Trivy で自動スキャンし、結果を
 GitHub の Security タブに公開している。
 
-**イメージ自体のスキャンは成立しない。** パッケージデータベースを
+**イメージ自体の Trivy スキャンは成立しない。** パッケージデータベースを
 持たないため Trivy が対象を1つも識別できない（「脆弱性 0 件」ではなく
-「スキャン対象を認識できない」）。構成要素の脆弱性はバージョンを
-手で追跡する（→ `security-review` skill）。
+「スキャン対象を認識できない」）。
+
+構成要素（BusyBox / musl / OpenRC）の CVE は `scripts/scan-image.sh`
+（`make scan-image`）で照合する。イメージ内のバイナリから読んだ版で
+SBOM を作り、Grype で照合する。公開中の `latest` には
+`dependency-review.yml` の `published-image-scan` が毎週月曜
+04:00 UTC に回す（→ [CICD_GUIDE.md](../developer/CICD_GUIDE.md#7-dependency-review-githubworkflowsdependency-reviewyml)）。
 
 ### 更新ポリシー
 

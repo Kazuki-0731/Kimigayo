@@ -26,13 +26,15 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 ### 1. 自動化監査（継続的）
 
 #### a. 脆弱性スキャン
-- **ツール**: Trivy
-- **頻度**: 週次（毎週日曜日 00:00 UTC）+ プッシュ/タグ時
-- **スコープ**:
-  - Dockerイメージ（全バリアント）
-  - ソースコードリポジトリ
-  - 依存関係パッケージ
-- **重大度**: CRITICAL, HIGH, MEDIUM
+- **出荷物（イメージ）**: `scripts/scan-image.sh`（`make scan-image`）
+  - イメージ内のバイナリを実行して読んだ BusyBox / musl / OpenRC の版から
+    CycloneDX の SBOM を作り、Grype で NVD の CPE と照合する
+  - 公開イメージ（Docker Hub の `latest`）に対して毎週月曜 04:00 UTC
+    （`dependency-review.yml` の `published-image-scan`）
+  - **push ごとの CVE 照合はまだ行っていない**（下記「自動化された監査」）
+- **リポジトリ**: Trivy のファイルシステムスキャン（push / PR・毎日・毎週）
+- **重大度**: 出荷物は `FAIL_ON`（既定 `low`、Grype の `--fail-on`）、
+  リポジトリは CRITICAL, HIGH
 
 #### b. 静的解析
 - **ツール**: ShellCheck
@@ -138,8 +140,8 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 1. **脆弱性スキャン実行**
    ```bash
-   # Docker イメージスキャン
-   make trivy-scan VARIANT=standard ARCH=x86_64
+   # 出荷物の CVE 照合（SBOM + Grype）と秘密情報スキャン
+   make scan-image VARIANT=standard ARCH=x86_64
 
    # ファイルシステムスキャン
    make trivy-fs-scan
@@ -211,8 +213,27 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 #### 2. リリース時（`release.yml`）
 
-ShellCheck と `scripts/verify-image.sh`（29 項目）。
+ShellCheck と `scripts/verify-image.sh`（31 項目）、push 前に
+`SCANS=secret` の `scripts/scan-image.sh`（秘密情報）。
 **Trivy のイメージスキャンは 2026-10-09 に外しました**（下記の理由）。
+
+`verify-image.sh` のうちセキュリティに関わる検査:
+
+- イメージ内の**全 ELF**の PIE / RELRO / BIND_NOW / 非実行スタック
+  （`scripts/check-elf-hardening.py` が `docker export` の tar を読む）
+- イメージ内のバイナリを実行して読んだ BusyBox / musl / OpenRC の版と
+  `versions.mk` の突合（`scripts/lib/image-components.sh`）
+- cpio のパストラバーサルの回帰テスト（v3.0.1 の公開イメージは
+  `ESCAPED` で落ちる。現在の `main` は `CONTAINED`）
+- setuid/setgid・`/etc/shadow` の権限・パッケージマネージャーの不在 など
+
+#### 2b. ビルドごと（`build-workflow.yml`）
+
+`ci.yml`・`manual-build.yml` が呼ぶビルド本体で、`verify-image.sh` の
+あとに `SCANS=secret` で `scripts/scan-image.sh` を実行します
+（rootfs の秘密情報。見つかればジョブが落ちる）。
+**CVE 照合はここでは走らせていません。** 公開中の版に既知の CVE があり、
+扱いが決まるまでどの push も落ちるためです。
 
 #### 3. 定期監査（`security.yml`）
 - **頻度**: **毎日 02:00 UTC**
@@ -224,11 +245,37 @@ ShellCheck と `scripts/verify-image.sh`（29 項目）。
 > Trivy は対象を 1 つも識別できません
 > （実測で `Target: -` / `Not scanned` / `Metadata.OS: null` / `Results: 0`）。
 > **「脆弱性 0 件」ではなく「スキャンしていない」。**
-> 構成要素（カーネル / musl / BusyBox / OpenRC）の脆弱性追跡は
-> **版を手で突合します**（→ `security-review` skill）。
+> 構成要素（musl / BusyBox / OpenRC）の CVE 照合は
+> **`scripts/scan-image.sh` が出荷物の版で行います**（下記 4.）。
+> カーネルはイメージに入らないので対象外です。
 
-#### 4. 依存レビュー（`dependency-review.yml`）
-`main` への PR と毎週月曜 04:00 UTC。`fail-on-severity: high`。
+#### 4. 依存レビューと公開イメージの照合（`dependency-review.yml`）
+`main` への PR と毎週月曜 04:00 UTC、手動。
+
+- `dependency-review`（PR のみ）: `fail-on-severity: high`
+- `published-image-scan`（定期・手動のみ）: Docker Hub の `latest` を pull し、
+  `scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。定期実行で
+  失敗すると `create-security-issue` が Issue を起票します
+
+> 以前の「Check component versions against CVE databases」ステップは
+> CVE データベースを照会せず、`versions.mk` の版を表示するだけでした
+> （2026-10-11 に置き換え）。
+
+#### 検出済みで未対応の CVE（2026-10-11、v3.0.1 の公開イメージ）
+
+`scan-image.sh` による照合で次の 5 件が検出されています。
+**対応（パッチを当てるか等）は未決です。**
+
+| 構成要素 | CVE | 内容 | 補足 |
+| --- | --- | --- | --- |
+| BusyBox 1.38.0 | CVE-2026-38753 | awk の use-after-free | |
+| BusyBox 1.38.0 | CVE-2026-38754 | ash の `ifsbreakup` のヒープオーバーフロー | Alpine aports は `0040-ash-fix-out-of-bounds-read-in-ifsbreakup.patch` を持つ |
+| BusyBox 1.38.0 | CVE-2026-38755 | ash の `evalcommand` | |
+| musl 1.2.6 | CVE-2026-40200 | `qsort` | 64bit では非現実的。Alpine aports はパッチ済み（pkgrel=5） |
+| musl 1.2.6 | CVE-2026-6042 | `iconv` の GB18030 による DoS | Alpine aports はパッチ済み（pkgrel=5） |
+
+このため `make scan-image`（CVE 照合を含む）と `published-image-scan` は
+現時点で失敗します。
 
 #### 5. 上流更新の検知（`base-image-update.yml`）
 毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。
@@ -236,17 +283,22 @@ ShellCheck と `scripts/verify-image.sh`（29 項目）。
 ### ローカル監査実行
 
 ```bash
-# 総合（下記のとおり trivy-scan は実質無効）
+# 総合（scan-image + trivy-fs-scan + shellcheck-scan）
 make security-scan
 
 # 個別スキャン
+make scan-image          # 出荷物の CVE 照合（SBOM + Grype）と秘密情報（有効）
 make trivy-fs-scan       # ファイルシステム（有効）
 make shellcheck-scan     # シェルスクリプト（有効）
-make trivy-scan          # Dockerイメージ（**何も検査しない**）
+make trivy-scan          # Dockerイメージ（**何も検査しない**。security-scan には含まれない）
 ```
 
-**`make security-scan` は `trivy-scan` が何も検査しなくても
-「✅ 完了」と出します。沈黙を安全と読まないこと。**
+`make scan-image` は `kimigayo-os:$(VARIANT)-$(ARCH)` を対象にするので、
+先にイメージをビルドしておきます。`SCANS`（既定 `secret vuln`）・
+`SBOM_OUT`・`FAIL_ON`（既定 `low`）で挙動を変えられます。
+
+**`make trivy-scan` は何も検査しなくても終了します。沈黙を安全と
+読まないこと**（2026-10-11 に `security-scan` から外しました）。
 
 ## 外部監査
 

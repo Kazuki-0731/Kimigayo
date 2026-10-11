@@ -24,7 +24,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
 | `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャンと Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
-| `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）|
+| `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
 
 ### 1. CI (`.github/workflows/ci.yml`)
 
@@ -92,6 +92,19 @@ strategy:
 入力に `variant` / `arch` / `build_kernel` / `upload_artifacts` を取ります。
 `build_kernel` の既定は `false` です。
 
+イメージを作ったあと、verify-image ジョブで次の2つを実行します
+（どちらも失敗すればジョブが落ちます）:
+
+1. `scripts/verify-image.sh` — イメージを起動しての検証（31 項目）
+2. `SCANS=secret bash scripts/scan-image.sh` — 出荷物の秘密情報スキャン
+   （Trivy の secret スキャナで rootfs を見る）
+
+> **CVE 照合（`SCANS=vuln`）はここではまだ走らせていません。**
+> 公開中の版に既知の CVE が 5 件あり、扱いが決まるまでどの push も
+> 落ちるためです。公開イメージに対する CVE 照合は
+> [7. Dependency Review](#7-dependency-review-githubworkflowsdependency-reviewyml)
+> が毎週行います。
+
 ### 4. Manual Build (`.github/workflows/manual-build.yml`)
 
 **トリガー:** 手動のみ（workflow_dispatch）
@@ -111,16 +124,19 @@ gh workflow run manual-build.yml \
 - 手動実行
 
 **処理内容:**
-1. 構成要素の版の確認
-2. 脆弱性スキャン（Trivy）
+1. 構成要素の版の確認（`version-check`）
+2. リポジトリのファイルシステムスキャン（Trivy、`trivy-filesystem-scan`）
 3. 脆弱性検出時に Issue を自動作成
 
-> **イメージの Trivy スキャンは実質的に何も検査していません。**
+> **イメージの Trivy スキャン（`trivy-image-scan`）は 2026-10-09 に外しました。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
 > 持たないため、Trivy は対象を 1 つも識別できません
 > （`Target: -` / `Not scanned` / `Results: 0`）。
 > **「脆弱性 0 件」ではなく「スキャンしていない」**という意味です。
-> 脆弱性の追跡は構成要素の版を手で突合します。
+> 出荷物の構成要素の CVE 照合は `scripts/scan-image.sh` が行い、
+> 公開イメージに対しては
+> [7. Dependency Review](#7-dependency-review-githubworkflowsdependency-reviewyml)
+> の `published-image-scan` が毎週回します。
 > ファイルシステムスキャン（`trivy-fs-scan`）はリポジトリ側の依存を
 > 見るので有効です。
 
@@ -136,7 +152,24 @@ PR を作成します。**この PR は「上流が動いた」という一次�
 
 **トリガー:** `main` への PR、毎週月曜 04:00 UTC、手動
 
-依存のレビューを行います（`fail-on-severity: high`）。
+| ジョブ | いつ | 何をするか |
+| --- | --- | --- |
+| `dependency-review` | PR のみ | 依存のレビュー（`fail-on-severity: high`） |
+| `vulnerability-scan` | PR・定期・手動 | リポジトリの Trivy FS スキャンとビルドスクリプトの検査 |
+| `published-image-scan` | 定期・手動（PR では走らない） | Docker Hub の `ishinokazuki/kimigayo-os:latest`（standard / amd64）を pull し、`scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。SBOM を `sbom-published-latest` として保存 |
+| `create-security-issue` | 定期実行で上の2つのどちらかが失敗したとき | Issue を起票 |
+
+`published-image-scan` が見るのは `latest` だけです。構成要素の版は
+バリアント・アーキテクチャで共通なためです。新しい CVE はコードが
+変わらなくても公開されるので、push ではなく定期で回します。
+
+> 以前ここにあった「Check component versions against CVE databases」
+> ステップは、CVE データベースを一切照会せず `versions.mk` の版を
+> 表示するだけでした（2026-10-11 に `published-image-scan` に置き換え）。
+
+> **2026-10-11 時点の公開イメージ（v3.0.1）では、このジョブは失敗します。**
+> BusyBox 1.38.0 に 3 件、musl 1.2.6 に 2 件の既知 CVE が検出されており、
+> 対応は未決です（→ [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)）。
 
 ## ビルドプロセス
 
@@ -267,7 +300,7 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
       "${{ matrix.arch }}"
 ```
 
-**検証の実体は `scripts/verify-image.sh`**（29 項目）で、`ci.yml` と
+**検証の実体は `scripts/verify-image.sh`**（31 項目）で、`ci.yml` と
 ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
@@ -275,6 +308,8 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
 > **`release.yml` に Trivy も pytest も統合テストもありません。**
 > Trivy のイメージスキャンは、パッケージデータベースが無く
 > 何も識別できないため 2026-10-09 に外しました。
+> `release.yml` でも push の前に `SCANS=secret` で
+> `scripts/scan-image.sh` を走らせます（CVE 照合はまだ走らせない）。
 > pytest は `ci.yml` 側で回ります。
 > 以前は検証に `continue-on-error` が付いており、
 > tarball が小さくても `exit 0` でスキップしていました。
@@ -395,6 +430,9 @@ docker run --rm test-image /bin/sh -c "echo 'Test' && busybox --help"
 ### 5. セキュリティテスト
 
 ```bash
+# 出荷物の CVE 照合（SBOM + Grype）と秘密情報スキャン
+make scan-image VARIANT=standard ARCH=x86_64
+
 # リポジトリ側の依存をスキャン（有効）
 make trivy-fs-scan
 
@@ -407,9 +445,11 @@ make shellcheck-scan
 > Trivy は対象を 1 つも識別できません
 > （`Target: -` / `Not scanned` / `Results: 0`）。
 > **「CRITICAL/HIGH が 0 件」ではなく「スキャンしていない」。**
-> 構成要素（カーネル / musl / BusyBox / OpenRC）の脆弱性追跡は
-> 版を手で突合します（→ `security-review` skill、
-> `.github/workflows/security.yml`）。
+> 構成要素（musl / BusyBox / OpenRC）の CVE 照合は `make scan-image`
+> を使います。イメージ内のバイナリを実行して読んだ版で CycloneDX の
+> SBOM を作り、Grype で NVD の CPE と照合します
+> （→ [DEVELOPMENT.md](../../DEVELOPMENT.md#セキュリティスキャン)）。
+> カーネルはイメージに入らないので照合の対象外です。
 
 ## セキュリティスキャン
 
@@ -431,17 +471,20 @@ make shellcheck-scan
 `.claude/hooks` も検査対象です（Hook はこのプロジェクトの作業ルール
 そのものなので、`scripts/` と同じ基準で静的解析します）。
 
-### Trivy（脆弱性スキャン）
+### Trivy（リポジトリのファイルシステムスキャン）
+
+Trivy は**リポジトリ**に対してだけ使います（`ci.yml`・`security.yml`・
+`dependency-review.yml`）。イメージには使いません（何も識別できないため）。
 
 ```yaml
-- name: Run Trivy vulnerability scanner
+- name: Run Trivy filesystem scan
   uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
   with:
-    image-ref: ${{ steps.trivy_tag.outputs.tag }}
+    scan-type: 'fs'
+    scan-ref: '.'
     format: 'sarif'
     output: 'trivy-results.sarif'
     severity: 'CRITICAL,HIGH'
-    scanners: 'vuln,config,secret'
 ```
 
 **SARIF形式でGitHub Security tabに結果をアップロード:**
@@ -452,6 +495,15 @@ make shellcheck-scan
   with:
     sarif_file: 'trivy-results.sarif'
 ```
+
+### 出荷物のスキャン（`scripts/scan-image.sh`）
+
+イメージそのものは `scripts/scan-image.sh` で検査します。
+
+| どこで | 何を | 失敗したら |
+| --- | --- | --- |
+| `build-workflow.yml`（ビルドごと） | `SCANS=secret`（秘密情報のみ） | ジョブが落ちる |
+| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | Issue を起票 |
 
 ## リリースプロセス
 
@@ -490,7 +542,7 @@ git push origin v3.0.2
 1. 版の解決（`scripts/get-version.sh`）
 2. ShellCheck
 3. 全バリアント・全アーキテクチャをビルド（6 ジョブ）
-4. **イメージを起動して検証**（`scripts/verify-image.sh`、29 項目）
+4. **イメージを起動して検証**（`scripts/verify-image.sh`、31 項目）
 5. 検証を通ったものだけ Docker Hub にプッシュ
 6. マルチアーキテクチャマニフェスト作成
 7. **Cosign のキーレス署名**（v3.0.2 から）

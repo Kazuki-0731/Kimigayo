@@ -93,7 +93,7 @@ make info
 # クリーン（clean=成果物のみ / clean-cache=ダウンロード / clean-all=全部）
 make clean
 
-# セキュリティスキャン（Trivy + ShellCheck）
+# セキュリティスキャン（scan-image + Trivy FS + ShellCheck）
 make security-scan
 
 # rootfs から Docker イメージまで（GitHub Actions 相当）
@@ -218,29 +218,76 @@ ls build/logs/
 - **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2`
 - **RELRO**: `-Wl,-z,relro,-z,now`
 
+成果物に効いているかは `scripts/verify-image.sh` が見る。イメージを
+`docker export` した tar を `scripts/check-elf-hardening.py` が読み、
+**イメージ内のすべての ELF** について PIE・RELRO・BIND_NOW・非実行スタックを
+検査する（以前は `/bin/busybox` が PIE かどうかだけだった）。
+
+`verify-image.sh` の「セキュリティの回帰」ではほかに次を見る:
+
+- **出荷物の構成要素の版** — イメージ内のバイナリを実行して読んだ
+  BusyBox / musl / OpenRC の版を `versions.mk` と突合する
+  （`scripts/lib/image-components.sh`）。古いビルド結果が残って
+  宣言と違う版が出荷されるのを止める
+- **cpio のパストラバーサル** — `../` を含むアーカイブを実際に展開し、
+  展開先の外に書き出さないこと（`CONTAINED`）を確かめる。
+  v3.0.1 の公開イメージはここで `ESCAPED` になる（修正前の状態）
+
 ### セキュリティスキャン
 
 ```bash
-# 総合（Trivy イメージ + Trivy FS + ShellCheck）
+# 総合（scan-image + Trivy FS + ShellCheck）
 make security-scan
 
 # 個別
-make trivy-scan
-make trivy-fs-scan
+make scan-image          # 出荷物の CVE 照合（SBOM + Grype）と秘密情報スキャン
+make trivy-fs-scan       # リポジトリ側の依存
 make shellcheck-scan
+make trivy-scan          # Kimigayo は識別されない（下記）
 ```
+
+**`make scan-image` は出荷するイメージそのものを検査する**
+（`scripts/scan-image.sh`。対象は `kimigayo-os:$(VARIANT)-$(ARCH)` なので、
+先にイメージをビルドしておく）。
+
+- **CVE 照合（`vuln`）** — イメージ内のバイナリから読んだ版で CycloneDX の
+  SBOM を作り、Grype（`anchore/grype:v0.120.1`）で NVD の CPE と照合する。
+  CPE は `busybox:busybox` / `musl-libc:musl` / `openrc_project:openrc`
+- **秘密情報（`secret`）** — Trivy の secret スキャナで rootfs のファイルを見る
+- grype / trivy がホストに無ければ、版を固定した公式 Docker イメージで動かす
+
+| 環境変数 | 既定 | 意味 |
+| --- | --- | --- |
+| `SCANS` | `secret vuln` | 実行する検査。片方だけなら `SCANS=secret` など |
+| `SBOM_OUT` | `build/sbom/kimigayo-<variant>-<arch>.cdx.json` | SBOM の出力先 |
+| `FAIL_ON` | `low` | この深刻度以上の CVE で失敗する（Grype の `--fail-on`） |
+
+> **v3.0.1 と同じ版の構成要素では CVE 照合が失敗する。**
+> 2026-10-11 の照合で、BusyBox 1.38.0 に 3 件（CVE-2026-38753 /
+> 38754 / 38755）、musl 1.2.6 に 2 件（CVE-2026-40200 / CVE-2026-6042）が
+> 検出されている。**対応は未決**（→ [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md)）。
 
 > **`make trivy-scan`（イメージスキャン）は実質何も検査していない。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
 > 持たないため、Trivy は対象を 1 つも識別できない
 > （`Target: -` / `Not scanned` / `Results: 0`）。
 > **「脆弱性 0 件」ではなく「スキャンしていない」。**
-> それでも `security-scan` は「✅ 完了」と出すので、沈黙を安全と
-> 読まないこと。脆弱性の追跡は構成要素の版を手で突合する
-> （→ `security-review` skill）。
+> そのため 2026-10-11 に `security-scan` から外し、脆弱性の検査は
+> `scan-image` に置き換えた。
 > **`make trivy-fs-scan` はリポジトリ側の依存を見るので有効。**
 
-依存関係のレビューは CI 側（`.github/workflows/dependency-review.yml`）で回る。
+CI 側では次のように回る:
+
+- **ビルドごと** — `build-workflow.yml` の verify-image ジョブが
+  `SCANS=secret` で `scan-image.sh` を実行する（失敗すればジョブも落ちる）。
+  **CVE 照合は push ごとにはまだ走らせていない**（公開中の版に既知 CVE があり、
+  扱いが決まるまでどの push も落ちるため）
+- **毎週月曜 04:00 UTC と手動** — `dependency-review.yml` の
+  `published-image-scan` ジョブが Docker Hub の `latest` を pull し、
+  `scan-image.sh`（CVE + 秘密情報）を回す。失敗すれば
+  `create-security-issue` が Issue を起票する
+- **PR** — `dependency-review.yml` の依存レビュー。リポジトリの Trivy FS スキャン
+  （`vulnerability-scan`）は PR と定期の両方で走る
 
 ## パフォーマンス測定
 

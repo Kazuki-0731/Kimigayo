@@ -106,7 +106,7 @@ make test-integration  # 統合テスト
 
 # 静的解析（ホスト側）
 make shellcheck-scan   # scripts/ と .claude/hooks/
-make security-scan     # Trivy + ShellCheck
+make security-scan     # scan-image（成果物の CVE・秘密情報）+ Trivy FS + ShellCheck
 ```
 
 > `make lint` / `make static-analysis` / `make docs` は存在しません。

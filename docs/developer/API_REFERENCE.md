@@ -262,8 +262,11 @@ python3 -m pytest tests/unit tests/property --cov --cov-report=term-missing
 # ShellCheck（scripts/ と .claude/hooks/）
 make shellcheck-scan
 
-# Trivy（イメージ + ファイルシステム）+ ShellCheck
+# scan-image + Trivy（ファイルシステム）+ ShellCheck
 make security-scan
+
+# 出荷物（kimigayo-os:$(VARIANT)-$(ARCH)）の CVE 照合と秘密情報スキャン
+make scan-image
 
 # リポジトリ側の依存だけを見る
 make trivy-fs-scan
@@ -272,6 +275,10 @@ make trivy-fs-scan
 > `make lint` / `make static-analysis` は存在しません。
 > **`make trivy-scan`（イメージスキャン）は何も検査できません。**
 > パッケージデータベースを持たないため Trivy が対象を識別できません。
+> そのため `security-scan` には含めず、脆弱性の検査は `scan-image`
+> （出荷物の版から SBOM を作り Grype で照合）で行います。
+> `scan-image` の環境変数（`SCANS` / `SBOM_OUT` / `FAIL_ON`）は
+> [DEVELOPMENT.md](../../DEVELOPMENT.md#セキュリティスキャン) を参照。
 
 ### ビルド設定変数
 
