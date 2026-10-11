@@ -53,12 +53,13 @@ kimigayo_is_built() {
 # 2026-10-11: さらに入力の内容ハッシュを足した（→ kimigayo_inputs_id）。
 # config・パッチ・ビルドスクリプト自身のどれかが変われば作り直す。
 #
-# musl のパッチ（src/libc/patches/）も入れる。BusyBox は static-pie で
-# libc.a を中に取り込むので、arm64（自前の musl を sysroot にして
-# リンクする）では musl にパッチを足しても BusyBox を作り直さない限り
-# 未パッチの qsort などが残る（CLAUDE.md「musl を作り直したら、
+# musl のパッチ（src/libc/patches/）も入れる。BUSYBOX_LINK=static のときは
+# libc.a を中に取り込むので、musl にパッチを足しても BusyBox を作り直さない
+# 限り未パッチの qsort などが残る（CLAUDE.md「musl を作り直したら、
 # それにリンクしているものも作り直す」節）。
-# 例: 1.38.0+standard+28a2a65cf6e0
+# リンク方法（BUSYBOX_LINK=static|dynamic）も入れる。同じ config から
+# 静的と動的の両方を作れるので、取り違えると別物が入る。
+# 例: 1.38.0+standard+dynamic+28a2a65cf6e0
 kimigayo_busybox_build_id() {
     local root="${PROJECT_ROOT:?PROJECT_ROOT must be set}"
     local id
@@ -67,7 +68,17 @@ kimigayo_busybox_build_id() {
         "${root}/src/busybox/patches/"*.patch \
         "${root}/src/libc/patches/"*.patch \
         "${root}/scripts/build-busybox.sh")"
-    printf '%s+%s+%s' "$1" "$2" "$id"
+    printf '%s+%s+%s+%s' "$1" "$2" "$(kimigayo_busybox_link)" "$id"
+}
+
+# BusyBox のリンク方法。既定値はここ1箇所だけに書く。
+#
+# build-busybox.sh（実際にビルドする側）と build-rootfs.sh（ビルド済みかを
+# 判定する側）の両方がこれを使う。既定値を別々に書くと、片方だけ
+# 変えたときに「判定は dynamic、ビルドは static」のように食い違う。
+KIMIGAYO_BUSYBOX_LINK_DEFAULT="dynamic"
+kimigayo_busybox_link() {
+    printf '%s' "${BUSYBOX_LINK:-$KIMIGAYO_BUSYBOX_LINK_DEFAULT}"
 }
 
 # musl のスタンプ値。
