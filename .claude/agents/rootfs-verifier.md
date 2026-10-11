@@ -19,7 +19,7 @@ color: green
 - OpenRC のバイナリが1つも入っていない（売りである Init が無い）
 - musl の `libc.so` が無く `/lib/ld-musl-*.so.1` がリンク切れ
 - `/tmp`・`/run`・`/var/log` などが無い
-- それでも smoke テストは通っていた（BusyBox が static-pie なので動く）
+- それでも smoke テストは通っていた（当時の BusyBox は static-pie なので動いた。v3.0.2 からは動的リンクなので、libc.so が無ければ /bin/sh も動かない）
 
 **「イメージが起動した」は検証ではありません。** 中身を1つずつ見ます。
 

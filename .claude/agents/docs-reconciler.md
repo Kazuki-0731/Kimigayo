@@ -119,7 +119,8 @@ grep -rhoE 'make [a-z][a-z0-9_-]+' --include='*.md' . | grep -v '^./build' |
 機能の説明が実態と違っていないかを、コードで裏を取ります。実例:
 
 - README が「完全静的リンク・依存関係ゼロ」と書いていたが、
-  **OpenRC は musl に動的リンクしている**（BusyBox だけが static-pie）
+  **OpenRC は musl に動的リンクしている**（当時は BusyBox だけが static-pie。
+  v3.0.2 からは BusyBox も動的リンク）
 - 「Init システム: OpenRC」が売りだが、**配布イメージに1つも
   入っていなかった**（v0.1.0〜v2.0.1）
 - パッケージマネージャーが無いのは**意図した設計**であって欠落ではない。
