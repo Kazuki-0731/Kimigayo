@@ -62,7 +62,17 @@ kimigayo_busybox_build_id() {
         "${root}/src/busybox/config/${2}.config" \
         "${root}/src/busybox/patches/"*.patch \
         "${root}/scripts/build-busybox.sh")"
-    printf '%s+%s+%s+%s' "$1" "$2" "${BUSYBOX_LINK:-static}" "$id"
+    printf '%s+%s+%s+%s' "$1" "$2" "$(kimigayo_busybox_link)" "$id"
+}
+
+# BusyBox のリンク方法。既定値はここ1箇所だけに書く。
+#
+# build-busybox.sh（実際にビルドする側）と build-rootfs.sh（ビルド済みかを
+# 判定する側）の両方がこれを使う。既定値を別々に書くと、片方だけ
+# 変えたときに「判定は dynamic、ビルドは static」のように食い違う。
+KIMIGAYO_BUSYBOX_LINK_DEFAULT="static"
+kimigayo_busybox_link() {
+    printf '%s' "${BUSYBOX_LINK:-$KIMIGAYO_BUSYBOX_LINK_DEFAULT}"
 }
 
 # musl のスタンプ値。

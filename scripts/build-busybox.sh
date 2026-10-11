@@ -88,7 +88,8 @@ log_error() {
 # 動的にしても共有ライブラリは増えない（libc.so は OpenRC のために既に入っている）。
 # 動的化で開く LD_PRELOAD の注入面は、musl の ldso パッチで塞いである
 # （→ src/libc/patches/0001-ldso-ignore-ld-env.patch）。
-BUSYBOX_LINK="${BUSYBOX_LINK:-static}"
+# 既定値は scripts/lib/build-stamp.sh の KIMIGAYO_BUSYBOX_LINK_DEFAULT
+BUSYBOX_LINK="$(kimigayo_busybox_link)"
 case "$BUSYBOX_LINK" in
     static|dynamic) ;;
     *) log_error "BUSYBOX_LINK must be 'static' or 'dynamic' (got '${BUSYBOX_LINK}')"; exit 1 ;;
