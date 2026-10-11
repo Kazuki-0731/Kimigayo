@@ -26,6 +26,10 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/versions.sh
+source "$SCRIPT_DIR/lib/versions.sh"
+# shellcheck source=lib/image-components.sh
+source "$SCRIPT_DIR/lib/image-components.sh"
 
 # Colors for output
 RED='\033[0;31m'
@@ -507,6 +511,34 @@ if [ -z "$pkgmgr" ]; then
     pass "no package manager"
 else
     fail "package managers are present:${pkgmgr}"
+fi
+
+# ---------------------------------------------------------------------------
+# 8. セキュリティの回帰
+# ---------------------------------------------------------------------------
+# **出荷物の構成要素の版が versions.mk と一致しているか。**
+#
+# 2026-10-09 に BusyBox 1.38.0 のつもりで 1.36.1 が残り、ビルドは
+# 「✅ completed」と報告した。脆弱性の確認は versions.mk の版で
+# 行っていたので、**古い（脆弱な）版が出荷されても気づけない**。
+# バイナリを実行して読んだ版と突合する。
+# scripts/scan-image.sh の CVE 照合も、ここで読むのと同じ版を使う。
+components="$(kimigayo_image_components "$IMAGE" "$PLATFORM")"
+mismatch=""
+while read -r name ver; do
+    case "$name" in
+        busybox) want="$BUSYBOX_VERSION" ;;
+        musl)    want="$MUSL_VERSION" ;;
+        openrc)  want="$OPENRC_VERSION" ;;
+        *) continue ;;
+    esac
+    [ "$ver" = "$want" ] || mismatch="${mismatch} ${name}=${ver}(versions.mk: ${want})"
+done <<< "$components"
+if [ -z "$mismatch" ]; then
+    pass "shipped versions match versions.mk ($(printf '%s' "$components" | tr '\n' ' ' | sed 's/ $//'))"
+else
+    fail "shipped versions differ from versions.mk:${mismatch}"
+    log_error "      古いビルド結果がスキップ判定をすり抜けた疑い（CLAUDE.md「版を上げたら build/ の残骸を疑う」節）"
 fi
 
 # ---------------------------------------------------------------------------
