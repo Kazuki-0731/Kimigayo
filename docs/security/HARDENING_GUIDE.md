@@ -574,20 +574,10 @@ rc-service auditd start
 rc-update add auditd default
 ```
 
-### CIS Benchmark準拠
-
-CIS (Center for Internet Security) Benchmarkに準拠するための確認：
-
-```bash
-# CIS Benchmarkスクリプトのダウンロード
-wget https://downloads.cisecurity.org/alpine-linux-benchmark.sh
-
-# ベンチマークの実行
-bash alpine-linux-benchmark.sh --level 1
-
-# レポートの確認
-cat /var/log/cis-benchmark-report.txt
-```
+> 以前ここに「CIS Benchmark スクリプト（`alpine-linux-benchmark.sh`）を
+> 取得して実行する」手順があったが、**その URL は 404 で、イメージに
+> `bash` も無い**（2026-10-12 に確認して削除）。Kimigayo は CIS
+> Benchmark への準拠を謳っていない。
 
 ## Trivy の既知の指摘と、その判断（2026-10-11）
 
