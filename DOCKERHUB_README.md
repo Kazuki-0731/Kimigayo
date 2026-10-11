@@ -118,8 +118,16 @@ kimigayo-os:latest-arm64        # 最新StandardのARM64
 
 ### 完全性の検証
 
-**イメージ署名（Docker Content Trust / Cosign）は未実装です。**
-検証したい場合は次の2つを使ってください。
+**Cosign のキーレス署名を v3.0.2 から行います。**
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:latest \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+**v3.0.1 以前のイメージは署名されていません。** その場合は次の2つを
+使ってください。
 
 - **ダイジェスト指定での pull**: タグではなくダイジェストで固定する
 

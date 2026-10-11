@@ -71,8 +71,9 @@ strategy:
 3. マルチアーキテクチャ・マルチバリアントビルド（6 ジョブ）
 4. イメージ検証と Docker Hub への push
 5. マルチアーキテクチャマニフェスト作成
-6. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`）
-7. SARIF 連携・通知
+6. **Cosign のキーレス署名**（`sign` ジョブ）
+7. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`）
+8. 通知
 
 > **`CHANGELOG.md` は自動生成されません。手で書きます。**
 > `make changelog` は `build/CHANGELOG.generated.md` に下書きを出すだけで、
@@ -287,6 +288,42 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
     docker push "${{ steps.tags.outputs.moving }}"
 ```
 
+#### 11. Cosign のキーレス署名
+
+**鍵を持ちません。** GitHub Actions の OIDC トークンで署名し、署名は
+Rekor の透明性ログに載ります。Secrets を増やさずに済みます。
+
+```yaml
+  sign:
+    permissions:
+      contents: read
+      id-token: write      # これが無いと OIDC が取れない
+    steps:
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      ...
+      - run: cosign sign --yes "${repo}@${digest}"
+```
+
+**署名するのはタグではなくダイジェストです。** タグは動くので、
+タグへの署名では「どのイメージを署名したか」を特定できません。
+`docker buildx imagetools inspect` の `Digest:` 行から引き
+（`--format` は古い buildx に無い）、**重複を落としてから署名します**
+（実測で 22 タグ → 9 ダイジェスト）。
+
+署名した直後に `cosign verify` で検証まで行います
+（「署名した」と「検証できる」は別）。
+
+利用者側の検証:
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:latest \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+> **v3.0.1 以前の公開イメージは署名されていません。**
+> 配線は 2026-10-11 に入れたもので、効くのは次のリリース以降です。
+
 #### 10. マルチアーキテクチャマニフェスト作成
 
 **作るタグは1種類ではありません。** `create-manifest` ジョブが
@@ -456,8 +493,9 @@ git push origin v3.0.2
 4. **イメージを起動して検証**（`scripts/verify-image.sh`、29 項目）
 5. 検証を通ったものだけ Docker Hub にプッシュ
 6. マルチアーキテクチャマニフェスト作成
-7. GitHub Releases を作成
-8. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS）を添付
+7. **Cosign のキーレス署名**（v3.0.2 から）
+8. GitHub Releases を作成
+9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS）を添付
 
 **Trivy スキャンと pytest は `release.yml` では走りません**
 （pytest は `ci.yml` 側。Trivy のイメージスキャンは何も識別できないため

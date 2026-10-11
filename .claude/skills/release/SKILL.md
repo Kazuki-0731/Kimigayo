@@ -106,10 +106,15 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 ```
 
 > 2026-10-11 に削除したもの: 「seccomp-BPF をデフォルトで有効化」
-> 「Cosign で署名」「再現可能ビルド＝ビット同一」「`stable` / `edge`
-> タグ」「Minimal はカーネル込み」。**どれも一度も実装されていません。**
+> 「再現可能ビルド＝ビット同一」「`stable` / `edge` タグ」
+> 「Minimal はカーネル込み」。**どれも一度も実装されていません。**
 > セキュリティパッチの期限も、`SECURITY_POLICY.md`（Critical 7日）より
 > 厳しい「24〜48時間」を公開面だけで約束していました。
+>
+> **Cosign は 2026-10-11 に実装しました**（`release.yml` の `sign`
+> ジョブ、キーレス署名）。**効くのは v3.0.2 以降で、v3.0.1 以前の
+> 公開イメージは未署名です。** 「署名されている」と書くときは、
+> どの版からかを必ず添えてください。
 
 **`CHANGELOG.md` を `make changelog` で上書きしないこと。**
 このコマンドは `build/CHANGELOG.generated.md` に下書きを出すだけです
@@ -207,6 +212,21 @@ done
 
 **一致していなければ、タグ名だけ合っていて中身が違う状態です。**
 v0.1.0〜v2.0.1 の公開イメージは全部この状態でした（`0.1.0` と名乗っていた）。
+
+### 署名を検証する（v3.0.2 以降）
+
+**「署名ジョブが緑」ではなく、実際に `cosign verify` が通ることを見ます。**
+
+```bash
+cosign verify "ishinokazuki/kimigayo-os:<X.Y.Z>" \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+**`latest` 系も含めて確認します。** `sign` ジョブはタグを全部並べて
+ダイジェストに解決し、重複を落としてから署名します。
+**新しいタグを `create-manifest` に足したら `sign` の `tags` にも足すこと。**
+片方だけだと「署名されていないタグ」が混ざり、利用者の検証が落ちます。
 
 ### GitHub Release も見る
 

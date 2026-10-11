@@ -549,7 +549,21 @@ docker run --rm \
 - **リリース資産のハッシュ配布**: `SHA256SUMS` と `SHA512SUMS` を
   GitHub Release に添付
 
-公開イメージへの署名（Cosign / Docker Content Trust）は未実装です。
+**公開イメージへの Cosign 署名を v3.0.2 から行います**（`release.yml` の
+`sign` ジョブ）。鍵を持たないキーレス署名（Sigstore OIDC）で、署名は
+Rekor の透明性ログに載ります。
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:latest \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+> **v3.0.1 以前の公開イメージは署名されていません。**
+> 署名の配線は 2026-10-11 に入れたもので、効くのは次のリリース以降です。
+
+**Docker Content Trust は使いません**（Docker Hub 側の仕組みに依存し、
+鍵の保管と失効の運用が必要になるため）。
 
 ### 🎯 ターゲット環境
 
