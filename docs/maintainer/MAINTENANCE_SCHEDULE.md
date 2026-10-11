@@ -57,9 +57,9 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 
 **Manual Review Required:** Review Security tab for findings, and the
 issue / SBOM artifact (`sbom-published-latest`) if `published-image-scan` failed.
-As of 2026-10-12 it fails on v3.0.1 (5 known CVEs in BusyBox 1.38.0 /
-musl 1.2.6). All 5 are patched on `main` and the failure clears once the
-next release replaces `latest` — see
+It failed on v3.0.1 (5 known CVEs in BusyBox 1.38.0 / musl 1.2.6). All 5 were
+patched in v3.0.2, and since that release replaced `latest` (2026-10-12) the
+scan passes with 0 findings — see
 [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md).
 
 #### Issue Triage

@@ -50,7 +50,7 @@ docker run -d \
   --security-opt no-new-privileges \
   --user 1000:1000 \
   -p 127.0.0.1:8080:8080 \
-  ishinokazuki/kimigayo-os:3.0.1
+  ishinokazuki/kimigayo-os:3.0.2
 ```
 
 | オプション | 何を防ぐか |
@@ -373,7 +373,7 @@ iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
 >   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
 >   --tmpfs /var/tmp:rw,noexec,nosuid,nodev,size=16m \
 >   --tmpfs /run:rw,noexec,nosuid,nodev \
->   ishinokazuki/kimigayo-os:3.0.1
+>   ishinokazuki/kimigayo-os:3.0.2
 > ```
 >
 > 以下はベアメタル／VM 向けです。
@@ -592,7 +592,8 @@ rc-update add auditd default
 
 > **`make scan-image` の CVE 照合は、v3.0.1 の公開イメージで 5 件を検出している**
 > （BusyBox 1.38.0 に 3 件・musl 1.2.6 に 2 件、2026-10-11）。
-> うち 3 件は `main` でパッチ済み。一覧と対応は [SECURITY_AUDIT.md](SECURITY_AUDIT.md#検出された-cve-と対応2026-10-11) にある。
+> **v3.0.2 で 5 件すべてにパッチを当て、v3.0.2 の公開イメージは 0 件**（2026-10-12）。
+> 一覧と対応は [SECURITY_AUDIT.md](SECURITY_AUDIT.md#検出された-cve-と対応2026-10-11) にある。
 
 ### BusyBox の cpio はディレクトリを脱出できた（v3.0.1 まで。修正済み）
 
