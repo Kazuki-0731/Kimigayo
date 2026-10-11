@@ -252,6 +252,13 @@ docker run --stop-timeout 2 ...
 Docker 自身のコンテナ生成なので、イメージサイズは効きません。
 差が出るのは常駐メモリとサイズの方です。
 
+> **v3.0.2（2026-10-12、同条件で同時に測定）では、常駐メモリが 288KB に増え、
+> Alpine 272KB / Ubuntu 312KB と同程度になった。** BusyBox を動的リンクにし、
+> BusyBox のコマンドも `libc.so` を読み込むようになったため。起動は
+> Kimigayo 0.60 秒 / Alpine 0.59 秒 / Ubuntu 0.59 秒で、やはり差は出ない。
+> v3.0.2 の数値は [README.md](../../README.md) の「パフォーマンス実績」節。
+> stop / restart などライフサイクルの各項目は v3.0.2 では測り直していない。
+
 > **旧表（Kimigayo 234ms / Alpine 245ms / Ubuntu 890ms）は撤回します。**
 > Ubuntu が 890ms という値は再現しません（実測 589ms）。
 > 測定条件が記録されておらず、検証できません。
@@ -301,7 +308,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: ishinokazuki/kimigayo-os:3.0.1
+        image: ishinokazuki/kimigayo-os:3.0.2
         livenessProbe:
           initialDelaySeconds: 1
           periodSeconds: 5
@@ -335,7 +342,7 @@ spec:
 IMAGE_NAME=kimigayo-os:local bash scripts/benchmark-lifecycle.sh
 
 # または手動でプル
-docker pull ishinokazuki/kimigayo-os:3.0.1
+docker pull ishinokazuki/kimigayo-os:3.0.2
 ```
 
 ### 権限エラー
