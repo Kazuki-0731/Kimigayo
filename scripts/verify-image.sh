@@ -7,7 +7,7 @@
 #   「ビルドが成功した」「イメージが起動した」は検証ではない。
 #   v0.1.0 から v2.0.1 までの公開済み4タグすべてで、OpenRC のバイナリが
 #   1つも入らず、musl の libc.so も /tmp も無い状態のまま smoke テストに
-#   通っていた（BusyBox は static-pie なので /bin/sh は動く）。
+#   通っていた（当時の BusyBox は static-pie なので /bin/sh は動いた）。
 #
 #   さらに arm64 では musl の libc.so 自身が __letf2 を解決できず、
 #   動的リンクのバイナリが全滅していたが、rootfs の検査（verify_rootfs）も
@@ -134,12 +134,24 @@ case "$bb_size" in
         # アプレットは /bin/busybox への相対シンボリックリンクなので、
         # 同名の実バイナリを cp されると本体が上書きされる。
         # 1.1MB が 57.8KB の start-stop-daemon に化けた事故がある。
-        if [ "$bb_size" -ge 1000000 ]; then
+        #
+        # 閾値は 500,000。以前は 1,000,000 だったが、それは静的リンク
+        # （libc を内包）前提の値で、動的リンクの minimal は 890KB になる。
+        # 事故の 57.8KB とは桁が違うので 500KB でも十分に検知できる。
+        # 「本当に BusyBox か」は下の識別検査で直接確かめる。
+        if [ "$bb_size" -ge 500000 ]; then
             pass "/bin/busybox is $bb_size bytes"
         else
-            fail "/bin/busybox is only $bb_size bytes (expected >= 1000000; overwritten?)"
+            fail "/bin/busybox is only $bb_size bytes (expected >= 500000; overwritten?)"
         fi
         ;;
+esac
+
+# 本当に BusyBox か（上書き事故をサイズではなく中身で見る）
+bb_banner="$(in_image '/bin/busybox 2>&1 | head -1')"
+case "$bb_banner" in
+    "BusyBox v"*) pass "/bin/busybox identifies as BusyBox (${bb_banner%% multi-call*})" ;;
+    *) fail "/bin/busybox does not identify as BusyBox (got '${bb_banner}')" ;;
 esac
 
 applets="$(in_image 'busybox --list | wc -l' | tr -d ' ')"
@@ -151,7 +163,7 @@ case "$applets" in
         else
             fail "$applets applets, outside ${APPLET_MIN}-${APPLET_MAX} for $VARIANT"
             log_error "      バリアントの取り違えか、BusyBox のビルドがスキップされた疑い"
-            log_error "      （.kimigayo-build-version は '1.38.0+<variant>' の形式）"
+            log_error "      （.kimigayo-build-version は '1.38.0+<variant>+<link>+<hash>' の形式）"
         fi
         ;;
 esac
@@ -430,6 +442,29 @@ if [ "$appledouble" = "0" ]; then
     pass "no AppleDouble (._*) files"
 else
     fail "$appledouble AppleDouble (._*) files found (COPYFILE_DISABLE=1 missing?)"
+fi
+
+# 動的ローダーが LD_PRELOAD を受け付けないこと
+#
+# src/libc/patches/0001-ldso-ignore-ld-env.patch の回帰テスト。
+# 公開中の v3.0.1 では LD_PRELOAD で OpenRC にコードを注入できた。
+#
+# イメージにはコンパイラが無いので、注入用のライブラリは作れない。
+# 代わりに「BusyBox がリンクしていない libeinfo.so.1 を LD_PRELOAD に
+# 指定し、/proc/self/maps に現れるか」で判定する。現れたら注入が通る。
+# BusyBox が静的リンクのときは動的ローダーを通らないので判定できない
+# （そのときは OpenRC 側が無防備でも見えない。警告だけ出す）。
+if in_image "grep -q ld-musl /bin/busybox && echo dyn" | grep -q dyn; then
+    preload_hits="$(in_image "LD_PRELOAD=/lib/libeinfo.so.1 /bin/busybox cat /proc/self/maps | grep -c libeinfo")"
+    if [ "$preload_hits" = "0" ]; then
+        pass "dynamic loader ignores LD_PRELOAD"
+    else
+        fail "dynamic loader honours LD_PRELOAD (libeinfo.so.1 was injected)"
+        log_error "      src/libc/patches/0001-ldso-ignore-ld-env.patch が当たっていない疑い"
+        log_error "      build/musl-patches.log を確認する"
+    fi
+else
+    log_warn "  ! /bin/busybox is static; LD_PRELOAD check skipped (cannot observe the loader)"
 fi
 
 setuid="$(in_image "find / -xdev \\( -perm -4000 -o -perm -2000 \\) | grep -c '' ")"
