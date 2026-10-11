@@ -30,8 +30,10 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
   Alpine 8.42MB の約 1/3、Ubuntu 24.04 78.2MB の約 1/28）
 - 🔒 **セキュアバイデフォルト**: パッケージマネージャー排除による最小攻撃面、包括的なセキュリティ強化
 - 🧩 **モジュラー設計**: 必要な機能のみを選択可能な3つのバリアント（Minimal/Standard/Extended）
-- 📦 **musl + BusyBox + OpenRC のみ**: BusyBox は static-pie。OpenRC は
-  musl と自身の `librc` / `libeinfo` だけに依存し、libcap は静的リンク済みなので
+- 📦 **musl + BusyBox + OpenRC のみ**: BusyBox と OpenRC は同じ musl の
+  `libc.so` に動的リンクする（v3.0.2 から。Kimigayo が musl に当てた
+  パッチが `/bin/sh` にも効く）。OpenRC はほかに自身の `librc` / `libeinfo`
+  だけに依存し、libcap は静的リンク済みなので
   イメージ内に第三者の共有ライブラリを持たない
 - 🌐 **マルチアーキテクチャ**: ARM64/x86_64完全対応（Apple Silicon M1/M2/M3最適化済み）
 
@@ -741,9 +743,10 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
   measured on the same host)
 - 🔒 **Secure-by-Default**: No package manager, minimal attack surface, comprehensive hardening
 - 🧩 **Modular Design**: 3 variants (Minimal/Standard/Extended) for different use cases
-- 📦 **musl + BusyBox + OpenRC only**: BusyBox is static-pie; OpenRC links only against
-  musl and its own `librc`/`libeinfo`, with libcap linked statically, so the image
-  carries no third-party shared libraries
+- 📦 **musl + BusyBox + OpenRC only**: BusyBox and OpenRC link dynamically against
+  the same musl `libc.so` (since v3.0.2, so the musl patches Kimigayo applies also
+  cover `/bin/sh`). OpenRC otherwise links only against its own `librc`/`libeinfo`,
+  with libcap linked statically, so the image carries no third-party shared libraries
 - 🌐 **Multi-Architecture**: ARM64/x86_64 fully supported (Apple Silicon M1/M2/M3 optimized)
 
 ### 🎯 Performance Achievements

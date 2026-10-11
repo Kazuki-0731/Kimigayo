@@ -1,5 +1,12 @@
 # BusyBox静的リンク問題のトラブルシューティング
 
+> **2026-10-12 追記: いまの既定は動的リンク**（`BUSYBOX_LINK=dynamic`）。
+> この文書の問題は「イメージに musl の `libc.so` が入っていなかった」ことが
+> 原因で、v3.0.0 からは `libc.so` が入っている（OpenRC のため）。
+> そのうえで BusyBox も同じ `libc.so` を使うようにした
+> （→ `scripts/build-busybox.sh` の BUSYBOX_LINK のコメント）。
+> 以下は静的リンクでビルドするとき（`BUSYBOX_LINK=static`）の記録として残す。
+
 ## 問題の概要
 
 BusyBoxが動的リンクでビルドされ、muslランタイムライブラリがイメージに含まれていないため、実行時にエラーが発生する問題。

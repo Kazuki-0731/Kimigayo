@@ -142,7 +142,10 @@ kernel.core_uses_pid = 1
   （2026-10-11 に `ls -l` で実測）
 - **1 ファイルで済む**: `libm` / `libpthread` / `libdl` が本体に入っており、
   イメージに置く共有ライブラリが 1 つで足りる
-- **静的リンク対応**: BusyBox は static-pie でビルドしている
+- **全バイナリで共有**: BusyBox も OpenRC もこの `libc.so` に動的リンクする
+  （v3.0.2 から。v3.0.1 までの BusyBox は static-pie で、x86_64 ではビルド環境の
+  `libc.a` を取り込んでいたため、Kimigayo が musl に当てたパッチが効いていなかった）。
+  静的リンクが必要なら `BUSYBOX_LINK=static` でビルドできる
 - **コンパイル時の強化を有効化**: `-fPIE` /
   `-fstack-protector-strong` / `-D_FORTIFY_SOURCE=2` /
   `-Wl,-z,relro -Wl,-z,now`（`scripts/build-musl.sh`）
