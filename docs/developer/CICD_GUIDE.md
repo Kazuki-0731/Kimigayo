@@ -148,120 +148,179 @@ PR を作成します。**この PR は「上流が動いた」という一次�
   uses: actions/checkout@v4
 ```
 
-#### 2. QEMUとBuildxのセットアップ
+#### 2. ビルド環境イメージの用意
 
 ```yaml
-- name: Set up QEMU
-  uses: docker/setup-qemu-action@v3
-  with:
-    platforms: linux/amd64,linux/arm64
-
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
-  with:
-    driver-opts: |
-      image=moby/buildkit:latest
-      network=host
-    buildkitd-flags: --debug
+  uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+- name: Build build-environment image
+  run: docker compose build
+  env:
+    KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
 ```
 
-**説明:**
-- QEMU: ARM64のエミュレーションを可能にする
-- Buildx: マルチアーキテクチャビルドを実行
+> **QEMU は使いません。** arm64 のジョブは **`ubuntu-24.04-arm`
+> ネイティブランナー**で走ります。
+>
+> ```yaml
+> runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+> ```
+>
+> 以前は x86 ランナー上で QEMU エミュレーションしていましたが、
+> 遅いうえに失敗もするため、ネイティブランナーに移しました。
+> **開発機（Apple Silicon）で x86_64 を回すと QEMU になる**ので、
+> フルビルドは Actions に任せます。
 
 #### 3. Docker Hubログイン
 
 ```yaml
 - name: Log in to Docker Hub
-  uses: docker/login-action@v3
+  uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
   with:
     username: ${{ env.DOCKER_HUB_USERNAME }}
     password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 ```
 
-**必要なシークレット:**
-- `DOCKER_HUB_ACCESS_TOKEN`: Docker Hubアクセストークン
+**必要なシークレットは1つだけです:**
+
+| 名前 | 種別 | 値 |
+| --- | --- | --- |
+| `DOCKER_HUB_ACCESS_TOKEN` | **Secret** | Docker Hub のアクセストークン |
+| `DOCKER_HUB_USERNAME` | **env**（Secret ではない）| `ishinokazuki` をワークフローに直書き |
+| `DISCORD_WEBHOOK` | Secret | 通知用（任意）|
+
+**`DOCKER_HUB_TOKEN` というシークレットはありません。**
 
 #### 4. メタデータの抽出
 
-```yaml
-- name: Extract metadata
-  id: meta
-  run: |
-    # バージョン抽出
-    VERSION=${GITHUB_REF#refs/tags/v}
-    echo "version=${VERSION}" >> $GITHUB_OUTPUT
+版は `meta` ジョブが `scripts/get-version.sh` で解決し、
+後続のジョブへ `needs.meta.outputs.version` として渡します。
 
-    # アーキテクチャ変換
-    if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-      DOCKER_ARCH="amd64"
-    else
-      DOCKER_ARCH="arm64"
-    fi
-    echo "docker_arch=${DOCKER_ARCH}" >> $GITHUB_OUTPUT
-```
+> **ここを渡し忘れると、タグ名だけ合っていて中身の版がずれます。**
+> 以前 `release.yml` が版を渡さず、`os-release` が `dev` になる事故が
+> ありました。下の検証（`EXPECT_VERSION`）はそれを止めるためのものです。
 
 #### 5. Rootfsビルド
+
+**`ci.yml` とまったく同じ入口を使います。** 経路が分かれていると、
+CI が緑でもリリースで落ちる（逆も）ことになります。
 
 ```yaml
 - name: Build Kimigayo OS rootfs
   run: |
-    export ARCH=${{ matrix.arch }}
-    export IMAGE_TYPE=${{ matrix.variant }}
-    bash scripts/build-rootfs.sh
+    docker compose run --rm \
+      -e IMAGE_TYPE=${{ matrix.variant }} \
+      -e KIMIGAYO_VERSION=${{ needs.meta.outputs.version }} \
+      kimigayo-build \
+      make build-no-kernel TARGET_ARCH=${{ matrix.arch }} IMAGE_TYPE=${{ matrix.variant }}
 ```
 
-#### 6. 統合テスト実行
+**`build-no-kernel` です。** カーネルはイメージに入らないので作りません。
+
+#### 6. パッチが黙ってスキップされていないか確認
 
 ```yaml
-- name: Run integration tests
+- name: Fail if patches were silently skipped
   run: |
-    python3 -m pip install --upgrade pip
-    pip3 install pytest hypothesis pytest-cov pytest-xdist pyyaml
-    python3 -m pytest tests/integration/test_phase1_integration.py -v
+    for log in build/kernel-patches.log build/busybox-patches.log; do
+      [ -f "$log" ] || continue
+      grep -iE 'skipped: [1-9]|not applicable' "$log" && exit 1
+    done
 ```
 
-#### 7. スモークテスト
+`apply-*-patches.sh` は当たらないパッチを `log_warn` して `return 0`
+するため、放置すると「適用されているつもり」で進みます。
+
+#### 7. イメージのビルド
+
+**`docker build` を直接使います**（`build-push-action` は使っていません）。
+検証したものをそのまま push するため、ビルドは 1 回だけです。
 
 ```yaml
-- name: Test Docker image (smoke test)
+- name: Build Docker image
   run: |
-    docker build -f Dockerfile.runtime -t test-image:${{ matrix.variant }}-${{ matrix.arch }} .
-    docker run --rm test-image:${{ matrix.variant }}-${{ matrix.arch }} /bin/sh -c "echo 'Test passed'"
+    docker build \
+      --platform "${{ steps.tags.outputs.platform }}" \
+      -f Dockerfile.runtime \
+      --build-arg TARBALL_PATH="output/kimigayo-${{ matrix.variant }}-${VERSION}-${{ matrix.arch }}.tar.gz" \
+      --build-arg VERSION="${VERSION}" \
+      --build-arg IMAGE_VARIANT="${{ matrix.variant }}" \
+      -t "${{ steps.tags.outputs.primary }}" \
+      -t "${{ steps.tags.outputs.moving }}" \
+      .
 ```
 
-#### 8. Docker Hubへプッシュ
+#### 8. イメージを実際に起動して検証
+
+**ここを通らなければ push しません。**
 
 ```yaml
-- name: Build and push Docker image
-  uses: docker/build-push-action@v5
-  with:
-    context: .
-    file: ./Dockerfile.runtime
-    platforms: linux/${{ steps.meta.outputs.docker_arch }}
-    push: true
-    tags: ${{ steps.meta.outputs.tags }}
-    build-args: |
-      VERSION=${{ steps.meta.outputs.version }}
-      BUILD_DATE=${{ github.event.repository.updated_at }}
-      VCS_REF=${{ github.sha }}
-      IMAGE_VARIANT=${{ matrix.variant }}
-    cache-from: type=gha
-    cache-to: type=gha,mode=max
+- name: Verify image by running it
+  env:
+    EXPECT_VERSION: ${{ needs.meta.outputs.version }}
+  run: |
+    bash scripts/verify-image.sh \
+      "${{ steps.tags.outputs.primary }}" \
+      "${{ matrix.variant }}" \
+      "${{ matrix.arch }}"
 ```
 
-#### 9. マルチアーキテクチャマニフェスト作成
+**検証の実体は `scripts/verify-image.sh`**（29 項目）で、`ci.yml` と
+ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
+`LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
+一致しなければ落ちます。
+
+> **`release.yml` に Trivy も pytest も統合テストもありません。**
+> Trivy のイメージスキャンは、パッケージデータベースが無く
+> 何も識別できないため 2026-10-09 に外しました。
+> pytest は `ci.yml` 側で回ります。
+> 以前は検証に `continue-on-error` が付いており、
+> tarball が小さくても `exit 0` でスキップしていました。
+
+#### 9. 検証済みイメージを push
+
+```yaml
+- name: Push verified image
+  run: |
+    docker push "${{ steps.tags.outputs.primary }}"
+    docker push "${{ steps.tags.outputs.moving }}"
+```
+
+#### 10. マルチアーキテクチャマニフェスト作成
+
+**作るタグは1種類ではありません。** `create-manifest` ジョブが
+次をすべて作ります。
+
+| タグ | 中身 |
+| --- | --- |
+| `<ver>-<variant>` | そのバリアントの amd64 + arm64 |
+| `latest-<variant>` | 同上の移動タグ |
+| `<ver>` | standard の amd64 + arm64 |
+| `latest` | standard の最新 |
+| `latest-amd64` / `latest-arm64` | standard のアーキ別（単一プラットフォーム）|
 
 ```yaml
 - name: Create and push multi-arch manifests
   run: |
-    VERSION=${GITHUB_REF#refs/tags/v}
+    docker buildx imagetools create -t "${repo}:latest-${variant}" \
+      "${repo}:latest-${variant}-amd64" \
+      "${repo}:latest-${variant}-arm64"
 
-    docker buildx imagetools create \
-      -t ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION} \
-      ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-amd64 \
-      ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}-arm64
+    docker buildx imagetools create -t "${repo}:latest" \
+      "${repo}:latest-standard-amd64" "${repo}:latest-standard-arm64"
+
+    # latest-<arch> も standard の別名
+    for a in amd64 arm64; do
+      docker buildx imagetools create -t "${repo}:latest-${a}" \
+        "${repo}:latest-standard-${a}"
+    done
 ```
+
+> **`latest-amd64` / `latest-arm64` は一度作り忘れて、
+> 永久に更新されない状態になっていました。**
+> `docs/RELEASE_CHECKLIST.md` がこのタグを案内しているため、
+> 作る対象から漏らさないこと。
 
 ## テスト戦略
 
@@ -299,12 +358,21 @@ docker run --rm test-image /bin/sh -c "echo 'Test' && busybox --help"
 ### 5. セキュリティテスト
 
 ```bash
-# Trivyスキャン
-trivy image --severity CRITICAL,HIGH myimage:latest
+# リポジトリ側の依存をスキャン（有効）
+make trivy-fs-scan
 
 # ShellCheckスキャン
-shellcheck scripts/*.sh
+make shellcheck-scan
 ```
+
+> **`trivy image` は Kimigayo のイメージに対して何も検査しません。**
+> `scratch` 上の手組み rootfs でパッケージデータベースを持たないため、
+> Trivy は対象を 1 つも識別できません
+> （`Target: -` / `Not scanned` / `Results: 0`）。
+> **「CRITICAL/HIGH が 0 件」ではなく「スキャンしていない」。**
+> 構成要素（カーネル / musl / BusyBox / OpenRC）の脆弱性追跡は
+> 版を手で突合します（→ `security-review` skill、
+> `.github/workflows/security.yml`）。
 
 ## セキュリティスキャン
 
@@ -366,28 +434,34 @@ Kimigayo OSは[Semantic Versioning](https://semver.org/)に従います:
 # 現在のバージョンを確認
 make version
 
-# 新しいバージョンでタグを作成
-git tag -a v0.2.0 -m "Release v0.2.0
+# 新しいバージョンでタグを作成（現行は v3.0.1）
+git tag -a v3.0.2 -m "Release v3.0.2
 
 - 新機能A
 - バグ修正B
 - セキュリティ強化C
 "
 
-# タグをプッシュ
-git push origin v0.2.0
+# タグをプッシュ（**ユーザーの明示的な承認が必要**）
+git push origin v3.0.2
 ```
 
 #### 2. 自動ビルドとリリース
 
 タグがプッシュされると、GitHub Actionsが自動的に:
 
-1. 全バリアント・全アーキテクチャをビルド
-2. テスト実行
-3. セキュリティスキャン
-4. Docker Hubにプッシュ
-5. GitHub Releasesを作成
-6. リリースアセット（tar.gz, SHA256SUMS, SHA512SUMS）を添付
+1. 版の解決（`scripts/get-version.sh`）
+2. ShellCheck
+3. 全バリアント・全アーキテクチャをビルド（6 ジョブ）
+4. **イメージを起動して検証**（`scripts/verify-image.sh`、29 項目）
+5. 検証を通ったものだけ Docker Hub にプッシュ
+6. マルチアーキテクチャマニフェスト作成
+7. GitHub Releases を作成
+8. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS）を添付
+
+**Trivy スキャンと pytest は `release.yml` では走りません**
+（pytest は `ci.yml` 側。Trivy のイメージスキャンは何も識別できないため
+2026-10-09 に外しました）。
 
 **`CHANGELOG.md` は自動生成されません。** タグを打つ前に手で更新して
 おいてください（→ [2. Release](#2-release-githubworkflowsreleaseyml)）。
@@ -405,7 +479,7 @@ GitHub Releasesページで以下を確認:
 
 ```bash
 # GitHub CLI を使用
-gh workflow run release.yml -f tag=v0.2.0
+gh workflow run release.yml -f tag=v3.0.2
 ```
 
 または、GitHubのActionsタブから手動実行。
@@ -434,7 +508,10 @@ act
 act push
 
 # 特定のジョブのみ実行
-act -j build-and-push
+# release.yml の実際のジョブ名は次の7つ:
+#   meta / shellcheck / build / verify-and-push /
+#   create-manifest / create-github-release / notify
+act -j build
 
 # 環境変数を指定
 act -s DOCKER_HUB_ACCESS_TOKEN=your_token
@@ -449,6 +526,16 @@ make ci-build-local
 # CI相当のビルド + プッシュ
 make ci-build-push
 ```
+
+> **`make ci-build-local` は macOS ホストでは通りません。**
+> ホスト側で `scripts/build-rootfs.sh` を直接叩き、その中で
+> `build-musl.sh` を実際に呼ぶため、musl の `configure` が
+> `unsupported long double type` で落ちます。
+> さらに `ARCH` を省略すると `uname -m` から自動検出するので、
+> Apple Silicon では `arm64` になります。
+> **Linux ホストならそのまま通ります**（GitHub Actions はこの経路）。
+> macOS での回避手順は
+> [CLAUDE.md](../../CLAUDE.md) の「ビルドの全体像」節にあります。
 
 ## カスタムプロジェクトへの適用
 
@@ -580,6 +667,10 @@ env:
 ```
 
 GitHub Settings > Secrets and variables > Actions で設定。
+
+> **これは一般的な例です。Kimigayo 自身のシークレットは
+> `DOCKER_HUB_ACCESS_TOKEN` だけ**で、ユーザー名は `env` に直書き
+> しています（→ [3. Docker Hubログイン](#3-docker-hubログイン)）。
 
 ### 3. 並列実行の最適化
 
