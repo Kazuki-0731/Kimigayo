@@ -41,7 +41,7 @@ Dockerを使用したインストールが最も簡単です。
 #### 前提条件
 - Docker 20.10以降がインストールされていること
 
-#### Minimalイメージ（2.62MB / arm64 2.98MB）
+#### Minimalイメージ（2.46MB / arm64 2.83MB）
 
 ```bash
 # Kimigayo OS Minimalイメージをpull
@@ -51,7 +51,7 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 docker run -it ishinokazuki/kimigayo-os:latest-minimal
 ```
 
-#### Standardイメージ（2.76MB / arm64 3.13MB、推奨）
+#### Standardイメージ（2.60MB / arm64 2.98MB、推奨）
 
 ```bash
 # Kimigayo OS Standardイメージをpull
@@ -61,7 +61,7 @@ docker pull ishinokazuki/kimigayo-os:latest
 docker run -it ishinokazuki/kimigayo-os:latest
 ```
 
-#### Extendedイメージ（2.78MB / arm64 3.17MB）
+#### Extendedイメージ（2.62MB / arm64 3.01MB）
 
 ```bash
 # Kimigayo OS Extendedイメージをpull
@@ -174,7 +174,7 @@ echo "kimigayo" > /etc/hostname
 FROM alpine:3.24 AS tz
 RUN apk add --no-cache tzdata
 
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 ENV TZ=Asia/Tokyo
 ```
@@ -218,7 +218,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY --from=builder /stage/ /
 ```
 

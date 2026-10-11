@@ -40,13 +40,13 @@ docker run -it ishinokazuki/kimigayo-os:latest
 **版を固定する場合**（`latest` は毎リリースで中身が変わります）:
 
 ```bash
-docker run -it ishinokazuki/kimigayo-os:3.0.1
+docker run -it ishinokazuki/kimigayo-os:3.0.2
 ```
 
 **バックグラウンドで起動して後から入る**:
 
 ```bash
-docker run -d --name myapp ishinokazuki/kimigayo-os:3.0.1 sleep infinity
+docker run -d --name myapp ishinokazuki/kimigayo-os:3.0.2 sleep infinity
 docker exec -it myapp /bin/sh
 ```
 
@@ -57,7 +57,7 @@ docker exec -it myapp /bin/sh
 ```bash
 # 中身の確認
 cat /etc/os-release
-# => VERSION_ID=3.0.1
+# => VERSION_ID=3.0.2
 # => VERSION_CODENAME=himawari
 ```
 
@@ -65,9 +65,9 @@ cat /etc/os-release
 
 | バリアント | イメージ | BusyBox アプレット | タグ |
 |-----------|---------|------------------|------|
-| Minimal | 2.62MB / arm64 2.98MB | 367 | `latest-minimal` / `3.0.1-minimal` |
-| **Standard**（推奨）| 2.76MB / arm64 3.13MB | 400 | `latest` / `latest-standard` / `3.0.1-standard` |
-| Extended | 2.78MB / arm64 3.17MB | 411 | `latest-extended` / `3.0.1-extended` |
+| Minimal | 2.46MB / arm64 2.83MB | 367 | `latest-minimal` / `3.0.2-minimal` |
+| **Standard**（推奨）| 2.60MB / arm64 2.98MB | 400 | `latest` / `latest-standard` / `3.0.2-standard` |
+| Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.0.2-extended` |
 
 **Minimal には `vi`・`wget`・`du`・`less` が入っていません。**
 対話的に触るなら Standard 以上を選んでください。
@@ -183,7 +183,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY --from=builder /stage/ /
 
 CMD ["/bin/sh"]
@@ -202,7 +202,7 @@ docker run -it \
   --hostname my-kimigayo \
   --add-host myhost:10.0.0.9 \
   --dns 1.1.1.1 \
-  ishinokazuki/kimigayo-os:3.0.1
+  ishinokazuki/kimigayo-os:3.0.2
 ```
 
 **ネットワークはランタイムが設定します。** `/etc/network/interfaces` という
@@ -232,7 +232,7 @@ OpenRC が起動していない状態で叩くとこう警告されて失敗し�
 
 ```bash
 docker run -d --name myapp --entrypoint /sbin/init \
-  ishinokazuki/kimigayo-os:3.0.1
+  ishinokazuki/kimigayo-os:3.0.2
 
 docker exec -it myapp rc-status
 ```
@@ -266,23 +266,23 @@ exit
 
 ## パフォーマンス実績
 
-v3.0.1 の実測値（2026-10-11、ホストは macOS / Apple Silicon）:
+v3.0.2 の実測値（2026-10-12、ホストは macOS / Apple Silicon）:
 
 | 指標 | 実測値 | 目標値 |
 |------|-------|--------|
-| イメージサイズ (Minimal) | 2.62MB / arm64 2.98MB | < 5MB |
-| イメージサイズ (Standard) | 2.76MB / arm64 3.13MB | < 15MB |
-| イメージサイズ (Extended) | 2.78MB / arm64 3.17MB | < 50MB |
-| 起動時間 | 0.61秒 | < 10秒 |
-| 常駐メモリ | 232KB | < 128MB |
-| BusyBox コマンド性能 | Alpine 比 0.90〜1.12x | Alpine 同等 |
+| イメージサイズ (Minimal) | 2.46MB / arm64 2.83MB | < 5MB |
+| イメージサイズ (Standard) | 2.60MB / arm64 2.98MB | < 15MB |
+| イメージサイズ (Extended) | 2.62MB / arm64 3.01MB | < 50MB |
+| 起動時間 | 0.60秒 | < 10秒 |
+| 常駐メモリ | 288KB | < 128MB |
+| BusyBox コマンド性能 | Alpine 比 0.97〜1.01x | Alpine 同等 |
 
-> **起動時間の 0.61 秒は「Kimigayo が速い」という意味ではありません。**
-> 同じ条件で測ると Alpine 0.62 秒・Ubuntu 24.04 0.59 秒で、
-> **100MB の Ubuntu がいちばん速い**という結果です。測っている時間の
-> ほとんどがコンテナランタイム自身の処理なので、イメージの中身は
-> ほとんど効きません。差が出るのは常駐メモリ
-> （Kimigayo 232KB / Alpine 276KB / Ubuntu 312KB）とサイズの方です。
+> **起動時間の 0.60 秒は「Kimigayo が速い」という意味ではありません。**
+> 同じ条件で測ると Alpine・Ubuntu 24.04 とも 0.59 秒で、差は出ません。
+> 測っている時間のほとんどがコンテナランタイム自身の処理なので、
+> イメージの中身はほとんど効きません。常駐メモリも
+> Kimigayo 288KB / Alpine 272KB / Ubuntu 312KB と同程度で、
+> **差が出るのはサイズの方です。**
 
 測定条件は [docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) に
 記録しています。

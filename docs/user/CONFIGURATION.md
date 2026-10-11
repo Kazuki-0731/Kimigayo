@@ -52,7 +52,7 @@ docker run -it --hostname my-server ishinokazuki/kimigayo-os:latest
 # docker-compose.yml
 services:
   app:
-    image: ishinokazuki/kimigayo-os:3.0.1
+    image: ishinokazuki/kimigayo-os:3.0.2
     hostname: my-server
 ```
 
@@ -93,7 +93,7 @@ FROM alpine:3.24 AS tz
 RUN apk add --no-cache tzdata
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 ENV TZ=Asia/Tokyo
 ```
@@ -152,7 +152,7 @@ docker run -it --network kimigayo-net --ip 192.168.100.10 \
 # docker-compose.yml
 services:
   app:
-    image: ishinokazuki/kimigayo-os:3.0.1
+    image: ishinokazuki/kimigayo-os:3.0.2
     networks:
       kimigayo-net:
         ipv4_address: 192.168.100.10
@@ -212,11 +212,11 @@ OpenRC が起動していない状態で叩くと、こう警告されて失敗�
 
 ```bash
 docker run -d --name myapp --entrypoint /sbin/init \
-  ishinokazuki/kimigayo-os:3.0.1
+  ishinokazuki/kimigayo-os:3.0.2
 ```
 
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY myservice /etc/init.d/myservice
 RUN chmod +x /etc/init.d/myservice && rc-update add myservice default
 CMD ["/sbin/init"]
@@ -420,14 +420,14 @@ docker run -d --log-opt max-size=10m --log-opt max-file=3 \
 
 ### 起動時間について
 
-**イメージを軽くしても起動は速くなりません。** v3.0.1 の実測は
-`docker run` が 0.61 秒ですが、同じ条件で Alpine 0.62 秒・
-Ubuntu 24.04 0.59 秒で、**100MB の Ubuntu がいちばん速い**という結果です。
+**イメージを軽くしても起動は速くなりません。** v3.0.2 の実測は
+`docker run` が 0.60 秒ですが、同じ条件で Alpine・Ubuntu 24.04 とも
+0.59 秒で、**100MB の Ubuntu と差がありません**。
 測っている時間のほとんどがコンテナランタイム自身の処理なので、
 イメージの中身はほとんど効きません。
 
-差が出るのは常駐メモリ（Kimigayo 232KB / Alpine 276KB / Ubuntu 312KB）と
-サイズの方です。測定条件は
+常駐メモリも同程度（Kimigayo 288KB / Alpine 272KB / Ubuntu 312KB）で、
+差が出るのはサイズの方です。測定条件は
 [docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) を参照してください。
 
 ## カーネルに関わる設定
@@ -513,12 +513,12 @@ docker stats
 ```bash
 # ボリュームのバックアップ（ホスト側で実行）
 docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
-  ishinokazuki/kimigayo-os:3.0.1 \
+  ishinokazuki/kimigayo-os:3.0.2 \
   tar czf /backup/data-backup.tar.gz -C /data .
 
 # 復元
 docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
-  ishinokazuki/kimigayo-os:3.0.1 \
+  ishinokazuki/kimigayo-os:3.0.2 \
   tar xzf /backup/data-backup.tar.gz -C /data
 ```
 
@@ -547,7 +547,7 @@ docker inspect <container-id> --format '{{.State.ExitCode}} {{.State.Error}}'
 
 ```bash
 # シェルで中を調べる
-docker run -it --entrypoint /bin/sh ishinokazuki/kimigayo-os:3.0.1
+docker run -it --entrypoint /bin/sh ishinokazuki/kimigayo-os:3.0.2
 ```
 
 ### ネットワークに接続できない
