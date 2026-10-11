@@ -346,6 +346,7 @@ docker run -it --user 1000:1000 ishinokazuki/kimigayo-os:latest
 
 - **GitHub リポジトリ**: https://github.com/Kazuki-0731/Kimigayo
 - **Issue報告**: https://github.com/Kazuki-0731/Kimigayo/issues
+- **GitHub Discussions**: https://github.com/Kazuki-0731/Kimigayo/discussions
 
 ## 次のステップ
 

@@ -583,6 +583,7 @@ docker network inspect bridge
 
 - **GitHub リポジトリ**: https://github.com/Kazuki-0731/Kimigayo
 - **Issue 報告**: https://github.com/Kazuki-0731/Kimigayo/issues
+- **GitHub Discussions**: https://github.com/Kazuki-0731/Kimigayo/discussions
 - **Docker 使用ガイド**: [DOCKER_USAGE.md](DOCKER_USAGE.md)
 - **インストールガイド**: [INSTALLATION.md](INSTALLATION.md)
 - **クイックスタート**: [QUICKSTART.md](QUICKSTART.md)

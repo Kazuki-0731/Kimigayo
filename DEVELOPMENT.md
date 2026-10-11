@@ -357,12 +357,13 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 
 ## サポート
 
-- **Issues**: バグ報告、機能リクエスト、質問
+- **Issues**: バグ報告、機能リクエスト
   （https://github.com/Kazuki-0731/Kimigayo/issues）
+- **Discussions**: 質問、アイデア共有
+  （https://github.com/Kazuki-0731/Kimigayo/discussions）
 
-**GitHub Discussions は有効にしていない**（`has_discussions=false`）。
-質問も Issue に出してください。ドキュメントは Wiki ではなく
-このリポジトリの `docs/` 配下にあります。
+**ドキュメントの正本はこのリポジトリの `docs/` 配下**です
+（Wiki ではありません）。
 
 ---
 
