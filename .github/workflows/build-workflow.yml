@@ -120,8 +120,12 @@ jobs:
           mkdir -p output
           # root 権限で固める。/etc/shadow のような権限制限ファイルを
           # 読むため。--numeric-owner はホストのユーザー名を埋め込まないため。
-          sudo tar czf "output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz" \
-            -C build/rootfs --numeric-owner .
+          # 並び順・mtime（コミット時刻）・gzip のヘッダを固定し、同じコミット
+          # からは同じバイト列の tarball になるようにする（再現可能ビルド）。
+          epoch="$(git log -1 --format=%ct)"
+          sudo tar -C build/rootfs --sort=name --mtime="@${epoch}" \
+            --owner=0 --group=0 --numeric-owner -cf - . \
+            | gzip -n > "output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz"
           sudo chown "$(id -u):$(id -g)" "output/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.tar.gz"
           ls -lh output/
 

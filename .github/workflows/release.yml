@@ -153,7 +153,12 @@ jobs:
           name="kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}.tar.gz"
           # root 権限で固める（/etc/shadow を読むため）。
           # --numeric-owner でホストのユーザー名を埋め込まない。
-          sudo tar czf "output/${name}" -C build/rootfs --numeric-owner .
+          # 並び順・mtime（コミット時刻）・gzip のヘッダを固定する（再現可能ビルド。
+          # build-workflow.yml と同じ）
+          epoch="$(git log -1 --format=%ct)"
+          sudo tar -C build/rootfs --sort=name --mtime="@${epoch}" \
+            --owner=0 --group=0 --numeric-owner -cf - . \
+            | gzip -n > "output/${name}"
           sudo chown "$(id -u):$(id -g)" "output/${name}"
           ls -lh output/
 
