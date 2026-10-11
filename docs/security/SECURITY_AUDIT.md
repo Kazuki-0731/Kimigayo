@@ -213,7 +213,7 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 #### 2. リリース時（`release.yml`）
 
-ShellCheck と `scripts/verify-image.sh`（32 項目）、push 前に
+ShellCheck と `scripts/verify-image.sh`（34 項目、minimal は 33）、push 前に
 `scripts/scan-image.sh`（CVE 照合 + 秘密情報）。作った SBOM（CycloneDX）は
 GitHub Release に添付します。
 **Trivy のイメージスキャンは 2026-10-09 に外しました**（下記の理由）。

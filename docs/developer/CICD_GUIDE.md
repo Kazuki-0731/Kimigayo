@@ -95,7 +95,7 @@ strategy:
 イメージを作ったあと、verify-image ジョブで次の2つを実行します
 （どちらも失敗すればジョブが落ちます）:
 
-1. `scripts/verify-image.sh` — イメージを起動しての検証（32 項目）
+1. `scripts/verify-image.sh` — イメージを起動しての検証（34 項目、minimal は 33）
 2. `bash scripts/scan-image.sh` — 出荷物の秘密情報スキャン（Trivy の
    secret スキャナで rootfs を見る）と CVE 照合（出荷物の版から SBOM を作り
    Grype で照合する）。SBOM は `sbom-<variant>-<arch>` の成果物として残ります
@@ -299,7 +299,7 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
       "${{ matrix.arch }}"
 ```
 
-**検証の実体は `scripts/verify-image.sh`**（32 項目）で、`ci.yml` と
+**検証の実体は `scripts/verify-image.sh`**（34 項目、minimal は 33）で、`ci.yml` と
 ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
@@ -542,7 +542,7 @@ git push origin v3.0.2
 1. 版の解決（`scripts/get-version.sh`）
 2. ShellCheck
 3. 全バリアント・全アーキテクチャをビルド（6 ジョブ）
-4. **イメージを起動して検証**（`scripts/verify-image.sh`、32 項目）
+4. **イメージを起動して検証**（`scripts/verify-image.sh`、34 項目、minimal は 33）
 5. 検証を通ったものだけ Docker Hub にプッシュ
 6. マルチアーキテクチャマニフェスト作成
 7. **Cosign のキーレス署名**（v3.0.2 から）
