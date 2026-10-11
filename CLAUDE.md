@@ -22,15 +22,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   数十分かけて作っていたため外した）。ベアメタル／QEMU を試したいときだけ
   手で回す（→「カーネルは CI で作らない」節）
 - **バリアント 3 種**（minimal / standard / extended）× **アーキテクチャ 2 種**（x86_64 / arm64）
-- **実測値**（2026-10-10）: Standard は x86_64 **2.78MB** / arm64 **3.16MB**、
+- **実測値**（2026-10-11, v3.0.1）: Standard は x86_64 **2.76MB** / arm64 **3.13MB**、
   起動 **0.61秒**、常駐メモリ **232KB**、BusyBox は Alpine 比
   **0.90〜1.12x**（走るたびに前後し有意差なし）。
   **起動時間はイメージの差が出ない**（Alpine も Ubuntu も 0.61 秒）。
   測っている時間のほとんどが Docker のコンテナ生成なので、
   **「軽いから起動が速い」とは書かない**。差が出るのは常駐メモリの方
-  （Alpine 280KB / Ubuntu 316KB）。
+  （Alpine 276KB / Ubuntu 312KB）。
   **v2.0.1 の 1.17MB は Init も libc.so も入っていないイメージの値**なので、
-  現在の 2.78MB と並べて比較しない。
+  現在の 2.76MB と並べて比較しない。
   **旧値 439ms / 0.2MB は計測が壊れていたため破棄済み**
   （`benchmark-startup.sh` は `sleep 5` の終了を、`benchmark-memory.sh` は
   `KiB` を潰した値を測っていた。2026-10-10 に両方書き直した）
