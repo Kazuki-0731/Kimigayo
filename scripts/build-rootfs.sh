@@ -1467,6 +1467,28 @@ generate_metadata() {
 
     local metadata_file="$ROOTFS_DIR/.kimigayo-build-info"
 
+    # 上流の版のまま当てた CVE パッチの一覧（例: musl:CVE-2026-40200）。
+    #
+    # 版で CVE を照合する scan-image.sh は、パッチを当てても版が同じなので
+    # 検出し続ける。かといってリポジトリのパッチ一覧で除外すると、
+    # **パッチを当てる前に出した古い公開イメージまで「修正済み」に見える。**
+    # だから「このイメージに何を当てたか」をイメージ自身に書き込む。
+    #
+    # パッチは当たらなければビルドが失敗し（apply-*-patches.sh）、
+    # スタンプがパッチの内容ハッシュを含むので古いビルド結果も使われない。
+    # よってここに並ぶものは実際に当たっている。
+    local patched="" f cve
+    for f in "${PROJECT_ROOT}"/src/libc/patches/*.patch \
+             "${PROJECT_ROOT}"/src/busybox/patches/*.patch; do
+        [ -f "$f" ] || continue
+        cve="$(basename "$f" | grep -oE 'CVE-[0-9]{4}-[0-9]+' || true)"
+        [ -n "$cve" ] || continue
+        case "$f" in
+            */src/libc/*) patched="${patched:+$patched }musl:${cve}" ;;
+            *)            patched="${patched:+$patched }busybox:${cve}" ;;
+        esac
+    done
+
     cat > "$metadata_file" << EOF
 # Kimigayo OS Build Information
 BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -1476,6 +1498,7 @@ VERSION=${OS_VERSION}
 CODENAME=${OS_CODENAME}
 BUILDER=$(whoami)
 BUILD_HOST=$(hostname)
+PATCHED_CVES=${patched}
 EOF
 
     chmod 644 "$metadata_file"
