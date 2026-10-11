@@ -28,7 +28,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
 # RUN apk add --no-cache npm && npm ci --omit=dev && cp -r node_modules /stage/app/
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Node.js runtime on Kimigayo OS"
