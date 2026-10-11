@@ -252,15 +252,23 @@ jobs:
             "${{ matrix.arch }}"
 
       # 公開するイメージそのものに鍵やトークンが紛れていないか。
-      # build-workflow.yml と同じく SCANS=secret だけ。CVE 照合は、パッチの
-      # 無い BusyBox の CVE が残っていて必ず落ちるので、まだ入れていない。
-      # Docker Hub に出たものは取り消せないので、push の前に止める。
-      - name: Scan image for secrets
+      # 秘密情報と CVE。Docker Hub に出たものは取り消せないので、push の前に止める。
+      # 作った SBOM は GitHub Release に添付する（利用者が自分の照合器にかけられる）。
+      - name: Scan image for secrets and CVEs
         run: |
-          SCANS=secret bash scripts/scan-image.sh \
+          SBOM_OUT="sbom/kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}.cdx.json" \
+            bash scripts/scan-image.sh \
             "${{ steps.tags.outputs.primary }}" \
             "${{ matrix.variant }}" \
             "${{ matrix.arch }}"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sbom-${{ matrix.variant }}-${{ matrix.arch }}
+          path: sbom/*.cdx.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Log in to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -458,11 +466,21 @@ jobs:
           path: artifacts/
           pattern: kimigayo-*
 
+      - name: Download SBOMs
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: sboms/
+          pattern: sbom-*
+
       - name: Prepare release assets
         run: |
           set -euo pipefail
           mkdir -p release-assets
           find artifacts/ -name "*.tar.gz" -exec cp {} release-assets/ \;
+          # SBOM（CycloneDX）は 3 バリアント × 2 アーキの 6 本。欠けたら出さない
+          find sboms/ -name "*.cdx.json" -exec cp {} release-assets/ \;
+          n=$(find release-assets -name '*.cdx.json' | wc -l)
+          [ "$n" -eq 6 ] || { echo "::error::expected 6 SBOMs, got $n"; exit 1; }
           cd release-assets
           sha256sum *.tar.gz > SHA256SUMS
           sha512sum *.tar.gz > SHA512SUMS
