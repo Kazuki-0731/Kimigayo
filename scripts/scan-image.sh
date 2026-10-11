@@ -150,15 +150,41 @@ json.dump({
 ' "$IMAGE" "$VARIANT" "$ARCH" > "$SBOM_OUT" || { log_error "SBOM generation failed"; return 1; }
     log_info "  SBOM: ${SBOM_OUT#"$PROJECT_ROOT"/}"
 
+    # **このイメージに当てた CVE パッチは除外する**（上流の版は同じままなので、
+    # 版で照合すると検出され続ける）。一覧はリポジトリではなくイメージの
+    # /.kimigayo-build-info から読む。リポジトリから読むと、パッチを
+    # 当てる前に出した公開イメージまで「修正済み」と扱ってしまう。
+    # 除外したものは必ずログに出す（黙って消さない）。
+    local patched
+    patched="$(docker run --rm --platform "$PLATFORM" --entrypoint /bin/sh "$IMAGE" \
+        -c 'sed -n "s/^PATCHED_CVES=//p" /.kimigayo-build-info 2>/dev/null' 2>/dev/null)"
+    {
+        echo "ignore:"
+        local entry
+        for entry in $patched; do
+            printf '  - vulnerability: %s\n    package:\n      name: %s\n' "${entry#*:}" "${entry%%:*}"
+        done
+    } > "$WORK/grype.yaml"
+    if [ -n "$patched" ]; then
+        log_info "  patched in this image (excluded from the result): ${patched}"
+    else
+        log_info "  no CVE patches recorded in this image"
+    fi
+    # 空の ignore: は YAML で null になるので、無ければ設定ファイルを渡さない
+    local cfg=()
+    [ -n "$patched" ] && cfg=(-c "$WORK/grype.yaml")
+    local dcfg=()
+    [ -n "$patched" ] && dcfg=(-c /work/grype.yaml)
+
     local rc
     if command -v grype >/dev/null 2>&1; then
-        grype "sbom:$SBOM_OUT" --fail-on "$FAIL_ON" -o table
+        grype "sbom:$SBOM_OUT" ${cfg[@]+"${cfg[@]}"} --fail-on "$FAIL_ON" -o table
         rc=$?
     else
         cp "$SBOM_OUT" "$WORK/sbom.json"
         # DB（数百 MB）を毎回取り直さないよう named volume に置く
         docker run --rm -v "$WORK:/work:ro" -v kimigayo-grype-db:/root/.cache/grype \
-            "$GRYPE_IMAGE" sbom:/work/sbom.json --fail-on "$FAIL_ON" -o table
+            "$GRYPE_IMAGE" sbom:/work/sbom.json ${dcfg[@]+"${dcfg[@]}"} --fail-on "$FAIL_ON" -o table
         rc=$?
     fi
     if [ "$rc" -eq 0 ]; then
