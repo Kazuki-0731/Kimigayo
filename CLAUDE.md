@@ -600,6 +600,18 @@ make benchmark             # 全ベンチマーク
 | パッチ | 理由 |
 | --- | --- |
 | `src/busybox/patches/0001-vi-musl-libc-compatibility.patch` | BusyBox の `editors/vi.c` が glibc の GNU 正規表現拡張（`re_syntax_options`・`re_compile_pattern`・`re_search`）を使っており musl ではコンパイルできない。POSIX `regcomp`/`regexec` に書き換えている。**1.38.0 でも上流は GNU 拡張のまま**なので引き続き必要（2026-10-09 に 1.38.0 への適用を dry-run で確認）。詳細 → [docs/development/busybox-vi-patch.md](docs/development/busybox-vi-patch.md) |
+| `src/busybox/patches/0002-CVE-2026-38754-ash-ifsbreakup-oob.patch` | ash（`/bin/sh`）の範囲外アクセス。BusyBox の ML に投稿された修正（v3）で、リリースにはまだ入っていない。Alpine aports の `0040-...` を sha512 で突合して取り込んだ。**上流がこの修正を含む版を出したら消す** |
+| `src/libc/patches/0001-CVE-2026-40200-qsort-stack-corruption.patch` | musl の qsort のスタック破壊。上流の 3 コミットで、musl 1.2.6 の次の版で不要になる。Alpine aports と sha512 で突合 |
+| `src/libc/patches/0002-CVE-2026-6042-iconv-gb18030-dos.patch` | musl の iconv（GB18030）の CPU DoS。同上 |
+
+**CVE パッチのファイル名には CVE ID を入れる。** `build-rootfs.sh` が
+ファイル名から `/.kimigayo-build-info` の `PATCHED_CVES` を作り、
+`scan-image.sh` がそれを読んでパッチ済みの CVE を照合結果から除外する
+（版は上流のままなので、記録しないと検出され続ける）。
+
+**musl のパッチは当たらなければビルドが失敗する**（`apply-musl-patches.sh`。
+カーネルの適用スクリプトのように警告して素通しはしない）。
+BusyBox の適用スクリプトも当たらなければ `exit 1` する。
 
 **カーネルのパッチは現在0件。** `0001-security-hardening.patch` は中身が
 コメントだけのプレースホルダで、毎ビルド「適用できないパッチ」として
