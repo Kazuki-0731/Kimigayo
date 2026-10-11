@@ -49,8 +49,63 @@ kimigayo_is_built() {
 # 「already built」でスキップされ、**standard の BusyBox が入った
 # minimal イメージ**が出来ていた（2026-10-09 に発覚）。
 # 版とバリアントの両方をスタンプに入れて区別する。
+#
+# 2026-10-11: さらに入力の内容ハッシュを足した（→ kimigayo_inputs_id）。
+# config・パッチ・ビルドスクリプト自身のどれかが変われば作り直す。
+# リンク方法（BUSYBOX_LINK=static|dynamic）も入れる。同じ config から
+# 静的と動的の両方を作れるので、取り違えると別物が入る。
+# 例: 1.38.0+standard+dynamic+28a2a65cf6e0
 kimigayo_busybox_build_id() {
-    printf '%s+%s' "$1" "$2"
+    local root="${PROJECT_ROOT:?PROJECT_ROOT must be set}"
+    local id
+    id="$(kimigayo_inputs_id \
+        "${root}/src/busybox/config/${2}.config" \
+        "${root}/src/busybox/patches/"*.patch \
+        "${root}/scripts/build-busybox.sh")"
+    printf '%s+%s+%s+%s' "$1" "$2" "${BUSYBOX_LINK:-static}" "$id"
+}
+
+# musl のスタンプ値。
+#
+# 版だけだと、src/libc/patches/ にセキュリティパッチを足しても
+# 未パッチの libc.so がそのまま使われる。パッチとビルドスクリプトの
+# 内容ハッシュを含める。例: 1.2.6+1e2234b4e0b1
+kimigayo_musl_build_id() {
+    local root="${PROJECT_ROOT:?PROJECT_ROOT must be set}"
+    local id
+    id="$(kimigayo_inputs_id \
+        "${root}/src/libc/patches/"*.patch \
+        "${root}/scripts/build-musl.sh")"
+    printf '%s+%s' "$1" "$id"
+}
+
+# 入力ファイル群（パッチ・config）の内容から短い ID を作る。
+#
+# 版とバリアントだけのスタンプでは、**同じ版のまま config やパッチを
+# 書き換えても「ビルド済み」と判定されてスキップされる**
+# （2026-10-11 に BusyBox の config 変更で実際に踏んだ。musl に
+# セキュリティパッチを足した場合も、未パッチの libc.so が残る）。
+# 中身のハッシュをスタンプに含めて、入力が変われば作り直させる。
+#
+# 引数のうち存在しないもの（グロブが展開されなかった場合など）は無視する。
+# 1つも無ければ空文字を返す。ファイル名順に並べるので引数の順序に依存しない。
+kimigayo_inputs_id() {
+    local f files=()
+    for f in "$@"; do
+        [ -f "$f" ] && files+=("$f")
+    done
+    [ "${#files[@]}" -gt 0 ] || return 0
+    local sum
+    if command -v sha256sum >/dev/null 2>&1; then
+        sum="sha256sum"
+    else
+        sum="shasum -a 256"
+    fi
+    # 内容とファイル名（basename）の両方を入れる。名前を変えただけでも作り直す
+    printf '%s\n' "${files[@]}" | sort | while IFS= read -r f; do
+        printf '%s\n' "$(basename "$f")"
+        cat "$f"
+    done | $sum | cut -c1-12
 }
 
 # ビルド成功後に版を記録する

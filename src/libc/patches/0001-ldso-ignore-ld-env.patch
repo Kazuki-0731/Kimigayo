@@ -1,0 +1,48 @@
+Kimigayo: ignore LD_LIBRARY_PATH and LD_PRELOAD from the environment
+
+Why: OpenRC (and anything else dynamically linked against musl) could be
+code-injected by anyone able to set an environment variable for it.
+Upstream musl only ignores these for suid/sgid processes; in a container
+almost everything is root without suid, so that guard never fires.
+
+Measured on the published v3.0.1 image before this patch:
+  LD_PRELOAD=/root/evil.so /sbin/openrc --version
+  -> "*** INJECTED via LD_PRELOAD ***" printed by the injected library
+
+The statically linked BusyBox was immune only because it does not use the
+dynamic loader at all. This patch closes the hole for every dynamic binary,
+which is what makes a dynamically linked BusyBox acceptable.
+
+Applied by scripts/apply-musl-patches.sh. If it stops applying after a musl
+version bump, the build FAILS on purpose: a security patch that silently
+does not apply is worse than no patch (see CLAUDE.md on
+apply-kernel-patches.sh skipping patches).
+
+--- a/ldso/dynlink.c
++++ b/ldso/dynlink.c
+@@ -1817,11 +1817,20 @@
+ 	libc.secure = ((aux[0]&0x7800)!=0x7800 || aux[AT_UID]!=aux[AT_EUID]
+ 		|| aux[AT_GID]!=aux[AT_EGID] || aux[AT_SECURE]);
+ 
+-	/* Only trust user/env if kernel says we're not suid/sgid */
+-	if (!libc.secure) {
+-		env_path = getenv("LD_LIBRARY_PATH");
+-		env_preload = getenv("LD_PRELOAD");
+-	}
++	/* Kimigayo: never take LD_LIBRARY_PATH or LD_PRELOAD from the
++	 * environment, regardless of libc.secure.
++	 *
++	 * Upstream only ignores them for suid/sgid processes. In a container
++	 * nearly everything runs as root without suid, so anyone who can set
++	 * an environment variable for a process (a service file, an exec'd
++	 * child, a crafted `docker exec -e`) can inject code into every
++	 * dynamically linked binary - including the init system.
++	 *
++	 * Library search paths that the system genuinely needs belong in
++	 * /etc/ld-musl-$ARCH.path (root-owned file, not caller-controlled).
++	 * Explicitly running the loader (`ld-musl-*.so.1 --preload X prog`)
++	 * still works; that requires the ability to exec arbitrary programs
++	 * already, so it grants nothing new. */
+ 
+ 	/* Activate error handler function */
+ 	error = error_impl;

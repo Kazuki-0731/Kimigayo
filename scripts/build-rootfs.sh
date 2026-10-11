@@ -1533,7 +1533,7 @@ main() {
     # usr/lib/libc.a に入るため条件が常に成立せず、毎回フルビルドしていた。
     # インストール先の配置を当てに行かず、バージョンスタンプで判定する。
     local MUSL_CHECK_DIR="${BUILD_DIR}/musl-install-${MUSL_ARCH}"
-    if ! kimigayo_is_built "$MUSL_CHECK_DIR" "$MUSL_VERSION"; then
+    if ! kimigayo_is_built "$MUSL_CHECK_DIR" "$(kimigayo_musl_build_id "$MUSL_VERSION")"; then
         log_warn "musl libc ${MUSL_VERSION} not built yet, building..."
         bash "${SCRIPT_DIR}/download-musl.sh" || { log_error "Failed to download musl"; exit 1; }
         ARCH=$MUSL_ARCH bash "${SCRIPT_DIR}/build-musl.sh" || { log_error "Failed to build musl"; exit 1; }

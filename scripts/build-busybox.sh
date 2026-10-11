@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # BusyBox Build Script for Kimigayo OS
-# Builds BusyBox statically linked with musl libc
+# Builds BusyBox against musl libc, statically (default) or dynamically
+# (BUSYBOX_LINK=dynamic)
 #
 
 set -euo pipefail
@@ -79,6 +80,21 @@ log_error() {
     timestamp=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
+
+# リンク方法: static（既定・static-PIE）| dynamic（PIE、musl の libc.so に動的リンク）
+#
+# 静的リンクだと BusyBox 1.38.0 の内蔵 TLS が壊れ、wget の HTTPS が落ちる
+# （→ docs/troubleshooting/busybox-wget-https-segfault.md）。
+# 動的にしても共有ライブラリは増えない（libc.so は OpenRC のために既に入っている）。
+# 動的化で開く LD_PRELOAD の注入面は、musl の ldso パッチで塞いである
+# （→ src/libc/patches/0001-ldso-ignore-ld-env.patch）。
+BUSYBOX_LINK="${BUSYBOX_LINK:-static}"
+case "$BUSYBOX_LINK" in
+    static|dynamic) ;;
+    *) log_error "BUSYBOX_LINK must be 'static' or 'dynamic' (got '${BUSYBOX_LINK}')"; exit 1 ;;
+esac
+export BUSYBOX_LINK
+log_info "BusyBox link mode: ${BUSYBOX_LINK}"
 
 # Check if BusyBox is already built at the version we want
 # 版だけでなくバリアントも見る（→ kimigayo_busybox_build_id のコメント）
@@ -306,10 +322,17 @@ fi
 install_prefix="${BUSYBOX_INSTALL_DIR}"
 sed -i "s|CONFIG_PREFIX=.*|CONFIG_PREFIX=\"${install_prefix}\"|" .config
 
-# Ensure static linking is enabled
-log_info "Ensuring static linking configuration..."
-sed -i "s|# CONFIG_STATIC is not set|CONFIG_STATIC=y|" .config
-sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
+# CONFIG_STATIC をリンク方法に合わせる
+set_config_static() {
+    if [ "$BUSYBOX_LINK" = "static" ]; then
+        sed -i "s|# CONFIG_STATIC is not set|CONFIG_STATIC=y|" .config
+        sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
+    else
+        sed -i "s|^CONFIG_STATIC=.*|# CONFIG_STATIC is not set|" .config
+    fi
+}
+log_info "Setting CONFIG_STATIC for ${BUSYBOX_LINK} linking..."
+set_config_static
 
 # Apply oldconfig with automatic default answers (non-interactive)
 log_info "Resolving configuration dependencies..."
@@ -318,7 +341,7 @@ log_info "Resolving configuration dependencies..."
 yes "" | make oldconfig > /dev/null 2>&1 || true
 
 # Re-apply critical settings after oldconfig (oldconfig may reset some values)
-sed -i "s|CONFIG_STATIC=.*|CONFIG_STATIC=y|" .config
+set_config_static
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # CONFIG_PIE は Kconfig が STATIC と排他にしているので触らない
     # （上記参照。PIE 化は -fPIE / -static-pie を直接渡して行う）
@@ -326,23 +349,41 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
     # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl includes these in libc.a)
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
-    log_info "Re-applied settings after oldconfig (STATIC=y, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
+    log_info "Re-applied settings after oldconfig (link=${BUSYBOX_LINK}, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
 else
-    log_info "Re-applied settings after oldconfig (STATIC=y)"
+    log_info "Re-applied settings after oldconfig (link=${BUSYBOX_LINK})"
 fi
 
-# Verify CONFIG_STATIC is set
-if ! grep -q "^CONFIG_STATIC=y" .config; then
-    log_error "Failed to enable CONFIG_STATIC in BusyBox configuration"
-    exit 1
+# Verify CONFIG_STATIC matches the requested link mode
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    if ! grep -q "^CONFIG_STATIC=y" .config; then
+        log_error "Failed to enable CONFIG_STATIC in BusyBox configuration"
+        exit 1
+    fi
+    log_success "CONFIG_STATIC=y verified"
+else
+    if grep -q "^CONFIG_STATIC=y" .config; then
+        log_error "CONFIG_STATIC is still enabled but BUSYBOX_LINK=dynamic"
+        exit 1
+    fi
+    log_success "CONFIG_STATIC disabled (dynamic linking) verified"
 fi
-log_success "CONFIG_STATIC=y verified"
 
 # Build BusyBox
 log_info "Building BusyBox..."
 log_info "This may take several minutes..."
 
-# Set compiler flags for static musl build
+# 最終リンクのフラグ（arm64 の clang は CFLAGS_busybox で渡す。理由は下記）
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    LDFLAGS_STATIC="-static "
+    BB_FINAL_LINK="-static -static-pie"
+else
+    LDFLAGS_STATIC=""
+    # 動的なら普通の PIE。インタプリタは /lib/ld-musl-<arch>.so.1
+    BB_FINAL_LINK="-pie"
+fi
+
+# Set compiler flags for musl build
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
@@ -387,7 +428,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         log_info "  placed ${crt} in the musl sysroot"
     done
 
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
+    export LDFLAGS="${LDFLAGS_STATIC}-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
     # Log musl location (already verified above)
     log_info "Using musl libc from: ${MUSL_INSTALL_DIR}"
@@ -399,7 +440,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 else
     # For x86_64: use stack protector (GCC has proper support)
     export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 ${CFLAGS_REPRODUCIBLE}"
-    export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
+    export LDFLAGS="${LDFLAGS_STATIC}-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 fi
 
 # Ensure we're using the correct compiler
@@ -419,7 +460,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # （1.38.0 で確認）、コマンドラインで上書きしても取りこぼしは無い。
     # CONFIG_PIE は Kconfig が STATIC と排他にしていて使えない（上記参照）。
     if ! make -j"$(nproc)" SKIP_STRIP=y LDLIBS="" \
-            CFLAGS_busybox="-static -static-pie" 2>&1 | tee /tmp/busybox-build.log; then
+            CFLAGS_busybox="${BB_FINAL_LINK}" 2>&1 | tee /tmp/busybox-build.log; then
         BUILD_FAILED=true
     fi
 else
@@ -461,14 +502,24 @@ else
     log_success "Binary size within target (${target_size} KB)"
 fi
 
-# Verify static linking
-log_info "Verifying static linking..."
-if file busybox | grep -qE "(statically linked|static-pie linked)"; then
-    log_success "BusyBox is statically linked"
+# Verify the link mode actually produced what was asked for
+log_info "Verifying ${BUSYBOX_LINK} linking..."
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    if file busybox | grep -qE "(statically linked|static-pie linked)"; then
+        log_success "BusyBox is statically linked"
+    else
+        log_error "BusyBox is not statically linked!"
+        file busybox
+        exit 1
+    fi
 else
-    log_error "BusyBox is not statically linked!"
-    file busybox
-    exit 1
+    if file busybox | grep -q "interpreter /lib/ld-musl-"; then
+        log_success "BusyBox is dynamically linked against musl ($(file busybox | grep -o 'interpreter [^,]*'))"
+    else
+        log_error "BusyBox is not dynamically linked against musl!"
+        file busybox
+        exit 1
+    fi
 fi
 
 # Verify musl libc
@@ -490,7 +541,7 @@ fi
 # という最悪の形だった。
 log_info "Installing BusyBox to ${install_prefix}..."
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    make install LDLIBS="" CFLAGS_busybox="-static -static-pie"
+    make install LDLIBS="" CFLAGS_busybox="${BB_FINAL_LINK}"
 else
     make install
 fi

@@ -472,9 +472,10 @@ main() {
     log_info ""
 
     # Check if musl is already built at the version we want
-    if kimigayo_is_built "$MUSL_INSTALL_DIR" "$MUSL_VERSION"; then
-        log_info "musl libc ${MUSL_VERSION} already built and installed: ${MUSL_INSTALL_DIR}"
-        log_info "Skipping build (use 'make clean-musl' to rebuild)"
+    MUSL_BUILD_ID="$(kimigayo_musl_build_id "$MUSL_VERSION")"
+    if kimigayo_is_built "$MUSL_INSTALL_DIR" "$MUSL_BUILD_ID"; then
+        log_info "musl libc ${MUSL_BUILD_ID} already built and installed: ${MUSL_INSTALL_DIR}"
+        log_info "Skipping build (use 'make clean-musl' in the container to rebuild)"
         show_summary
         log_info "musl libc build check completed!"
         exit 0
@@ -482,13 +483,20 @@ main() {
 
     installed_version="$(kimigayo_built_version "$MUSL_INSTALL_DIR")"
     if [ -n "$installed_version" ]; then
-        log_warn "Installed musl is ${installed_version}, want ${MUSL_VERSION} -- rebuilding"
+        log_warn "Installed musl is ${installed_version}, want ${MUSL_BUILD_ID} -- rebuilding"
         # ビルドディレクトリも捨てる（configure の結果が前の版のまま残る）
         rm -rf "${MUSL_INSTALL_DIR}" "${MUSL_BUILD_DIR}"
     fi
 
     setup_arch
     init_build_dirs
+
+    # セキュリティパッチ（src/libc/patches/）を当てる。
+    # 当たらなければ失敗する（警告して素通しはしない）。
+    # Makefile ではなくここで呼ぶのは、build-rootfs.sh がこのスクリプトを
+    # 直接呼ぶ経路もあるため。どの経路でも必ず当たるようにする。
+    bash "${PROJECT_ROOT}/scripts/apply-musl-patches.sh"
+
     check_prerequisites
     configure_musl
     build_musl
@@ -498,7 +506,7 @@ main() {
     show_summary
 
     # どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-    kimigayo_write_build_stamp "$MUSL_INSTALL_DIR" "$MUSL_VERSION"
+    kimigayo_write_build_stamp "$MUSL_INSTALL_DIR" "$MUSL_BUILD_ID"
 
     log_info "musl libc build completed successfully!"
 
