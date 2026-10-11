@@ -601,6 +601,8 @@ make benchmark             # 全ベンチマーク
 | --- | --- |
 | `src/busybox/patches/0001-vi-musl-libc-compatibility.patch` | BusyBox の `editors/vi.c` が glibc の GNU 正規表現拡張（`re_syntax_options`・`re_compile_pattern`・`re_search`）を使っており musl ではコンパイルできない。POSIX `regcomp`/`regexec` に書き換えている。**1.38.0 でも上流は GNU 拡張のまま**なので引き続き必要（2026-10-09 に 1.38.0 への適用を dry-run で確認）。詳細 → [docs/development/busybox-vi-patch.md](docs/development/busybox-vi-patch.md) |
 | `src/busybox/patches/0002-CVE-2026-38754-ash-ifsbreakup-oob.patch` | ash（`/bin/sh`）の範囲外アクセス。BusyBox の ML に投稿された修正（v3）で、リリースにはまだ入っていない。Alpine aports の `0040-...` を sha512 で突合して取り込んだ。**上流がこの修正を含む版を出したら消す** |
+| `src/busybox/patches/0003-CVE-2026-38753-awk-sub-use-after-free.patch` | awk の use-after-free。**Alpine にも無い**ので BusyBox の ML に投稿された修正（NVD の参照先）を読んで取り込んだ。上流が版を出したら消す |
+| `src/busybox/patches/0004-CVE-2026-38755-ash-evalfun-recursion.patch` | ash の関数の無限再帰でシェルが落ちる。同上。**深さ 1000 で打ち切る挙動の変更を伴う**（`verify-image.sh` が回帰を見る） |
 | `src/libc/patches/0001-CVE-2026-40200-qsort-stack-corruption.patch` | musl の qsort のスタック破壊。上流の 3 コミットで、musl 1.2.6 の次の版で不要になる。Alpine aports と sha512 で突合 |
 | `src/libc/patches/0002-CVE-2026-6042-iconv-gb18030-dos.patch` | musl の iconv（GB18030）の CPU DoS。同上 |
 
@@ -859,8 +861,9 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   イメージ内のバイナリから読んだ版で SBOM を作り、Grype で NVD の CPE と
   照合する。**「0 件」は「CPE の範囲で 0 件」で、Alpine だけが持つ
   修正は見えない**ので、出た CVE は `security-review` skill で確かめる。
-  毎 push で走るのは秘密情報だけで、CVE は `dependency-review.yml` が
-  毎週、公開中の `latest` を照合する
+  CI（毎 push）と `release.yml`（push 前）で CVE と秘密情報を見る。
+  加えて `dependency-review.yml` が毎週、公開中の `latest` を照合する。
+  **NVD に CVE が載るとコードを変えていない push でも落ちる**（正しい信号）
 - **ビルド後の検査は `scripts/verify-image.sh` に集める**（CI・release・
   ローカル共通）。強化まわりでは、全 ELF の PIE / RELRO / BIND_NOW /
   非実行スタック、出荷物の版と `versions.mk` の突合、cpio の
