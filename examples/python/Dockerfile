@@ -12,10 +12,12 @@ RUN apk add --no-cache python3
 # 必要な共有ライブラリを ldd で解決して1か所に集める。
 # **手で列挙しないこと**（上流の更新で依存が増えると
 # `Error relocating ...: symbol not found` で落ちます）。
+# python3 本体だけでなく、拡張モジュール（lib-dynload/*.so）の依存も拾う。
+# 本体だけだと `import ssl` が libssl.so.3 不足で落ちる（2026-10-12 に確認）。
 RUN mkdir -p /stage/usr/bin /stage/usr/lib \
     && cp -a /usr/bin/python3* /stage/usr/bin/ \
     && cp -a /usr/lib/python3* /stage/usr/lib/ \
-    && ldd "$(readlink -f /usr/bin/python3)" \
+    && for f in "$(readlink -f /usr/bin/python3)" /usr/lib/python3*/lib-dynload/*.so; do ldd "$f"; done \
        | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
        | grep -v 'ld-musl' \
        | sort -u \
@@ -26,7 +28,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
 # RUN apk add --no-cache py3-pip && pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.1
+FROM ishinokazuki/kimigayo-os:3.0.2
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Python runtime on Kimigayo OS"
