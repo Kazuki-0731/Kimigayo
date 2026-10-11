@@ -600,28 +600,52 @@ cat /var/log/cis-benchmark-report.txt
 | **DS-0002 (HIGH)** イメージのユーザーが root | `Dockerfile.runtime` | **直さない（要判断として保留）。** 公開イメージの既定ユーザーを変えると、`openrc` が動かなくなり、既存の利用者全員に影響する破壊的変更になる。**利用者側で `docker run --user 65534` か Dockerfile の `USER` を使う**ことを案内する（→ `examples/` の3つはすべて `USER 65534` にしてある） |
 | `make trivy-scan`（イメージスキャン）が何も検出しない | 公開イメージ | **仕様。** パッケージデータベースを持たないため Trivy が対象を1つも識別できない。「脆弱性 0 件」ではなく「スキャンしていない」。構成要素の版は手で追跡する（→ `security-review` skill） |
 
-### BusyBox の cpio はディレクトリを脱出できる
+### BusyBox の cpio はディレクトリを脱出できた（v3.0.1 まで。修正済み）
 
-**`busybox cpio -i` は、エントリ名の `../` を剥がしません**（2026-10-11 実測）。
+**v3.0.1 までの `busybox cpio -i` は、エントリ名の `../` を剥がさなかった**
+（2026-10-11 実測）。**2026-10-11 に
+`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y` を 3 バリアントすべてで
+有効にして修正した。次のリリース（v3.0.2）から有効。**
 
-```console
-$ docker run --rm -v ./evil.cpio:/tmp/evil.cpio:ro <image> sh -c \
-    'mkdir -p /extract/here && cd /extract/here && busybox cpio -i -F /tmp/evil.cpio'
-$ # ../../escaped.txt というエントリが / に作られる
+修正を実際の脱出で検証した結果:
+
+| BusyBox | 警告 | 展開先 |
+| --- | --- | --- |
+| **新 Kimigayo 1.38.0（保護有効）** | `cpio: removing leading '../' from member names` | **展開先ディレクトリ内**（阻止）|
+| Alpine 3.24 の 1.37.0（保護無効・比較）| なし | **展開先の外**（脱出成功）|
+
+再現手順（`../escaped` を含む cpio を作り、`dest/` から展開する）:
+
+```bash
+# 悪意あるアーカイブを作る
+mkdir -p /work/mk/sub /work/target/dest
+echo PWNED > /work/mk/escaped          # /work/mk/sub から見て ../escaped
+cd /work/mk/sub && printf '../escaped\n' | cpio -o -H newc > /work/evil.cpio
+
+# 展開してどこに出るか見る
+cd /work/target/dest && busybox cpio -iv -F /work/evil.cpio
+# 保護あり: /work/target/dest/escaped（内側）
+# 保護なし: /work/target/escaped（外側 = 脱出）
 ```
 
-- **`tar` と `unzip` は安全。** どちらも常に `../` を剥がす
+> **検証するときは、BusyBox を `busybox` という名前で置くこと。**
+> BusyBox は `argv[0]` でアプレットを決めるので、
+> `/opt/bb/new-busybox cpio ...` のように別名で置くと
+> `applet not found`（rc=127）になり、**「何も展開されなかった」のを
+> 「保護が効いた」と読み違える。** 2026-10-11 に実際にこれで
+> 誤った結論を出しかけた。
+
+- **`tar` と `unzip` は元から安全。** どちらも常に `../` を剥がす
   （`archival/tar.c` の `skip_unsafe_prefix`、`archival/unzip.c` の
   `strip_unsafe_prefix`）
-- **`cpio` / `ar` / `rpm` は `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION`
-  に依存する。** BusyBox の既定は `n` で、Kimigayo も設定していない
-- **Alpine も同じ挙動**（同条件で実測。Alpine の BusyBox でも脱出した）
-- 影響範囲: `cpio` は standard / extended に入っている。`ar` は extended のみ。
-  `rpm` は v3.0.1 で削除済み
+- **`cpio` / `ar` / `rpm` が `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION`
+  に依存する。** BusyBox の既定は `n`
+- 影響範囲: `cpio` は 3 バリアントすべてに入っている（minimal にも
+  既定で入っていた）。`ar` は extended のみ。`rpm` は v3.0.1 で削除済み
+- **サイズとアプレット数は変わらない**（extended: 1186KB / 411 のまま）
 
-**信頼できないアーカイブを特権で展開しないこと。** 必要なら
-`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y` を有効にしてビルドし直す
-（アプレットの挙動が変わるので、リリースの判断が必要）。
+**v3.0.1 以前のイメージを使っているあいだは、信頼できないアーカイブを
+特権で展開しないこと。**
 
 関連して、2026-10-09 に **CVE-2026-108119**（BusyBox の `tar` の遅延リンク
 生成が展開先の外を検証しない、CVSS 6.3 MEDIUM）が公表された。

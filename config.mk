@@ -24,13 +24,44 @@
 #       appears only here, yet the artifacts do have a non-exec stack
 #       (GNU_STACK=RW on busybox, openrc and libc.so) because lld defaults
 #       to it. Not guaranteed by us.
-#   REPRODUCIBLE_BUILD / SOURCE_DATE_EPOCH / -f*-prefix-map
-#       never applied. REPRODUCIBLE_BUILD is not set anywhere either, so the
-#       block below could not fire even if this file were included.
+#   -Wl,-z,noexecstack
+#       as of 2026-10-11 the three build scripts pass it explicitly, so the
+#       non-exec stack is now stated by us rather than inherited from lld.
+#   REPRODUCIBLE_BUILD / SOURCE_DATE_EPOCH
+#       REPRODUCIBLE_BUILD *is* set: build-system/Makefile line 51 has
+#       `REPRODUCIBLE_BUILD ?= yes` and line 93 `export SOURCE_DATE_EPOCH := 0`.
+#       That export does reach the build scripts (measured 2026-10-11 with
+#       `make --eval='showenv: ; @echo $$SOURCE_DATE_EPOCH'` -> `0`).
+#       An earlier note here, and in CLAUDE.md, wrongly said it was never set.
+#   -f*-prefix-map
+#       build-system/Makefile adds `-fdebug-prefix-map` to its own CFLAGS, but
+#       scripts/build-{musl,busybox,openrc}.sh each do `export CFLAGS="..."`,
+#       which overwrote it. As of 2026-10-11 the three scripts rebuild the
+#       prefix maps themselves, gated on REPRODUCIBLE_BUILD.
 #
-# Wiring this file into the build scripts changes the flags every binary is
-# compiled with, so it needs its own change and its own full rebuild. Until
-# then, do not cite config.mk as the source of truth for hardening flags.
+# **Bit-for-bit reproducibility is still unverified.** Setting
+# SOURCE_DATE_EPOCH and the prefix maps removes two known sources of
+# nondeterminism; it does not prove there are no others. To actually claim it,
+# build the same commit twice in a clean tree and compare:
+#
+#   for i in 1 2; do
+#     rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
+#     docker compose run --rm -T kimigayo-build make busybox \
+#       TARGET_ARCH=x86_64 IMAGE_TYPE=standard
+#     cp build/busybox-install-x86_64/bin/busybox /tmp/bb.$i
+#   done
+#   cmp /tmp/bb.1 /tmp/bb.2 && echo "bit-identical"
+#
+# Until that passes, do not advertise reproducible builds.
+#
+# BUSYBOX_CONFIG below is wrong: there is no src/busybox/kimigayo_defconfig.
+# The real configs are src/busybox/config/{minimal,standard,extended}.config,
+# selected by IMAGE_TYPE in scripts/build-busybox.sh.
+#
+# Wiring the *rest* of this file in would change the flags every binary is
+# compiled with (note BASE_CFLAGS carries -Werror), so it needs its own change
+# and its own full rebuild. Until then, do not cite config.mk as the source of
+# truth for hardening flags.
 # ============================================================================
 
 # Architecture-specific settings
@@ -122,7 +153,9 @@ include $(dir $(lastword $(MAKEFILE_LIST)))versions.mk
 KERNEL_CONFIG := $(KERNEL_SRC)/config/kimigayo_$(ARCH)_defconfig
 
 # BusyBox configuration
-BUSYBOX_CONFIG := $(UTILS_SRC)/busybox/kimigayo_defconfig
+# WRONG: this path does not exist. See the header. Kept only so that wiring
+# this file in does not silently pick up a bogus default.
+BUSYBOX_CONFIG := $(UTILS_SRC)/busybox/config/$(IMAGE_TYPE).config
 
 # Build parallelism
 MAKEFLAGS += -j$(shell nproc 2>/dev/null || echo 1)

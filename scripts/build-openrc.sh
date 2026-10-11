@@ -147,17 +147,33 @@ if ! command -v ninja &> /dev/null; then
     exit 1
 fi
 
+# Reproducible build flags.
+#
+# build-system/Makefile exports SOURCE_DATE_EPOCH=0 and that does reach
+# here, but its `CFLAGS += -fdebug-prefix-map=...` is lost because the
+# assignments below overwrite CFLAGS. Rebuild the prefix maps.
+# This alone does not make the build bit-for-bit reproducible.
+CFLAGS_REPRODUCIBLE=""
+if [ "${REPRODUCIBLE_BUILD:-yes}" = "yes" ]; then
+    CFLAGS_REPRODUCIBLE="-fdebug-prefix-map=${PROJECT_ROOT:-$PWD}=. -fmacro-prefix-map=${PROJECT_ROOT:-$PWD}=."
+fi
+
+# -Wl,-z,noexecstack is stated explicitly rather than relying on the
+# linker default (the artifacts already have GNU_STACK=RW, but that is
+# lld's choice, not ours).
+LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
+
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # For ARM64 LLVM/Clang: use musl's strlcat (no stack protector to avoid complexity)
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY"
+    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY ${CFLAGS_REPRODUCIBLE}"
     # Standard linking - let musl-clang wrapper handle the details
-    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+    export LDFLAGS="${LDFLAGS_SECURITY}"
 else
     # For x86_64: use standard flags with stack protector
-    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"'"
-    export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' ${CFLAGS_REPRODUCIBLE}"
+    export LDFLAGS="${LDFLAGS_SECURITY}"
 fi
 
 # Configure with meson

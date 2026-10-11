@@ -192,8 +192,13 @@ configure_musl() {
     cd "$MUSL_BUILD_DIR" || exit 1
 
     # Security hardening flags
+    #
+    # -Wl,-z,noexecstack is passed explicitly. The artifacts already have
+    # GNU_STACK=RW, but only because lld defaults to it - that is the
+    # linker's choice, not ours. State it so a toolchain change cannot
+    # silently turn the stack executable.
     local CFLAGS_SECURITY="-fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-    local LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now"
+    local LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
     # Optimization flags
     local CFLAGS_OPT="-Os"
@@ -201,8 +206,22 @@ configure_musl() {
         CFLAGS_OPT="-O0 -g"
     fi
 
+    # Reproducible build flags.
+    #
+    # build-system/Makefile sets REPRODUCIBLE_BUILD ?= yes and exports
+    # SOURCE_DATE_EPOCH := 0, which reaches this script. What did NOT reach
+    # it was the Makefile's `CFLAGS += -fdebug-prefix-map=...`, because the
+    # line below overwrites CFLAGS wholesale. Rebuild the prefix maps here.
+    #
+    # This does not by itself make the build bit-for-bit reproducible;
+    # that has never been verified (see config.mk).
+    local CFLAGS_REPRODUCIBLE=""
+    if [ "${REPRODUCIBLE_BUILD:-yes}" = "yes" ]; then
+        CFLAGS_REPRODUCIBLE="-fdebug-prefix-map=${PROJECT_ROOT:-$PWD}=. -fmacro-prefix-map=${PROJECT_ROOT:-$PWD}=."
+    fi
+
     # Combined flags
-    export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY}"
+    export CFLAGS="${CFLAGS_ARCH} ${CFLAGS_OPT} ${CFLAGS_SECURITY} ${CFLAGS_REPRODUCIBLE}"
     export LDFLAGS="${LDFLAGS_SECURITY}"
 
     # aarch64 の 128-bit long double（TFmode）演算と複素数乗算は

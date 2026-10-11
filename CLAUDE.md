@@ -810,13 +810,21 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   中身は「こうしたい」という宣言で、効いているのは上の3スクリプト。
   - **`-Wl,-z,noexecstack` は `config.mk` にしか無い。** ただし成果物は
     実際に非実行スタック（`busybox`・`openrc`・`libc.so` の
-    `GNU_STACK=RW`）。lld の既定でそうなっているだけで、こちらが
-    保証しているわけではない
-  - **再現可能ビルドは一度も効いていない。** `REPRODUCIBLE_BUILD=yes` の
-    ときだけ `SOURCE_DATE_EPOCH` と prefix-map が入る作りだが、この変数を
-    どこも設定していない（`config.mk` 自体が読まれないので二重に無効）。
-    配線するとすべてのバイナリのフラグが変わるため、独立した変更として
-    フルビルドで検証する
+    `GNU_STACK=RW`）。**2026-10-11 に 3 スクリプトへ明示的に追加した**ので、
+    いまは lld の既定に頼らずこちらで宣言している
+  - **`REPRODUCIBLE_BUILD` は設定されている。** 以前ここに
+    「どこも設定していない」と書いていたが**誤り**だった。
+    `build-system/Makefile` が `REPRODUCIBLE_BUILD ?= yes`（L51）と
+    `export SOURCE_DATE_EPOCH := 0`（L93）を持ち、**この export は
+    ビルドスクリプトに届いている**（2026-10-11 に
+    `make --eval='showenv: ; @echo $$SOURCE_DATE_EPOCH'` で `0` を実測）。
+    届いていなかったのは Makefile 側の `CFLAGS += -fdebug-prefix-map=...`
+    の方で、`scripts/build-*.sh` が `export CFLAGS="..."` で上書きして
+    消していた。**2026-10-11 に 3 スクリプトで prefix-map を組み直した。**
+  - **ただしビット同一性は未検証。** `SOURCE_DATE_EPOCH` と prefix-map は
+    既知の非決定要因を 2 つ消すだけで、他に無いことの証明にはならない。
+    **「再現可能ビルド」を名乗る前に、同じコミットを 2 回ビルドして
+    `cmp` が通ることを確認する**（手順は `config.mk` の冒頭コメント）
 - `make security-scan` = Trivy（イメージ）+ Trivy（ファイルシステム）+ ShellCheck
 - **`make trivy-scan`（イメージスキャン）は何も検査していない。**
   Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
