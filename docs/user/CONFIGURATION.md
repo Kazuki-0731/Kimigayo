@@ -1,6 +1,28 @@
 # Kimigayo OS システム設定ガイド
 
-このガイドでは、Kimigayo OSの各種設定方法について説明します。
+このガイドでは、Kimigayo OS の設定方法について説明します。
+
+## 前提: 設定をどこで行うか
+
+**Kimigayo OS は VPS 上の Docker コンテナで動かすことを想定した OS です。**
+rootfs だけを詰めたイメージで、**カーネルはイメージに入りません**
+（コンテナはホストのカーネルで動きます）。パッケージマネージャーも
+意図的に持ちません。
+
+このため、ブートする OS の設定ガイドとは置き場所が変わります。
+
+| 何を設定するか | どこで行うか |
+|---------------|-------------|
+| ホスト名・DNS・IP アドレス | **コンテナの外**（`docker run` のオプション、Compose、Kubernetes）|
+| カーネルパラメータ・モジュール | **ホスト側**（`/proc/sys` はコンテナから読み取り専用）|
+| ファイアウォール | **ホスト側**（`iptables` はイメージに入っていません）|
+| 追加ソフトウェア | **ビルド時**（マルチステージビルド。実行中には追加できません）|
+| サービス（OpenRC） | **コンテナ内**。ただし OpenRC を PID 1 にする必要があります |
+| タイムゾーン・ロケール | 下記のとおり制約があります |
+
+**既定の PID 1 は `/bin/sh` です。** `Dockerfile.runtime` は `ENTRYPOINT` を
+持たず `CMD ["/bin/sh"]` なので、`docker run` しただけでは OpenRC は
+動いていません（→ [サービス管理](#サービス管理)）。
 
 ## 目次
 
@@ -8,542 +30,563 @@
 - [ネットワーク設定](#ネットワーク設定)
 - [サービス管理](#サービス管理)
 - [セキュリティ設定](#セキュリティ設定)
-- [システム最適化](#システム最適化)
-- [カーネル設定](#カーネル設定)
+- [リソースとチューニング](#リソースとチューニング)
+- [カーネルに関わる設定](#カーネルに関わる設定)
+- [モニタリング](#モニタリング)
+- [バックアップと復元](#バックアップと復元)
+- [トラブルシューティング](#トラブルシューティング)
+- [参考リソース](#参考リソース)
 
 ## 基本設定
 
 ### ホスト名の設定
 
+**コンテナの外から指定するのが確実です。** コンテナ内で
+`echo ... > /etc/hostname` しても、すでに設定されたホスト名は変わりません。
+
 ```bash
-# ホスト名の確認
+docker run -it --hostname my-server ishinokazuki/kimigayo-os:latest
+```
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    image: ishinokazuki/kimigayo-os:3.0.1
+    hostname: my-server
+```
+
+```bash
+# コンテナ内で確認
 hostname
-
-# ホスト名の変更
-echo "my-server" > /etc/hostname
-
-# 即座に反映
-hostname my-server
-
-# /etc/hostsファイルの更新
-vi /etc/hosts
 ```
 
-`/etc/hosts`に以下を追加：
+### `/etc/hosts` への追記
+
+**`/etc/hosts` はコンテナランタイムが生成します。** コンテナ内で編集しても
+再作成すると消えるので、外から渡します。
+
+```bash
+docker run -it --add-host myhost:10.0.0.9 ishinokazuki/kimigayo-os:latest
 ```
-127.0.0.1   localhost
-127.0.1.1   my-server
+
+```bash
+# コンテナ内で確認
+grep myhost /etc/hosts
+# => 10.0.0.9	myhost
 ```
 
 ### タイムゾーンの設定
 
+**タイムゾーンのデータベースは入っていません。** `/usr/share/zoneinfo` と
+`/etc/localtime` が無いため、既定では UTC になります。
+
 ```bash
-# 現在のタイムゾーンの確認
 date +%Z
-
-# 利用可能なタイムゾーンの確認
-ls /usr/share/zoneinfo/
-
-# タイムゾーンの設定（日本の場合）
-ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
-
-# 時刻の確認
-date
+# => UTC
 ```
+
+必要なゾーンだけをビルド時に持ち込みます。
+
+```dockerfile
+FROM alpine:3.24 AS tz
+RUN apk add --no-cache tzdata
+
+# 版を固定する。latest は毎リリースで中身が変わります。
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+ENV TZ=Asia/Tokyo
+```
+
+ゾーン一式が必要なら `/usr/share/zoneinfo/` ごと `COPY` しますが、
+数 MB 増えてイメージサイズが倍以上になります。**使うゾーンだけに絞るのが
+この OS の趣旨に合います。**
 
 ### ロケールの設定
 
-```bash
-# ロケールの設定
-vi /etc/locale.conf
-```
-
-以下を追加：
-```
-LANG=ja_JP.UTF-8
-LC_ALL=ja_JP.UTF-8
-```
+**musl libc はロケールをほぼ実装していません。** `C` と `C.UTF-8` 相当だけが
+あり、`ja_JP.UTF-8` を設定しても照合順序や月名の翻訳は変わりません
+（文字エンコーディングは常に UTF-8 なので、日本語の表示自体は行えます）。
+`/etc/locale.conf` も存在しません。
 
 ```bash
-# ロケールの反映
-export LANG=ja_JP.UTF-8
-export LC_ALL=ja_JP.UTF-8
+# 環境変数として渡すことはできる（アプリ側が見る場合に意味を持つ）
+docker run -it -e LANG=ja_JP.UTF-8 ishinokazuki/kimigayo-os:latest
 ```
 
-### キーボード配列の設定
+**libc のロケール機能に依存するアプリを動かす場合は、この OS は
+適していません。** glibc ベースのイメージを検討してください。
 
-```bash
-# キーボード配列の設定
-vi /etc/conf.d/keymaps
-```
+### キーボード配列
 
-以下を設定：
-```
-keymap="jp106"
-```
+**コンテナには該当しません。** `/etc/conf.d/keymaps` と `keymaps` サービスは
+物理コンソール向けのもので、`docker exec` や `docker attach` の入力は
+ホスト側の端末が扱います。
 
 ## ネットワーク設定
 
-### 静的IPアドレスの設定
+### ネットワークはランタイムが設定する
+
+**イメージに `networking` サービスは入っていません。**
+`/etc/network/interfaces` というファイル自体は置かれていますが、
+**それを読むサービスが無いため、書き換えても何も起きません。**
 
 ```bash
-# ネットワーク設定ファイルの編集
-vi /etc/network/interfaces
+# 確認はコンテナ内から行える
+ip link show
+ip addr show
 ```
 
-以下の内容を追加：
+### 静的 IP アドレスの設定
+
+コンテナの外からネットワークとアドレスを指定します。
+
+```bash
+docker network create --subnet 192.168.100.0/24 kimigayo-net
+
+docker run -it --network kimigayo-net --ip 192.168.100.10 \
+  ishinokazuki/kimigayo-os:latest
 ```
-auto eth0
-iface eth0 inet static
-    address 192.168.1.100
-    netmask 255.255.255.0
-    gateway 192.168.1.1
-    dns-nameservers 8.8.8.8 8.8.4.4
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    image: ishinokazuki/kimigayo-os:3.0.1
+    networks:
+      kimigayo-net:
+        ipv4_address: 192.168.100.10
+
+networks:
+  kimigayo-net:
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+```
+
+### DHCP
+
+**通常は不要です。** `docker run` ではランタイムがアドレスを割り当てます。
+`--network host` や特殊な構成で自分で取得する必要がある場合は、
+BusyBox の `udhcpc` を使います（`dhclient` は入っていません）。
+
+```bash
+udhcpc -i eth0
+```
+
+### DNS 設定
+
+**`/etc/resolv.conf` はコンテナランタイムが生成します。** コンテナ内で
+編集しても再作成時に消えるので、外から渡します。
+
+```bash
+docker run -it --dns 1.1.1.1 --dns 8.8.8.8 ishinokazuki/kimigayo-os:latest
 ```
 
 ```bash
-# ネットワークサービスの再起動
-rc-service networking restart
-
-# IPアドレスの確認
-ip addr show eth0
+# コンテナ内で確認
+grep nameserver /etc/resolv.conf
 ```
 
-### DHCP設定
+### 無線 LAN
 
-```bash
-# DHCPクライアントの設定
-vi /etc/network/interfaces
-```
-
-以下の内容を追加：
-```
-auto eth0
-iface eth0 inet dhcp
-```
-
-```bash
-# ネットワークサービスの再起動
-rc-service networking restart
-```
-
-### DNS設定
-
-```bash
-# DNS設定ファイルの編集
-vi /etc/resolv.conf
-```
-
-以下を追加：
-```
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-nameserver 1.1.1.1
-```
-
-### 無線LAN設定
-
-無線LAN機能が必要な場合は、マルチステージビルドで必要なツールを組み込んでください。
-
-```bash
-# 無線インターフェースの確認
-iwconfig
-
-# WPA設定ファイルの作成
-wpa_passphrase "SSID" "password" > /etc/wpa_supplicant/wpa_supplicant.conf
-
-# ネットワーク設定
-vi /etc/network/interfaces
-```
-
-以下を追加：
-```
-auto wlan0
-iface wlan0 inet dhcp
-    pre-up wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf
-    post-down killall -q wpa_supplicant
-```
+**対象外です。** 無線インターフェースはホストが扱います。
 
 ## サービス管理
 
-Kimigayo OSはOpenRCを使用してサービスを管理します。
+Kimigayo OS は Init に **OpenRC** を使います。`rc-service`・`rc-update`・
+`rc-status`・`openrc-run`・`start-stop-daemon` はすべてイメージに入っています。
+
+### まず OpenRC を PID 1 にする
+
+**既定の PID 1 は `/bin/sh` なので、そのままでは `rc-service` が使えません。**
+OpenRC が起動していない状態で叩くと、こう警告されて失敗します。
+
+```
+ * You are attempting to run an openrc service on a
+ * system which openrc did not boot.
+```
+
+**`/sbin/init` を PID 1 にします。** `/etc/inittab` が `openrc sysinit` →
+`openrc boot` → `openrc default` を順に実行します。
+
+```bash
+docker run -d --name myapp --entrypoint /sbin/init \
+  ishinokazuki/kimigayo-os:3.0.1
+```
+
+```dockerfile
+FROM ishinokazuki/kimigayo-os:3.0.1
+COPY myservice /etc/init.d/myservice
+RUN chmod +x /etc/init.d/myservice && rc-update add myservice default
+CMD ["/sbin/init"]
+```
+
+**権限が足りない処理は失敗しますが、起動そのものは続行します。**
+通常の `docker run` では次がログに出ます（いずれも無害です）。
+
+| ログ | 理由 |
+|------|------|
+| `Unable to mount tmpfs on /run` | `--tmpfs /run` を渡せば解消します |
+| `kernel parameters are managed by the host (/proc/sys is read-only)` | 設計どおり。ホスト側で設定します |
+| `ip: RTNETLINK answers: Operation not permitted` | `lo` の設定はランタイムが済ませています |
+| `dmesg: klogctl: Operation not permitted` | `CAP_SYSLOG` が無いため |
+
+**サービスを使わないなら OpenRC を PID 1 にする必要はありません。**
+アプリを直接 PID 1 にする方が軽く、シグナルの扱いも素直です。
 
 ### サービスの基本操作
 
 ```bash
-# サービスの起動
-rc-service <service-name> start
-
-# サービスの停止
-rc-service <service-name> stop
-
-# サービスの再起動
-rc-service <service-name> restart
-
-# サービスの状態確認
-rc-service <service-name> status
-
-# すべてのサービスの状態確認
+# 状態の一覧
 rc-status
+
+# 個別の操作
+rc-service <service-name> start
+rc-service <service-name> stop
+rc-service <service-name> restart
+rc-service <service-name> status
 ```
 
-### サービスの自動起動設定
+### 自動起動の設定
 
 ```bash
-# サービスを自動起動に追加
+# ランレベルに追加・削除
 rc-update add <service-name> default
-
-# サービスを自動起動から削除
 rc-update del <service-name> default
 
-# 起動時に実行されるサービスの確認
+# 登録内容の確認
 rc-update show default
-
-# すべてのランレベルのサービスを表示
 rc-update show
 ```
 
-### ランレベルの管理
+### ランレベル
 
-Kimigayo OSの主なランレベル：
-- **sysinit**: システム初期化
-- **boot**: ブート時
-- **default**: デフォルトランレベル
-- **shutdown**: シャットダウン時
+イメージに入っているランレベルは `sysinit` / `boot` / `default` /
+`nonetwork` / `shutdown` です。既定の `default` には `local` と `netmount` が
+登録されています。
 
 ```bash
-# 現在のランレベルの確認
-rc-status --runlevel
-
-# 特定のランレベルのサービス確認
-rc-update show boot
+rc-update show default
+# =>                 local | default
+# =>              netmount | default
 ```
 
 ### カスタムサービスの作成
 
 ```bash
-# サービススクリプトの作成
-vi /etc/init.d/myservice
-```
-
-以下の内容を追加：
-```bash
+cat > /etc/init.d/myservice <<'EOS'
 #!/sbin/openrc-run
 
 name="My Service"
 command="/usr/bin/myapp"
-pidfile="/var/run/myservice.pid"
+command_args="--port 8080"
+command_background=true
+pidfile="/run/myservice.pid"
 
 depend() {
-    need net
-    after firewall
+    need localmount
 }
-```
+EOS
 
-```bash
-# 実行権限を付与
 chmod +x /etc/init.d/myservice
-
-# サービスを有効化
 rc-update add myservice default
-
-# サービスを起動
 rc-service myservice start
 ```
 
+**`depend()` に `net` や `firewall` を書かないこと。** どちらのサービスも
+イメージに入っていないので、依存が解決できず起動しません。
+ネットワークはコンテナ起動時点で用意されています。
+
 ## セキュリティ設定
 
-### ファイアウォールの設定
+**この OS の攻撃面の小ささは、まず「無いこと」で成り立っています。**
+パッケージマネージャーが無いので、侵入されても追加ツールを
+取得・インストールできません。以下はその上に積む設定です。
+
+### ファイアウォール
+
+**`iptables` はイメージに入っていません。** コンテナの通信制御は
+ホスト側かオーケストレータで行います。
 
 ```bash
-# 基本的なファイアウォールルール
-# すべてをブロック
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT
+# 公開するポートだけを明示する
+docker run -d -p 127.0.0.1:8080:8080 ishinokazuki/kimigayo-os:latest
 
-# ループバックを許可
-iptables -A INPUT -i lo -j ACCEPT
-
-# 確立された接続を許可
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# SSHを許可
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-
-# HTTPとHTTPSを許可
-iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-
-# ルールの保存
-rc-service iptables save
-
-# iptablesを自動起動に追加
-rc-update add iptables default
+# 外部との通信が不要なら切り離す
+docker run -it --network none ishinokazuki/kimigayo-os:latest
 ```
 
-### SSH設定
+Kubernetes なら `NetworkPolicy` で制御します。
+
+### SSH
+
+**`sshd` はイメージに入っていません。** コンテナへの接続は
+`docker exec` / `kubectl exec` を使います。
 
 ```bash
-# SSH設定ファイルの編集
-vi /etc/ssh/sshd_config
+docker exec -it myapp /bin/sh
 ```
 
-推奨設定：
-```
-# rootログインを無効化
-PermitRootLogin no
+**`sshd` を入れることは推奨しません。** 攻撃面が増え、
+不変インフラという前提も崩れます。
 
-# パスワード認証を無効化（公開鍵認証のみ）
-PasswordAuthentication no
+### ユーザーと権限
 
-# 公開鍵認証を有効化
-PubkeyAuthentication yes
-
-# ポート番号の変更（オプション）
-Port 2222
-```
+**`sudo` と `wheel` グループはありません。** `/etc/group` に `wheel` が
+無いので `adduser username wheel` は失敗します。root からの降格には
+BusyBox の `su`、実行ユーザーの指定にはコンテナのオプションを使います。
 
 ```bash
-# SSHサービスの再起動
-rc-service sshd restart
+# 非 root で実行する
+docker run -it --user 1000:1000 ishinokazuki/kimigayo-os:latest
 
-# SSHを自動起動に追加
-rc-update add sshd default
-```
-
-### ユーザーとパーミッション
-
-```bash
-# 新しいユーザーの作成
+# コンテナ内でユーザーを作る場合（BusyBox の adduser）
 adduser username
-
-# sudoグループに追加
-adduser username wheel
-
-# sudoの設定
-vi /etc/sudoers
 ```
 
-以下の行のコメントを解除：
-```
-%wheel ALL=(ALL) ALL
-```
-
-## システム最適化
-
-### メモリ最適化
-
-Kimigayo OSは128MB未満でのメモリ使用を目標としています。
+### 権限を落とす
 
 ```bash
-# メモリ使用量の確認
+# ルートファイルシステムを読み取り専用にし、書ける場所だけ tmpfs で与える
+docker run -it --read-only --tmpfs /tmp --tmpfs /run \
+  ishinokazuki/kimigayo-os:latest
+
+# ケーパビリティを落とす
+docker run -it --cap-drop ALL ishinokazuki/kimigayo-os:latest
+
+# 特権昇格を禁じる
+docker run -it --security-opt no-new-privileges ishinokazuki/kimigayo-os:latest
+```
+
+読み取り専用にすると、`/etc` などへの書き込みは
+`Read-only file system` で拒否されます。`/tmp` と `/run` は
+tmpfs として書き込めます。
+
+詳細は [セキュリティガイド](../security/SECURITY_GUIDE.md) と
+[ハードニングガイド](../security/HARDENING_GUIDE.md) を参照してください。
+
+## リソースとチューニング
+
+### メモリと CPU の制限
+
+**コンテナの外から指定します。** `/etc/fstab` に追記しても効きません。
+
+```bash
+# メモリを 512MB に制限し、スワップを無効化する
+docker run -it --memory=512m --memory-swap=512m \
+  ishinokazuki/kimigayo-os:latest
+
+# CPU を 0.5 コア相当に制限する
+docker run -it --cpus=0.5 ishinokazuki/kimigayo-os:latest
+
+# 特定のコアに固定する
+docker run -it --cpuset-cpus=0,1 ishinokazuki/kimigayo-os:latest
+```
+
+**コンテナ内で `swapon` はできません。** スワップはホストの設定と
+`--memory-swap` で決まります。
+
+```bash
+# コンテナ内から見た使用量（ホストの値が見えることがあります）
 free -m
-
-# プロセスのメモリ使用量を確認
-ps aux --sort=-%mem | head -10
-
-# 不要なサービスを無効化
-rc-update del <service-name> default
-
-# スワップの設定（必要に応じて）
-dd if=/dev/zero of=/swapfile bs=1M count=512
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-
-# 起動時にスワップを有効化
-echo "/swapfile none swap sw 0 0" >> /etc/fstab
+top
 ```
 
-### ディスク最適化
+**`ps aux --sort=-%mem` は使えません**（BusyBox の `ps` は `--sort` を
+解しません）。`top` を使うか、ホストから `docker stats` を見てください。
+
+### 一時ファイルを RAM に置く
 
 ```bash
-# ディスク使用量の確認
+docker run -it --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  ishinokazuki/kimigayo-os:latest
+```
+
+### ディスク使用量の確認
+
+```bash
 df -h
-
-# 大きなファイルの検索
-find / -type f -size +10M -exec ls -lh {} \;
-
-# ログローテーションの設定
-vi /etc/logrotate.conf
-
-# tmpfsを使用して一時ファイルをRAMに保存
-echo "tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0" >> /etc/fstab
+find / -xdev -type f -size +10M -exec ls -lh {} \;
 ```
 
-### 起動時間の最適化
-
-Kimigayo OSは10秒以下の起動時間を目標としています。
+**`logrotate` は入っていません。** ログは `docker logs` 側で扱い、
+ランタイムのログドライバで上限を決めます。
 
 ```bash
-# 起動時間の確認
-dmesg | grep "Freeing unused kernel"
-
-# 不要なサービスを無効化
-rc-update show default
-
-# サービスを削除
-rc-update del <unnecessary-service> default
-
-# カーネルパラメータの最適化
-vi /etc/default/grub
+docker run -d --log-opt max-size=10m --log-opt max-file=3 \
+  ishinokazuki/kimigayo-os:latest
 ```
 
-以下を追加：
-```
-GRUB_CMDLINE_LINUX="quiet splash"
-```
+### 起動時間について
 
-## カーネル設定
+**イメージを軽くしても起動は速くなりません。** v3.0.1 の実測は
+`docker run` が 0.61 秒ですが、同じ条件で Alpine 0.62 秒・
+Ubuntu 24.04 0.59 秒で、**100MB の Ubuntu がいちばん速い**という結果です。
+測っている時間のほとんどがコンテナランタイム自身の処理なので、
+イメージの中身はほとんど効きません。
 
-### カーネルパラメータの変更
+差が出るのは常駐メモリ（Kimigayo 232KB / Alpine 276KB / Ubuntu 312KB）と
+サイズの方です。測定条件は
+[docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) を参照してください。
+
+## カーネルに関わる設定
+
+**カーネルはイメージに入りません。コンテナはホストのカーネルで動きます。**
+したがって GRUB・`/boot`・`grub-mkconfig`・カーネルの再ビルドは
+このガイドの対象外です（`/boot` 自体が存在しません）。
+
+### sysctl
+
+**コンテナからは読めますが書けません。**
 
 ```bash
-# 現在のカーネルパラメータの確認
-cat /proc/cmdline
+sysctl net.ipv4.ip_forward
+# => net.ipv4.ip_forward = 1
 
-# ブートローダー設定の編集
-vi /boot/grub/grub.cfg
-
-# または
-vi /etc/default/grub
-
-# 設定を反映
-grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-### カーネルモジュールの管理
-
-```bash
-# ロード済みモジュールの確認
-lsmod
-
-# モジュールのロード
-modprobe <module-name>
-
-# モジュールのアンロード
-modprobe -r <module-name>
-
-# 起動時に自動ロードするモジュールの設定
-vi /etc/modules-load.d/modules.conf
-```
-
-### sysctl設定
-
-```bash
-# 現在のsysctl設定の確認
-sysctl -a
-
-# 設定の変更（一時的）
 sysctl -w net.ipv4.ip_forward=1
-
-# 永続的な設定
-vi /etc/sysctl.conf
+# => sysctl: error setting key 'net.ipv4.ip_forward': Read-only file system
 ```
 
-推奨設定：
-```
-# IPv4フォワーディング
-net.ipv4.ip_forward = 1
-
-# TCP設定の最適化
-net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_keepalive_time = 1800
-
-# セキュリティ設定
-kernel.dmesg_restrict = 1
-kernel.kptr_restrict = 2
-```
+**名前空間化されたものはコンテナの外から渡せます。**
 
 ```bash
-# 設定の反映
-sysctl -p
+docker run -it --sysctl net.ipv4.ip_local_port_range="10000 60000" \
+  ishinokazuki/kimigayo-os:latest
 ```
 
-## システムモニタリング
+名前空間化されていないもの（`kernel.kptr_restrict` など）は拒否されます。
+
+```
+invalid argument "kernel.kptr_restrict=2" for "--sysctl" flag: sysctl 'kernel.kptr_restrict=2' is not whitelisted
+```
+
+**これらはホスト側で設定します。** イメージには
+`/etc/sysctl.d/99-kimigayo-performance.conf` が入っており、
+ベアメタルや VM でこの rootfs を使う場合にだけ効きます。
+コンテナでは `sysctl` サービスが
+`kernel parameters are managed by the host` と報告してスキップします。
+
+### カーネルモジュール
+
+**コンテナからは操作できません。** `/lib/modules` が無いためです。
+
+```bash
+modprobe overlay
+# => modprobe: can't change directory to '/lib/modules': No such file or directory
+```
+
+`lsmod` は `/proc/modules` を読むので動きますが、**表示されるのは
+ホストのモジュール**です。モジュールのロードはホストで行ってください。
+
+## モニタリング
 
 ### ログの確認
 
+**`/var/log` は空で、syslog は動いていません。** 標準出力・標準エラーに
+出したものを `docker logs` で読むのが基本です。
+
 ```bash
-# システムログの確認
-tail -f /var/log/messages
-
-# カーネルログの確認
-dmesg | tail -50
-
-# 特定のサービスのログ
-tail -f /var/log/<service-name>.log
+# ホスト側から
+docker logs -f myapp
+kubectl logs -f <pod>
 ```
+
+`dmesg` はコンテナからは使えません（`Operation not permitted`。
+`CAP_SYSLOG` が必要です）。
 
 ### リソース監視
 
 ```bash
-# システムリソースのリアルタイム監視
+# コンテナ内から
 top
 
-# ディスクI/Oの監視（必要に応じてマルチステージビルドで組み込み）
-# iostat
-
-# ネットワーク監視（必要に応じてマルチステージビルドで組み込み）
-# iftop
+# ホスト側から（こちらが正確）
+docker stats
 ```
 
 ## バックアップと復元
 
-### システムのバックアップ
+**不変インフラなので、コンテナの中身をバックアップする設計にしないでください。**
+イメージは Dockerfile から再現し、**残すべきものはボリュームに置きます。**
 
 ```bash
-# 重要な設定ファイルのバックアップ
-tar -czf config-backup.tar.gz /etc
+# ボリュームのバックアップ（ホスト側で実行）
+docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
+  ishinokazuki/kimigayo-os:3.0.1 \
+  tar czf /backup/data-backup.tar.gz -C /data .
 
-# 完全なシステムバックアップ
-tar -czf system-backup.tar.gz \
-    --exclude=/proc \
-    --exclude=/sys \
-    --exclude=/dev \
-    --exclude=/tmp \
-    /
+# 復元
+docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
+  ishinokazuki/kimigayo-os:3.0.1 \
+  tar xzf /backup/data-backup.tar.gz -C /data
 ```
 
-### 復元
-
-```bash
-# 設定ファイルの復元
-tar -xzf config-backup.tar.gz -C /
-
-# サービスの再起動
-rc-service <service-name> restart
-```
+**設定を手で変えてバックアップする運用にしないこと。** 変更は
+Dockerfile か `docker run` のオプションに書き、イメージの版で管理します。
 
 ## トラブルシューティング
 
-### 起動しない場合
+### コンテナが起動しない・即座に終了する
 
-1. ブートローダー（GRUB）のリカバリモードで起動
-2. ルートファイルシステムを読み書きモードでマウント
-3. 設定ファイルを確認・修正
+**GRUB のリカバリモードはありません。** まずログを読みます。
 
 ```bash
-# 読み書きモードで再マウント
-mount -o remount,rw /
+docker logs <container-id>
+docker inspect <container-id> --format '{{.State.ExitCode}} {{.State.Error}}'
 ```
 
-### ネットワークが接続できない場合
+よくある原因:
+
+| 症状 | 原因 |
+|------|------|
+| すぐ終了する | PID 1 のプロセスが終了した（`CMD` が常駐しない）|
+| `exec format error` | アーキテクチャ不一致。`--platform linux/amd64` か `linux/arm64` を指定する |
+| `Error relocating ...: symbol not found` | 持ち込んだ実行ファイルの共有ライブラリが足りない（`ldd` で解決する）|
+| `rc-service` が警告して失敗 | OpenRC が PID 1 で起動していない（→ [サービス管理](#サービス管理)）|
 
 ```bash
-# ネットワークインターフェースの確認
+# シェルで中を調べる
+docker run -it --entrypoint /bin/sh ishinokazuki/kimigayo-os:3.0.1
+```
+
+### ネットワークに接続できない
+
+```bash
+# コンテナ内から
 ip link show
+ip addr show
+grep nameserver /etc/resolv.conf
 
-# インターフェースを有効化
-ip link set eth0 up
-
-# DHCPで再度取得
-dhclient eth0
+# ホスト側から
+docker network ls
+docker network inspect bridge
 ```
+
+**`/etc/network/interfaces` を直しても効きません**（読むサービスが
+イメージに入っていません）。ネットワークはランタイム側の設定で直します。
+
+### 設定を変えたのに反映されない
+
+**`/etc/hostname`・`/etc/hosts`・`/etc/resolv.conf` はランタイムが管理します。**
+コンテナ内で書き換えても再作成で消えます。`--hostname` / `--add-host` /
+`--dns` で渡してください。
+
+### ソフトウェアを追加したい
+
+パッケージマネージャーは**意図的に入れていません**。マルチステージビルドで
+ビルド時に持ち込みます。手順と動く例は
+[インストールガイド](INSTALLATION.md#追加ソフトウェアのインストール)と
+[examples/](../../examples/) を参照してください。
 
 ## 参考リソース
 
-- **公式ドキュメント**: https://docs.kimigayo-os.org
-- **OpenRCドキュメント**: https://wiki.gentoo.org/wiki/OpenRC
-- **コミュニティフォーラム**: https://forum.kimigayo-os.org
+- **GitHub リポジトリ**: https://github.com/Kazuki-0731/Kimigayo
+- **Issue 報告**: https://github.com/Kazuki-0731/Kimigayo/issues
+- **GitHub Discussions**: https://github.com/Kazuki-0731/Kimigayo/discussions
+- **Docker 使用ガイド**: [DOCKER_USAGE.md](DOCKER_USAGE.md)
+- **インストールガイド**: [INSTALLATION.md](INSTALLATION.md)
+- **クイックスタート**: [QUICKSTART.md](QUICKSTART.md)
+- **セキュリティガイド**: [../security/SECURITY_GUIDE.md](../security/SECURITY_GUIDE.md)
+- **OpenRC ドキュメント**: https://wiki.gentoo.org/wiki/OpenRC
+- **BusyBox ドキュメント**: https://busybox.net/downloads/BusyBox.html
