@@ -70,7 +70,7 @@ kimigayo_busybox_build_id() {
 # build-busybox.sh（実際にビルドする側）と build-rootfs.sh（ビルド済みかを
 # 判定する側）の両方がこれを使う。既定値を別々に書くと、片方だけ
 # 変えたときに「判定は dynamic、ビルドは static」のように食い違う。
-KIMIGAYO_BUSYBOX_LINK_DEFAULT="static"
+KIMIGAYO_BUSYBOX_LINK_DEFAULT="dynamic"
 kimigayo_busybox_link() {
     printf '%s' "${BUSYBOX_LINK:-$KIMIGAYO_BUSYBOX_LINK_DEFAULT}"
 }
