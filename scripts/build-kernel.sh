@@ -226,9 +226,9 @@ apply_security_hardening() {
     # Update config without interactive prompts
     log_info "Finalizing kernel configuration..."
     if [ "$ARCH" = "arm64" ]; then
-        make ARCH="$KERNEL_ARCH" LLVM=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" olddefconfig > /dev/null 2>&1 || true
+        make ARCH="$KERNEL_ARCH" LLVM=1 KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
     else
-        make ARCH="$KERNEL_ARCH" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" olddefconfig > /dev/null 2>&1 || true
+        make ARCH="$KERNEL_ARCH" KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" olddefconfig > /dev/null 2>&1 || true
     fi
     log_info "Kernel configuration finalized"
 }
@@ -292,7 +292,7 @@ build_kernel() {
     if [ "$ARCH" = "arm64" ] && [[ "$CROSS_COMPILE" == *"musl"* ]]; then
         log_info "Using LLVM toolchain for ARM64 cross-compilation"
         # For ARM64 with LLVM (no realmode, so no REALMODE_CFLAGS)
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" LLVM=1 LLVM_IAS=1 KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
@@ -335,7 +335,7 @@ build_kernel() {
         # で落ちる（2026-10-09 の CI 実測。6.18.55 / x86_64 / GCC）。
         # -DDISABLE_BRANCH_PROFILING・-march=i386・-mregparm=3・-ffreestanding も
         # 同時に落ちていた。
-        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11 -Wno-error" HOSTCFLAGS="-std=gnu11 -Wno-error" "$MAKE_TARGET" 2>&1 | \
+        stdbuf -oL -eL make -j"$JOBS" ARCH="$KERNEL_ARCH" CROSS_COMPILE="$CROSS_COMPILE" KCFLAGS="-std=gnu11" HOSTCFLAGS="-std=gnu11" "$MAKE_TARGET" 2>&1 | \
         while IFS= read -r line; do
             # Write to log file immediately with tee (unbuffered)
             echo "$line" | tee -a "$BUILD_LOG" > /dev/null
