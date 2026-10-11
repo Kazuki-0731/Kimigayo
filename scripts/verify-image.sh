@@ -25,6 +25,8 @@
 
 set -u
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -284,26 +286,40 @@ else
     log_error "      patch_openrc_for_busybox (scripts/build-rootfs.sh) に置換を足す"
 fi
 
-# **出荷されるイメージの BusyBox が PIE か（ASLR が効くか）。**
+# **出荷されるイメージの全 ELF が強化されているか。**
 #
-# 2026-10-10 まで arm64 だけ ELF Type=EXEC だった。x86_64 は Alpine の
-# gcc が default-PIE なので同じ config から PIE になっており、
-# **片方だけ ASLR が効かない状態に気づけなかった。**
+# PIE / RELRO / BIND_NOW / 非実行スタックを、BusyBox だけでなく
+# OpenRC・librc・libeinfo・libc.so を含む**すべての ELF**で見る。
+#
+# 2026-10-10 まで arm64 の BusyBox だけ ELF Type=EXEC（ASLR が効かない）
+# だった。x86_64 は Alpine の gcc が default-PIE なので同じ config から
+# PIE になっており、**片方だけ ASLR が効かない状態に気づけなかった。**
+# そのあとも 2026-10-11 まで、機械的に見ていたのは BusyBox の ELF type
+# だけで、他のバイナリの RELRO などは手で readelf を叩いて確かめただけ
+# だった。ビルドフラグを1つ落としても CI は緑のままになる。
 #
 # build-busybox.sh 側にも同じ検査があるが、そこを通ったあとに
 # `make install` がリンクし直して EXEC に戻した前例がある。
 # **ここは実際に配るイメージの中を見る。**
 #
-# イメージに readelf は無いので ELF ヘッダを直接読む。
-# e_type は offset 16 からの 2 バイト（リトルエンディアン）で
-# ET_EXEC=2 / ET_DYN=3。`od -d` は 2 バイト単位の十進で出す。
-etype="$(in_image 'dd if=/bin/busybox bs=1 skip=16 count=2 2>/dev/null | od -d | head -1' | awk '{print $2}')"
-case "$etype" in
-    3) pass "/bin/busybox is a PIE (ASLR works)" ;;
-    2) fail "/bin/busybox is ET_EXEC — ASLR does not work"
-       log_error "      -fPIE / -static-pie の渡し方を確認（scripts/build-busybox.sh）" ;;
-    *) fail "could not read the ELF type of /bin/busybox (got '${etype}')" ;;
-esac
+# イメージにも開発機（macOS）にも readelf は無いので、docker export の
+# tar を Python で読む（scripts/check-elf-hardening.py）。
+cid="$(docker create --platform "$PLATFORM" "$IMAGE" /bin/true 2>/dev/null)"
+if [ -z "$cid" ]; then
+    fail "could not create a container to export the filesystem"
+else
+    out="$(docker export "$cid" | python3 -I "$SCRIPT_DIR/check-elf-hardening.py" - 2>&1)"
+    rc=$?
+    docker rm "$cid" >/dev/null 2>&1
+    summary="$(printf '%s\n' "$out" | head -1)"
+    if [ "$rc" -eq 0 ]; then
+        pass "every ELF is PIE + RELRO + BIND_NOW + non-exec stack (${summary})"
+    else
+        fail "ELF hardening is missing (${summary})"
+        show_output "$(printf '%s\n' "$out" | tail -n +2)"
+        log_error "      強化フラグの渡し方を確認（scripts/build-{musl,busybox,openrc}.sh）"
+    fi
+fi
 
 # **同一内容のファイルが同じディレクトリに重複していないか。**
 #
