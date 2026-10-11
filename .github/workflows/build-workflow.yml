@@ -208,15 +208,26 @@ jobs:
             "${{ inputs.arch }}"
 
       # 出荷物そのものの秘密情報スキャン（scripts/scan-image.sh）。
-      # CVE 照合（SCANS=vuln）はここではまだ走らせていない。
-      # 公開中の版に既知の CVE があり、どの push も落ちるため。
-      # 公開イメージに対する CVE 照合は dependency-review.yml が毎週行う。
-      - name: Scan image for secrets
+      # 秘密情報と CVE の両方を見る。CVE は出荷物の版で SBOM を作って
+      # Grype で照合し、イメージに記録したパッチ済みの CVE は除外する。
+      # NVD に新しい CVE が載ると、コードを変えていない push でも落ちる。
+      # それは「出荷物に未対応の CVE がある」という正しい信号なので握り潰さない。
+      - name: Scan image for secrets and CVEs
         run: |
-          SCANS=secret bash scripts/scan-image.sh \
+          SBOM_OUT="build/sbom/kimigayo-${{ inputs.variant }}-${{ inputs.arch }}.cdx.json" \
+            bash scripts/scan-image.sh \
             "kimigayo-os:${{ inputs.variant }}-${{ inputs.arch }}" \
             "${{ inputs.variant }}" \
             "${{ inputs.arch }}"
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sbom-${{ inputs.variant }}-${{ inputs.arch }}
+          path: build/sbom/*.cdx.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Report image size
         if: success()
