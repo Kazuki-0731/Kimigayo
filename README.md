@@ -26,8 +26,8 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 ### ✨ 主な特徴
 
-- 🪶 **軽量**: Standard で **2.76MB**（同じ platform で同時に実測した
-  Alpine 8.42MB の約 1/3、Ubuntu 24.04 78.2MB の約 1/28）
+- 🪶 **軽量**: Standard で **2.60MB**（同じ platform で実測した
+  Alpine 8.42MB の約 1/3、Ubuntu 24.04 78.2MB の約 1/30）
 - 🔒 **セキュアバイデフォルト**: パッケージマネージャー排除による最小攻撃面、包括的なセキュリティ強化
 - 🧩 **モジュラー設計**: 必要な機能のみを選択可能な3つのバリアント（Minimal/Standard/Extended）
 - 📦 **musl + BusyBox + OpenRC のみ**: BusyBox と OpenRC は同じ musl の
@@ -41,32 +41,36 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 | 指標 | 実測値 | 目標値 | 達成状況 |
 |------|-------|--------|---------|
-| イメージサイズ (Minimal) | **2.62MB** / arm64 **2.98MB** | < 5MB | ✅ **目標の52%** / 60% |
-| イメージサイズ (Standard) | **2.76MB** / arm64 **3.13MB** | < 15MB | ✅ **目標の18%** / 21% |
-| イメージサイズ (Extended) | **2.78MB** / arm64 **3.17MB** | < 50MB | ✅ **目標の6%** / 6% |
-| 起動時間 | **0.61秒** | < 10秒 | ✅ **目標の6%** |
-| 常駐メモリ | **232KB** | < 128MB | ✅ **目標の0.2%** |
-| BusyBoxコマンド性能 | Alpine比 **0.90〜1.12x** | Alpine同等 | ✅ **有意差なし** |
+| イメージサイズ (Minimal) | **2.46MB** / arm64 **2.83MB** | < 5MB | ✅ **目標の49%** / 57% |
+| イメージサイズ (Standard) | **2.60MB** / arm64 **2.98MB** | < 15MB | ✅ **目標の17%** / 20% |
+| イメージサイズ (Extended) | **2.62MB** / arm64 **3.01MB** | < 50MB | ✅ **目標の5%** / 6% |
+| 起動時間 | **0.60秒** | < 10秒 | ✅ **目標の6%** |
+| 常駐メモリ | **288KB** | < 128MB | ✅ **目標の0.2%** |
+| BusyBoxコマンド性能 | Alpine比 **0.97〜1.01x** | Alpine同等 | ✅ **有意差なし** |
 
 目標値は [SPECIFICATION.md](SPECIFICATION.md) §8.3 の定義
 （Minimal 5MB / Standard 15MB / Extended 50MB）。
 **実際には 3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っている。**
 
-v3.0.1 を 2026-10-11 に実測。サイズは 6 イメージすべて、起動時間・メモリ・
+v3.0.2 の公開イメージを 2026-10-12 に実測。サイズは 6 イメージすべて、起動時間・メモリ・
 コマンド性能は arm64 ネイティブの Standard。6 バリアントすべてが
-`scripts/verify-image.sh` の 29 項目を通過している。
+`scripts/verify-image.sh` の検査（34 項目、wget を持たない Minimal は 33）を通過している。
 
-> **起動時間の 0.61 秒は「Kimigayo が速い」という意味ではない。**
-> 同じ条件で同時に測ると **Alpine 0.62 秒・Ubuntu 24.04 0.59 秒**で、
-> **100MB の Ubuntu がいちばん速い**。この 0.6 秒のほとんどは Docker 自身の
+> **起動時間の 0.60 秒は「Kimigayo が速い」という意味ではない。**
+> 同じ条件で同時に測ると **Alpine 0.59 秒・Ubuntu 24.04 0.59 秒**で、
+> 差は出ない。この 0.6 秒のほとんどは Docker 自身の
 > コンテナ生成なので、イメージの中身はほとんど効かない。
-> 差が出るのは常駐メモリの方（Kimigayo **232KB** / Alpine 276KB /
-> Ubuntu 312KB）。
+>
+> **常駐メモリは v3.0.2 で Alpine をわずかに上回った**（Kimigayo **288KB** /
+> Alpine 272KB / Ubuntu 312KB）。v3.0.1 は 236KB だった。BusyBox を
+> 動的リンクにしたため、`sleep` のような BusyBox のコマンドも `libc.so` を
+> 読み込むようになった分（約 56KB）。Kimigayo が musl に当てた CVE パッチを
+> `/bin/sh` にも効かせるための選択で、目標（128MB 未満）には影響しない。
 
 <details>
 <summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
 
-**測定条件**: 2026-10-11 / 対象は v3.0.1 / ホストは macOS（Apple Silicon, arm64）/
+**測定条件**: 2026-10-12 / 対象は v3.0.2 の公開イメージ / ホストは macOS（Apple Silicon, arm64）/
 Alpine 3.24 ベースのビルド環境 /
 カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
 
@@ -74,39 +78,42 @@ Alpine 3.24 ベースのビルド環境 /
 | --- | --- |
 | サイズ | `docker inspect` のバイト数を 10 進 MB に換算。x86_64 は `--platform linux/amd64`（QEMU エミュレーション）|
 | 起動時間 | `docker run --rm <image> /bin/true` の実時間、10 回の中央値。arm64 ネイティブ |
-| 常駐メモリ | `sleep` で常駐させたコンテナの `docker stats`。**37 標本すべて 232KB**（`docker stats` が返す `0B` は捨てている。90 秒間で 53 回返った）。arm64 ネイティブ |
-| コマンド性能 | `ls`・`grep`・`find`・`awk`・`sort`・`cat`・`wc`・`head` の 8 つを Alpine と同条件で実行（`scripts/benchmark-busybox.sh`）。**同じコマンドが走るたびに 0.90〜1.12x の間で前後する**ので、どちらが速いとは言えない |
+| 常駐メモリ | `sleep` で常駐させたコンテナの `docker stats`、1 秒おきに 20 標本。**20 標本すべて同じ値**（`docker stats` が返す `0B` は捨てる。今回は 0 回）。arm64 ネイティブ |
+| コマンド性能 | `ls`・`grep`・`find`・`awk`・`sort`・`cat`・`wc`・`head` の 8 つを Alpine と同条件で実行（`scripts/benchmark-busybox.sh`）。**中央値の比で 0.97〜1.01x**（平均は 1 回の外れ値に引っ張られるので中央値で見る）ので、どちらが速いとは言えない |
 
-**OpenRC が default ランレベルを完走するまでは 0.77 秒**
+**OpenRC が default ランレベルを完走するまでは 0.72 秒**
 （`docker run --rm <image> /sbin/openrc default`、arm64、10 回の中央値）。
-`/bin/true` の 0.61 秒との差が Init の分。
+`/bin/true` の 0.60 秒との差が Init の分。
 
 | バリアント | BusyBox アプレット | BusyBox 本体 | tarball | イメージ |
 | --- | --- | --- | --- | --- |
-| Minimal (x86_64) | 367 | 1,030KB | 1,313KB | **2.62MB** |
-| Standard (x86_64) | 400 | 1,162KB | 1,407KB | **2.76MB** |
-| Extended (x86_64) | 411 | 1,186KB | 1,428KB | **2.78MB** |
-| Minimal (arm64) | 367 | 1,098KB | 1,472KB | **2.98MB** |
-| Standard (arm64) | 400 | 1,243KB | 1,573KB | **3.13MB** |
-| Extended (arm64) | 411 | 1,277KB | 1,594KB | **3.17MB** |
+| Minimal (x86_64) | 367 | 869KB | 1,186KB | **2.46MB** |
+| Standard (x86_64) | 400 | 1,001KB | 1,277KB | **2.60MB** |
+| Extended (x86_64) | 411 | 1,025KB | 1,300KB | **2.62MB** |
+| Minimal (arm64) | 367 | 941KB | 1,341KB | **2.83MB** |
+| Standard (arm64) | 400 | 1,085KB | 1,441KB | **2.98MB** |
+| Extended (arm64) | 411 | 1,120KB | 1,462KB | **3.01MB** |
+
+> **v3.0.2 で BusyBox 本体が約 160KB 小さくなった**（v3.0.1 の Standard x86_64 は
+> 1,162KB / イメージ 2.76MB）。BusyBox を動的リンクにし、静的リンクで中に
+> 取り込んでいた libc を、OpenRC と共有の `/lib/libc.so` に寄せたため。
 
 > **v3.0.0 からアプレットが 3 つ減っている**（370/403/413 → 367/400/411）。
 > `dpkg`・`dpkg-deb`・`rpm` を外したため
 > （→ [CHANGELOG.md](CHANGELOG.md) の 3.0.1）。
 
-**3バリアントの差は BusyBox のアプレット数だけで、x86_64 では 156KB しかない。**
+**3バリアントの差は BusyBox のアプレット数だけで、x86_64 では 160KB しかない。**
 イメージの大半は musl の `libc.so`・BusyBox 本体・
 OpenRC（バイナリ9個 + 共有ライブラリ2本 + ヘルパ）で、どのバリアントにも入る。
 
-**arm64 が x86_64 より 0.36-0.39MB 大きいのは BusyBox 本体の差**
-（aarch64 は固定長命令なので同じコードでもコード量が増える。
-v3.0.0 で ASLR のため static-PIE 化とスタックプロテクタを有効にした分も含む）。
+**arm64 が x86_64 より 0.37-0.39MB 大きいのは主に BusyBox 本体と libc.so の差**
+（aarch64 は固定長命令なので同じコードでもコード量が増える）。
 
 > **v2.0.1（2026-01-16）では Standard 1.17MB だった。** 増えた主因は
 > BusyBox 1.38.0 本体が単体で 1.16MB あること、および
 > **v2.0.1 までは musl の `libc.so` と OpenRC のバイナリがイメージに
 > 入っていなかった**こと（2026-10-09 に修正）。つまり 1.17MB は
-> 「Init システムが入っていない状態」の数字で、現在の 2.76MB と
+> 「Init システムが入っていない状態」の数字で、現在の 2.60MB と
 > 同じものを測った値ではない。
 >
 > **起動時間とメモリの旧値（439ms / 0.2MB）は破棄した。計測が壊れていた。**
@@ -116,7 +123,7 @@ v3.0.0 で ASLR のため static-PIE 化とスタックプロテクタを有効�
 > **イメージが壊れているほど速く見える**計測だった）。
 > `scripts/benchmark-memory.sh` は `KiB` を `0.001` に置換したうえ
 > 結果を整数 MB に丸めており、**1MB 未満を 0 としか表せなかった**。
-> 2026-10-10 に両方を書き直し、測り直したのが上の値。
+> 2026-10-10 に両方を書き直した。上の値は 2026-10-12 に v3.0.2 で測ったもの。
 
 </details>
 
@@ -357,9 +364,9 @@ make ci-build-all
 docker images | grep kimigayo
 
 # 主要イメージ
-kimigayo-os:standard-x86_64    # Standard版 (2.76MB / 2026-10-11 実測)
-kimigayo-os:minimal-x86_64     # Minimal版 (2.62MB)
-kimigayo-os:extended-x86_64    # Extended版 (2.78MB)
+kimigayo-os:standard-x86_64    # Standard版 (2.60MB / 2026-10-12 実測)
+kimigayo-os:minimal-x86_64     # Minimal版 (2.46MB)
+kimigayo-os:extended-x86_64    # Extended版 (2.62MB)
 ```
 
 **使用方法:**
@@ -487,29 +494,29 @@ make build  # コンテナ内でビルド
 
 | イメージタイプ | サイズ | 用途 | Docker Hubタグ |
 | -------------- | ------ | ---- | -------------- |
-| **Minimal** | **2.62MB**（367 アプレット） | コンテナ、最小限の環境 | `ishinokazuki/kimigayo-os:latest-minimal` |
-| **Standard** | **2.76MB**（400 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
-| **Extended** | **2.78MB**（411 アプレット） | MTD/flash・framebuffer を扱う場合 | `ishinokazuki/kimigayo-os:latest-extended` |
+| **Minimal** | **2.46MB**（367 アプレット） | コンテナ、最小限の環境 | `ishinokazuki/kimigayo-os:latest-minimal` |
+| **Standard** | **2.60MB**（400 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
+| **Extended** | **2.62MB**（411 アプレット） | MTD/flash・framebuffer を扱う場合 | `ishinokazuki/kimigayo-os:latest-extended` |
 
-いずれも x86_64 / v3.0.1 を 2026-10-11 実測。arm64 は Minimal 2.98MB /
-Standard 3.13MB / Extended 3.17MB（→「パフォーマンス実績」節）。
+いずれも x86_64 / v3.0.2 を 2026-10-12 実測。arm64 は Minimal 2.83MB /
+Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）。
 
 > **`latest` 系は最新リリースを指す**（公開済みの版は
 > [Releases](https://github.com/Kazuki-0731/Kimigayo/releases) を参照）。
 > マルチアーキなので `linux/amd64` と `linux/arm64` の
 > どちらを引いても同じ版が来る。
-> **本番では版を固定する**（`3.0.1-standard` のように版番号つきのタグ、
+> **本番では版を固定する**（`3.0.2-standard` のように版番号つきのタグ、
 > またはダイジェスト指定）。
 
-**比較**（2026-10-11 に同じホスト・`--platform linux/amd64` で実測。
-Kimigayo Standard = 2.76MB）:
+**比較**（`--platform linux/amd64`。Kimigayo Standard = 2.60MB は 2026-10-12、
+他は 2026-10-11 に同じホストで実測）:
 
 | イメージ | サイズ | Kimigayo 比 |
 | --- | --- | --- |
 | `gcr.io/distroless/static-debian12` | 2.11MB | 0.8倍（シェルも Init も無い） |
-| `alpine:latest`（3.24.2） | 8.42MB | 3.1倍 |
-| `gcr.io/distroless/base-debian12` | 20.9MB | 7.6倍 |
-| `ubuntu:24.04` | 78.2MB | 28倍 |
+| `alpine:latest`（3.24.2） | 8.42MB | 3.2倍 |
+| `gcr.io/distroless/base-debian12` | 20.9MB | 8.0倍 |
+| `ubuntu:24.04` | 78.2MB | 30倍 |
 
 ### 🔐 セキュリティ機能
 
@@ -551,9 +558,11 @@ docker run --rm \
 - **リリース資産のハッシュ配布**: `SHA256SUMS` と `SHA512SUMS` を
   GitHub Release に添付
 
-**公開イメージへの Cosign 署名を v3.0.2 から行います**（`release.yml` の
+**公開イメージは v3.0.2 から Cosign で署名しています**（`release.yml` の
 `sign` ジョブ）。鍵を持たないキーレス署名（Sigstore OIDC）で、署名は
-Rekor の透明性ログに載ります。
+Rekor の透明性ログに載ります。**検証には cosign v3 以降が必要です**
+（署名は新しい形式で置いてあり、cosign v2 では `no signatures found` になる。
+2026-10-12 に v3.0.6 で検証を確認）。
 
 ```bash
 cosign verify ishinokazuki/kimigayo-os:latest \
@@ -562,7 +571,6 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 ```
 
 > **v3.0.1 以前の公開イメージは署名されていません。**
-> 署名の配線は 2026-10-11 に入れたもので、効くのは次のリリース以降です。
 
 **Docker Content Trust は使いません**（Docker Hub 側の仕組みに依存し、
 鍵の保管と失効の運用が必要になるため）。
@@ -605,27 +613,29 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 ### 🌟 競合OS比較
 
-**v3.0.1 を 2026-10-11 に同じホスト（macOS / Apple Silicon）で実測。**
+**同じホスト（macOS / Apple Silicon）で実測。** Kimigayo・Alpine・Ubuntu の
+起動時間とメモリは 2026-10-12 に同時に測った値（Kimigayo は v3.0.2）。
+distroless は 2026-10-11 の値。
 サイズは x86_64（`--platform linux/amd64`、QEMU）と arm64 の両方、
 **起動時間とメモリは arm64 ネイティブ**（QEMU を挟むと時間の比較に
 ならないため）。測り方は「パフォーマンス実績」節の折りたたみを参照。
 
 | OS | サイズ (x86_64 / arm64) | 起動時間 | 常駐メモリ | シェル | パッケージマネージャー | Init |
 |----|-------|---------|-------|-------|---------------------|------|
-| **Kimigayo Minimal** | **2.62** / **2.98MB** | 0.62秒 | **232KB** | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Standard** | **2.76** / **3.13MB** | 0.61秒 | **232KB** | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Extended** | **2.78** / **3.17MB** | 0.60秒 | 240KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Minimal** | **2.46** / **2.83MB** | 0.59秒 | 288KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Standard** | **2.60** / **2.98MB** | 0.60秒 | 288KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Extended** | **2.62** / **3.01MB** | 0.58秒 | 284KB | ✅ BusyBox | ❌ | ✅ OpenRC |
 | `gcr.io/distroless/static-debian12` | 2.11 / 2.11MB | — | — | ❌ | ❌ | ❌ |
 | `gcr.io/distroless/base-debian12` | 20.9 / 31.4MB | — | — | ❌ | ❌ | ❌ |
-| `alpine:latest`（3.24.2） | 8.42 / 8.66MB | 0.62秒 | 276KB | ✅ ash | ✅ apk | ❌ |
-| `ubuntu:24.04` | 78.2 / 101MB | **0.59秒** | 312KB | ✅ bash | ✅ apt | ❌ |
+| `alpine:latest`（3.24.2） | 8.42 / 8.66MB | 0.59秒 | **272KB** | ✅ ash | ✅ apk | ❌ |
+| `ubuntu:24.04` | 78.2 / 101MB | 0.59秒 | 312KB | ✅ bash | ✅ apt | ❌ |
 
-> **起動時間に差は出ていない**（0.59〜0.62秒）。それどころか
-> **101MB の Ubuntu がいちばん速い。** 測っている時間のほとんどは
-> Docker のコンテナ生成で、イメージの中身はほとんど効かないので、
-> **「軽いから起動が速い」とは言えない。**
-> 差が出るのは常駐メモリの方で、Kimigayo は Ubuntu の約 74%、
-> Alpine の約 84%。
+> **起動時間に差は出ていない**（0.58〜0.60秒。101MB の Ubuntu も同じ）。
+> 測っている時間のほとんどは Docker のコンテナ生成で、イメージの中身は
+> ほとんど効かないので、**「軽いから起動が速い」とは言えない。**
+> 常駐メモリは Kimigayo が Ubuntu の約 92%、**Alpine の約 106%**
+> （v3.0.1 では Alpine より少なかった。BusyBox を動的リンクにした分。
+> →「パフォーマンス実績」節）。
 >
 > **`docker stop` はどのイメージでも約 10.4 秒かかる**（PID 1 が SIGTERM を
 > 処理しない場合。Alpine も 10.4 秒）。アプリ側で SIGTERM を扱えば
@@ -635,8 +645,8 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 > メモリも測れない（`/bin/true` すら無い）。これは欠陥ではなく設計。
 
 #### vs Alpine Linux
-- ✅ **約3倍軽量**: 2.76MB vs 8.42MB（x86_64。arm64 でも 3.13 vs 8.66MB）
-- ✅ **常駐メモリが少ない**: 232KB vs 276KB（arm64）
+- ✅ **約3倍軽量**: 2.60MB vs 8.42MB（x86_64。arm64 でも 2.98 vs 8.66MB）
+- ⚠️ **常駐メモリはほぼ同じ**: 288KB vs 272KB（arm64。v3.0.2 から BusyBox が動的リンク）
 - ✅ **パッケージマネージャーなし**: セキュリティ優先の設計（Alpine は apk を含む）
 - ✅ **Init を同梱**: OpenRC 0.63.2（Alpine のイメージには Init が入っていない）
 - ✅ **不変インフラ**: ビルド時に全て決定、実行時の変更を排除
@@ -647,7 +657,7 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 - ⚠️ **サイズ**: Distroless Static（2.11MB）より大きいが、機能が豊富
 
 #### 独自の強み
-- 🏆 **シェルと Init を備えて 2.76MB**
+- 🏆 **シェルと Init を備えて 2.60MB**
 - 🚀 **Apple Silicon最適化**: ARM64ネイティブ対応（M1/M2/M3）
 - 🔒 **セキュリティとデバッグの両立**: 不変インフラ + シェルアクセス
 - 🇯🇵 **充実した日本語ドキュメント**: 日本発のOSS
@@ -739,7 +749,7 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 
 ### ✨ Key Features
 
-- 🪶 **Lightweight**: 2.76MB for Standard (vs. Alpine 8.42MB and Ubuntu 24.04 78.2MB,
+- 🪶 **Lightweight**: 2.60MB for Standard (vs. Alpine 8.42MB and Ubuntu 24.04 78.2MB,
   measured on the same host)
 - 🔒 **Secure-by-Default**: No package manager, minimal attack surface, comprehensive hardening
 - 🧩 **Modular Design**: 3 variants (Minimal/Standard/Extended) for different use cases
@@ -753,31 +763,35 @@ Kimigayo OS is a lightweight, fast, and secure container-focused operating syste
 
 | Metric | Measured | Target | Status |
 |--------|----------|--------|---------|
-| Image size (Minimal) | **2.62MB** / arm64 **2.98MB** | < 5MB | ✅ **52% of target** / 60% |
-| Image size (Standard) | **2.76MB** / arm64 **3.13MB** | < 15MB | ✅ **18% of target** / 21% |
-| Image size (Extended) | **2.78MB** / arm64 **3.17MB** | < 50MB | ✅ **6% of target** / 6% |
-| Boot time | **0.61s** | < 10s | ✅ **6% of target** |
-| Resident memory | **232KB** | < 128MB | ✅ **0.2% of target** |
-| BusyBox performance | **0.90-1.12x** of Alpine | Alpine equivalent | ✅ **no measurable difference** |
+| Image size (Minimal) | **2.46MB** / arm64 **2.83MB** | < 5MB | ✅ **49% of target** / 57% |
+| Image size (Standard) | **2.60MB** / arm64 **2.98MB** | < 15MB | ✅ **17% of target** / 20% |
+| Image size (Extended) | **2.62MB** / arm64 **3.01MB** | < 50MB | ✅ **5% of target** / 6% |
+| Boot time | **0.60s** | < 10s | ✅ **6% of target** |
+| Resident memory | **288KB** | < 128MB | ✅ **0.2% of target** |
+| BusyBox performance | **0.97-1.01x** of Alpine | Alpine equivalent | ✅ **no measurable difference** |
 
 Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
 (Minimal 5MB / Standard 15MB / Extended 50MB). **In practice all three
 variants come in under 5MB — the strictest of the three targets.**
 
-v3.0.1 measured on 2026-10-11: sizes for all six images, and boot time, memory
-and command performance for Standard on native arm64. Every variant passes all
-29 checks in `scripts/verify-image.sh`.
+The published v3.0.2 images measured on 2026-10-12: sizes for all six images, and
+boot time, memory and command performance for Standard on native arm64. Every
+variant passes `scripts/verify-image.sh` (34 checks; 33 for Minimal, which has no wget).
 
-> **The 0.61s boot time does not mean Kimigayo is fast.** Measured in the same
-> session, Alpine comes out at 0.62s and Ubuntu 24.04 at **0.59s** — the 100MB
-> image is the fastest of the three. Almost all of that 0.6s is Docker creating
-> the container, so the image barely matters. Resident memory is where the
-> difference actually shows (Kimigayo **232KB** / Alpine 276KB / Ubuntu 312KB).
+> **The 0.60s boot time does not mean Kimigayo is fast.** Measured in the same
+> session, Alpine and Ubuntu 24.04 both come out at 0.59s. Almost all of that
+> 0.6s is Docker creating the container, so the image barely matters.
+>
+> **Resident memory went slightly above Alpine in v3.0.2** (Kimigayo **288KB** /
+> Alpine 272KB / Ubuntu 312KB; v3.0.1 was 236KB). BusyBox is now dynamically
+> linked, so BusyBox commands such as `sleep` map `libc.so` too (about 56KB).
+> That is the price of having Kimigayo's musl CVE patches cover `/bin/sh`; it is
+> nowhere near the 128MB target.
 
 <details>
 <summary><b>Per-variant breakdown, and where the bytes go</b></summary>
 
-**Measurement conditions**: 2026-10-11, v3.0.1, host is macOS on Apple Silicon
+**Measurement conditions**: 2026-10-12, published v3.0.2 images, host is macOS on Apple Silicon
 (arm64). Build environment is based on Alpine 3.24, with kernel 6.18.55 /
 musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
 
@@ -785,38 +799,41 @@ musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
 | --- | --- |
 | Size | `docker inspect` byte count converted to decimal MB; x86_64 under QEMU via `--platform linux/amd64` |
 | Boot time | wall time of `docker run --rm <image> /bin/true`, median of 10, native arm64 |
-| Resident memory | `docker stats` of an idle container. **All 37 samples read 232KB**; the `0B` readings `docker stats` returns are discarded (53 of them over 90 seconds). Native arm64 |
-| Command performance | `ls`, `grep`, `find`, `awk`, `sort`, `cat`, `wc` and `head` run against Alpine under identical conditions (`scripts/benchmark-busybox.sh`). **The same command swings between 0.90x and 1.12x from run to run**, so neither is measurably faster |
+| Resident memory | `docker stats` of an idle container, 20 samples one second apart. **All 20 samples read the same value**; `0B` readings would be discarded (none this time). Native arm64 |
+| Command performance | `ls`, `grep`, `find`, `awk`, `sort`, `cat`, `wc` and `head` run against Alpine under identical conditions (`scripts/benchmark-busybox.sh`). **Medians fall between 0.97x and 1.01x** (means are skewed by single outliers, so medians are used), so neither is measurably faster |
 
-**OpenRC reaches the `default` runlevel in 0.77s**
+**OpenRC reaches the `default` runlevel in 0.72s**
 (`docker run --rm <image> /sbin/openrc default`, native arm64, median of 10).
 The difference over `/bin/true` is what the init system costs.
 
 | Variant | BusyBox applets | BusyBox binary | tarball | image |
 | --- | --- | --- | --- | --- |
-| Minimal (x86_64) | 367 | 1,030KB | 1,313KB | **2.62MB** |
-| Standard (x86_64) | 400 | 1,162KB | 1,407KB | **2.76MB** |
-| Extended (x86_64) | 411 | 1,186KB | 1,428KB | **2.78MB** |
-| Minimal (arm64) | 367 | 1,098KB | 1,472KB | **2.98MB** |
-| Standard (arm64) | 400 | 1,243KB | 1,573KB | **3.13MB** |
-| Extended (arm64) | 411 | 1,277KB | 1,594KB | **3.17MB** |
+| Minimal (x86_64) | 367 | 869KB | 1,186KB | **2.46MB** |
+| Standard (x86_64) | 400 | 1,001KB | 1,277KB | **2.60MB** |
+| Extended (x86_64) | 411 | 1,025KB | 1,300KB | **2.62MB** |
+| Minimal (arm64) | 367 | 941KB | 1,341KB | **2.83MB** |
+| Standard (arm64) | 400 | 1,085KB | 1,441KB | **2.98MB** |
+| Extended (arm64) | 411 | 1,120KB | 1,462KB | **3.01MB** |
+
+> **The BusyBox binary shrank by about 160KB in v3.0.2** (v3.0.1 Standard x86_64:
+> 1,162KB / 2.76MB image). BusyBox is now dynamically linked and shares
+> `/lib/libc.so` with OpenRC instead of carrying its own copy of libc.
 
 > **Three applets fewer than v3.0.0** (370/403/413 → 367/400/411): `dpkg`,
 > `dpkg-deb` and `rpm` were removed (see [CHANGELOG.md](CHANGELOG.md), 3.0.1).
 
 **The three variants differ only in the number of BusyBox applets — a span of
-just 156KB on x86_64.** Most of the image is musl's `libc.so`, the BusyBox
+just 160KB on x86_64.** Most of the image is musl's `libc.so`, the BusyBox
 binary and OpenRC (9 binaries, 2 shared libraries and the helpers), all of
 which are present in every variant.
 
-**arm64 is 0.36-0.39MB larger than x86_64 because of the BusyBox binary**
-(aarch64 uses fixed-width instructions, so the same code takes more space;
-this also includes the static-PIE and stack-protector work done in v3.0.0
-to enable ASLR).
+**arm64 is 0.37-0.39MB larger than x86_64, mostly because of the BusyBox binary
+and `libc.so`** (aarch64 uses fixed-width instructions, so the same code takes
+more space).
 
 > v2.0.1 (2026-01-16) reported 1.17MB for Standard. That figure was measured on
 > images that **did not actually contain musl's `libc.so` or any OpenRC binary**
-> (fixed on 2026-10-09), so it is not the same thing as today's 2.76MB.
+> (fixed on 2026-10-09), so it is not the same thing as today's 2.60MB.
 >
 > The old boot time and memory figures (439ms / 0.2MB) were discarded — the
 > benchmarks were broken. `scripts/benchmark-startup.sh` timed
@@ -825,7 +842,7 @@ to enable ASLR).
 > runs, so **the more broken the image, the faster it looked**.
 > `scripts/benchmark-memory.sh` replaced `KiB` with `0.001` and then rounded to
 > whole megabytes, so **anything under 1MB came out as 0**. Both were rewritten
-> on 2026-10-10 and re-measured; the numbers above are from the 2026-10-11 run.
+> on 2026-10-10 and re-measured; the numbers above are from the 2026-10-12 run (v3.0.2).
 
 </details>
 
