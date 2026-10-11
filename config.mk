@@ -41,10 +41,14 @@
 #       which overwrote it. As of 2026-10-11 the three scripts rebuild the
 #       prefix maps themselves, gated on REPRODUCIBLE_BUILD.
 #
-# **Bit-for-bit reproducibility is still unverified.** Setting
-# SOURCE_DATE_EPOCH and the prefix maps removes two known sources of
-# nondeterminism; it does not prove there are no others. To actually claim it,
-# build the same commit twice in a clean tree and compare:
+# **Verified 2026-10-12 for the rootfs tarball only:** the same commit
+# (46b05da) built independently by ci.yml and manual-build.yml produced
+# standard/x86_64 tarballs with identical SHA-256. Getting there also needed
+# a deterministic /.kimigayo-build-info (commit time, no hostname) and a
+# normalized tar (--sort=name, --mtime, gzip -n) in the workflows.
+# Docker image digests and the other variants/arches are not verified.
+# To re-check a single component locally, build the same commit twice
+# in a clean tree and compare:
 #
 #   for i in 1 2; do
 #     rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
@@ -54,7 +58,7 @@
 #   done
 #   cmp /tmp/bb.1 /tmp/bb.2 && echo "bit-identical"
 #
-# Until that passes, do not advertise reproducible builds.
+# Do not advertise more than what has been checked this way.
 #
 # BUSYBOX_CONFIG below is wrong: there is no src/busybox/kimigayo_defconfig.
 # The real configs are src/busybox/config/{minimal,standard,extended}.config,
