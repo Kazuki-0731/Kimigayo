@@ -25,21 +25,36 @@ name: Release
 #   build（x86 でクロスコンパイル）→ verify-and-push（ネイティブ
 #   ランナーでイメージ化・検証・push）。**検証したそのイメージを push する。**
 #   検証の実体は scripts/verify-image.sh で、ci.yml とローカルも同じものを呼ぶ。
+#
+# **公開するのは v*.*.* タグの push だけ。** 手動実行（workflow_dispatch）は
+# ビルドと検証（verify-image.sh・scan-image.sh）までで、Docker Hub には
+# 一切 push しない。マニフェスト・署名・GitHub Release も作らない。
+# 2026-10-12 までは手動実行でも verify-and-push が push しており、既定の
+# tag 入力のままだと latest-<variant>-<arch> を上書きしていた。しかも
+# マニフェスト・署名・Release はタグ push のときしか走らないので、
+# 「push されたが署名もマニフェストも無い」状態を作れた。
+# 公開をやり直したいときは、タグを打ち直すか Actions の Re-run を使う
+# （どちらも github.event_name が push のまま）。
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  # 手動実行はビルドと検証だけ（push しない。→ 冒頭のコメント）。
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g., v3.0.2)'
+        description: 'イメージに入れる版の表記（例: v3.0.2）。空なら edge。Docker Hub には push しない'
         required: false
-        default: 'latest'
+        default: ''
 
 env:
   DOCKER_HUB_USERNAME: ishinokazuki
   IMAGE_NAME: kimigayo-os
+  # 公開する run かどうか。タグの push のときだけ 'true'。
+  # ステップの if はここを見る（ジョブの if では env を参照できないので、
+  # create-manifest / sign / create-github-release は同じ条件を直接書いている）。
+  PUBLISH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read
@@ -82,13 +97,18 @@ jobs:
 
       # continue-on-error は付けない。静的解析がリリースを止められない
       # のでは意味がない。
+      #
+      # ci.yml と同じく make shellcheck-scan と同じ対象を、ダイジェストで
+      # 固定したイメージで検査する。以前の ludeeus/action-shellcheck は
+      # additional_files を ./scripts の中での find -name として扱うため、
+      # .claude/hooks/ を検査していなかった。
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
-        with:
-          additional_files: '.claude/hooks'
-          scandir: './scripts'
-          severity: warning
-          ignore_paths: build output
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${PWD}:/mnt" -w /mnt \
+            koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d \
+            --severity=warning \
+            scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 
   build:
     name: Build ${{ matrix.variant }} ${{ matrix.arch }}
@@ -181,6 +201,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # 検証は常に行い、push はタグの push のときだけ（env.PUBLISH）。
   verify-and-push:
     name: Verify and push ${{ matrix.variant }} ${{ matrix.arch }}
     needs: [meta, build]
@@ -276,12 +297,14 @@ jobs:
           retention-days: 90
 
       - name: Log in to Docker Hub
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Push verified image
+        if: env.PUBLISH == 'true'
         run: |
           set -euo pipefail
           docker push "${{ steps.tags.outputs.primary }}"
@@ -297,6 +320,11 @@ jobs:
             echo "- image size: \`${size}\`"
             echo "- verified on: \`$(uname -m)\` runner"
             echo "- tags: \`${{ steps.tags.outputs.primary }}\`, \`${{ steps.tags.outputs.moving }}\`"
+            if [ "${PUBLISH}" = "true" ]; then
+              echo "- pushed to Docker Hub"
+            else
+              echo "- **not pushed**（workflow_dispatch はビルドと検証のみ）"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   create-manifest:
@@ -587,15 +615,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # 手動実行（ビルドと検証だけ）では create-manifest / sign /
+  # create-github-release が skipped になる。それを「失敗」と数えない。
+  # 逆にタグの push では、この3つまで success でなければ失敗として通知する。
   notify:
     name: Discord Notification
     runs-on: ubuntu-latest
-    needs: [meta, build, verify-and-push, create-manifest, create-github-release]
+    needs: [meta, build, verify-and-push, create-manifest, sign, create-github-release]
     if: always()
     timeout-minutes: 5
     permissions: {}
+    # ジョブの env では env コンテキストを参照できないので、PUBLISH と同じ
+    # 条件をここに直接書いている。
     env:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      OK: ${{ needs.build.result == 'success' && needs.verify-and-push.result == 'success' && (!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (needs.create-manifest.result == 'success' && needs.sign.result == 'success' && needs.create-github-release.result == 'success')) }}
     steps:
       # 断言しない。各ジョブの結果をそのまま並べる。
       # 以前は「Docker Hub: ✅ Images pushed」と書いていたが、
@@ -605,17 +639,17 @@ jobs:
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         with:
           webhook: ${{ env.DISCORD_WEBHOOK }}
-          status: ${{ (needs.build.result == 'success' && needs.verify-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success') && 'success' || 'failure' }}
-          title: >-
-            ${{ (needs.build.result == 'success' && needs.verify-and-push.result == 'success' && needs.create-manifest.result == 'success' && needs.create-github-release.result == 'success') && '🎉 Release Success' || '❌ Release Failed' }}
+          status: ${{ env.OK == 'true' && 'success' || 'failure' }}
+          title: ${{ env.PUBLISH == 'true' && (env.OK == 'true' && '🎉 Release Success' || '❌ Release Failed') || (env.OK == 'true' && '✅ Release build verified (not published)' || '❌ Release build failed (not published)') }}
           description: |
-            **Kimigayo OS v${{ needs.meta.outputs.version }}**
+            **Kimigayo OS v${{ needs.meta.outputs.version }}**${{ env.PUBLISH != 'true' && '（workflow_dispatch: ビルドと検証のみ。Docker Hub には push していない）' || '' }}
 
             • Build (3 variants x 2 arch): ${{ needs.build.result }}
             • Verify and push: ${{ needs.verify-and-push.result }}
             • Multi-arch manifests: ${{ needs.create-manifest.result }}
+            • Cosign signature: ${{ needs.sign.result }}
             • GitHub Release: ${{ needs.create-github-release.result }}
 
-            🐳 `docker pull ishinokazuki/kimigayo-os:${{ needs.meta.outputs.version }}-standard`
-            📦 https://github.com/Kazuki-0731/Kimigayo/releases/tag/v${{ needs.meta.outputs.version }}
+            ${{ env.PUBLISH == 'true' && format('🐳 `docker pull ishinokazuki/kimigayo-os:{0}-standard`', needs.meta.outputs.version) || '' }}
+            ${{ env.PUBLISH == 'true' && format('📦 https://github.com/Kazuki-0731/Kimigayo/releases/tag/v{0}', needs.meta.outputs.version) || '' }}
           username: 'Kimigayo Release Bot'
