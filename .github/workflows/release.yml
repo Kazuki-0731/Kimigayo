@@ -9,8 +9,8 @@ name: Release
 #   - スモークテストしたイメージと push するイメージが別物だった
 #     （スモークは --platform も TARBALL_PATH も渡さない docker build、
 #       push は build-push-action の別ビルド）
-#   - スモークの中身が /bin/sh・ls・busybox --help の3つだけ。BusyBox は
-#     static-pie なので、OpenRC も libc.so も /tmp も無くても全部通る
+#   - スモークの中身が /bin/sh・ls・busybox --help の3つだけ。当時の BusyBox は
+#     static-pie だったので、OpenRC も libc.so も /tmp も無くても全部通る
 #   - ビルド経路が ci.yml と違っていた（CI は make、ここは
 #     build-rootfs.sh 直叩き）。CI が緑でも release が通る保証がない
 #   - matrix に fail-fast: false が無く、1セル失敗で他がキャンセルされる。
@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g., v0.1.0)'
+        description: 'Tag to build (e.g., v3.0.2)'
         required: false
         default: 'latest'
 
@@ -527,6 +527,24 @@ jobs:
           - BusyBox 本体が上書きされていない／アプレット数がバリアントと一致
           - \`/tmp\`・\`/run\`・\`/var/tmp\` などが存在し、スティッキービットが付いている
           - setuid/setgid バイナリと AppleDouble（\`._*\`）が無い
+          - 全 ELF が PIE・Full RELRO（BIND_NOW）・非実行スタック
+          - 入っている構成要素の版が \`versions.mk\` と一致し、
+            \`/etc/os-release\` の版がこのリリースの版と一致する
+          - 秘密情報が無く、CVE の照合（\`scripts/scan-image.sh\`。
+            イメージ内のバイナリから SBOM を作って Grype で照合）を通過した
+
+          ## 🔏 署名と SBOM
+
+          公開したイメージは Cosign でキーレス署名しています。
+          検証には **cosign v3 以上**が必要です（v2 では no signatures found になります）。
+
+          \`\`\`bash
+          cosign verify ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION} \\
+            --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          \`\`\`
+
+          SBOM（CycloneDX、3 バリアント × 2 アーキの 6 本）をこの Release に添付しています。
 
           ## 🔄 Changes Since ${PREVIOUS_TAG}
 
