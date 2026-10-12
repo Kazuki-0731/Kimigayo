@@ -1,13 +1,73 @@
 # Kimigayo OS - Cloud Deployment Guide
 
-This guide explains how to deploy Kimigayo OS on major cloud platforms.
+This guide explains how to run containers built on Kimigayo OS on a VPS and on major cloud platforms.
+
+## What you deploy
+
+Kimigayo OS is a **base image**, not an application. The published image
+(`ishinokazuki/kimigayo-os`) contains only a rootfs (musl, BusyBox, OpenRC);
+there is no kernel in it, and its default command is `/bin/sh`. If you deploy
+the bare image, the container starts a shell and exits immediately (nothing
+listens on a port, nothing answers a health check).
+
+So every example below assumes **your own application image built on top of
+Kimigayo**:
+
+```dockerfile
+FROM ishinokazuki/kimigayo-os:3.0.2-standard
+# Copy your application (and the shared libraries it needs; see
+# examples/python/Dockerfile for collecting them with ldd)
+COPY --from=build /out/my-app /usr/local/bin/my-app
+EXPOSE 8080
+CMD ["/usr/local/bin/my-app"]
+```
+
+```bash
+docker build -t my-app:1.0.0 .
+```
+
+- Pin the Kimigayo version (`3.0.2-standard`) or a digest; `latest` moves on every release
+- Minimal has no `wget`; use Standard or Extended if your health check needs it
+- Your application should handle SIGTERM; otherwise every stop waits for the
+  platform's grace period (see [lifecycle.md](../benchmarks/lifecycle.md))
+
+The intended use is **Docker on a VPS**. Managed container services also work,
+because they run the same image. Booting Kimigayo as a VM image (AMI, cloud
+images, bare metal) is not supported: the image has no kernel or bootloader.
 
 ## Table of Contents
 
+- [VPS (Docker)](#vps)
 - [AWS (Amazon Web Services)](#aws)
 - [Azure (Microsoft Azure)](#azure)
 - [GCP (Google Cloud Platform)](#gcp)
 - [General Best Practices](#best-practices)
+
+---
+
+## VPS (Docker) {#vps}
+
+```bash
+# On the VPS
+docker pull registry.example.com/my-app:1.0.0
+docker run -d --name my-app --restart unless-stopped \
+  -p 80:8080 registry.example.com/my-app:1.0.0
+```
+
+With Compose (`compose.yaml`):
+
+```yaml
+services:
+  my-app:
+    image: registry.example.com/my-app:1.0.0
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+```
+
+```bash
+docker compose up -d
+```
 
 ---
 
@@ -26,26 +86,26 @@ aws ecr get-login-password --region us-east-1 | \
   123456789012.dkr.ecr.us-east-1.amazonaws.com
 
 # Tag image
-docker tag ishinokazuki/kimigayo-os:latest \
-  123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest
+docker tag my-app:1.0.0 \
+  123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:1.0.0
 
 # Push image
-docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest
+docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:1.0.0
 ```
 
 **2. Create ECS Task Definition**
 
 ```json
 {
-  "family": "kimigayo-app",
+  "family": "my-app",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
   "containerDefinitions": [
     {
-      "name": "kimigayo-container",
-      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest",
+      "name": "my-app",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:1.0.0",
       "portMappings": [
         {
           "containerPort": 8080,
@@ -53,22 +113,16 @@ docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest
         }
       ],
       "essential": true,
-      "environment": [
-        {
-          "name": "NODE_ENV",
-          "value": "production"
-        }
-      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/kimigayo",
+          "awslogs-group": "/ecs/my-app",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
       },
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget --spider localhost:8080/health || exit 1"],
+        "command": ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"],
         "interval": 30,
         "timeout": 5,
         "retries": 3,
@@ -79,14 +133,18 @@ docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest
 }
 ```
 
+The CPU/memory values are examples; size them for your application.
+The health check assumes your app serves `/health` and the image is Standard or
+Extended (Minimal has no `wget`).
+
 **3. Deploy with AWS CLI**
 
 ```bash
 # Create service
 aws ecs create-service \
-  --cluster kimigayo-cluster \
-  --service-name kimigayo-service \
-  --task-definition kimigayo-app:1 \
+  --cluster my-cluster \
+  --service-name my-app \
+  --task-definition my-app:1 \
   --desired-count 2 \
   --launch-type FARGATE \
   --network-configuration \
@@ -99,20 +157,20 @@ aws ecs create-service \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kimigayo-deployment
+  name: my-app
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: kimigayo
+      app: my-app
   template:
     metadata:
       labels:
-        app: kimigayo
+        app: my-app
     spec:
       containers:
-      - name: kimigayo
-        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/kimigayo-os:latest
+      - name: my-app
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:1.0.0
         ports:
         - containerPort: 8080
         resources:
@@ -126,25 +184,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kimigayo-service
+  name: my-app
 spec:
   type: LoadBalancer
   selector:
-    app: kimigayo
+    app: my-app
   ports:
   - port: 80
     targetPort: 8080
 ```
-
-### EC2 Deployment (Advanced)
-
-For EC2 deployment, you would need to create a custom AMI. This is more complex and requires:
-
-1. Build rootfs tarball
-2. Create custom AMI using EC2 Image Builder
-3. Configure instance with user data
-
-**Note**: EC2 deployment is recommended only for advanced users. Container-based deployment (ECS/EKS) is preferred.
 
 ---
 
@@ -161,11 +209,10 @@ For EC2 deployment, you would need to create a custom AMI. This is more complex 
 az acr login --name myregistry
 
 # Tag image
-docker tag ishinokazuki/kimigayo-os:latest \
-  myregistry.azurecr.io/kimigayo-os:latest
+docker tag my-app:1.0.0 myregistry.azurecr.io/my-app:1.0.0
 
 # Push image
-docker push myregistry.azurecr.io/kimigayo-os:latest
+docker push myregistry.azurecr.io/my-app:1.0.0
 ```
 
 **2. Deploy to ACI**
@@ -173,15 +220,15 @@ docker push myregistry.azurecr.io/kimigayo-os:latest
 ```bash
 az container create \
   --resource-group myResourceGroup \
-  --name kimigayo-container \
-  --image myregistry.azurecr.io/kimigayo-os:latest \
+  --name my-app \
+  --image myregistry.azurecr.io/my-app:1.0.0 \
   --cpu 1 \
   --memory 1 \
   --registry-login-server myregistry.azurecr.io \
   --registry-username <username> \
   --registry-password <password> \
-  --dns-name-label kimigayo-app \
-  --ports 80
+  --dns-name-label my-app \
+  --ports 8080
 ```
 
 **3. Using ARM Template**
@@ -194,14 +241,14 @@ az container create \
     {
       "type": "Microsoft.ContainerInstance/containerGroups",
       "apiVersion": "2021-09-01",
-      "name": "kimigayo-group",
+      "name": "my-app-group",
       "location": "[resourceGroup().location]",
       "properties": {
         "containers": [
           {
-            "name": "kimigayo-container",
+            "name": "my-app",
             "properties": {
-              "image": "myregistry.azurecr.io/kimigayo-os:latest",
+              "image": "myregistry.azurecr.io/my-app:1.0.0",
               "resources": {
                 "requests": {
                   "cpu": 1,
@@ -210,7 +257,7 @@ az container create \
               },
               "ports": [
                 {
-                  "port": 80,
+                  "port": 8080,
                   "protocol": "TCP"
                 }
               ]
@@ -223,7 +270,7 @@ az container create \
           "ports": [
             {
               "protocol": "TCP",
-              "port": 80
+              "port": 8080
             }
           ]
         }
@@ -239,7 +286,7 @@ az container create \
 # Create AKS cluster
 az aks create \
   --resource-group myResourceGroup \
-  --name kimigayo-cluster \
+  --name my-cluster \
   --node-count 3 \
   --node-vm-size Standard_B2s \
   --generate-ssh-keys
@@ -247,9 +294,9 @@ az aks create \
 # Get credentials
 az aks get-credentials \
   --resource-group myResourceGroup \
-  --name kimigayo-cluster
+  --name my-cluster
 
-# Deploy (same Kubernetes manifests as EKS)
+# Deploy (same Kubernetes manifests as EKS, with the image path changed)
 kubectl apply -f deployment.yaml
 ```
 
@@ -257,30 +304,39 @@ kubectl apply -f deployment.yaml
 
 ## GCP (Google Cloud Platform) {#gcp}
 
+Container Registry (`gcr.io`) has been replaced by **Artifact Registry**.
+The examples use Artifact Registry.
+
 ### Container Deployment
 
 #### Cloud Run
 
-**1. Push image to GCR**
+**1. Push image to Artifact Registry**
 
 ```bash
-# Configure Docker for GCR
-gcloud auth configure-docker
+# Create a Docker repository (once)
+gcloud artifacts repositories create my-repo \
+  --repository-format=docker --location=us-central1
+
+# Configure Docker for Artifact Registry
+gcloud auth configure-docker us-central1-docker.pkg.dev
 
 # Tag image
-docker tag ishinokazuki/kimigayo-os:latest \
-  gcr.io/my-project/kimigayo-os:latest
+docker tag my-app:1.0.0 \
+  us-central1-docker.pkg.dev/my-project/my-repo/my-app:1.0.0
 
 # Push image
-docker push gcr.io/my-project/kimigayo-os:latest
+docker push us-central1-docker.pkg.dev/my-project/my-repo/my-app:1.0.0
 ```
 
 **2. Deploy to Cloud Run**
 
+Cloud Run requires the container to listen on the port given by `--port`
+(your application must do this; the bare Kimigayo image does not).
+
 ```bash
-gcloud run deploy kimigayo-service \
-  --image gcr.io/my-project/kimigayo-os:latest \
-  --platform managed \
+gcloud run deploy my-app \
+  --image us-central1-docker.pkg.dev/my-project/my-repo/my-app:1.0.0 \
   --region us-central1 \
   --allow-unauthenticated \
   --memory 512Mi \
@@ -296,12 +352,12 @@ gcloud run deploy kimigayo-service \
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: kimigayo-service
+  name: my-app
 spec:
   template:
     spec:
       containers:
-      - image: gcr.io/my-project/kimigayo-os:latest
+      - image: us-central1-docker.pkg.dev/my-project/my-repo/my-app:1.0.0
         ports:
         - containerPort: 8080
         resources:
@@ -319,16 +375,16 @@ gcloud run services replace service.yaml
 
 ```bash
 # Create GKE cluster
-gcloud container clusters create kimigayo-cluster \
+gcloud container clusters create my-cluster \
   --num-nodes 3 \
   --machine-type e2-small \
   --region us-central1
 
 # Get credentials
-gcloud container clusters get-credentials kimigayo-cluster \
+gcloud container clusters get-credentials my-cluster \
   --region us-central1
 
-# Deploy (same Kubernetes manifests)
+# Deploy (same Kubernetes manifests, with the image path changed)
 kubectl apply -f deployment.yaml
 ```
 
@@ -342,13 +398,14 @@ kubectl apply -f deployment.yaml
 
 ```bash
 # AWS ECR
-aws ecr create-repository --repository-name kimigayo-os
+aws ecr create-repository --repository-name my-app
 
 # Azure ACR
 az acr create --resource-group myRG --name myregistry --sku Basic
 
-# GCP GCR
-# Automatically available with project
+# GCP Artifact Registry
+gcloud artifacts repositories create my-repo \
+  --repository-format=docker --location=us-central1
 ```
 
 #### 2. Implement Least Privilege
@@ -365,48 +422,40 @@ az acr create --resource-group myRG --name myregistry --sku Basic
         "ecr:BatchGetImage",
         "ecr:BatchCheckLayerAvailability"
       ],
-      "Resource": "arn:aws:ecr:*:*:repository/kimigayo-os"
+      "Resource": "arn:aws:ecr:*:*:repository/my-app"
     }
   ]
 }
 ```
 
-#### 3. Enable Container Scanning
+#### 3. Vulnerability Scanning
 
-**AWS:**
+Registry scanners (ECR image scanning, Microsoft Defender for Containers,
+Artifact Analysis) identify components from a package database. **Kimigayo has
+no package database, so these scanners cannot see the Kimigayo layer** (the same
+is true of Trivy's image scan). They still scan what your application adds
+(for example language packages).
+
+To check the Kimigayo components themselves, use the project's scanner, which
+reads versions out of the binaries and matches them against CVEs:
+
 ```bash
-aws ecr put-image-scanning-configuration \
-  --repository-name kimigayo-os \
-  --image-scanning-configuration scanOnPush=true
+# In a clone of the Kimigayo repository
+bash scripts/scan-image.sh ishinokazuki/kimigayo-os:3.0.2-standard standard x86_64
 ```
 
-**Azure:**
-```bash
-az acr task create \
-  --name scan-on-push \
-  --registry myregistry \
-  --context /dev/null \
-  --cmd mcr.microsoft.com/azure-defender/scan:latest
-```
-
-**GCP:**
-```bash
-gcloud container images scan gcr.io/my-project/kimigayo-os:latest
-```
+The published images are also checked weekly (`dependency-review.yml`), and
+each GitHub Release carries a CycloneDX SBOM per image.
 
 ### Cost Optimization
 
 #### 1. Right-Size Resources
 
-**Kimigayo OS recommended sizes:**
+Kimigayo itself uses a few hundred KB of memory (288KB resident for an idle
+Standard container, v3.0.2). The resources you need are determined by your
+application; measure it and size accordingly.
 
-| Workload Type | CPU | Memory | Notes |
-|---------------|-----|--------|-------|
-| Minimal (static) | 0.25 vCPU | 256 MB | Static websites |
-| Standard (API) | 0.5-1 vCPU | 512 MB | RESTful APIs |
-| Heavy (processing) | 1-2 vCPU | 1-2 GB | Data processing |
-
-#### 2. Use Spot/Preemptible Instances
+#### 2. Use Spot/Preemptible Capacity
 
 **AWS Fargate Spot:**
 ```json
@@ -427,11 +476,12 @@ gcloud container images scan gcr.io/my-project/kimigayo-os:latest
 }
 ```
 
-**GKE Preemptible Nodes:**
+**GKE Spot Nodes:**
 ```bash
-gcloud container node-pools create preemptible-pool \
-  --cluster kimigayo-cluster \
-  --preemptible \
+gcloud container node-pools create spot-pool \
+  --cluster my-cluster \
+  --region us-central1 \
+  --spot \
   --num-nodes 3
 ```
 
@@ -441,7 +491,7 @@ gcloud container node-pools create preemptible-pool \
 ```bash
 aws application-autoscaling register-scalable-target \
   --service-namespace ecs \
-  --resource-id service/kimigayo-cluster/kimigayo-service \
+  --resource-id service/my-cluster/my-app \
   --scalable-dimension ecs:service:DesiredCount \
   --min-capacity 1 \
   --max-capacity 10
@@ -449,7 +499,8 @@ aws application-autoscaling register-scalable-target \
 
 **GCP Cloud Run (automatic):**
 ```bash
-gcloud run services update kimigayo-service \
+gcloud run services update my-app \
+  --region us-central1 \
   --min-instances 0 \
   --max-instances 10
 ```
@@ -460,16 +511,7 @@ gcloud run services update kimigayo-service \
 
 ```bash
 # View logs
-aws logs tail /ecs/kimigayo --follow
-
-# Create alarm
-aws cloudwatch put-metric-alarm \
-  --alarm-name kimigayo-high-cpu \
-  --metric-name CPUUtilization \
-  --namespace AWS/ECS \
-  --statistic Average \
-  --period 300 \
-  --threshold 80
+aws logs tail /ecs/my-app --follow
 ```
 
 #### Azure Monitor
@@ -478,28 +520,26 @@ aws cloudwatch put-metric-alarm \
 # View logs
 az monitor log-analytics query \
   --workspace <workspace-id> \
-  --analytics-query "ContainerLog | where Name == 'kimigayo-container'"
+  --analytics-query "ContainerLog | where Name == 'my-app'"
 ```
 
-#### GCP Cloud Monitoring
+#### GCP Cloud Logging
 
 ```bash
 # View logs
 gcloud logging read "resource.type=cloud_run_revision \
-  AND resource.labels.service_name=kimigayo-service"
+  AND resource.labels.service_name=my-app"
 ```
 
-### Backup and Disaster Recovery
+### Versioning
 
-#### Image Versioning
-
-Always tag images with semantic versioning:
+Tag your own images with an explicit version, and pin the Kimigayo base image
+the same way. Kimigayo's own tags look like `3.0.2`, `3.0.2-standard` and
+`3.0.2-standard-amd64` (no `v` prefix); `latest` and `latest-<variant>` move
+on every release.
 
 ```bash
-docker tag image:latest registry/image:v1.2.3
-docker tag image:latest registry/image:v1.2
-docker tag image:latest registry/image:v1
-docker tag image:latest registry/image:latest
+docker tag my-app:build registry.example.com/my-app:1.0.0
 ```
 
 #### Multi-Region Deployment
@@ -511,36 +551,18 @@ aws ecr put-replication-configuration \
   --replication-configuration '{"rules":[{"destinations":[{"region":"us-west-2","registryId":"123456789012"}]}]}'
 ```
 
-**GCP:**
-```bash
-# Use multi-regional GCR
-docker push gcr.io/my-project/kimigayo-os:latest
-# Automatically replicated
-```
-
-## Cost Estimates
-
-### Monthly Cost Comparison (3 containers, 24/7)
-
-| Platform | Service | Config | Est. Cost |
-|----------|---------|--------|-----------|
-| **AWS** | ECS Fargate | 0.25 vCPU, 0.5GB | ~$15-20/month |
-| **Azure** | ACI | 1 vCPU, 1GB | ~$30-35/month |
-| **GCP** | Cloud Run | 1 vCPU, 512MB | ~$10-15/month* |
-
-\* Cloud Run pricing based on request count and execution time
-
-### Optimization Tips
-
-1. **Use managed container services** (ECS Fargate, Cloud Run) for small workloads
-2. **Use Kubernetes** (EKS, AKS, GKE) for large-scale deployments
-3. **Enable auto-scaling** to match demand
-4. **Use spot instances** for non-critical workloads
-5. **Leverage Kimigayo OS's small size** to reduce data transfer costs
+**GCP:** create an Artifact Registry repository in a multi-region location
+(for example `--location=us`).
 
 ## Troubleshooting
 
 ### Common Issues
+
+#### Container exits immediately
+
+You are probably running the bare Kimigayo image, whose default command is
+`/bin/sh`. Without a TTY the shell exits at once. Deploy an image with your
+application as the command (see [What you deploy](#what-you-deploy)).
 
 #### Image Pull Errors
 
@@ -549,8 +571,7 @@ docker push gcr.io/my-project/kimigayo-os:latest
 # Verify credentials
 aws ecr get-login-password | docker login --username AWS --password-stdin <registry-url>
 
-# Check IAM permissions
-aws iam get-role-policy --role-name ecsTaskExecutionRole --policy-name ECSTaskExecutionPolicy
+# Check the task execution role has the ECR permissions shown above
 ```
 
 #### Container Crashes
@@ -558,10 +579,11 @@ aws iam get-role-policy --role-name ecsTaskExecutionRole --policy-name ECSTaskEx
 **Solution:**
 ```bash
 # Check logs
-aws logs tail /ecs/kimigayo
+aws logs tail /ecs/my-app
 
-# Increase memory if needed
-# Update task definition with more memory
+# If your binary fails with "not found", the shared libraries it needs are
+# probably missing from the image. Collect them with ldd
+# (see examples/python/Dockerfile).
 ```
 
 #### Network Issues
@@ -574,17 +596,16 @@ aws logs tail /ecs/kimigayo
 ## Support
 
 - [AWS Documentation](https://docs.aws.amazon.com/)
-- [Azure Documentation](https://docs.microsoft.com/azure/)
+- [Azure Documentation](https://learn.microsoft.com/azure/)
 - [GCP Documentation](https://cloud.google.com/docs)
 - [Kimigayo OS Issues](https://github.com/Kazuki-0731/Kimigayo/issues)
 
 ## Additional Resources
 
 - [AWS ECS Best Practices](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/)
-- [Azure Container Best Practices](https://docs.microsoft.com/azure/container-instances/container-instances-best-practices)
 - [GCP Cloud Run Best Practices](https://cloud.google.com/run/docs/best-practices)
 
 ---
 
-**Last Updated:** 2025-12-22
-**Maintained by:** Kimigayo OS Team
+**Last Updated:** 2026-10-12
+**Maintained by:** Kimigayo OS maintainer
