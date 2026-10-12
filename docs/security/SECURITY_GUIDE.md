@@ -52,7 +52,7 @@ Kimigayo OSは多層防御（Defense in Depth）の原則に基づいて設計�
 ├─────────────────────────────────────────────┤
 │ コンパイル層                                 │★ Kimigayo
 │   - PIE, RELRO (-z relro -z now), 非実行スタック│
-│   - Stack protector（arm64 の OpenRC を除く）│
+│   - Stack protector（v3.0.2 の arm64 OpenRC 以外）│
 ├─────────────────────────────────────────────┤
 │ 小さな実行面                                 │★ Kimigayo
 │   - 共有ライブラリは musl と OpenRC のものだけ│
