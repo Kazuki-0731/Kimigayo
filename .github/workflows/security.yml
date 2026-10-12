@@ -32,26 +32,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
-      - name: Check Alpine Linux security advisories
-        id: alpine_check
-        run: |
-          # Fetch Alpine security database
-          # ビルドに使っている Alpine の版を見る。
-          # 以前は edge を見ていたため、実際に使っている 3.24 と
-          # 違うデータベースで判断していた。
-          # shellcheck disable=SC1091
-          source scripts/lib/versions.sh
-          url="https://secdb.alpinelinux.org/v${ALPINE_VERSION}/main.json"
-          echo "fetching ${url}"
-          wget -q "$url" -O alpine-security.json || echo "Failed to fetch ${url}"
-
-          if [ -f alpine-security.json ]; then
-            VULN_COUNT=$(jq 'length' alpine-security.json 2>/dev/null || echo "0")
-            echo "vulnerabilities=$VULN_COUNT" >> $GITHUB_OUTPUT
-            echo "Found $VULN_COUNT packages with known vulnerabilities"
-          else
-            echo "vulnerabilities=0" >> $GITHUB_OUTPUT
-          fi
+      # Alpine の secdb を数えるステップは削除した（2026-10-12）。
+      # jq 'length' はトップレベルのキー数（常に 6）を数えていただけで、
+      # しかも Alpine のパッケージは出荷物に入らない（Alpine はビルド環境）。
+      # 出荷物の CVE は scripts/scan-image.sh が見る（ci.yml・release.yml・
+      # dependency-review.yml の published-image-scan）。
 
       - name: Check musl libc updates
         id: musl_check
@@ -115,9 +100,6 @@ jobs:
           - Latest: ${{ steps.busybox_check.outputs.latest }}
           - Update needed: ${{ steps.busybox_check.outputs.update_needed }}
 
-          ### Alpine Linux Security Advisories
-          - Vulnerabilities found: ${{ steps.alpine_check.outputs.vulnerabilities }}
-
           ## Recommended Actions
 
           EOF
@@ -128,10 +110,6 @@ jobs:
 
           if [ "${{ steps.busybox_check.outputs.update_needed }}" = "true" ]; then
             echo "- [ ] Update BusyBox to ${{ steps.busybox_check.outputs.latest }}" >> reports/security-check-$(date +%Y%m%d).md
-          fi
-
-          if [ "${{ steps.alpine_check.outputs.vulnerabilities }}" != "0" ]; then
-            echo "- [ ] Review Alpine security advisories" >> reports/security-check-$(date +%Y%m%d).md
           fi
 
       - name: Create issue for security updates
