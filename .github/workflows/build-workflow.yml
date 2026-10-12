@@ -116,6 +116,30 @@ jobs:
           done
           exit "$found"
 
+      # カーネルを作ったときは、実際の .config の強化項目を残す。
+      # src/kernel/config/ はほとんど使われず、上流 defconfig に
+      # apply_security_hardening を当てたものがビルドされるので、
+      # 「何が有効か」は成果物の .config でしか分からない。
+      - name: Record kernel config (build_kernel only)
+        if: ${{ inputs.build_kernel }}
+        run: |
+          set -euo pipefail
+          cfg=$(ls build/kernel/output/config-* | head -1)
+          {
+            echo "### Kernel config: $(basename "$cfg")"
+            echo '```'
+            grep -E '^(# )?CONFIG_(SECURITY|SECURITY_DMESG_RESTRICT|HARDENED_USERCOPY|FORTIFY_SOURCE|STACKPROTECTOR|STACKPROTECTOR_STRONG|RANDOMIZE_BASE|RANDOMIZE_MEMORY|MITIGATION_RETPOLINE|MITIGATION_PAGE_TABLE_ISOLATION|SECURITY_YAMA|USER_NS|OVERLAY_FS|SQUASHFS|NETFILTER|NETFILTER_XTABLES|IP_NF_IPTABLES|SECCOMP|SECCOMP_FILTER|MODULES|STRICT_KERNEL_RWX|INIT_ON_ALLOC_DEFAULT_ON)[ =]' "$cfg" | sort
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload kernel config (build_kernel only)
+        if: ${{ inputs.build_kernel }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: kernel-config-${{ inputs.arch }}
+          path: build/kernel/output/config-*
+          retention-days: 30
+
       - name: Package rootfs
         run: |
           set -euo pipefail
