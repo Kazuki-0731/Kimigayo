@@ -20,19 +20,20 @@
    `olddefconfig` を回す
 2. そうでなければ上流の defconfig を使う
    （x86_64 は `x86_64_defconfig`、arm64 は `defconfig`）。
-   このとき `<arch>.config` が無ければプレースホルダを書き出す
+   `<arch>.config` が無くても何も書き出さない（2026-10-13 までは
+   プレースホルダを `src/kernel/config/<arch>.config` に書き出していた）
 3. どちらの場合も、`scripts/config` で次を上書きしてから `olddefconfig` を回す
    - 有効: `RANDOMIZE_BASE`・`RANDOMIZE_MEMORY`・`SECURITY`・
      `SECURITY_DMESG_RESTRICT`・`HARDENED_USERCOPY`・`FORTIFY_SOURCE`・
      `STACKPROTECTOR`・`STACKPROTECTOR_STRONG`・`PANIC_ON_OOPS`（`PANIC_TIMEOUT=10`）
    - 無効: `NETFILTER` 系（`NETFILTER_ADVANCED`・`NETFILTER_XTABLES`・
-     `IP_NF_IPTABLES`・`IP6_NF_IPTABLES`・`BRIDGE_NETFILTER`）、
-     x86_64 では `RETPOLINE`
+     `IP_NF_IPTABLES`・`IP6_NF_IPTABLES`・`BRIDGE_NETFILTER`）
+   - 2026-10-13 までは x86_64 で `--disable RETPOLINE` も呼んでいたが、
+     6.18 ではシンボル名が `MITIGATION_RETPOLINE` に変わっていて
+     何もしていなかったので外した（Spectre v2 の緩和は無効にしない）
 
 **追跡中の `x86_64.config` はプレースホルダ**なので、x86_64 は手順 2 の
-上流 defconfig で作られる。arm64 は `arm64.config` が追跡されていないため、
-初回ビルドで手順 2 のプレースホルダが `src/kernel/config/arm64.config` に
-書き出される（未追跡ファイルとして残る）。
+上流 defconfig で作られる。arm64 は `arm64.config` が無いので、同じく手順 2。
 
 **バリアント（minimal / standard / extended）でカーネル config は変わらない。**
 バリアントの違いは BusyBox の config（`src/busybox/config/`）だけ。
