@@ -23,13 +23,14 @@
 # Consequences, measured rather than assumed:
 #
 #   -fPIE / -fstack-protector-strong / -D_FORTIFY_SOURCE=2
-#       set directly by the three build scripts, with exceptions:
-#       the arm64 OpenRC build (scripts/build-openrc.sh) does not pass
-#       -fstack-protector-strong, so openrc / librc / libeinfo on arm64 have
-#       no stack protector. musl does not implement FORTIFY, so the effect of
+#       set directly by the three build scripts. Until 2026-10-13 the arm64
+#       OpenRC build (scripts/build-openrc.sh) did not pass
+#       -fstack-protector-strong, so openrc / librc / libeinfo in the published
+#       v3.0.2 arm64 image have no stack protector (fixed on main).
+#       musl does not implement FORTIFY, so the effect of
 #       -D_FORTIFY_SOURCE=2 is not confirmed.
-#       scripts/verify-image.sh checks PIE, RELRO, BIND_NOW and a non-exec
-#       stack on every ELF in the image.
+#       scripts/verify-image.sh checks PIE, RELRO, BIND_NOW, a non-exec
+#       stack and the stack protector on every ELF in the image.
 #   -Wl,-z,noexecstack
 #       used to appear only here. The artifacts did have a non-exec stack,
 #       but only because the linker defaulted to it - not because we asked.
