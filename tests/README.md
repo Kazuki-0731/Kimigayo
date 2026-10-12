@@ -6,8 +6,8 @@
 tests/
 ├── conftest.py         # Pytest設定とフィクスチャ（hypothesis のプロファイルもここ）
 ├── fixtures/           # テスト用のデータ
-├── unit/               # 単体テスト
-├── property/           # プロパティベーステスト
+├── unit/               # 単体テスト（344 件、2026-10-13 時点）
+├── property/           # プロパティベーステスト（255 件、同）
 └── integration/        # 統合テスト
 ```
 
@@ -52,6 +52,14 @@ pytest tests/integration/
 `output/` に rootfs の tarball があるかを確かめます（`make ci-build-local` の一段）。
 シェルの統合テストは `make test-docker`（`test_docker_startup.sh`）と
 `make test-func`（`test_functionality.sh`）で、どちらもイメージが要ります。
+検査するイメージは `kimigayo-os:<variant>-<arch>`（`make ci-build-local` が作る名前）で、
+Makefile が `VARIANT` / `ARCH` / `VERSION` を渡します
+（`make test-docker VARIANT=minimal ARCH=arm64`）。スクリプトを直接叩くときも
+`IMAGE_NAME` を省けば同じ名前が既定になります。
+
+ビルドコンテナ側の `make test-musl` / `test-busybox` / `test-openrc`
+（`scripts/test-*-integration.sh`）は、ビルド済みの構成要素
+（`build/*-install-*`）を検査します。
 
 ### 特定のマーカー
 
