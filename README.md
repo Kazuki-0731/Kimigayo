@@ -172,14 +172,14 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 - ✅ **最小攻撃面**: パッケージインストール機能がないため、実行時の脆弱性リスクを大幅に削減
 - ✅ **超軽量**: 数MBのイメージサイズ（実測は「パフォーマンス実績」を参照）
 - ✅ **不変インフラ**: コンテナ時代の「Build once, run anywhere」思想に完全準拠
-- ✅ **予測可能性**: ランタイムでの変更が不可能なため、動作が完全に予測可能
+- ✅ **予測可能性**: 実行時にソフトウェアを足す仕組みを持たないため、動くものはビルド時に決まる
 
 #### Alpine Linux からの継承
 
-- ✅ **musl libc**: 軽量で高速なCライブラリ（glibcの1/10のサイズ）
+- ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: 基本的なUnixコマンドとシェルを提供（デバッグ可能）
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: コンパイル時・実行時の包括的な保護（PIE, ASLR, Stack Protector等）
+- ✅ **セキュリティ強化**: 全実行ファイルを PIE・Stack Protector・FORTIFY_SOURCE・Full RELRO でビルド（ASLR はホストのカーネルが効かせる）
 
 この組み合わせにより、**distroless のセキュリティ** と **Alpine の実用性** を両立し、コンテナ環境に最適化されたOSを実現しています。
 
@@ -188,16 +188,26 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 ```dockerfile
 # マルチステージビルドで必要なものを全てビルド時に準備
 FROM alpine:3.24 AS builder
-RUN apk add --no-cache python3 py3-pip
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN apk add --no-cache python3
 
-# Kimigayo OSで最小ランタイム環境を構築
-FROM ishinokazuki/kimigayo-os:latest
-COPY --from=builder /usr/lib/python3.11 /usr/lib/python3.11
-COPY app.py .
-CMD ["python3", "app.py"]
+# 共有ライブラリは手で列挙せず ldd で集める（拡張モジュールの依存も含める）
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp -a /usr/bin/python3* /stage/usr/bin/ \
+    && cp -a /usr/lib/python3* /stage/usr/lib/ \
+    && for f in "$(readlink -f /usr/bin/python3)" /usr/lib/python3*/lib-dynload/*.so; do ldd "$f"; done \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+# Kimigayo OSで最小ランタイム環境を構築（版を固定する）
+FROM ishinokazuki/kimigayo-os:3.0.2
+COPY --from=builder /stage/ /
+COPY app.py /app/
+USER 65534
+CMD ["python3", "/app/app.py"]
 ```
+
+動く完全な例は [examples/python/Dockerfile](examples/python/Dockerfile)（nginx・Node.js もあり）。
 
 このアプローチにより、**開発の柔軟性**と**本番環境のセキュリティ**を両立します。
 
