@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild:
-        description: 'Force rebuild even if no updates detected'
+        description: '更新が無くても PR を作る（ビルドはしない）'
         required: false
         default: 'false'
 
@@ -160,9 +160,9 @@ jobs:
 
           # Create changelog entry
           cat > UPDATES.md << EOF
-          # Base Image Updates - $(date +%Y-%m-%d)
+          # 構成要素の更新 - $(date +%Y-%m-%d)
 
-          ## Updated Components
+          ## 更新する構成要素
 
           EOF
 
@@ -191,34 +191,32 @@ jobs:
           過去に OpenRC の \`-Dos=Linux\` が削除されて \`meson setup\` が
           失敗した前例がある（CLAUDE.md「版上げで実際に壊れた箇所」節）。
 
-          ## Testing Required
+          ## 確認すること
+
+          **この PR では CI が自動では走らない**（GITHUB_TOKEN で作った PR は
+          ワークフローを起動しない）。下の確認は手で回す。
 
           - [ ] \`scripts/download-*.sh\` のチェックサム表を更新した
-          - [ ] Build all variants (minimal, standard, extended)
-          - [ ] \`build/kernel-patches.log\` / \`build/busybox-patches.log\` に
-                \`skipped:\` が無いことを確認した
-          - [ ] Run integration tests
-          - [ ] Run security scans
-          - [ ] Verify Docker image functionality
+          - [ ] 全バリアント（minimal / standard / extended）がビルドできた
+          - [ ] \`build/busybox-patches.log\` に \`skipped: [1-9]\` や
+                \`not applicable\` が無いことを確認した
+          - [ ] 統合テストが通った
+          - [ ] \`make scan-image\`（CVE と秘密情報の照合）が通った
+          - [ ] \`scripts/verify-image.sh\` でイメージを検証した
 
-          ## Related Links
+          ## 参考
 
           - musl libc releases: https://musl.libc.org/releases.html
           - BusyBox releases: https://busybox.net/downloads/
           - OpenRC (Alpine aports): https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/main/openrc/APKBUILD
-          - Linux kernel: https://www.kernel.org/releases.json
           EOF
 
           cat UPDATES.md
 
           git add versions.mk UPDATES.md
-          git commit -m "⬆️ Update base image components
+          git commit -m "⬆️ 構成要素の版を上流の最新に合わせる（自動検知）
 
-          $(cat UPDATES.md)
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>"
+          $(cat UPDATES.md)"
 
           git push -u origin "$BRANCH_NAME"
 
@@ -227,11 +225,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Build PR body
-          PR_BODY="## Automated Base Image Update
+          PR_BODY="## 構成要素の更新（自動作成）
 
-          This PR updates core components to their latest versions.
+          上流の新しい版を検知したので、versions.mk の版を更新する。
 
-          ### Changes
+          ### 変更
           "
 
           if [ "${{ needs.check-updates.outputs.musl_update }}" = "true" ]; then
@@ -251,30 +249,30 @@ jobs:
 
           PR_BODY="${PR_BODY}
 
-          ### Testing Checklist
+          ### 確認すること
 
           - [ ] scripts/download-*.sh のチェックサム表を更新した（自動更新されない）
           - [ ] 上流のビルドオプションが消えていないか確認した
-          - [ ] All variants build successfully (minimal, standard, extended)
-          - [ ] Integration tests pass
-          - [ ] Security scans pass (Trivy)
-          - [ ] Docker images functional
-          - [ ] No performance regressions
+          - [ ] 全バリアント（minimal / standard / extended）がビルドできた
+          - [ ] 統合テストが通った
+          - [ ] make scan-image（CVE と秘密情報の照合）が通った
+          - [ ] scripts/verify-image.sh でイメージを検証した
+          - [ ] 性能が退行していない
 
-          ### Notes
+          ### 注意
 
-          - This PR was automatically created by the base image update workflow
-          - Please review changelog and test thoroughly before merging
-          - Security scans will run automatically on this PR
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+          - この PR は base-image-update.yml が自動で作成した
+          - 上流の NEWS / Changelog を読んでからマージする
+          - **この PR では CI が自動では走らない**（GITHUB_TOKEN で作った PR は
+            ワークフローを起動しない）。マージ前に手で回す
+            （例: gh workflow run manual-build.yml --ref <このブランチ>）"
 
           # Create PR using gh CLI
           gh pr create \
-            --title "⬆️ Update base image components - $(date +%Y-%m-%d)" \
+            --title "⬆️ 構成要素の版を更新 - $(date +%Y-%m-%d)" \
             --body "$PR_BODY" \
             --label "dependencies,automated" \
             --base main
 
-  # Note: Full build testing is done in the PR's CI/CD pipeline
-  # This workflow only creates the update PR
+  # このワークフローは更新 PR を作るだけ。GITHUB_TOKEN で作った PR では
+  # CI が自動で走らないので、ビルドの検証は手で回す。
