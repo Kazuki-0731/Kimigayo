@@ -79,8 +79,14 @@ calculate_median() {
     fi
 }
 
-# Function to calculate speedup
-calculate_speedup() {
+# Function to calculate the ratio Alpine / Kimigayo (> 1.00 = Kimigayo faster)
+#
+# **比は中央値どうしで取る。** README・CLAUDE.md の「0.97〜1.01x」は
+# 中央値の比。2026-10-13 まで平均の比を "Speedup" と表示しており、
+# 同じ名前で別の値を指していた（docker run の外れ値に平均が引っ張られる）。
+# JSON には平均の比も ratio_avg として残す。"speedup" は
+# benchmark-report.sh など既存の読み手のための別名で、ratio_median と同じ値。
+calculate_ratio() {
     local kimigayo_ms=$1
     local alpine_ms=$2
     # **Do not use `bc` here.** `echo "scale=2; 742/772" | bc` prints `.96`
@@ -128,8 +134,9 @@ kimigayo_ls_avg=$(calculate_average "${kimigayo_ls_times[@]}")
 kimigayo_ls_median=$(calculate_median "${kimigayo_ls_times[@]}")
 alpine_ls_avg=$(calculate_average "${alpine_ls_times[@]}")
 alpine_ls_median=$(calculate_median "${alpine_ls_times[@]}")
-ls_speedup=$(calculate_speedup "$kimigayo_ls_avg" "$alpine_ls_avg")
-log_success "ls: Kimigayo avg=${kimigayo_ls_avg}ms, Alpine avg=${alpine_ls_avg}ms, Speedup=${ls_speedup}x"
+ls_ratio=$(calculate_ratio "$kimigayo_ls_median" "$alpine_ls_median")
+ls_ratio_avg=$(calculate_ratio "$kimigayo_ls_avg" "$alpine_ls_avg")
+log_success "ls: Kimigayo median=${kimigayo_ls_median}ms, Alpine median=${alpine_ls_median}ms, ratio (Alpine/Kimigayo, median)=${ls_ratio}x"
 echo ""
 
 # Benchmark 2: grep - Text search
@@ -147,8 +154,9 @@ kimigayo_grep_avg=$(calculate_average "${kimigayo_grep_times[@]}")
 kimigayo_grep_median=$(calculate_median "${kimigayo_grep_times[@]}")
 alpine_grep_avg=$(calculate_average "${alpine_grep_times[@]}")
 alpine_grep_median=$(calculate_median "${alpine_grep_times[@]}")
-grep_speedup=$(calculate_speedup "$kimigayo_grep_avg" "$alpine_grep_avg")
-log_success "grep: Kimigayo avg=${kimigayo_grep_avg}ms, Alpine avg=${alpine_grep_avg}ms, Speedup=${grep_speedup}x"
+grep_ratio=$(calculate_ratio "$kimigayo_grep_median" "$alpine_grep_median")
+grep_ratio_avg=$(calculate_ratio "$kimigayo_grep_avg" "$alpine_grep_avg")
+log_success "grep: Kimigayo median=${kimigayo_grep_median}ms, Alpine median=${alpine_grep_median}ms, ratio (Alpine/Kimigayo, median)=${grep_ratio}x"
 echo ""
 
 # Benchmark 3: find - Directory traversal
@@ -166,8 +174,9 @@ kimigayo_find_avg=$(calculate_average "${kimigayo_find_times[@]}")
 kimigayo_find_median=$(calculate_median "${kimigayo_find_times[@]}")
 alpine_find_avg=$(calculate_average "${alpine_find_times[@]}")
 alpine_find_median=$(calculate_median "${alpine_find_times[@]}")
-find_speedup=$(calculate_speedup "$kimigayo_find_avg" "$alpine_find_avg")
-log_success "find: Kimigayo avg=${kimigayo_find_avg}ms, Alpine avg=${alpine_find_avg}ms, Speedup=${find_speedup}x"
+find_ratio=$(calculate_ratio "$kimigayo_find_median" "$alpine_find_median")
+find_ratio_avg=$(calculate_ratio "$kimigayo_find_avg" "$alpine_find_avg")
+log_success "find: Kimigayo median=${kimigayo_find_median}ms, Alpine median=${alpine_find_median}ms, ratio (Alpine/Kimigayo, median)=${find_ratio}x"
 echo ""
 
 # Benchmark 4: awk - Text processing
@@ -185,8 +194,9 @@ kimigayo_awk_avg=$(calculate_average "${kimigayo_awk_times[@]}")
 kimigayo_awk_median=$(calculate_median "${kimigayo_awk_times[@]}")
 alpine_awk_avg=$(calculate_average "${alpine_awk_times[@]}")
 alpine_awk_median=$(calculate_median "${alpine_awk_times[@]}")
-awk_speedup=$(calculate_speedup "$kimigayo_awk_avg" "$alpine_awk_avg")
-log_success "awk: Kimigayo avg=${kimigayo_awk_avg}ms, Alpine avg=${alpine_awk_avg}ms, Speedup=${awk_speedup}x"
+awk_ratio=$(calculate_ratio "$kimigayo_awk_median" "$alpine_awk_median")
+awk_ratio_avg=$(calculate_ratio "$kimigayo_awk_avg" "$alpine_awk_avg")
+log_success "awk: Kimigayo median=${kimigayo_awk_median}ms, Alpine median=${alpine_awk_median}ms, ratio (Alpine/Kimigayo, median)=${awk_ratio}x"
 echo ""
 
 # Benchmark 5: sort - Data sorting
@@ -204,8 +214,9 @@ kimigayo_sort_avg=$(calculate_average "${kimigayo_sort_times[@]}")
 kimigayo_sort_median=$(calculate_median "${kimigayo_sort_times[@]}")
 alpine_sort_avg=$(calculate_average "${alpine_sort_times[@]}")
 alpine_sort_median=$(calculate_median "${alpine_sort_times[@]}")
-sort_speedup=$(calculate_speedup "$kimigayo_sort_avg" "$alpine_sort_avg")
-log_success "sort: Kimigayo avg=${kimigayo_sort_avg}ms, Alpine avg=${alpine_sort_avg}ms, Speedup=${sort_speedup}x"
+sort_ratio=$(calculate_ratio "$kimigayo_sort_median" "$alpine_sort_median")
+sort_ratio_avg=$(calculate_ratio "$kimigayo_sort_avg" "$alpine_sort_avg")
+log_success "sort: Kimigayo median=${kimigayo_sort_median}ms, Alpine median=${alpine_sort_median}ms, ratio (Alpine/Kimigayo, median)=${sort_ratio}x"
 echo ""
 
 # Benchmark 6: cat - File reading
@@ -223,8 +234,9 @@ kimigayo_cat_avg=$(calculate_average "${kimigayo_cat_times[@]}")
 kimigayo_cat_median=$(calculate_median "${kimigayo_cat_times[@]}")
 alpine_cat_avg=$(calculate_average "${alpine_cat_times[@]}")
 alpine_cat_median=$(calculate_median "${alpine_cat_times[@]}")
-cat_speedup=$(calculate_speedup "$kimigayo_cat_avg" "$alpine_cat_avg")
-log_success "cat: Kimigayo avg=${kimigayo_cat_avg}ms, Alpine avg=${alpine_cat_avg}ms, Speedup=${cat_speedup}x"
+cat_ratio=$(calculate_ratio "$kimigayo_cat_median" "$alpine_cat_median")
+cat_ratio_avg=$(calculate_ratio "$kimigayo_cat_avg" "$alpine_cat_avg")
+log_success "cat: Kimigayo median=${kimigayo_cat_median}ms, Alpine median=${alpine_cat_median}ms, ratio (Alpine/Kimigayo, median)=${cat_ratio}x"
 echo ""
 
 # Benchmark 7: wc - Word count
@@ -242,8 +254,9 @@ kimigayo_wc_avg=$(calculate_average "${kimigayo_wc_times[@]}")
 kimigayo_wc_median=$(calculate_median "${kimigayo_wc_times[@]}")
 alpine_wc_avg=$(calculate_average "${alpine_wc_times[@]}")
 alpine_wc_median=$(calculate_median "${alpine_wc_times[@]}")
-wc_speedup=$(calculate_speedup "$kimigayo_wc_avg" "$alpine_wc_avg")
-log_success "wc: Kimigayo avg=${kimigayo_wc_avg}ms, Alpine avg=${alpine_wc_avg}ms, Speedup=${wc_speedup}x"
+wc_ratio=$(calculate_ratio "$kimigayo_wc_median" "$alpine_wc_median")
+wc_ratio_avg=$(calculate_ratio "$kimigayo_wc_avg" "$alpine_wc_avg")
+log_success "wc: Kimigayo median=${kimigayo_wc_median}ms, Alpine median=${alpine_wc_median}ms, ratio (Alpine/Kimigayo, median)=${wc_ratio}x"
 echo ""
 
 # Benchmark 8: head/tail - Partial file reading
@@ -261,23 +274,26 @@ kimigayo_head_avg=$(calculate_average "${kimigayo_head_times[@]}")
 kimigayo_head_median=$(calculate_median "${kimigayo_head_times[@]}")
 alpine_head_avg=$(calculate_average "${alpine_head_times[@]}")
 alpine_head_median=$(calculate_median "${alpine_head_times[@]}")
-head_speedup=$(calculate_speedup "$kimigayo_head_avg" "$alpine_head_avg")
-log_success "head: Kimigayo avg=${kimigayo_head_avg}ms, Alpine avg=${alpine_head_avg}ms, Speedup=${head_speedup}x"
+head_ratio=$(calculate_ratio "$kimigayo_head_median" "$alpine_head_median")
+head_ratio_avg=$(calculate_ratio "$kimigayo_head_avg" "$alpine_head_avg")
+log_success "head: Kimigayo median=${kimigayo_head_median}ms, Alpine median=${alpine_head_median}ms, ratio (Alpine/Kimigayo, median)=${head_ratio}x"
 echo ""
 
 # Generate summary
 log_info "=== Benchmark Summary ==="
 echo ""
-printf "%-20s %15s %15s %15s %15s %12s\n" "Command" "Kimigayo (ms)" "Alpine (ms)" "K Median" "A Median" "Speedup"
+printf "%-20s %15s %15s %15s %15s %12s\n" "Command" "Kimigayo Avg" "Alpine Avg" "K Median" "A Median" "Ratio(med)"
 printf "%-20s %15s %15s %15s %15s %12s\n" "--------------------" "---------------" "---------------" "---------------" "---------------" "------------"
-printf "%-20s %15d %15d %15d %15d %12s\n" "ls" "$kimigayo_ls_avg" "$alpine_ls_avg" "$kimigayo_ls_median" "$alpine_ls_median" "${ls_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "grep" "$kimigayo_grep_avg" "$alpine_grep_avg" "$kimigayo_grep_median" "$alpine_grep_median" "${grep_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "find" "$kimigayo_find_avg" "$alpine_find_avg" "$kimigayo_find_median" "$alpine_find_median" "${find_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "awk" "$kimigayo_awk_avg" "$alpine_awk_avg" "$kimigayo_awk_median" "$alpine_awk_median" "${awk_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "sort" "$kimigayo_sort_avg" "$alpine_sort_avg" "$kimigayo_sort_median" "$alpine_sort_median" "${sort_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "cat" "$kimigayo_cat_avg" "$alpine_cat_avg" "$kimigayo_cat_median" "$alpine_cat_median" "${cat_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "wc" "$kimigayo_wc_avg" "$alpine_wc_avg" "$kimigayo_wc_median" "$alpine_wc_median" "${wc_speedup}x"
-printf "%-20s %15d %15d %15d %15d %12s\n" "head" "$kimigayo_head_avg" "$alpine_head_avg" "$kimigayo_head_median" "$alpine_head_median" "${head_speedup}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "ls" "$kimigayo_ls_avg" "$alpine_ls_avg" "$kimigayo_ls_median" "$alpine_ls_median" "${ls_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "grep" "$kimigayo_grep_avg" "$alpine_grep_avg" "$kimigayo_grep_median" "$alpine_grep_median" "${grep_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "find" "$kimigayo_find_avg" "$alpine_find_avg" "$kimigayo_find_median" "$alpine_find_median" "${find_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "awk" "$kimigayo_awk_avg" "$alpine_awk_avg" "$kimigayo_awk_median" "$alpine_awk_median" "${awk_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "sort" "$kimigayo_sort_avg" "$alpine_sort_avg" "$kimigayo_sort_median" "$alpine_sort_median" "${sort_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "cat" "$kimigayo_cat_avg" "$alpine_cat_avg" "$kimigayo_cat_median" "$alpine_cat_median" "${cat_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "wc" "$kimigayo_wc_avg" "$alpine_wc_avg" "$kimigayo_wc_median" "$alpine_wc_median" "${wc_ratio}x"
+printf "%-20s %15d %15d %15d %15d %12s\n" "head" "$kimigayo_head_avg" "$alpine_head_avg" "$kimigayo_head_median" "$alpine_head_median" "${head_ratio}x"
+echo ""
+echo "Ratio(med) = Alpine median / Kimigayo median (> 1.00 means Kimigayo is faster)"
 echo ""
 
 # Save results to JSON (fixed filename, overwrite mode)
@@ -288,13 +304,16 @@ cat > "$json_file" << EOF
   "kimigayo_image": "$IMAGE_NAME",
   "alpine_image": "$ALPINE_IMAGE",
   "iterations": $ITERATIONS,
+  "ratio_definition": "ratio_median = alpine_median_ms / kimigayo_median_ms; ratio_avg = alpine_avg_ms / kimigayo_avg_ms; speedup = ratio_median (alias kept for existing readers). > 1.00 means Kimigayo is faster",
   "results": {
     "ls": {
       "kimigayo_avg_ms": $kimigayo_ls_avg,
       "kimigayo_median_ms": $kimigayo_ls_median,
       "alpine_avg_ms": $alpine_ls_avg,
       "alpine_median_ms": $alpine_ls_median,
-      "speedup": $ls_speedup,
+      "ratio_median": $ls_ratio,
+      "ratio_avg": $ls_ratio_avg,
+      "speedup": $ls_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_ls_times[*]}")]
     },
     "grep": {
@@ -302,7 +321,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_grep_median,
       "alpine_avg_ms": $alpine_grep_avg,
       "alpine_median_ms": $alpine_grep_median,
-      "speedup": $grep_speedup,
+      "ratio_median": $grep_ratio,
+      "ratio_avg": $grep_ratio_avg,
+      "speedup": $grep_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_grep_times[*]}")]
     },
     "find": {
@@ -310,7 +331,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_find_median,
       "alpine_avg_ms": $alpine_find_avg,
       "alpine_median_ms": $alpine_find_median,
-      "speedup": $find_speedup,
+      "ratio_median": $find_ratio,
+      "ratio_avg": $find_ratio_avg,
+      "speedup": $find_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_find_times[*]}")]
     },
     "awk": {
@@ -318,7 +341,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_awk_median,
       "alpine_avg_ms": $alpine_awk_avg,
       "alpine_median_ms": $alpine_awk_median,
-      "speedup": $awk_speedup,
+      "ratio_median": $awk_ratio,
+      "ratio_avg": $awk_ratio_avg,
+      "speedup": $awk_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_awk_times[*]}")]
     },
     "sort": {
@@ -326,7 +351,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_sort_median,
       "alpine_avg_ms": $alpine_sort_avg,
       "alpine_median_ms": $alpine_sort_median,
-      "speedup": $sort_speedup,
+      "ratio_median": $sort_ratio,
+      "ratio_avg": $sort_ratio_avg,
+      "speedup": $sort_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_sort_times[*]}")]
     },
     "cat": {
@@ -334,7 +361,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_cat_median,
       "alpine_avg_ms": $alpine_cat_avg,
       "alpine_median_ms": $alpine_cat_median,
-      "speedup": $cat_speedup,
+      "ratio_median": $cat_ratio,
+      "ratio_avg": $cat_ratio_avg,
+      "speedup": $cat_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_cat_times[*]}")]
     },
     "wc": {
@@ -342,7 +371,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_wc_median,
       "alpine_avg_ms": $alpine_wc_avg,
       "alpine_median_ms": $alpine_wc_median,
-      "speedup": $wc_speedup,
+      "ratio_median": $wc_ratio,
+      "ratio_avg": $wc_ratio_avg,
+      "speedup": $wc_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_wc_times[*]}")]
     },
     "head": {
@@ -350,7 +381,9 @@ cat > "$json_file" << EOF
       "kimigayo_median_ms": $kimigayo_head_median,
       "alpine_avg_ms": $alpine_head_avg,
       "alpine_median_ms": $alpine_head_median,
-      "speedup": $head_speedup,
+      "ratio_median": $head_ratio,
+      "ratio_avg": $head_ratio_avg,
+      "speedup": $head_ratio,
       "kimigayo_samples": [$(IFS=,; echo "${kimigayo_head_times[*]}")]
     }
   }
@@ -373,16 +406,18 @@ txt_file="${OUTPUT_DIR}/busybox.txt"
     echo ""
     echo "Results (all times in milliseconds):"
     echo ""
-    printf "%-20s %15s %15s %15s %15s %12s\n" "Command" "Kimigayo Avg" "Alpine Avg" "K Median" "A Median" "Speedup"
+    printf "%-20s %15s %15s %15s %15s %12s\n" "Command" "Kimigayo Avg" "Alpine Avg" "K Median" "A Median" "Ratio(med)"
     printf "%-20s %15s %15s %15s %15s %12s\n" "--------------------" "---------------" "---------------" "---------------" "---------------" "------------"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "ls" "$kimigayo_ls_avg" "$alpine_ls_avg" "$kimigayo_ls_median" "$alpine_ls_median" "${ls_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "grep" "$kimigayo_grep_avg" "$alpine_grep_avg" "$kimigayo_grep_median" "$alpine_grep_median" "${grep_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "find" "$kimigayo_find_avg" "$alpine_find_avg" "$kimigayo_find_median" "$alpine_find_median" "${find_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "awk" "$kimigayo_awk_avg" "$alpine_awk_avg" "$kimigayo_awk_median" "$alpine_awk_median" "${awk_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "sort" "$kimigayo_sort_avg" "$alpine_sort_avg" "$kimigayo_sort_median" "$alpine_sort_median" "${sort_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "cat" "$kimigayo_cat_avg" "$alpine_cat_avg" "$kimigayo_cat_median" "$alpine_cat_median" "${cat_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "wc" "$kimigayo_wc_avg" "$alpine_wc_avg" "$kimigayo_wc_median" "$alpine_wc_median" "${wc_speedup}x"
-    printf "%-20s %15d %15d %15d %15d %12s\n" "head" "$kimigayo_head_avg" "$alpine_head_avg" "$kimigayo_head_median" "$alpine_head_median" "${head_speedup}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "ls" "$kimigayo_ls_avg" "$alpine_ls_avg" "$kimigayo_ls_median" "$alpine_ls_median" "${ls_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "grep" "$kimigayo_grep_avg" "$alpine_grep_avg" "$kimigayo_grep_median" "$alpine_grep_median" "${grep_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "find" "$kimigayo_find_avg" "$alpine_find_avg" "$kimigayo_find_median" "$alpine_find_median" "${find_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "awk" "$kimigayo_awk_avg" "$alpine_awk_avg" "$kimigayo_awk_median" "$alpine_awk_median" "${awk_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "sort" "$kimigayo_sort_avg" "$alpine_sort_avg" "$kimigayo_sort_median" "$alpine_sort_median" "${sort_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "cat" "$kimigayo_cat_avg" "$alpine_cat_avg" "$kimigayo_cat_median" "$alpine_cat_median" "${cat_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "wc" "$kimigayo_wc_avg" "$alpine_wc_avg" "$kimigayo_wc_median" "$alpine_wc_median" "${wc_ratio}x"
+    printf "%-20s %15d %15d %15d %15d %12s\n" "head" "$kimigayo_head_avg" "$alpine_head_avg" "$kimigayo_head_median" "$alpine_head_median" "${head_ratio}x"
+    echo ""
+    echo "Ratio(med) = Alpine median / Kimigayo median (> 1.00 means Kimigayo is faster)"
 } > "$txt_file"
 
 log_success "Summary saved to: $txt_file"

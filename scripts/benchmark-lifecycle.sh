@@ -192,17 +192,46 @@ image_size_mb=$(awk -v b="$image_size" 'BEGIN { printf "%.2f", b / 1000 / 1000 }
 log_success "Image size: ${image_size_mb}MB, Layers: $layer_count"
 echo ""
 
-# 7. Pull time (if cache can be cleared)
+# 7. Pull time (warm cache)
+#
+# **pull が失敗したら時間を記録しない。** measure_time は終了コードを
+# 見ないので、手元でビルドしただけのタグ（kimigayo-os:standard-x86_64 など、
+# レジストリに無いもの）を渡すと、pull は即座に失敗するのにその失敗までの
+# 時間が「pull (warm)」として記録されていた（2026-10-13 に修正）。
+# 失敗した回は捨て、1回も成功しなければ N/A（JSON では null）にする。
 log_info "7. Image pull time (warm cache)"
 pull_times=()
+pull_skip_reason=""
 for i in $(seq 1 3); do  # Only 3 iterations for pull test
     log_info "  Iteration $i/3..."
-    time_ms=$(measure_time docker pull "$IMAGE_NAME")
-    pull_times+=("$time_ms")
+    pull_start=$(date +%s%N)
+    if docker pull "$IMAGE_NAME" >/dev/null 2>&1; then
+        pull_end=$(date +%s%N)
+        pull_times+=("$(( (pull_end - pull_start) / 1000000 ))")
+    else
+        log_warning "  docker pull failed (local-only image or registry unreachable); not recorded"
+        pull_skip_reason="docker pull failed (image not in a registry, or registry unreachable)"
+        # 1回目で失敗したら、残りも同じ理由で失敗するので打ち切る
+        [ "${#pull_times[@]}" -eq 0 ] && break
+    fi
 done
-pull_avg=$(calculate_average "${pull_times[@]}")
-pull_median=$(calculate_median "${pull_times[@]}")
-log_success "Image pull (warm): avg=${pull_avg}ms, median=${pull_median}ms"
+if [ "${#pull_times[@]}" -gt 0 ]; then
+    pull_avg=$(calculate_average "${pull_times[@]}")
+    pull_median=$(calculate_median "${pull_times[@]}")
+    pull_avg_json=$pull_avg
+    pull_median_json=$pull_median
+    pull_skipped_json=false
+    log_success "Image pull (warm): avg=${pull_avg}ms, median=${pull_median}ms (${#pull_times[@]} successful)"
+else
+    pull_avg="N/A"
+    pull_median="N/A"
+    pull_avg_json=null
+    pull_median_json=null
+    pull_skipped_json=true
+    log_warning "Image pull (warm): skipped (${pull_skip_reason})"
+fi
+pull_reason_json=null
+[ -n "$pull_skip_reason" ] && pull_reason_json="\"${pull_skip_reason}\""
 echo ""
 
 # Generate summary
@@ -215,7 +244,7 @@ printf "%-35s %15d %15d\n" "Container start" "$start_avg" "$start_median"
 printf "%-35s %15d %15d\n" "Container stop" "$stop_avg" "$stop_median"
 printf "%-35s %15d %15d\n" "Container restart" "$restart_avg" "$restart_median"
 printf "%-35s %15d %15d\n" "Container cleanup" "$cleanup_avg" "$cleanup_median"
-printf "%-35s %15d %15d\n" "Image pull (warm cache)" "$pull_avg" "$pull_median"
+printf "%-35s %15s %15s\n" "Image pull (warm cache)" "$pull_avg" "$pull_median"
 echo ""
 printf "%-35s %15s\n" "Image size (MB)" "$image_size_mb"
 printf "%-35s %15s\n" "Layer count" "$layer_count"
@@ -255,9 +284,11 @@ cat > "$json_file" << EOF
       "samples": [$(IFS=,; echo "${cleanup_times[*]}")]
     },
     "image_pull_warm": {
-      "average_ms": $pull_avg,
-      "median_ms": $pull_median,
-      "samples": [$(IFS=,; echo "${pull_times[*]}")]
+      "skipped": $pull_skipped_json,
+      "note": $pull_reason_json,
+      "average_ms": $pull_avg_json,
+      "median_ms": $pull_median_json,
+      "samples": [$(IFS=,; echo "${pull_times[*]:-}")]
     },
     "image_info": {
       "size_bytes": $image_size,
@@ -291,7 +322,7 @@ txt_file="${OUTPUT_DIR}/lifecycle.txt"
     printf "%-35s %15d %15d\n" "Container stop" "$stop_avg" "$stop_median"
     printf "%-35s %15d %15d\n" "Container restart" "$restart_avg" "$restart_median"
     printf "%-35s %15d %15d\n" "Container cleanup" "$cleanup_avg" "$cleanup_median"
-    printf "%-35s %15d %15d\n" "Image pull (warm cache)" "$pull_avg" "$pull_median"
+    printf "%-35s %15s %15s\n" "Image pull (warm cache)" "$pull_avg" "$pull_median"
     echo ""
     echo "Image Information:"
     printf "%-35s %15s MB\n" "Size" "$image_size_mb"

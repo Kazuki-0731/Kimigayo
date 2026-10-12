@@ -38,7 +38,16 @@ KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-$(bash "${PROJECT_ROOT}/scripts/get-versio
 # **公開前の版は Docker Hub に無い。** KIMIGAYO_IMAGE で手元のイメージを
 # 指せるようにしておく（タグを打つ前に比較値が要るときのため）。
 #   KIMIGAYO_IMAGE=kimigayo-os:standard-arm64 bash scripts/benchmark-comparison.sh
-KIMIGAYO_IMAGE="${KIMIGAYO_IMAGE:-ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-arm64}"
+#
+# 既定のアーキテクチャはホストに合わせる。2026-10-13 まで `-standard-arm64`
+# に固定されており、x86_64 ホストでは QEMU 経由で arm64 を測っていた。
+# 公開タグの命名は release.yml の `<版>-standard-amd64` / `-standard-arm64`。
+case "$(uname -m)" in
+    arm64|aarch64) HOST_IMAGE_ARCH="arm64" ;;
+    x86_64|amd64)  HOST_IMAGE_ARCH="amd64" ;;
+    *)             HOST_IMAGE_ARCH="amd64" ;;
+esac
+KIMIGAYO_IMAGE="${KIMIGAYO_IMAGE:-ishinokazuki/kimigayo-os:${KIMIGAYO_VERSION}-standard-${HOST_IMAGE_ARCH}}"
 
 # Ubuntu は 24.04。README と CLAUDE.md が載せている比較値がこの版なので
 # 揃える（2026-10-11 まで 22.04 を測っていて食い違っていた）。
@@ -96,8 +105,19 @@ log_info "Output directory: ${OUTPUT_DIR}"
 echo ""
 
 # Pull all images
+#
+# **pull 前から手元にあったイメージを覚えておく。** 最後の片付けで
+# 消してよいのは、このスクリプトが新しく取ってきたものだけ。
+# 2026-10-13 まで alpine:latest や ubuntu:24.04 を、利用者が元から
+# 持っていても無条件に docker rmi していた。
 log_info "=== Pulling images ==="
+declare -A pulled_by_us
 for image in "${IMAGES[@]}"; do
+    if docker image inspect "$image" > /dev/null 2>&1; then
+        pulled_by_us["$image"]=false
+    else
+        pulled_by_us["$image"]=true
+    fi
     log_info "Pulling $image..."
     if docker pull "$image" > /dev/null 2>&1; then
         log_success "Pulled: $image"
@@ -416,12 +436,18 @@ EOF
 
 log_success "Markdown report: $MD_FILE"
 
-# Cleanup: Remove pulled images
+# Cleanup: Remove only the images this script pulled
 log_info "=== Cleaning up pulled images ==="
 for image in "${IMAGES[@]}"; do
     # Skip kimigayo-os (our own image)
     if [[ "$image" == *"kimigayo-os"* ]]; then
         log_info "Keeping $image (our image)"
+        continue
+    fi
+
+    # 実行前から手元にあったものは残す
+    if [ "${pulled_by_us[$image]:-false}" != true ]; then
+        log_info "Keeping $image (was present before this run)"
         continue
     fi
 
