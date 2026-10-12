@@ -11,12 +11,23 @@
 >
 > - **`git tag -a v0.1.0` と書いてあります。** 現在は v3.0.x です
 > - **「アーティファクト（tar.gz, checksums, signatures）の添付」の
->   signatures は存在しません。** 署名を作っていた
+>   signatures（ファイルの署名）は存在しません。** 署名を作っていた
 >   `scripts/build-image.sh` は中身が
 >   `"signature": "placeholder_signature_phase5_..."` という偽物で、
 >   2026-10-11 に削除しました。GitHub Release に付くのは tarball 6本と
 >   `SHA256SUMS` / `SHA512SUMS`、SBOM（`*.cdx.json`）6本の計14ファイルです
->   （SBOM は v3.0.2 から）
+>   （SBOM は v3.0.2 から）。**署名があるのは Docker イメージの方**で、
+>   v3.0.2 から `release.yml` の sign ジョブが cosign でキーレス署名しています
+>   （検証は cosign v3 以上）
+> - **「3. セキュリティスキャンの合格確認」は何も検査していませんでした。**
+>   Trivy のイメージスキャンは、パッケージデータベースを持たない Kimigayo では
+>   対象を1つも識別できません（「CRITICAL/HIGH が出たら失敗」は成立しない）。
+>   出荷物の CVE 照合は現在 `scripts/scan-image.sh`（バイナリから SBOM → Grype）で行います
+> - **当時の CI と今の CI は別物です。** 定期のセキュリティスキャンは現在
+>   毎日 02:00 UTC（`security.yml`）、arm64 は QEMU ではなく arm64 ランナーでネイティブに
+>   ビルドしています。ここに書かれたワークフロー名・ID・run 番号は当時のものです
+> - **「CONFIGURATION.md - パッケージマネージャ」とありますが、** Kimigayo は
+>   パッケージマネージャーを持たない設計です（README の設計思想）
 > - **この文書が `latest-amd64` / `latest-arm64` を引けと案内していた
 >   のに、`release.yml` はそのタグを作っていませんでした**（2026-10-10 に
 >   `release.yml` 側を直して作るようにした）。
@@ -348,4 +359,4 @@ git push origin v0.1.0
 
 **作成日:** 2025-12-22
 **作成者:** Claude (Anthropic)
-**次回レビュー:** v0.1.0タグpush後
+**位置づけ:** v0.1.0 公開時の記録。更新しない（現在の手順は `.claude/skills/release/SKILL.md`）
