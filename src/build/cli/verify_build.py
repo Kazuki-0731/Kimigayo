@@ -16,8 +16,8 @@ Requirements:
 
 モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
 モジュールはイメージには入らない（どこからも呼ばれていない）。
-reproducible サブコマンドは BuildConfig に文字列を渡しており、現在は
-'str' object has no attribute 'value' で失敗する。
+reproducible サブコマンドが検証するのは src/build/reproducible.py の
+模擬ビルドであり、実際の rootfs の再現性ではない。
 """
 
 import sys
@@ -34,7 +34,7 @@ from src.build.reproducible import (
     calculate_build_checksum,
     verify_cross_environment_reproducibility,
 )
-from src.build.config import BuildConfig
+from src.build.config import Architecture, BuildConfig, ImageType
 
 
 def cmd_verify_metadata(args):
@@ -150,10 +150,11 @@ def cmd_verify_reproducible(args):
         output_dir.mkdir(parents=True)
 
     try:
-        # Create a minimal config for testing
+        # BuildConfig は Enum を受け取る。文字列を渡すと後段の .value で
+        # 'str' object has no attribute 'value' になる（2026-10-13 に修正）
         config = BuildConfig(
-            architecture="x86_64",
-            image_type="minimal",
+            architecture=Architecture(args.arch),
+            image_type=ImageType(args.image_type),
             reproducible=True
         )
 
@@ -187,7 +188,7 @@ def cmd_verify_reproducible(args):
         return 1
 
 
-def main():
+def main(argv=None):
     """Main entry point"""
     parser = argparse.ArgumentParser(
         description="Kimigayo OS Build Verification Tool",
@@ -228,8 +229,12 @@ Examples:
     parser_repro = subparsers.add_parser('reproducible', help='Verify reproducible builds')
     parser_repro.add_argument('output_dir', help='Output directory for builds')
     parser_repro.add_argument('--builds', type=int, default=2, help='Number of builds to perform (default: 2)')
+    parser_repro.add_argument('--arch', choices=[a.value for a in Architecture],
+                              default=Architecture.X86_64.value, help='Target architecture (default: x86_64)')
+    parser_repro.add_argument('--image-type', choices=[t.value for t in ImageType],
+                              default=ImageType.MINIMAL.value, help='Image type (default: minimal)')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if not args.command:
         parser.print_help()
