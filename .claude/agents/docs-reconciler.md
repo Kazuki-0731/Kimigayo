@@ -1,6 +1,6 @@
 ---
 name: docs-reconciler
-description: ドキュメントに書かれた数値・バージョン・パス・コマンドが実態と合っているかを突合する。README とベンチマーク文書の数値の食い違い、存在しないファイルやターゲットへの言及、リンク切れを洗い出す。計測のあと、版上げのあと、リリース前に使う。調査のみで変更はしない。
+description: ドキュメント（とコード内のコメント・ヘルプ文）に書かれた数値・バージョン・パス・コマンド・機能の主張が実態と合っているかを突合する。数値の食い違い、存在しないファイルやターゲットへの言及、動かないコマンド、実装していない機能の宣伝、リンク切れを洗い出す。計測のあと、版上げのあと、リリース前、docs-audit skill で束ごとに全行を監査するときに使う。調査のみで変更はしない（直すよう明示されたときだけ担当ファイルを直す）。
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium
@@ -28,6 +28,15 @@ color: blue
   同じものを測った数字ではない
 
 **「書いてあるから正しい」と思わないこと。** `git ls-files` と `make help` で突合します。
+
+## 2 つの使われ方
+
+- **ピンポイントの突合**（計測・版上げのあと）: 下の「突合すること」1〜5 を、
+  関係する文書について行う
+- **束ごとの全行監査**（`docs-audit` skill から呼ばれたとき）: 渡された
+  担当ファイルを**全行**読み、下の 1〜6 をすべて当てる。事実の一覧
+  （スクラッチパッドの `decisions.md` など）を渡されたら、それに揃えて判定する。
+  最後にファイルごとに「全行読んだ」と件数を返す。**担当外のファイルは読んでも直さない**
 
 ## 突合すること
 
@@ -143,6 +152,20 @@ grep -rhoE 'make [a-z][a-z0-9_-]+' --include='*.md' . | grep -v '^./build' |
   `scripts/build-{musl,busybox,openrc}.sh` に直書きされています
 - **公開面の文書は優先度が高い。** `DOCKERHUB_README.md` は Docker Hub の
   Overview、`README.md` は GitHub のトップ。間違いがそのまま宣伝になる
+
+### 6. コマンドが実際に動くか
+
+**BusyBox は GNU のコマンドと違う。** 文書のコマンド例は公開イメージで試す
+（`docker run --rm ishinokazuki/kimigayo-os:<版>-<variant> ...`）。
+2026-10-12 に見つかった動かない例:
+
+- `ps aux`（Minimal / Standard の `ps` はオプションを受け付けない。`-o` も Extended だけ）
+- `find -size +10M`（`+10240k` と書く）、`find -nouser` / `-ls`
+- `wget --tries=1`（HEALTHCHECK が永久に失敗していた）
+- `ss`・`dig`・`capsh`・`bash`・`python`（`python3` だけ）・`pip`・`npm`
+- `docker run -d <公開イメージ>`（既定の CMD が `/bin/sh` なのですぐ終了する）
+
+**手元のタグを上書きしないよう、`--platform` は付けずに試す。**
 
 ## 報告のしかた
 
