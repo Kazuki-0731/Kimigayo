@@ -217,7 +217,8 @@ jobs:
   #    Metadata.OS: null / Results: 0）。「脆弱性 0 件」ではなく
   #    「スキャンしていない」。
   # 3. pull 先が存在しない。standard のとき :latest を指していたが、
-  #    release.yml は latest-standard までしか作らない。
+  #    当時の release.yml は latest-standard までしか作っていなかった
+  #    （いまは :latest も作る）。
   #    しかも失敗を || echo で握り潰していた。
   #
   # 構成要素の脆弱性は、出荷物から SBOM を作って照合する scripts/scan-image.sh で

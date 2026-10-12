@@ -179,15 +179,15 @@ jobs:
 
             ### Action Required
 
-            1. Review the workflow logs
-            2. Check Trivy scan results in Security tab
-            3. Address any critical/high vulnerabilities
-            4. Update affected components if needed
+            1. published-image-scan ジョブのログを見る（scripts/scan-image.sh が公開中の latest を Grype で照合した結果。SBOM は artifact の sbom-published-latest）
+            2. 出た CVE が本当に該当するかを確かめる（.claude/skills/security-review/SKILL.md）
+            3. 該当するなら構成要素の版上げかパッチで対応する
+            4. Trivy（リポジトリのファイルシステム）の結果は Security タブにあるが、失敗させない設定なので通常この Issue の原因ではない
 
             ### Resources
 
-            - [Security Policy](../blob/main/SECURITY.md)
-            - [Alpine Linux Security](https://security.alpinelinux.org/)
+            - [Security Policy](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/security/SECURITY_POLICY.md)
+            - [NVD](https://nvd.nist.gov/)
 
             🤖 This issue was automatically created by the dependency review workflow.`;
 
@@ -197,6 +197,6 @@ jobs:
                 repo: context.repo.repo,
                 title: issueTitle,
                 body: issueBody,
-                labels: ['security', 'automated', 'vulnerability']
+                labels: ['security', 'automated']
               });
             }
