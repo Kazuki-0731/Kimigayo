@@ -172,25 +172,9 @@ generate_kernel_config() {
         cat > "$custom_config" << 'EOF'
 # Kimigayo OS Kernel Configuration
 # This is a placeholder config file
-# Actual configuration will be generated from kernel defconfig
-# with Kimigayo OS specific security and optimization settings
-#
-# Security Hardening Features:
-# CONFIG_SECURITY=y
-# CONFIG_SECURITY_DMESG_RESTRICT=y
-# CONFIG_SECURITY_PERF_EVENTS_RESTRICT=y
-# CONFIG_SECURITY_NETWORK=y
-# CONFIG_HARDENED_USERCOPY=y
-# CONFIG_FORTIFY_SOURCE=y
-# CONFIG_GCC_PLUGIN_STACKLEAK=y
-# CONFIG_GCC_PLUGIN_STRUCTLEAK=y
-# CONFIG_GCC_PLUGIN_STRUCTLEAK_BYREF_ALL=y
-# CONFIG_GCC_PLUGIN_LATENT_ENTROPY=y
-# CONFIG_GCC_PLUGIN_RANDSTRUCT=y
-# CONFIG_RANDOMIZE_BASE=y
-# CONFIG_RANDOMIZE_MEMORY=y
-#
-# Note: Run 'make menuconfig' to customize this configuration
+# scripts/build-kernel.sh ignores any config containing the line above and
+# uses the upstream defconfig plus apply_security_hardening (scripts/config).
+# To use a custom config, replace this whole file with a real .config.
 EOF
     fi
 
@@ -221,7 +205,8 @@ apply_security_hardening() {
         scripts/config --enable PANIC_ON_OOPS
         scripts/config --set-val PANIC_TIMEOUT 10
 
-        # Disable netfilter/iptables (not needed for minimal container OS)
+        # Disable netfilter/iptables. This kernel is only for bare-metal/QEMU
+        # checks and is never shipped in the image (containers use the host kernel).
         scripts/config --disable NETFILTER
         scripts/config --disable NETFILTER_ADVANCED
         scripts/config --disable NETFILTER_XTABLES
@@ -229,15 +214,19 @@ apply_security_hardening() {
         scripts/config --disable IP6_NF_IPTABLES
         scripts/config --disable BRIDGE_NETFILTER
 
-        # GCC 15 compatibility: Disable RETPOLINE for x86_64
-        # Realmode code cannot use __x86_return_thunk
+        # 注: 6.18 ではシンボル名が MITIGATION_RETPOLINE に変わっており、
+        # 下の --disable RETPOLINE は存在しないシンボルを指すので何もしていない
+        # （arch/x86/Kconfig の config MITIGATION_RETPOLINE。この行の扱いは別途判断）。
+        # 6.6 系を GCC 15 でビルドするための回避策の残骸。realmode の
+        # __x86_return_thunk の問題は REALMODE_CFLAGS を上書きしないことで
+        # 解決している（build_kernel のコメント参照）。
         if [ "$ARCH" = "x86_64" ]; then
             scripts/config --disable RETPOLINE
-            log_info "Retpoline disabled for GCC 15 compatibility"
+            log_info "scripts/config --disable RETPOLINE: no-op on this kernel (the symbol is MITIGATION_RETPOLINE)"
         fi
 
         log_info "Security hardening applied to kernel config"
-        log_info "Netfilter/iptables disabled (minimal container OS)"
+        log_info "Netfilter/iptables disabled (QEMU/bare-metal test kernel; not shipped in the image)"
     else
         log_warn "scripts/config not found, skipping config modifications"
     fi
@@ -257,7 +246,7 @@ build_kernel() {
 
     # Build kernel
     log_info "Starting kernel compilation..."
-    log_info "This may take 5-30 minutes depending on CPU cores and configuration..."
+    log_info "This may take tens of minutes (CI measured: x86_64 17-27 min, arm64 53-59 min)..."
     log_info "Progress will be shown below:"
     log_info "Log file: $BUILD_LOG"
     log_info "=========================================="
@@ -327,7 +316,7 @@ build_kernel() {
             # Show progress every 50 lines
             if (( line_count - last_update >= 50 )); then
                 if [[ "$line" =~ ^[[:space:]]*(CC|LD|AR) ]]; then
-                    echo "[Progress] Compiled $line_count files..." >&2
+                    echo "[Progress] $line_count lines of build output..." >&2
                     last_update=$line_count
                 fi
             fi
@@ -370,7 +359,7 @@ build_kernel() {
             # Show progress every 50 lines
             if (( line_count - last_update >= 50 )); then
                 if [[ "$line" =~ ^[[:space:]]*(CC|LD|AR) ]]; then
-                    echo "[Progress] Compiled $line_count files..." >&2
+                    echo "[Progress] $line_count lines of build output..." >&2
                     last_update=$line_count
                 fi
             fi
@@ -499,7 +488,7 @@ main() {
     # Check if kernel is already built
     if [ -f "$KERNEL_OUTPUT_DIR/vmlinuz-${KERNEL_VERSION}-${ARCH}" ]; then
         log_info "Kernel already built: $KERNEL_OUTPUT_DIR/vmlinuz-${KERNEL_VERSION}-${ARCH}"
-        log_info "Skipping build (use 'make clean' to rebuild)"
+        log_info "Skipping build (use 'make clean-kernel' in the container to rebuild)"
         show_summary
         log_info "Kernel build check completed!"
         exit 0
