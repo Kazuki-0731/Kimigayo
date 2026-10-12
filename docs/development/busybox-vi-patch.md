@@ -2,7 +2,7 @@
 
 ## 概要
 
-BusyBox 1.36.1のviエディタは、GNU正規表現拡張機能を使用しているため、musl libcでコンパイルエラーが発生します。このドキュメントでは、musl libc対応パッチの詳細と適用方法を説明します。
+BusyBoxのviエディタ（1.36.1 で発覚。1.38.0 でも上流は GNU 拡張のまま）は、GNU正規表現拡張機能を使用しているため、musl libcでコンパイルエラーが発生します。このドキュメントでは、musl libc対応パッチの詳細と適用方法を説明します。
 
 ## 問題の詳細
 
@@ -118,30 +118,29 @@ if (rc != 0) {
 ビルドプロセスで自動的に適用されます：
 
 ```bash
-# ビルド時に自動適用
-make ci-build-local VARIANT=standard
-make ci-build-local VARIANT=extended
+# ビルド時に自動適用（ビルドコンテナ内の build-system/Makefile）
+docker compose run --rm -T kimigayo-build make busybox TARGET_ARCH=x86_64 IMAGE_TYPE=standard
 ```
 
-`scripts/build-busybox.sh` がダウンロード後、コンパイル前にパッチを適用します。
+`scripts/build-busybox.sh` が `scripts/apply-busybox-patches.sh` を呼び、
+コンパイル前に `src/busybox/patches/` のパッチを適用します
+（当たらなければビルドが失敗します）。
 
 ### 手動適用
 
 ```bash
-# BusyBoxソースディレクトリに移動
-cd build/busybox-1.36.1
+# BusyBoxソースディレクトリに移動（<version> は versions.mk の BUSYBOX_VERSION）
+cd build/busybox-<version>
 
-# パッチ適用
+# 当たるかを先に確認してから適用
+patch -p1 --dry-run < ../../src/busybox/patches/0001-vi-musl-libc-compatibility.patch
 patch -p1 < ../../src/busybox/patches/0001-vi-musl-libc-compatibility.patch
-
-# 適用確認
-git diff editors/vi.c
 ```
 
 ### パッチの取り消し
 
 ```bash
-cd build/busybox-1.36.1
+cd build/busybox-<version>
 patch -p1 -R < ../../src/busybox/patches/0001-vi-musl-libc-compatibility.patch
 ```
 
@@ -150,11 +149,9 @@ patch -p1 -R < ../../src/busybox/patches/0001-vi-musl-libc-compatibility.patch
 ### 1. ビルドテスト
 
 ```bash
-# standardバリアントでビルド
-IMAGE_TYPE=standard TARGET_ARCH=x86_64 bash scripts/build-busybox.sh
-
-# extendedバリアントでビルド
-IMAGE_TYPE=extended TARGET_ARCH=x86_64 bash scripts/build-busybox.sh
+# scripts/build-busybox.sh は直接叩かない（Makefile が渡す変数が要る）
+docker compose run --rm -T kimigayo-build make busybox TARGET_ARCH=x86_64 IMAGE_TYPE=standard
+docker compose run --rm -T kimigayo-build make busybox TARGET_ARCH=x86_64 IMAGE_TYPE=extended
 ```
 
 ### 2. 機能テスト
@@ -179,6 +176,9 @@ vi test.txt
 ```
 
 ### 3. 正規表現テスト
+
+正規表現検索（`CONFIG_FEATURE_VI_REGEX_SEARCH`）が有効なのは extended だけです
+（standard の config には書かれておらず、minimal は vi 自体が無効）。
 
 ```bash
 # vi内で正規表現検索
@@ -217,24 +217,22 @@ Hunk #1 FAILED at 2390.
 # 1. BusyBoxバージョン確認
 ls build/busybox-*
 
-# 2. パッチを手動で適用
-cd build/busybox-1.36.1
-vim editors/vi.c
+# 2. パッチを手動で作り直す（展開した tarball は git 管理ではないので diff を使う）
+cd build
+cp -a busybox-<version> busybox-orig   # 編集前の状態を残しておく
+vi busybox-<version>/editors/vi.c
 # 手動でGNU正規表現をPOSIX正規表現に置き換え
 
-# 3. 新しいパッチファイル生成
-git diff > ../../src/busybox/patches/0001-vi-musl-libc-compatibility-new.patch
+# 3. 新しいパッチファイル生成（patch -p1 で当たる形）
+diff -u busybox-orig/editors/vi.c busybox-<version>/editors/vi.c \
+  > ../src/busybox/patches/0001-vi-musl-libc-compatibility-new.patch
 ```
 
 ### viの検索が動作しない
 
 ```bash
-# デバッグビルド
-export DEBUG=1
-IMAGE_TYPE=standard bash scripts/build-busybox.sh
-
-# viでデバッグ情報表示
-vi -v test.txt
+# 検索に使う機能が config で有効か確かめる
+grep -n 'CONFIG_FEATURE_VI_SEARCH\|CONFIG_FEATURE_VI_REGEX_SEARCH' src/busybox/config/*.config
 ```
 
 ### パフォーマンス低下
@@ -275,23 +273,6 @@ GNU拡張の一部機能（例: `\w`, `\s`）はPOSIX BREでは使用不可。
 **対処**: POSIX準拠の正規表現を使用
 - `\w` → `[a-zA-Z0-9_]`
 - `\s` → `[ \t\n]`
-
-## 将来の改善
-
-### Phase 4以降で検討
-
-1. **nanoエディタの追加**
-   - musl libc完全対応
-   - より使いやすいUI
-   - サイズ: 約50KB（viと同等）
-
-2. **BusyBox独自の正規表現エンジン**
-   - GNU依存を完全排除
-   - パフォーマンス最適化
-
-3. **viの代替実装**
-   - vim-tinyのmusl対応版
-   - neovim-minimal
 
 ## 参考資料
 
