@@ -18,9 +18,25 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="${IMAGE_NAME:-kimigayo-os:minimal-latest}"
+# 既定は Makefile の build-image / package-rootfs と同じ名前。
+#   イメージ: kimigayo-os:<variant>-<arch>
+#   tarball:  output/kimigayo-<variant>-<version>-<arch>.tar.gz
+# IMAGE_NAME にタグが無ければ（Makefile / .env の IMAGE_NAME=kimigayo-os は
+# リポジトリ名）、<variant>-<arch> を補う。
+VARIANT="${VARIANT:-standard}"
+ARCH="${ARCH:-x86_64}"
+VERSION="${VERSION:-latest}"
+IMAGE_NAME="${IMAGE_NAME:-kimigayo-os}"
+case "${IMAGE_NAME##*/}" in
+    *:*) ;;
+    *)   IMAGE_NAME="${IMAGE_NAME}:${VARIANT}-${ARCH}" ;;
+esac
+TAR_FILE="${TAR_FILE:-${PROJECT_ROOT}/output/kimigayo-${VARIANT}-${VERSION}-${ARCH}.tar.gz}"
+case "$ARCH" in
+    arm64|aarch64) MUSL_ARCH="aarch64" ;;
+    *)             MUSL_ARCH="$ARCH" ;;
+esac
 CONTAINER_NAME="kimigayo-func-test-$$"
-TEST_TIMEOUT=30
 
 # Test results
 TESTS_PASSED=0
@@ -57,6 +73,15 @@ cleanup() {
 # Set trap for cleanup
 trap cleanup EXIT
 
+# tarball の一覧は一度だけ取る。
+# `tar tzf | grep -q` は pipefail の下で、grep が先に抜けると tar が
+# SIGPIPE で落ちてパイプライン全体が偽になる（見つかったのに FAIL）。
+# 判定もパイプを通さず here-string で渡す（同じ理由）。
+TAR_LIST=""
+tar_has() {
+    grep -qE "$1" <<< "$TAR_LIST"
+}
+
 # Banner
 echo -e "${BLUE}"
 cat << "EOF"
@@ -75,15 +100,14 @@ if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
 fi
 
 info "Using Docker image: $IMAGE_NAME"
+info "Using rootfs tarball: $TAR_FILE"
 
 # Detect platform
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    PLATFORM="macOS"
     info "Running on macOS - tests will verify tar.gz contents only"
     info "Full runtime tests are designed for Linux (GitHub Actions CI)"
     SKIP_RUNTIME_TESTS=true
 else
-    PLATFORM="Linux"
     info "Running on Linux - full runtime tests enabled"
     SKIP_RUNTIME_TESTS=false
 fi
@@ -95,25 +119,26 @@ echo ""
 # ===================================================================
 section "Test 1: BusyBox Binary Verification"
 
-TAR_FILE="${PROJECT_ROOT}/output/kimigayo-minimal-0.1.0-x86_64.tar.gz"
-
 if [ ! -f "$TAR_FILE" ]; then
     fail "tar.gz file not found: $TAR_FILE"
+    echo "Please run: make package-rootfs VARIANT=${VARIANT} ARCH=${ARCH} VERSION=${VERSION}"
+elif ! TAR_LIST="$(tar tzf "$TAR_FILE")"; then
+    fail "Failed to list tar.gz: $TAR_FILE"
 else
     pass "tar.gz file exists"
 
     # Check if BusyBox binary exists
-    if tar tzf "$TAR_FILE" | grep -q "^./bin/busybox$"; then
+    if tar_has "^\./bin/busybox$"; then
         pass "BusyBox binary found in tar.gz"
     else
         fail "BusyBox binary not found in tar.gz"
     fi
 
     # Check essential libraries
-    if tar tzf "$TAR_FILE" | grep -q "lib/ld-musl-x86_64.so.1"; then
-        pass "musl libc loader found"
+    if tar_has "lib/ld-musl-${MUSL_ARCH}\.so\.1$"; then
+        pass "musl libc loader found (ld-musl-${MUSL_ARCH}.so.1)"
     else
-        fail "musl libc loader not found"
+        fail "musl libc loader not found (ld-musl-${MUSL_ARCH}.so.1)"
     fi
 fi
 
@@ -126,10 +151,16 @@ if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
     info "Skipping runtime tests on macOS"
     info "Verifying BusyBox applets in tar.gz instead..."
 
-    # List common BusyBox applets we expect
+    # BusyBox はアプレットを /bin・/sbin・/usr/bin・/usr/sbin への
+    # シンボリックリンクとして入れる。その存在を tarball で確かめる
     EXPECTED_COMMANDS="sh ls cat echo pwd mkdir rm cp mv grep sed awk"
-    info "Expected BusyBox applets: $EXPECTED_COMMANDS"
-    pass "BusyBox applets verification (static check)"
+    for cmd in $EXPECTED_COMMANDS; do
+        if tar_has "^\./(usr/)?s?bin/${cmd}$"; then
+            pass "BusyBox applet in tar.gz: $cmd"
+        else
+            fail "BusyBox applet not found in tar.gz: $cmd"
+        fi
+    done
 else
     # Linux - run full container tests
     info "Starting test container..."
@@ -174,13 +205,11 @@ if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
     info "Skipping runtime tests on macOS"
 
     # Check if network-related files exist in tar.gz
-    if tar tzf "$TAR_FILE" | grep -q "etc/"; then
+    if tar_has "^\./etc/"; then
         pass "etc/ directory exists (for network config)"
     else
         fail "etc/ directory not found"
     fi
-
-    pass "Network functionality verification (static check)"
 else
     # Linux - test network stack
     if docker exec "$CONTAINER_NAME" /bin/sh -c "command -v ping >/dev/null 2>&1"; then
@@ -207,7 +236,22 @@ fi
 # ===================================================================
 section "Test 4: Package Manager Test"
 info "Package manager intentionally excluded (distroless approach)"
-pass "No package manager verification needed"
+
+# 出荷物にパッケージマネージャーが入っていないこと
+PKG_MANAGERS="apk apt apt-get dpkg rpm yum dnf opkg pip pip3"
+found_pm=""
+for pm in $PKG_MANAGERS; do
+    if tar_has "^\./(usr/)?(local/)?s?bin/${pm}$"; then
+        found_pm="${found_pm} ${pm}"
+    fi
+done
+if [ -n "$TAR_LIST" ] && [ -z "$found_pm" ]; then
+    pass "No package manager in tar.gz"
+elif [ -z "$TAR_LIST" ]; then
+    fail "Cannot check for package managers (tar.gz not available)"
+else
+    fail "Package manager found in tar.gz:${found_pm}"
+fi
 
 # Package repository removed (distroless approach)
 REPO_DIR="${PROJECT_ROOT}/repository"
@@ -225,7 +269,7 @@ section "Test 5: File System Structure Verification"
 # FHS (Filesystem Hierarchy Standard) directories
 FHS_DIRS="bin sbin lib etc usr var dev"
 for dir in $FHS_DIRS; do
-    if tar tzf "$TAR_FILE" | grep -q "^./$dir/"; then
+    if tar_has "^\./$dir/"; then
         pass "FHS directory exists: /$dir"
     else
         fail "FHS directory missing: /$dir"
@@ -237,13 +281,13 @@ done
 # ===================================================================
 section "Test 6: OpenRC Init System Verification"
 
-if tar tzf "$TAR_FILE" | grep -q "lib/librc.so"; then
+if tar_has "lib/librc\.so"; then
     pass "OpenRC library found"
 else
     fail "OpenRC library not found"
 fi
 
-if tar tzf "$TAR_FILE" | grep -q "lib/rc/"; then
+if tar_has "^\./lib/rc/"; then
     pass "OpenRC scripts directory found"
 else
     fail "OpenRC scripts directory not found"

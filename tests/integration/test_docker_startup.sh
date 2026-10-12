@@ -6,10 +6,6 @@
 
 set -uo pipefail
 
-# Script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -18,9 +14,17 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="${IMAGE_NAME:-kimigayo-os:minimal-latest}"
+# 既定は Makefile の build-image が付けるタグ（kimigayo-os:<variant>-<arch>）。
+# IMAGE_NAME にタグが無ければ（Makefile / .env の IMAGE_NAME=kimigayo-os は
+# リポジトリ名）、<variant>-<arch> を補う。
+VARIANT="${VARIANT:-standard}"
+ARCH="${ARCH:-x86_64}"
+IMAGE_NAME="${IMAGE_NAME:-kimigayo-os}"
+case "${IMAGE_NAME##*/}" in
+    *:*) ;;
+    *)   IMAGE_NAME="${IMAGE_NAME}:${VARIANT}-${ARCH}" ;;
+esac
 CONTAINER_NAME="kimigayo-test-$$"
-TEST_TIMEOUT=30
 # Former design goals (not in the current SPECIFICATION.md). The measured
 # startup time is mostly Docker's container creation, not the image.
 TARGET_BOOT_TIME=10  # Former goal: < 10 seconds
@@ -29,6 +33,7 @@ TARGET_MEMORY_MB=128 # Former goal: < 128 MB
 # Test results
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
 
 # Helper functions
 pass() {
@@ -39,6 +44,12 @@ pass() {
 fail() {
     echo -e "${RED}✗ FAIL${NC}: $1"
     ((TESTS_FAILED++))
+}
+
+# 実行していないものは PASS にしない
+skip() {
+    echo -e "${YELLOW}- SKIP${NC}: $1"
+    ((TESTS_SKIPPED++))
 }
 
 info() {
@@ -104,7 +115,7 @@ IMAGE_SIZE_MB=$(echo "scale=2; $IMAGE_SIZE_BYTES / 1024 / 1024" | bc)
 info "Image size: ${IMAGE_SIZE_MB} MB (${IMAGE_SIZE_BYTES} bytes)"
 
 # Check size requirement (< 5 MB for minimal)
-if [ $(echo "$IMAGE_SIZE_MB < 5" | bc -l) -eq 1 ]; then
+if [ "$(echo "$IMAGE_SIZE_MB < 5" | bc -l)" -eq 1 ]; then
     pass "Image size is within target (< 5 MB)"
 else
     fail "Image size exceeds target (${IMAGE_SIZE_MB} MB > 5 MB)"
@@ -127,7 +138,7 @@ if [ "$PLATFORM" = "macOS" ]; then
     END_TIME=$(date +%s.%N)
     BOOT_TIME=$(echo "$END_TIME - $START_TIME" | bc)
     info "Image inspection completed in ${BOOT_TIME} seconds"
-    pass "Image exists and is valid (runtime tests skipped on macOS)"
+    skip "Container startup (runtime tests skipped on macOS)"
 
     # Skip container-based tests on macOS
     SKIP_RUNTIME_TESTS=true
@@ -140,7 +151,7 @@ else
         info "Container started in ${BOOT_TIME} seconds"
 
         # Check boot time requirement
-        if [ $(echo "$BOOT_TIME < $TARGET_BOOT_TIME" | bc -l) -eq 1 ]; then
+        if [ "$(echo "$BOOT_TIME < $TARGET_BOOT_TIME" | bc -l)" -eq 1 ]; then
             pass "Boot time is within target (< ${TARGET_BOOT_TIME}s)"
         else
             fail "Boot time exceeds target (${BOOT_TIME}s > ${TARGET_BOOT_TIME}s)"
@@ -161,8 +172,7 @@ fi
 section "Test 3: Container Status Verification"
 
 if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
-    info "Skipping runtime tests on macOS"
-    pass "Tests skipped (platform limitation)"
+    skip "Runtime tests skipped on macOS (platform limitation)"
 else
     # Wait a moment for container to fully initialize
     sleep 1
@@ -189,9 +199,8 @@ fi
 section "Test 4: Memory Usage Measurement"
 
 if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
-    info "Skipping runtime tests on macOS"
     MEMORY_MB=0
-    pass "Tests skipped (platform limitation)"
+    skip "Runtime tests skipped on macOS (platform limitation)"
 else
     # Wait for stats to be available
     sleep 2
@@ -211,11 +220,14 @@ else
         MEMORY_KB=${BASH_REMATCH[1]}
         MEMORY_MB=$(echo "scale=2; $MEMORY_KB / 1024" | bc)
     else
-        MEMORY_MB=0
+        # 読めなかった値を 0 として「目標内」にしない
+        MEMORY_MB=""
     fi
 
     # Check memory requirement
-    if [ $(echo "$MEMORY_MB < $TARGET_MEMORY_MB" | bc -l) -eq 1 ]; then
+    if [ -z "$MEMORY_MB" ]; then
+        fail "Could not read memory usage from docker stats ('${MEMORY_STATS}')"
+    elif [ "$(echo "$MEMORY_MB < $TARGET_MEMORY_MB" | bc -l)" -eq 1 ]; then
         pass "Memory usage is within target (< ${TARGET_MEMORY_MB} MB)"
     else
         fail "Memory usage exceeds target (${MEMORY_MB} MB > ${TARGET_MEMORY_MB} MB)"
@@ -228,8 +240,7 @@ fi
 section "Test 5: Basic Command Execution Test"
 
 if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
-    info "Skipping runtime tests on macOS"
-    pass "Tests skipped (platform limitation)"
+    skip "Runtime tests skipped on macOS (platform limitation)"
 else
     # Test various BusyBox commands
     TEST_COMMANDS="echo ls pwd cat"
@@ -255,8 +266,7 @@ fi
 section "Test 6: Container Logs Check"
 
 if [ "$SKIP_RUNTIME_TESTS" = "true" ]; then
-    info "Skipping runtime tests on macOS"
-    pass "Tests skipped (platform limitation)"
+    skip "Runtime tests skipped on macOS (platform limitation)"
 else
     # Check if container has any error logs
     ERROR_LOGS=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -i "error" || true)
@@ -277,6 +287,7 @@ echo -e "${BLUE}Test Summary${NC}"
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}Passed: ${TESTS_PASSED}${NC}"
 echo -e "${RED}Failed: ${TESTS_FAILED}${NC}"
+echo -e "${YELLOW}Skipped: ${TESTS_SKIPPED}${NC}"
 echo ""
 
 # Performance Summary
