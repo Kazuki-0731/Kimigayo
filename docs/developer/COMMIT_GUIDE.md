@@ -88,12 +88,12 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 `Uncategorized` に入ります。黙って落とさないためです（以前は7種類しか分類できず、
 🧹 📊 🔧 ⚡ ⬆️ 🐳 ✅ のコミットが消えていました）。
 
-> **Dependabot の PR は形式が違います。** `.github/dependabot.yml` が
-> `prefix: "⬆️"`（Docker は `🐳`）と `include: "scope"` を指定しているため、
-> `⬆️(deps): Bump ...` のような件名になります。テキストの scope が付く点で
-> 上の規則とは食い違っています（扱いは決めていません）。
-> CHANGELOG の下書きでは先頭の絵文字で分類されるので、`⬆️` は `Changed`、
-> `🐳` は `Build/CI` に入ります。
+> **Dependabot の PR も同じ形式です。** `.github/dependabot.yml` は
+> `prefix: "⬆️"` だけを指定し（`include: "scope"` は外した）、
+> `⬆️ Bump ...` という件名になります。2026-10-13 までは `⬆️(deps): Bump ...`
+> とテキストの scope が付いていました（PR #116〜#120）。
+> Dependabot が見るのは GitHub Actions だけです（docker の設定は外しました）。
+> CHANGELOG の下書きでは先頭の絵文字で分類されるので、`⬆️` は `Changed` に入ります。
 
 ## 間違えたとき
 
