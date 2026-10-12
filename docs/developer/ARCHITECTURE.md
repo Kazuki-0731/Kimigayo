@@ -332,17 +332,22 @@ CONFIG_PANIC_ON_OOPS=y         # PANIC_TIMEOUT=10
 # 無効にする
 # CONFIG_NETFILTER / NETFILTER_ADVANCED / NETFILTER_XTABLES
 # CONFIG_IP_NF_IPTABLES / IP6_NF_IPTABLES / BRIDGE_NETFILTER
-# CONFIG_RETPOLINE（x86_64 のみ）
 ```
+
+2026-10-13 までは x86_64 で `scripts/config --disable RETPOLINE` も呼んでいましたが、
+6.18 ではシンボル名が `MITIGATION_RETPOLINE` に変わっていて何もしていなかったので
+外しました（Spectre v2 の緩和は無効にしません）。また、`<arch>.config` が無いときに
+プレースホルダを `src/kernel/config/` へ書き出す処理もやめました。
+モジュールの `modules_install` は、モジュールがビルドされたとき
+（`modules.order` があるとき）だけ実行し、失敗したらビルドを止めます。
 
 > **実際にビルドされた `.config` でこれらが効いているかは未確認です。**
 > 手元に残っている 6.18.55 の `.config` は上の意図と食い違っており
 > （`CONFIG_NETFILTER=y`・`# CONFIG_SECURITY_DMESG_RESTRICT is not set`）、
 > 上書きが効いていないのか、途中で止まった実行の残骸なのかを確かめていません。
-> 確かめるには `manual-build.yml` を `build_kernel=true` で回し、
-> `build/kernel/output/config-<version>-<arch>` を読みます。
-> 6.18 では `RETPOLINE` が `MITIGATION_RETPOLINE` に改名されているため、
-> 無効化が効いていない可能性もあります。
+> 確かめるには `manual-build.yml` を `build_kernel=true` で回します。
+> 主な強化項目がジョブのサマリーに出て、`.config` が artifact
+> `kernel-config-<arch>` に残ります（手元なら `build/kernel/output/config-<version>-<arch>`）。
 
 > **`src/kernel/config/` のほかのファイルはビルドで使われていません。**
 > `minimal-x86_64.config` / `standard-x86_64.config` /
@@ -445,9 +450,10 @@ CONFIG_UNLZOP=y
 ```
 
 **★ の 3 層が Kimigayo 自身が担保している部分です。**
-ただし Layer 4 のうち、Stack Protector は arm64 の OpenRC
+ただし Layer 4 のうち、Stack Protector は v3.0.2 の arm64 の OpenRC
 （`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません
-（`scripts/build-openrc.sh` の arm64 の `CFLAGS` に無い）。
+（`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、
+次のリリースから付きます。`scripts/verify-image.sh` が検査します）。
 `-D_FORTIFY_SOURCE=2` は指定していますが、musl は FORTIFY を実装して
 いないため、効果は確認できていません。
 Layer 1 と 2 はホストと利用者の設定によります
