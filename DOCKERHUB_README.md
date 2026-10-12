@@ -11,13 +11,13 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 ### distroless からの継承
 - ✅ **不変インフラ**: パッケージマネージャーなし、実行時の変更を排除
 - ✅ **最小攻撃面**: 実行時にパッケージをインストールする仕組みを持たない
-- ✅ **超軽量**: 2.5〜3MB の極小イメージサイズ
+- ✅ **軽量**: 2.46〜3.01MB のイメージサイズ（v3.0.2、バリアント × アーキテクチャ）
 
 ### Alpine Linux からの継承
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: デバッグ可能なシェルとUnixコマンド
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: PIE、Stack Protector、FORTIFY_SOURCE、Full RELRO
+- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO・非実行スタックでビルド（Stack Protector は x86_64 の全 ELF。arm64 の OpenRC には付いていない）
 
 ### Alpine/distroless との違い
 
@@ -25,7 +25,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 |------|-----------|--------|----------------|
 | パッケージマネージャー | ❌ | ✅ apk | ❌ **なし** |
 | シェル/ユーティリティ | ❌ | ✅ | ✅ **BusyBox** |
-| 不変インフラ | ✅ | ⚠️ 任意 | ✅ **強制** |
+| パッケージマネージャーで実行時に足せるか | ❌ | ✅ | ❌ **足せない** |
 | デバッグ容易性 | ❌ | ✅ | ✅ **容易** |
 
 **Kimigayo OS = distrolessのセキュリティ + Alpineの実用性**
@@ -33,10 +33,10 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 ## 主な特徴
 
 - 🪶 **超軽量**: Standard（x86_64）**2.60MB** / arm64 2.98MB（v3.0.2、2026-10-12 実測）
-- 💾 **省メモリ**: 常駐メモリ 288KB（Alpine 272KB / Ubuntu 24.04 312KB と同程度。同条件で実測）
+- 💾 **常駐メモリ**: 288KB（Alpine 272KB / Ubuntu 24.04 312KB と同程度。同条件で実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE・Full RELRO・非実行スタックでビルド
 - 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除（`apk` も `dpkg` も無い）
-- ✍️ **署名済み**: Cosign のキーレス署名と SBOM 付き（v3.0.2 から）
+- ✍️ **署名済み**: Cosign のキーレス署名（v3.0.2 から）。SBOM は GitHub Release に添付
 - 🏗️ **3 バリアント**: minimal / standard / extended から選べる
 - 🌐 **マルチアーキテクチャ**: x86_64とARM64をサポート
 
@@ -90,17 +90,28 @@ docker run ishinokazuki/kimigayo-os:latest uname -a
 FROM alpine:3.24 AS builder
 RUN apk add --no-cache nginx
 
-# Kimigayo OSで最小ランタイム環境を構築
-FROM ishinokazuki/kimigayo-os:latest
-COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
-COPY --from=builder /usr/lib/nginx /usr/lib/nginx
+# 実行ファイルだけでは動かない。共有ライブラリは ldd で集める
+RUN mkdir -p /stage/usr/sbin /stage/usr/lib /stage/etc/nginx \
+    && cp /usr/sbin/nginx /stage/usr/sbin/ \
+    && cp /etc/nginx/mime.types /stage/etc/nginx/ \
+    && ldd /usr/sbin/nginx \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
 
-# アプリケーションのセットアップ
-COPY . /app
-WORKDIR /app
+# Kimigayo OSで最小ランタイム環境を構築（版を固定する）
+FROM ishinokazuki/kimigayo-os:3.0.2
+COPY --from=builder /stage/ /
+RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /var/lib/nginx/logs /var/www/html \
+    && chown -R 65534:65534 /var/log/nginx /var/lib/nginx
+COPY nginx.conf /etc/nginx/nginx.conf
 
-CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
+USER 65534
+CMD ["nginx", "-g", "daemon off;"]
 ```
+
+`nginx.conf` を含む動く完全な例は
+[examples/nginx](https://github.com/Kazuki-0731/Kimigayo/tree/main/examples/nginx)（Python・Node.js もあり）。
 
 ## イメージバリアント
 
@@ -110,11 +121,11 @@ CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 
 - **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.46MB / arm64 2.83MB）
   - musl libc + 最小限のBusyBox + OpenRC
-  - 特化したコンテナ向けの絶対最小フットプリント
+  - Standard から `vi`・`wget`・`less`・`tr`・`tee` など 33 アプレットを除いたもの
 
 - **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.62MB / arm64 3.01MB）
-  - 開発ツールと追加ユーティリティを含む
-  - 開発環境と機能豊富なコンテナ向け
+  - Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの
+  - コンパイラなどの開発ツールは含まない
 
 ## タグ一覧
 
@@ -134,8 +145,9 @@ kimigayo-os:3.0.2-standard-amd64    # x86_64
 kimigayo-os:3.0.2-standard-arm64    # ARM64
 ```
 
-バリアント名なしのタグ（`3.0.2`・`latest` など）はマルチアーキの
+アーキテクチャ名を含まないタグ（`3.0.2`・`3.0.2-minimal`・`latest` など）はマルチアーキの
 マニフェストなので、`docker pull` が自動で合うものを選びます。
+`latest-amd64`・`latest-arm64` は Standard の単一プラットフォームの別名です。
 
 ### ローリングタグ（リリースごとに更新）
 ```
@@ -175,7 +187,7 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 **出荷するイメージそのものを照合しています。** イメージ内のバイナリから
 読んだ版で SBOM（CycloneDX）を作り、Grype で NVD と照合します。
 CI（毎 push）とリリースの公開前に走り、公開中の `latest` も毎週照合します。
-v3.0.2 は **0 件**です（NVD の CPE に載っている範囲で）。
+v3.0.2 は公開時点で **0 件**でした（NVD の CPE に載っている範囲で。NVD に新しい CVE が載れば変わります）。
 
 - 上流が修正版を出していない CVE はパッチを当てて出荷し、
   `/.kimigayo-build-info` の `PATCHED_CVES` に記録しています
@@ -190,13 +202,12 @@ v3.0.2 は **0 件**です（NVD の CPE に載っている範囲で）。
 
 - **脆弱性報告の受領確認**: 24時間以内
 - **初期評価**: 72時間以内
-- **修正のリリース**: Critical 7日以内 / High 30日以内 / Medium 90日以内
-- **バグ修正**: 定期的なパッチリリースに含める
-- **機能更新**: SemVer のマイナー版で出す
+- **修正のリリース**: Critical 7日以内 / High 30日以内 / Medium 90日以内 / Low 次回リリース
+- **サポート対象**: 最新のリリースだけ（古い版へのバックポートはしない）
 
 ## ライセンス
 
-GPL-2.0 - 詳細は[LICENSE](https://github.com/Kazuki-0731/Kimigayo/blob/main/LICENSE)ファイルを参照してください。
+構成要素ごとに元のライセンスに従います（BusyBox: GPL-2.0 / musl libc: MIT / OpenRC: BSD-2-Clause / ビルドシステム: MIT）。詳細は[LICENSE](https://github.com/Kazuki-0731/Kimigayo/blob/main/LICENSE)ファイルを参照してください。
 
 ## サポート
 
