@@ -29,7 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   測っている時間のほとんどが Docker のコンテナ生成なので、
   **「軽いから起動が速い」とは書かない**。
   **常駐メモリは v3.0.2 で Alpine（272KB）とほぼ同じになった**
-  （v3.0.1 は 236KB で Alpine より少なかった。BusyBox の動的リンク化で
+  （v3.0.1 は 232KB で Alpine より少なかった。BusyBox の動的リンク化で
   約 56KB 増えた）。**「常駐メモリが Alpine より少ない」とは書かない。**
   差が出るのはサイズの方（Alpine 8.42MB / Ubuntu 78.2MB）。
   **v2.0.1 の 1.17MB は Init も libc.so も入っていないイメージの値**なので、
@@ -336,8 +336,13 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
   - **`src/kernel/patches/`・`src/busybox/patches/`** — 過去のビルド失敗から
     手で作ったパッチ。消すと同じ失敗をゼロから調べ直すことになる
     （→「パッチはなぜ存在するか」節）
-  - **`src/kernel/config/`・`src/busybox/config/`** — 項目ごとの取捨選択が
-    実測の結果。`defconfig` から作り直せない
+  - **`src/busybox/config/`** — 項目ごとの取捨選択が実測の結果。
+    `defconfig` から作り直せない
+  - **`src/kernel/config/`** — 2026-10-12 時点でビルドに使われているのは
+    `<arch>.config` だけで、それも追跡中の `x86_64.config` はプレースホルダ
+    （実際は上流 defconfig + `apply_security_hardening`）。バリアント別の
+    config と `kimigayo_*_defconfig` は使われていない参考資料だが、
+    当時の検討の記録なので消す前に聞く（→ `src/kernel/config/README.md`）
   - **`benchmark-results/`・`docs/benchmarks/`** — 過去の版の実測値。
     測り直すには同じホスト・同じ版が必要で、事実上再現できない
   - **`.env`** — Docker Hub のアクセストークンが入っている
@@ -454,7 +459,7 @@ versions.mk ─┬→ download-musl    → build-musl     [1/4]
 ```bash
 make docker-build          # ビルド環境イメージを構築（Alpine ベース）
 make shell                 # ビルドコンテナに入る（推奨。リアルタイム出力が見える）
-make build                 # コンテナ内で OS をビルド [1/4]〜[4/4]
+make build                 # コンテナ内で OS をビルド [1/4]〜[4/4]（カーネル込み。数十分〜）
 make status                # どこまで完了したか確認
 make info                  # ビルド設定を表示
 
@@ -493,8 +498,10 @@ make benchmark             # 全ベンチマーク
   `build-musl.sh` 等を**実際に呼んでビルドしに行く**（成果物があることを
   前提にはしていない）。macOS では musl の `configure` が
   `unsupported long double type` で落ちる（実測）。
-  さらに `ARCH` を省略すると `uname -m` から自動検出するため、
-  Apple Silicon では `arm64` になり、x86_64 のビルド結果があっても使われない。
+  なお `make ci-build-local` 自体は `ARCH=x86_64` を既定で渡す
+  （`Makefile` の `ARCH ?= x86_64`）。`scripts/build-rootfs.sh` を
+  **`ARCH` なしで直接**叩いたときだけ `uname -m` から自動検出し、
+  Apple Silicon では `arm64` になって x86_64 のビルド結果が使われない。
 - **ローカルで CI 相当を通したいなら、2つの環境に分けて回す。**
   コンテナには Docker ソケットが**読み取り専用**でしか入っていないので
   `docker build` ができず、コンテナ内だけでも完結しない:
@@ -557,10 +564,10 @@ make benchmark             # 全ベンチマーク
   （`platform` 固定を外す話も不要）
 - **開発機でやるのは「段を絞ったビルド」まで。** 例:
   `make ARCH=x86_64 arch/x86/realmode/` のようにカーネルの一部だけ、
-  あるいは `scripts/build-openrc.sh` 単体。
-  **arm64 のクロスビルドを手元で回すなら compose を使わない**
-  （`memory: 2G` 制限で `meson setup` が OOM kill される。
-  `docker run --memory 8g` で直接叩く）
+  あるいは OpenRC だけ（`make init`。コンテナ内）。
+  ビルドコンテナで全体を通すなら、カーネル抜きの `make build-no-kernel` を使う。
+  compose の memory 上限は 8G（2026-10-09 に 2G から上げた。2G では
+  arm64 のクロスビルドで `meson setup` が OOM kill されていた）
 - **Docker イメージにカーネルは入らない。** rootfs だけなので、
   musl / BusyBox / OpenRC の変更は `make ci-build-local` で検証できる。
   **「イメージが動いた」はカーネルを検証したことにならない**
@@ -651,7 +658,7 @@ BusyBox の適用スクリプトも当たらなければ `exit 1` する。
 >         -path "*${c}-install-*" -exec cat {} \; 2>/dev/null)"
 > done
 > # 空欄 = 未ビルド。versions.mk と食い違っていたらビルドし直す
-> # BusyBox は "1.38.0+standard" のようにバリアントも入る（下記）
+> # BusyBox は "1.38.0+standard+dynamic+<hash>" の形（下記）
 > # カーネルは build/kernel/output/vmlinuz-<version>-<arch> のファイル名で分かる
 > ls build/kernel/output/vmlinuz-* 2>/dev/null
 > ```
@@ -662,22 +669,24 @@ BusyBox の適用スクリプトも当たらなければ `exit 1` する。
 > **standard をビルドしたあとに `IMAGE_TYPE=minimal` でビルドしても
 > 「already built」でスキップされ、standard の BusyBox が入った
 > minimal イメージが出来ていた**（2026-10-09 に発覚）。
-> いま `.kimigayo-build-version` には `1.38.0+standard` のように入る。
+> いま `.kimigayo-build-version` には `1.38.0+standard+dynamic+28a2a65cf6e0`
+> のように、版・バリアント・リンク方法（`BUSYBOX_LINK`）・入力の内容ハッシュが入る
+> （`scripts/lib/build-stamp.sh`）。
 > **バリアントを切り替えて測るときは、スキップされていないことを確認する。**
 
-> **スタンプは `src/*/config/` の編集を検知しない。**
-> `1.38.0+extended` のまま config を書き換えても、版とバリアントの
-> 文字列が同じなのでビルドはスキップされる。
-> **config を変えたときは、その成果物を手で捨ててからビルドする**
-> （2026-10-11 に実際に踏んだ）。
+> **スタンプが入力の中身を見るのは BusyBox と musl だけ。**
+> 2026-10-11 に、BusyBox の config を書き換えても版とバリアントの文字列が
+> 同じなのでスキップされる事故を踏み、内容ハッシュを足した
+> （BusyBox は config・BusyBox と musl のパッチ・`build-busybox.sh`、
+> musl はパッチ・`build-musl.sh`）。
+> **OpenRC のスタンプは版だけ**、**カーネルは
+> `build/kernel/output/vmlinuz-<version>-<arch>` があればスキップ**するので、
+> どちらもビルドスクリプトや config の編集を検知しない。
+> そのときは成果物を手で捨ててからビルドする。
 >
 > ```bash
-> rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
-> docker compose run --rm -T kimigayo-build make busybox \
->   TARGET_ARCH=x86_64 IMAGE_TYPE=extended
+> docker compose run --rm -T kimigayo-build make clean-kernel
 > ```
->
-> 同じことがカーネル config（`src/kernel/config/`）にも言える。
 
 > **`scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らないパッチを
 > `log_warn` して `return 0` する。つまり当たらないパッチは黙ってスキップされ、
@@ -685,7 +694,9 @@ BusyBox の適用スクリプトも当たらなければ `exit 1` する。
 > **`build/kernel-patches.log` を必ず読み、「not applicable」が出ていないか確認する。**
 > 効かなくなったパッチは、不要になったのか・当て直しが必要なのかを判断して
 > 消すか作り直す。放置すると「適用されているつもり」のまま進む。
-> 同じことが `scripts/apply-busybox-patches.sh`（`build/busybox-patches.log`）にも言える。
+> **BusyBox と musl は違う。** `apply-busybox-patches.sh`・
+> `apply-musl-patches.sh` は当たらないパッチがあればビルドを止める
+> （既に当たっているものだけ飛ばす）。
 
 ### 版を上げたら `build/` の残骸を疑う
 
@@ -786,8 +797,8 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 
 ```bash
 make test                      # コンテナ内で pytest
-python3 -m pytest tests/unit -q          # 単体（273 件）
-python3 -m pytest tests/property -q      # プロパティ（hypothesis、253 件）
+python3 -m pytest tests/unit -q          # 単体（275 件、2026-10-12 時点）
+python3 -m pytest tests/property -q      # プロパティ（hypothesis、255 件、同）
 python3 -m pytest -m "not slow" -q       # 遅いものを除く
 pip install -r requirements-dev.txt      # pytest / hypothesis 等
 ```
@@ -983,7 +994,7 @@ make check-links        # scripts/check-links.py
 > `Read(///**)`（全ファイルシステムの読み取り）と `Bash(bash:*)`（任意の
 > コマンド）が入っていた。**このリポジトリは公開されているので、置けば
 > clone した全員の Claude Code にその承認が効く。**
-> 共有するのは `settings.json`（Hook の登録だけ）。
+> 共有するのは `settings.json`（Hook の登録と `env`）。
 
 | 場所 | 中身 | Git |
 | --- | --- | --- |
@@ -1003,8 +1014,10 @@ make check-links        # scripts/check-links.py
 
 | Hook | いつ | 何をするか |
 | --- | --- | --- |
-| `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add をブロック |
-| `after-edit.sh` | PostToolUse(Edit\|Write) | `.sh` の構文エラーをブロック。`versions.mk` を触ったら連動先を出す。`-Wno-error` や `\|\| true` を**新しく足したら**指摘する |
+| `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`reset --hard`／`filter-branch`・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add をブロック |
+| `guard-memo-files.sh` | PreToolUse(Bash) | メモ・下書きのファイルの `git add` / `git commit` をブロック（→「メモは機密扱いにする」節） |
+| `guard-edit-during-build.sh` | PreToolUse(Edit\|Write\|MultiEdit) | ビルドコンテナが走っている間の `scripts/`・`build-system/` の編集をブロック（bash は実行中のスクリプトを読み進めるため） |
+| `after-edit.sh` | PostToolUse(Edit\|Write\|MultiEdit) | `.sh` の構文エラーをブロック。`versions.mk` を触ったら連動先を出す。`-Wno-error` や `\|\| true` を**新しく足したら**指摘する |
 | `check-untracked.sh` | Stop | 未追跡の新規ファイルが残っていたら1度だけ止める |
 
 **通常の `git push origin main` は止めていない。** 会話での承認ルール
@@ -1057,7 +1070,7 @@ make check-links        # scripts/check-links.py
 
 **プロジェクト単位の設定ファイルは存在しない。** `.claude/teams/teams.json`
 のようなファイルは設定として認識されず、ただのファイルとして扱われる。
-再利用する役割は**Subagent の定義で表現する**（上記 3 つはそのまま
+再利用する役割は**Subagent の定義で表現する**（上記 5 つはそのまま
 teammate として使える）。
 
 `.claude/settings.json` の `env` で有効化してある:
@@ -1143,8 +1156,8 @@ Subagent の方が速くて安い。3〜5人から始める。
   公開イメージを `latest` ごと差し替える）と、**Docker Hub への直接 push**。
   この2つは `guard-bash.sh` が機械的に止めるので、文章で覚えなくてよい
 - **コミットメッセージは日本語。先頭に絵文字を1つ置き、`feat:` のような
-  テキスト prefix は付けない**（このリポジトリの既存 498 コミットは
-  すべてこの形式で、テキスト prefix は 0 件）。
+  テキスト prefix は付けない**（2026-10-12 時点の 723 コミットのうち、
+  絵文字で始まらないのは初期の 2 件と dependabot の `:arrow_up:(deps):` 6 件だけ）。
   本文に「なぜそうしたか」を書く（何を変えたかは diff を見ればわかる）。
 
   | 種類 | 絵文字 | | 種類 | 絵文字 |
@@ -1250,10 +1263,11 @@ Subagent の方が速くて安い。3〜5人から始める。
 | `config.mk` | **どこからも include されていない**（意図の記録のみ。実際のフラグは `scripts/build-*.sh`） |
 | `Makefile` | 入口。全量は `make help` |
 | `scripts/` | `download-*` / `apply-*-patches` / `build-*` / `test-*` / `verify-*` / `benchmark-*` |
-| `src/kernel/` | カーネル config（arch × バリアント）・パッチ・`build.py` |
-| `src/busybox/` | BusyBox config（minimal/standard/extended）・musl 互換パッチ |
-| `src/openrc/`, `configs/openrc/` | init.d / conf.d / runlevels / `rc.conf` / サービス一覧 |
-| `src/libc/`, `src/toolchain/`, `src/security/`, `src/system/` | ビルド補助の Python モジュール |
+| `src/kernel/` | カーネル config（**ビルドで読むのは `<arch>.config` だけ**）・パッチ（0件）・`build.py` |
+| `src/busybox/` | BusyBox config（minimal/standard/extended）・パッチ（musl 互換と CVE） |
+| `src/libc/patches/` | musl の CVE パッチ（`apply-musl-patches.sh` が当てる） |
+| `src/openrc/`, `configs/openrc/`, `configs/sysctl/` | init.d / conf.d / runlevels / `rc.conf` / サービス一覧。**イメージには入らない**（実物は `build-rootfs.sh` の heredoc と上流 OpenRC） |
+| `src/libc/`, `src/toolchain/`, `src/security/`, `src/system/`, `src/init/`, `src/utilities/` | ビルド補助・テスト用の Python モジュール |
 | `src/benchmark/`, `src/integration/` | 計測・環境別の検証 |
 | `tests/unit/`, `tests/property/`, `tests/integration/` | pytest / hypothesis / シェルの統合テスト |
 | `docs/developer/` | ARCHITECTURE・BUILD_GUIDE・CICD_GUIDE・CUSTOM_BUILD・PERFORMANCE_* |
@@ -1285,7 +1299,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 **ローカルで変更したら、外に出す前に最低これを通す:**
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 526 件
+python3 -m pytest tests/unit tests/property -q     # 530 件（2026-10-12 時点）
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
 make security-scan                                 # scan-image + Trivy FS + ShellCheck
@@ -1311,8 +1325,8 @@ done
 # それ以外に出たら直す。
 
 # 3) 効かなくなったパッチが黙ってスキップされていないか
-grep -iE 'skipped: [1-9]|not applicable' \
-  build/kernel-patches.log build/busybox-patches.log
+grep -iE 'skipped: [1-9]|not applicable|does not apply|failed: [1-9]' \
+  build/kernel-patches.log build/busybox-patches.log build/musl-patches.log
 # → 出たら「上流が取り込んだので不要」か「当て直しが必要」かを判断する
 #    （src/kernel/patches/README.md 参照）
 
@@ -1326,6 +1340,9 @@ grep -oE "^option\('[a-z_-]+'" build/openrc-*/meson_options.txt
 
 ## rtk（bash 出力の圧縮）
 
+> **個人環境の設定で、このリポジトリには含まれない。** 無ければ
+> コマンドはそのまま普通に動く。
+
 グローバル hook（`~/.claude/settings.json` の PreToolUse → `rtk hook claude`）が
 Bash コマンドを自動で `rtk` 付きに書き換える（`git status` → `rtk git status` など）。
 **明示的に `rtk` を書く必要はない。**
@@ -1334,4 +1351,5 @@ Bash コマンドを自動で `rtk` 付きに書き換える（`git status` → 
   未対応コマンドは素通しなので安全
 - 生出力が必要なとき: `rtk proxy <cmd>`。削減量の確認: `rtk gain`
 - **ビルドログは大きい。** `build/*.log` を読むときは `grep` で絞るか
-  `make log-kernel` / `log-musl` / `log-openrc`（最新100行）を使う
+  `make log-kernel` / `log-musl`（最新100行）を使う。
+  `make log-openrc` は `build-openrc.sh` がログを書かないため何も出ない
