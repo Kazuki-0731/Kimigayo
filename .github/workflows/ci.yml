@@ -34,6 +34,11 @@ jobs:
       - name: Check markdown links
         run: python3 scripts/check-links.py
 
+      # 2026-10-12 の横串監査で直した古い記述が戻ってきていないか。
+      # 規則は scripts/check-stale-docs.py の RULES にある。
+      - name: Check for stale statements in docs
+        run: python3 scripts/check-stale-docs.py
+
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:

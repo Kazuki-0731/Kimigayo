@@ -13,7 +13,7 @@ KIMIGAYO_VERSION ?= $(shell bash scripts/get-version.sh 2>/dev/null || echo dev)
 export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
-.PHONY: build-rootfs package-rootfs build-image verify-image check-links test-integration test-smoke ci-build-local ci-build-all
+.PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
@@ -455,6 +455,13 @@ SHELLCHECK_TARGETS := scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 check-links:
 	@echo "=== Checking markdown links (tracked files only) ==="
 	@python3 scripts/check-links.py
+
+# 一度直した古い記述（存在しないタグ・動かない BusyBox のコマンド・
+# 撤回した数値など）が戻ってきていないかを見る。規則は
+# scripts/check-stale-docs.py の RULES。CI でも走る。
+check-stale-docs:
+	@echo "=== Checking for stale statements in docs ==="
+	@python3 scripts/check-stale-docs.py
 
 shellcheck-scan:
 	@echo "=== Running ShellCheck on scripts (severity: warning) ==="
