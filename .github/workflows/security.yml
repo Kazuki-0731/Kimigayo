@@ -220,6 +220,7 @@ jobs:
   #    release.yml は latest-standard までしか作らない。
   #    しかも失敗を || echo で握り潰していた。
   #
-  # 構成要素の脆弱性は版を手で突合して追う（version-check ジョブ）。
-  # 構造的な対策は SBOM の生成（未着手、要判断）。
+  # 構成要素の脆弱性は、出荷物から SBOM を作って照合する scripts/scan-image.sh で
+  # 見る（CI・リリース前・毎週の公開 latest）。ここでは版の新旧だけを見る
+  # （version-check ジョブ）。
   # → .claude/skills/security-review/SKILL.md
