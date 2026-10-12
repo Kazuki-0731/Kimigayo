@@ -3,11 +3,11 @@
 ## リポジトリ情報
 
 ### アカウント詳細
-- **組織名/ユーザー名**: IshinoKazuki
+- **組織名/ユーザー名**: ishinokazuki
 - **リポジトリ名**: kimigayo-os
 - **リポジトリ**: ishinokazuki/kimigayo-os
 - **公開範囲**: Public
-- **説明**: Alpine Linuxにインスパイアされた軽量・高速・セキュアなコンテナ向けOS
+- **説明**: distroless と Alpine Linux の考え方を組み合わせた、軽量なコンテナ向けOS
 
 ### リポジトリ説明文
 
@@ -35,20 +35,25 @@ Docker Hub の Overview に貼る文章はこのファイルだけで管理す�
 
 各バージョンは、イメージサイズと含まれる機能に基づいて3つのバリアントで提供されます:
 
-1. **Minimal**（`-minimal`接尾辞）
-   - サイズ: < 5MB
-   - 含まれるもの: musl libc + 最小限のBusyBox + OpenRC
-   - 用途: 特化したコンテナ向けの絶対最小フットプリント
+サイズは目標（`SPECIFICATION.md` §8.3）で、実測（v3.0.2、x86_64 / arm64）は
+Minimal 2.46MB / 2.83MB、Standard 2.60MB / 2.98MB、Extended 2.62MB / 3.01MB です。
+3 つの違いは BusyBox のアプレットだけです。
 
-2. **Standard**（接尾辞なし、デフォルト）
-   - サイズ: < 15MB
-   - 含まれるもの: Minimal + 一般的なユーティリティ
+1. **Minimal**（`-minimal`接尾辞）
+   - サイズ目標: < 5MB
+   - 含まれるもの: musl libc + BusyBox（367 アプレット）+ OpenRC
+   - Standard と比べて `vi`・`wget`・`du`・`less`・`tr` などが無い
+
+2. **Standard**（接尾辞なし、または `-standard`。デフォルト）
+   - サイズ目標: < 15MB
+   - 含まれるもの: musl libc + BusyBox（400 アプレット）+ OpenRC
    - 用途: 汎用コンテナベースイメージ
 
 3. **Extended**（`-extended`接尾辞）
-   - サイズ: < 50MB
-   - 含まれるもの: Standard + 開発ツール + 追加ユーティリティ
-   - 用途: 開発環境と機能豊富なコンテナ
+   - サイズ目標: < 50MB
+   - 含まれるもの: Standard + 11 アプレット（`ar`・`ed`・`fbset`・`fdformat`・
+     `flash_*`・`flashcp`・`inotifyd`・`rfkill`・`unlzop`）
+   - 開発ツールやデバッガは入っていません
 
 #### タグの例
 
@@ -57,16 +62,18 @@ Docker Hub の Overview に貼る文章はこのファイルだけで管理す�
 
 ```
 # バージョン指定（マルチアーキのマニフェスト）
-kimigayo-os:3.0.0               # Standardバリアント
-kimigayo-os:3.0.0-minimal
-kimigayo-os:3.0.0-extended
+kimigayo-os:3.0.2               # Standardバリアント
+kimigayo-os:3.0.2-standard
+kimigayo-os:3.0.2-minimal
+kimigayo-os:3.0.2-extended
 
 # バリアント + アーキテクチャ（単一プラットフォーム）
-kimigayo-os:3.0.0-standard-amd64
-kimigayo-os:3.0.0-minimal-arm64
+kimigayo-os:3.0.2-standard-amd64
+kimigayo-os:3.0.2-minimal-arm64
 
 # ローリングタグ（リリースごとに更新。全12本）
 kimigayo-os:latest              # standard のマニフェスト
+kimigayo-os:latest-standard
 kimigayo-os:latest-minimal
 kimigayo-os:latest-extended
 kimigayo-os:latest-amd64        # standard のアーキ別
@@ -75,7 +82,7 @@ kimigayo-os:latest-standard-amd64
 kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 ```
 
-> **`3.0.0-amd64` のようなバリアント名なしのアーキ別タグは存在しない。**
+> **`3.0.2-amd64` のようなバリアント名なしのアーキ別タグは存在しない。**
 > バージョン指定でアーキを固定するならバリアント名が必要。
 >
 > **`stable` と `edge` も存在しない。** 2026-10-10 までこの手順書が
@@ -84,17 +91,20 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 
 ### タグ付けワークフロー
 
-**Docker Hub へ push するのは `v*.*.*` タグを打ったときだけ。**
-`main` へのコミットでは `ci.yml` が走るが、イメージは公開されない。
+**Docker Hub へ push するのは `release.yml` だけ**（`v*.*.*` タグの push か、
+手動実行）。`main` へのコミットでは `ci.yml` が走るが、イメージは公開されない。
+どちらも公開物を変えるので、ユーザーの明示的な承認を取る。
 
 1. **安定版リリース**
-   - `git tag -a v3.0.1` → push で `release.yml` が走る
-   - バージョン指定タグ（10本）と `latest` 系（12本）を更新する
-   - フォーマット: `3.0.0`、`3.0.1`
+   - `git tag -a v3.0.3` → push で `release.yml` が走る（版は例）
+   - バージョン指定タグ（10本）と `latest` 系（12本）を更新し、Cosign で署名する
+   - フォーマット: `3.0.2`、`3.0.3`
 
-2. **手動リリース**
+2. **手動実行**
    - Actions から `release.yml` を `workflow_dispatch` で実行する
-   - `tag` を指定しなければバージョンは `edge` になる（通常は使わない）
+   - **これも Docker Hub に push する**（`<ver>-<variant>-<arch>` と
+     `latest-<variant>-<arch>`）。マニフェスト作成・署名・GitHub Release は飛ぶ
+   - `tag` を指定しなければ入力の既定値 `latest` が版になる（通常は使わない）
 
 **プレリリース（beta / rc）は運用していない。**
 
@@ -103,7 +113,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 ### ステップ1: Docker Hubアカウント作成
 
 1. https://hub.docker.com/signup にアクセス
-2. ユーザー名`kimigayo-os`でアカウント登録
+2. ユーザー名 `ishinokazuki` でアカウント登録（公開イメージの名前空間）
 3. メールアドレスを検証
 4. プロフィール設定を完了
 
@@ -113,7 +123,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 2. "Create Repository"をクリック
 3. リポジトリ詳細を入力:
    - **名前**: `kimigayo-os`
-   - **説明**: （上記の説明を使用）
+   - **説明**: 「アカウント詳細」の説明
    - **公開範囲**: Public
 4. "Create"をクリック
 
@@ -122,14 +132,11 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 以下の設定を行います:
 
 #### Overviewタブ
-- 上記の完全な説明を追加
-- 以下のリンクを追加:
-  - GitHubリポジトリ: `https://github.com/Kazuki-0731/Kimigayo`
+- [DOCKERHUB_README.md](../../DOCKERHUB_README.md) を貼る（→ ステップ4）
 
-#### Buildsタブ（将来のCI/CD統合用）
-- GitHub Actionsで設定予定
-- タグプッシュ時の自動ビルド
-- buildxを使用したマルチアーキテクチャビルド
+#### Buildsタブ
+- 使わない。ビルドと push は GitHub Actions の `release.yml` が行う
+  （→ [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md)）
 
 #### Collaboratorsタブ
 - 必要に応じてチームメンバーを追加
@@ -140,16 +147,17 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 [DOCKERHUB_README.md](../../DOCKERHUB_README.md) の中身をそのまま
 Docker Hub の Overview に貼る。**ここに文章を写さない**（上記参照）。
 
-Docker Hub の Overview は API からも更新できる:
+**Overview は自動では同期されない。** `release.yml` も触らない。
 
-```bash
-# .env の DOCKER_HUB_ACCESS_TOKEN を使う（トークンはコミットしない）
-curl -s -X PATCH \
-  -H "Authorization: Bearer ${DOCKER_HUB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data "$(python3 -c 'import json,sys; print(json.dumps({"full_description": open("DOCKERHUB_README.md").read()}))')" \
-  https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/
-```
+- `.env` / GitHub Secrets の push 用トークン（`DOCKER_HUB_ACCESS_TOKEN`）では、
+  API での更新は **403** になる（ログインは通るが説明文の書き換え権限が無い）
+- 更新するには、Web の Overview 編集画面に貼るか、説明文を書き換えられる権限の
+  トークンを別に用意して API（`PATCH /v2/repositories/ishinokazuki/kimigayo-os/`
+  の `full_description`）で送る
+- **貼ったあと、公開されている全文が `DOCKERHUB_README.md` と一致するかを
+  突き合わせる。** 手順（読み取りだけなので権限は要らない）は
+  [.claude/skills/release/SKILL.md](../../.claude/skills/release/SKILL.md) の
+  「Docker Hub の Overview を更新する」にある
 
 
 ## セキュリティに関する考慮事項
@@ -165,8 +173,9 @@ GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` を案内する。
 
 ### 脆弱性スキャン
 
-ソースツリーとビルド環境は Trivy で自動スキャンし、結果を
-GitHub の Security タブに公開している。
+リポジトリ（ソースツリー）は Trivy のファイルシステムスキャンで自動検査し、
+結果を GitHub の Security タブに送っている。ビルド環境のイメージは
+スキャンしていない。
 
 **イメージ自体の Trivy スキャンは成立しない。** パッケージデータベースを
 持たないため Trivy が対象を1つも識別できない（「脆弱性 0 件」ではなく
@@ -184,31 +193,40 @@ SBOM を作り、Grype で照合する。公開中の `latest` には
 
 - **脆弱性報告の受領確認**: 24時間以内
 - **初期評価**: 72時間以内
-- **修正のリリース**: Critical 7日以内 / High 30日以内 / Medium 90日以内
+- **修正のリリース**: Critical 7日以内 / High 30日以内 / Medium 90日以内 / Low 次回リリース
 - **バグ修正**: 定期的なパッチリリースに含める
 - **機能更新**: SemVer のマイナー版で出す
 
 ## メタデータラベル
 
-すべてのイメージにOpenContainer Initiative（OCI）ラベルを含めます:
+すべてのイメージにOpenContainer Initiative（OCI）ラベルを含めます
+（正本は [Dockerfile.runtime](../../Dockerfile.runtime)。以下はその抜粋）:
 
 ```dockerfile
 LABEL org.opencontainers.image.title="Kimigayo OS"
-LABEL org.opencontainers.image.description="軽量・高速・セキュアなコンテナ向けOS"
+LABEL org.opencontainers.image.description="Lightweight, secure container OS combining the distroless and Alpine Linux approaches"
 LABEL org.opencontainers.image.authors="Kimigayo OS Team"
-LABEL org.opencontainers.image.url="https://github.com/kimigayo-os/kimigayo"
-LABEL org.opencontainers.image.documentation="https://github.com/kimigayo-os/kimigayo/tree/main/docs"
-LABEL org.opencontainers.image.source="https://github.com/kimigayo-os/kimigayo"
+LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
+LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
+LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.licenses="GPL-2.0"
+LABEL org.opencontainers.image.vendor="Kimigayo OS Project"
+LABEL org.opencontainers.image.base.name="scratch"
+
+# Kimigayo 独自のラベル
+LABEL io.kimigayo.version="${VERSION}"
+LABEL io.kimigayo.variant="${IMAGE_VARIANT}"
+LABEL io.kimigayo.architecture="${TARGETARCH}"
 ```
+
+`VERSION` / `IMAGE_VARIANT` / `BUILD_DATE` / `VCS_REF` は `release.yml` が
+`--build-arg` で渡します。
 
 ## 次のステップ
 
-リポジトリセットアップ後:
-1. 自動ビルド用のGitHub Actions設定（タスク26）
-2. セキュリティスキャンの実装（タスク27）
-3. マルチアーキテクチャビルドの設定（タスク28）
-4. 最初のリリース準備（タスク29）
+リポジトリセットアップ後は、[GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md) の
+手順で `DOCKER_HUB_ACCESS_TOKEN` を GitHub Secrets に登録すれば、
+タグの push でリリースできます。
