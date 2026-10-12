@@ -1,6 +1,11 @@
 version: 2
 updates:
-  # GitHub Actions dependencies
+  # GitHub Actions のアクション（ワークフロー内の uses: の固定ダイジェスト）
+  #
+  # docker エコシステムのブロックは置かない。Dockerfile は
+  # FROM alpine:${ALPINE_VERSION} と ARG で版を受け取り（Dependabot は追えない）、
+  # Dockerfile.runtime は scratch。構成要素と Alpine の版は versions.mk が
+  # 単一の真実の源で、base-image-update.yml が上流の更新を検知する。
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -9,27 +14,13 @@ updates:
       time: "03:00"
       timezone: "UTC"
     open-pull-requests-limit: 10
+    # リポジトリに実在するラベルだけを使う（存在しないラベルは付かずに警告になる）。
     labels:
       - "dependencies"
-      - "github-actions"
       - "automated"
+    # コミットの件名は「先頭に絵文字1つ、テキスト prefix なし」（CLAUDE.md「Git の運用ルール」節）。
+    # include: scope を付けると "⬆️(deps): Bump ..." になっていた（PR #116〜#120）。
+    # Dependabot は prefix が英数字や括弧で終わるときだけ ":" を足し、空白は自分で足すので
+    # "⬆️ Bump ..." になる。
     commit-message:
       prefix: "⬆️"
-      include: "scope"
-
-  # Docker dependencies (Dockerfile)
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "docker"
-      - "automated"
-    commit-message:
-      prefix: "🐳"
-      include: "scope"
