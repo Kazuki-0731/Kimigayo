@@ -2,7 +2,7 @@
 
 ## 1. プロジェクト概要
 
-Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除し、不変インフラを徹底することで、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスとセキュリティを実現します。
+Kimigayo OSは、Googleのdistrolessと Alpine Linux の設計思想を組み合わせた、軽量・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除して不変インフラを徹底し、攻撃面とイメージサイズを小さく保ちながら、シェルとユーティリティでコンテナの中を確かめられる実用性を残します。
 
 ## 2. 設計思想
 
@@ -10,7 +10,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 - **軽量性（Lightweight）**: 最小限のフットプリント（目標はバリアントごとに設定。→ 8.3）
 - **不変性（Immutability）**: パッケージマネージャー排除による不変インフラの実現
 - **セキュリティ（Security）**: 最小攻撃面を実現するセキュアバイデフォルトの設計
-- **高速性（Performance）**: 高速起動と低メモリ消費
+- **小ささ（Footprint）**: イメージサイズと常駐メモリを小さく保つ（起動時間はほぼ Docker のコンテナ生成で決まり、イメージによる差は出ない。「軽いから起動が速い」とは言わない）
 - **予測可能性（Predictability）**: ビルド時に全てが決定される予測可能な動作
 - **デバッグ性（Debuggability）**: distrolessと異なり、シェルとユーティリティを含む
   - BusyBoxによる基本的なUnixコマンド
@@ -36,7 +36,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用した軽�
 
 ### 3.2 Cライブラリ
 - **採用**: musl libc（Alpineと同様）
-- **理由**: 軽量、高速、セキュア、静的リンクのサポート
+- **理由**: 軽量でシンプル、Alpine での実績、静的リンクと動的リンクの両方に対応（v3.0.2 から BusyBox と OpenRC は同じ `libc.so` に動的リンクする）
 
 ### 3.3 コアユーティリティ
 - **採用**: BusyBox
@@ -95,6 +95,7 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 ├── etc/          # 設定ファイル
 ├── home/         # ユーザーディレクトリ
 ├── lib/          # 共有ライブラリ
+├── media/        # リムーバブルメディアのマウントポイント
 ├── mnt/          # 一時マウントポイント
 ├── opt/          # オプションソフトウェア
 ├── proc/         # プロセス情報
@@ -111,10 +112,12 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 ## 5. セキュリティ仕様
 
 ### 5.1 コンパイル時のセキュリティ
-- PIE (Position Independent Executables)
-- Stack-smashing protection
-- FORTIFY_SOURCE
-- RELRO (Relocation Read-Only)
+- PIE (Position Independent Executables) — 全 ELF（`scripts/verify-image.sh` が検査）
+- Full RELRO (RELRO + BIND_NOW) — 全 ELF（同上）
+- Stack-smashing protection — x86_64 は全 ELF。**arm64 の OpenRC には付いていない**
+  （`scripts/build-openrc.sh` の arm64 の CFLAGS に `-fstack-protector-strong` が無い）
+- FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2` を指定しているが、musl は FORTIFY を
+  実装しておらず、効果は確認できていない
 
 ### 5.2 ランタイムセキュリティ
 
@@ -147,7 +150,9 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 - **リリース資産のハッシュ配布**: `release.yml` が `SHA256SUMS` と
   `SHA512SUMS` を GitHub Release に添付する
 
-**公開イメージへの署名（Cosign / Docker Content Trust）は未実装。**
+**公開イメージは v3.0.2 から Cosign でキーレス署名する**（`release.yml` の `sign`
+ジョブ。検証には cosign v3 以上が要る）。SBOM（CycloneDX）は GitHub Release に
+添付する（イメージへの attestation ではない）。Docker Content Trust は使わない。
 
 ## 6. ターゲット環境
 
@@ -157,8 +162,8 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 - Podman
 
 Kimigayo OSはDockerイメージとして実行されることを前提に設計されており、コンテナ環境での利用を最優先としています。
-想定する配置先は AWS / GCP などクラウド上のコンテナで、Web アプリケーションや
-バッチ処理を載せる用途です。
+想定する配置先は VPS 上の Docker コンテナ（クラウドのマネージドなコンテナサービスでも使える）で、
+Web アプリケーションやバッチ処理を載せる用途です。
 
 ### 6.2 対象外
 
@@ -178,7 +183,7 @@ Kimigayo OSはDockerイメージとして実行されることを前提に設計
 - [x] カーネル設定とビルド（手元と手動 CI 専用。成果物には含まない → 3.1）
 - [x] 3 バリアント × 2 アーキテクチャのビルドと公開
 - [x] 成果物の検査（`scripts/verify-image.sh`）
-- [x] 統合テスト（`tests/unit` / `tests/property` / `tests/integration`）
+- [x] テスト（`tests/unit` / `tests/property` / `tests/integration`）
 - [x] ドキュメント整備
 
 ### 残っていること
@@ -197,10 +202,10 @@ distroless 的アプローチと両立しないため取り下げた。
 
 ## 8. 技術仕様
 
-### 8.1 最小システム要件
-- CPU: x86_64, ARM64
-- RAM: 128MB（最小）、512MB（推奨）
-- Storage: 512MB（最小）、2GB（推奨）
+### 8.1 システム要件
+- ホスト: Docker が動く Linux（x86_64 / ARM64）。カーネルはホストのものを使う
+- イメージ自体: 3MB 未満、常駐メモリは 300KB 程度（v3.0.2 の実測は [README.md](README.md) の「パフォーマンス実績」）
+- 必要な RAM・ストレージは、載せるアプリケーションで決まる
 
 ### 8.2 サポートアーキテクチャ
 - x86_64 (AMD64)
@@ -219,11 +224,13 @@ distroless 的アプローチと両立しないため取り下げた。
 - クロスコンパイル対応
 - バージョンの固定（[versions.mk](versions.mk) が単一の真実の源）
 
-**再現可能ビルドは未達**（2026-10-11 に確認）。`config.mk` に
-`SOURCE_DATE_EPOCH` と prefix-map を入れる仕組みはあるが、
-`REPRODUCIBLE_BUILD=yes` のときだけ有効で、この変数をどこも設定して
-いない。そもそも `config.mk` 自体がどの Makefile からも include されて
-いないため、ビット同一性は検証も保証もされていない。
+**再現可能ビルド**: `build-system/Makefile` が `REPRODUCIBLE_BUILD ?= yes` と
+`SOURCE_DATE_EPOCH` を設定し、`scripts/build-{musl,busybox,openrc}.sh` が
+prefix-map を付ける（`config.mk` はどこからも include されていないので、
+そちらの記述は効いていない）。**rootfs の tarball は 2026-10-12 にビット同一を
+確認した**（同じコミット 46b05da を CI と Manual Build で別々にビルドし、
+standard / x86_64 の 1 組で SHA-256 が一致）。**Docker イメージの digest は
+確かめていない。**
 
 ### 9.2 ビルドプロセス
 1. musl libcのビルド
@@ -238,12 +245,16 @@ Kimigayo の想定は VPS やクラウド上の Docker コンテナであり、
 ベアメタル・組み込みは対象外（2026-10-10 決定）。
 `make` に `iso` ターゲットは存在しない。
 
-**カーネルのビルドは、この手順に含まれない。** 成果物の Docker
+**成果物を作るのにカーネルのビルドは要らない。** 成果物の Docker
 イメージは rootfs だけを詰めたもので、コンテナはホストのカーネルで
-動く。手元で作りたいときは
+動く。ただしビルドコンテナ内の `make build` はカーネルも作る
+（`build-system/Makefile` の `build: musl kernel busybox init rootfs`）。
+カーネル抜きは `make build-no-kernel` で、CI はこちらを使う。
+カーネルだけ作りたいときは
 `docker compose run --rm kimigayo-build make kernel` で作れるが
 （`kernel` ターゲットはビルドコンテナ内の `build-system/Makefile` にある。
-ホストの `Makefile` には無い）、CI では一切ビルドしない
+ホストの `Makefile` には無い）、CI では `manual-build.yml` を
+`build_kernel=true` で回したとき以外はビルドしない
 （→ [CLAUDE.md](CLAUDE.md)「カーネルは CI で作らない」）。
 
 ## 10. 命名規則とブランディング
@@ -268,12 +279,12 @@ Ubuntu が `Warty` から `Yakkety` まで一巡したあと `Artful` で A に�
 | --- | --- | --- | --- |
 | v1.0 | （命名前） | — | コードネームの運用開始前に公開 |
 | v2.0 | （命名前） | — | 同上 |
-| **v3.0** | **Himawari** | 向日葵 | 太陽に向かう成長・高パフォーマンス |
+| **v3.0** | **Himawari** | 向日葵 | 太陽に向かう成長 |
 | v4.0 | Kiku | 菊 | 長寿・高潔・安定性 |
 | v5.0 | Momiji | 紅葉 | 成熟・変革 |
 | v6.0 | Ume | 梅 | 先駆性・堅牢性 |
 | v7.0 | Fuji | 藤 | 優雅・拡張性 |
-| v8.0 | Asagao | 朝顔 | 高速起動・清々しさ |
+| v8.0 | Asagao | 朝顔 | 朝の始まり・清々しさ |
 | v9.0 | Tsubaki | 椿 | 常緑・常時稼働 |
 | v10.0 | Satsuki | 皐月 | 軽量・精密設計 |
 | v11.0 | Higanbana | 彼岸花 | 変革・リニューアル |
@@ -309,13 +320,14 @@ Ubuntu が `Warty` から `Yakkety` まで一巡したあと `Artful` で A に�
 ## 11. コミュニティとライセンス
 
 ### 11.1 ライセンス
-- OSコア: GPLv2（Linuxカーネルに準拠）
-- ユーザーランドツール: MIT/BSD/GPL（各コンポーネントによる）
+- 各構成要素は元のライセンスに従う（BusyBox: GPL-2.0 / musl libc: MIT / OpenRC: BSD-2-Clause。
+  イメージに含まれない Linux カーネルは GPL-2.0）
+- Kimigayo 自身のビルドシステム・ドキュメント・テスト: MIT（→ [LICENSE](LICENSE)）
 
 ### 11.2 開発モデル
 - オープンソース開発
 - GitHubでのコード管理
-- コミュニティドリブンの開発
+- 現在はメンテナー 1 人で開発（Issue・Pull Request は歓迎）
 
 ## 12. 差別化ポイント
 
@@ -326,7 +338,7 @@ Ubuntu が `Warty` から `Yakkety` まで一巡したあと `Artful` で A に�
 - モダンなツールチェインの積極採用（clang / lld によるクロスビルド）
 
 ### 12.2 他のディストリビューションとの違い
-- 極限まで削ぎ落とした軽量性
+- シェルと Init を備えたうえで、数 MB のイメージサイズ
 - コンテナ環境での最適化
 - セキュリティファーストの設計
 - シンプルで理解しやすいシステム構成
