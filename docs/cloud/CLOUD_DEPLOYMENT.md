@@ -41,11 +41,13 @@ images, bare metal) is not supported: the image has no kernel or bootloader.
 - [AWS (Amazon Web Services)](#aws)
 - [Azure (Microsoft Azure)](#azure)
 - [GCP (Google Cloud Platform)](#gcp)
-- [General Best Practices](#best-practices)
+- [Best Practices](#best-practices)
 
 ---
 
-## VPS (Docker) {#vps}
+<a name="vps"></a>
+
+## VPS (Docker)
 
 ```bash
 # On the VPS
@@ -71,7 +73,9 @@ docker compose up -d
 
 ---
 
-## AWS (Amazon Web Services) {#aws}
+<a name="aws"></a>
+
+## AWS (Amazon Web Services)
 
 ### Container Deployment
 
@@ -196,7 +200,9 @@ spec:
 
 ---
 
-## Azure (Microsoft Azure) {#azure}
+<a name="azure"></a>
+
+## Azure (Microsoft Azure)
 
 ### Container Deployment
 
@@ -302,7 +308,9 @@ kubectl apply -f deployment.yaml
 
 ---
 
-## GCP (Google Cloud Platform) {#gcp}
+<a name="gcp"></a>
+
+## GCP (Google Cloud Platform)
 
 Container Registry (`gcr.io`) has been replaced by **Artifact Registry**.
 The examples use Artifact Registry.
@@ -390,7 +398,9 @@ kubectl apply -f deployment.yaml
 
 ---
 
-## Best Practices {#best-practices}
+<a name="best-practices"></a>
+
+## Best Practices
 
 ### Security
 
