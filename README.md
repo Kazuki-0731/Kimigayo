@@ -185,7 +185,7 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: 基本的なUnixコマンドとシェルを提供（デバッグ可能）
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO（BIND_NOW）・非実行スタックでビルド（`scripts/verify-image.sh` が検査。ASLR はホストのカーネルが効かせる）。Stack Protector は x86_64 では全 ELF に付くが、arm64 の OpenRC には付いていない
+- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO（BIND_NOW）・非実行スタックでビルド（`scripts/verify-image.sh` が検査。ASLR はホストのカーネルが効かせる）。Stack Protector は x86_64 では全 ELF に付くが、v3.0.2 の arm64 の OpenRC には付いていない（main で修正済み、次のリリースから付く。`verify-image.sh` が検査する）
 
 この組み合わせにより、**distroless のセキュリティ** と **Alpine の実用性** を両立し、コンテナ環境に最適化されたOSを実現しています。
 
@@ -274,7 +274,7 @@ Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）�
 
 - PIE (Position Independent Executables) — 全 ELF（`scripts/verify-image.sh` が検査）
 - Full RELRO (Relocation Read-Only + BIND_NOW) — 全 ELF（同上）
-- Stack-smashing protection — x86_64 は全 ELF。**arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**
+- Stack-smashing protection — x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**（main で修正済み、次のリリースから付く。`scripts/verify-image.sh` が検査する）
 - FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2` を指定しているが、musl は FORTIFY を実装しておらず効果は確認できていない
 
 #### ランタイム（イメージ側）
@@ -447,8 +447,8 @@ distroless は 2026-10-11 の値。
 
 | ワークフロー | トリガー | 目的 | 処理内容 |
 |------------|---------|------|---------|
-| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit / property）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、build-workflow.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
-| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
+| **ci.yml** | PR、main push、手動 | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit / property）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、build-workflow.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
+| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
 | **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
 | **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
 | **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら Issue）<br>• Trivy ファイルシステムスキャン |
