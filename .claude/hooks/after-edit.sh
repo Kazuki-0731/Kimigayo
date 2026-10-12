@@ -64,7 +64,9 @@ if [ "$REL" = "versions.mk" ]; then
 2. 捨てた古い値が他のファイルに残っていないか:
    git diff versions.mk | grep '^-[A-Z]' で旧値を拾って grep -rn
 3. README.md と docs/ のバージョン表記
-4. 版を上げたら build/ の残骸を疑う（make clean-<component>）
+4. 版を上げたら build/ の残骸を疑う
+   （docker compose run --rm kimigayo-build make clean-<component>。
+   ホストの Makefile には clean-<component> が無い）
 5. パッチが黙ってスキップされていないか:
    grep -iE 'skipped: [1-9]|not applicable' build/*-patches.log"
 fi
