@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`examples/python` で `import ssl` が `libssl.so.3` 不足で落ちていたのを直した。**
+  共有ライブラリを `python3` 本体の `ldd` からしか集めておらず、拡張モジュール
+  （`lib-dynload/*.so`）が使う libssl / libcrypto を拾っていなかった
+  （v3.0.1 を土台にしても落ちる、以前からの欠落）
+
+### Changed
+
+- `examples/` の土台を `kimigayo-os:3.0.2` に上げた
+- ドキュメント（README・Docker Hub の Overview・設計書・利用者向け文書・
+  性能の文書・リリースの手順）の実測値・タグ・署名の記述を v3.0.2 の実態に合わせた
+
 ## [3.0.2] "Himawari" (向日葵) - 2026-10-12
 
 **既知の CVE 5 件を塞ぎ、`wget` の HTTPS を直した版。**
@@ -41,6 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 脆弱性の報告窓口を GitHub Security Advisories に一本化した。
   文書にあった `kimigayo-os.org` のメール窓口・PGP 鍵は実在しなかった。
   `.github/SECURITY.md` を置いた。
+- **公開イメージに Cosign のキーレス署名を付けた**（`release.yml` の `sign` ジョブ）。
+  署名されているのは v3.0.2 以降で、v3.0.1 以前の公開イメージは未署名。
+  検証には cosign v3 以上が要る（v2 では `no signatures found` になる）
+- **同じコミットから rootfs の tarball がビット同一になるようにした。**
+  tar の並び順・mtime・所有者・gzip ヘッダを固定し、`/.kimigayo-build-info` の
+  `BUILD_DATE` をコミット時刻にして `BUILD_HOST` を消した。
+  同じコミット（46b05da）を CI と Manual Build で別々にビルドし、
+  standard / x86_64 の tarball の SHA-256 が一致することを確認した
+  （確認したのはこの 1 組だけで、Docker イメージの digest は見ていない）
+- `-Wl,-z,noexecstack` を musl / BusyBox / OpenRC のビルドスクリプトに明示した
+  （それまでは lld の既定に頼っていた）。`-fdebug-prefix-map` も
+  ビルドスクリプトの `CFLAGS` 上書きで消えていたのを組み直した
 
 ### Fixed
 
@@ -51,10 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTTPS は内蔵の TLS だけで処理する。**証明書は引き続き検証しない**（BusyBox の仕様）。
 - カーネルのビルド（`make kernel`、CI では作らない）で、Kconfig
   （`olddefconfig`）の失敗を飲み込んでいたのを止めた。
+- カーネルのビルドから `-Wno-error` を外した。6.6 系を GCC 15 で
+  ビルドするための回避策で、6.18 では不要だった（`manual-build.yml` を
+  `build_kernel=true` で両アーキに回して確認）。
 
 ### Changed
 
-- **BusyBox を動的リンクにした**（`/lib/libc.so` を OpenRC と共有）。
+- **BusyBox を動的リンクにした**（`/usr/lib/libc.so` を OpenRC と共有）。
   静的リンクでは x86_64 の BusyBox がビルド環境の `libc.a` を取り込み、
   Kimigayo が musl に当てたパッチが `/bin/sh` に効いていなかった。
   イメージは 165〜169KB 小さくなる。
@@ -179,6 +207,10 @@ Kimigayo では絶対に実行され得ない init スクリプト9本。
   - 「再現可能ビルド: ビット同一なビルド出力」— `config.mk` の
     `REPRODUCIBLE_FLAGS` は `REPRODUCIBLE_BUILD=yes` のときだけ効くが、
     この変数をどこも設定していない。ビット同一性の検証記録も無い
+    （**訂正: 「どこも設定していない」は誤り。** `build-system/Makefile` が
+    `REPRODUCIBLE_BUILD ?= yes` と `SOURCE_DATE_EPOCH` を設定している。
+    当時、検証記録が無かったのは事実。v3.0.2 で rootfs の tarball の
+    ビット同一を 1 組確認した）
   - 「イメージ署名: Docker Content Trust / Cosign」— `release.yml` に
     署名工程が無い
   - 「Trivy でイメージを自動スキャン」— パッケージデータベースを
@@ -256,7 +288,7 @@ BusyBox は static-pie で動くため `/bin/sh` は動き、smoke テストは�
 
 **6 バリアントすべてが `scripts/verify-image.sh` の 27 項目を通過。**
 起動時間とメモリはリリース時点では計測方法に問題があるため未測定だった
-（下記）。**2026-10-10 中に計測方法を直して実測した** → [Unreleased]。
+（下記）。**計測方法を直して実測した結果は [3.0.1] の Added。**
 
 ### Changed
 
@@ -306,7 +338,7 @@ BusyBox は static-pie で動くため `/bin/sh` は動き、smoke テストは�
 - **`.coveragerc`** — カバレッジ設定（`pytest.ini` に書いても効かないため）
 - `make print-versions` / `print-kernel` 等 — versions.mk の値を単発で取り出す
 - **`src/kernel/patches/README.md`** — 各パッチが存在する理由と、
-  版上げ時に当たらなくなったパッケージの扱い
+  版上げ時に当たらなくなったパッチの扱い
 - カーネル tarball の SHA-256 照合（これまで計算して表示するだけだった）
 - OpenRC tarball の SHA-256 照合（これまで「展開できたら OK」だった）
 - `make show-version` に構成要素のバージョン表示を追加
@@ -574,7 +606,7 @@ BusyBox は static-pie で動くため `/bin/sh` は動き、smoke テストは�
 詳細は `git log v0.1.0..v0.1.1`。
 
 
-## [0.1.0] - 2025-12-21
+## [0.1.0] - 2025-12-22
 
 ### Added
 - rootfsサイズ最適化を実装
