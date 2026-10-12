@@ -36,7 +36,7 @@ COPY --from=builder /stage/ /
 # 設定を読む前に開こうとするので、無いと起動時に alert が出る。
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /var/lib/nginx/logs \
              /var/www/html /etc/nginx/conf.d \
-    && printf '<html><body><h1>Kimigayo OS + Nginx</h1></body></html>\n' \
+    && printf '<html><body><h1>Welcome to Kimigayo OS + Nginx!</h1></body></html>\n' \
        > /var/www/html/index.html \
     && chown -R 65534:65534 /var/log/nginx /var/lib/nginx
 
@@ -48,7 +48,7 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
+  CMD wget -q --spider http://localhost:8080/ || exit 1
 
 # **root で動かさない。** Kimigayo のイメージには nobody (65534) が居ます。
 USER 65534
