@@ -1,6 +1,10 @@
 # Kimigayo OS セキュリティアドバイザリ
 
-**アドバイザリID**: KIMSA-YYYY-NNNN
+> アドバイザリは [GitHub Security Advisories](https://github.com/Kazuki-0731/Kimigayo/security/advisories)
+> で公開します。この雛形はその本文の下書き用です。
+
+**アドバイザリID**: GHSA-xxxx-xxxx-xxxx（GitHub が採番）
+**CVE**: CVE-YYYY-NNNNN（取得した場合）
 **公開日**: YYYY年MM月DD日
 **最終更新日**: YYYY年MM月DD日
 
@@ -16,7 +20,7 @@ Kimigayo OS [影響を受けるバージョン]において、[脆弱性の簡�
 
 ### 影響あり
 
-- Kimigayo OS v[バージョン] ([variant]: minimal, standard, extended)
+- Kimigayo OS v[バージョン]（イメージのタグ: `[バージョン]-[variant]`。variant: minimal, standard, extended）
 - [その他の影響を受けるバージョン]
 
 ### 影響なし
@@ -27,10 +31,6 @@ Kimigayo OS [影響を受けるバージョン]において、[脆弱性の簡�
 ---
 
 ## 脆弱性の詳細
-
-### CVE識別子
-
-**CVE**: CVE-YYYY-NNNNN
 
 ### CWE分類
 
@@ -92,8 +92,7 @@ Kimigayo OS [影響を受けるバージョン]において、[脆弱性の簡�
 
 ### 修正コミット
 
-- GitHub コミット: [`[コミットハッシュ]`](https://github.com/Kazuki-0731/Kimigayo/commit/[ハッシュ])
-- プルリクエスト: [#PR番号](https://github.com/Kazuki-0731/Kimigayo/pull/[番号])
+- GitHub コミット: `https://github.com/Kazuki-0731/Kimigayo/commit/[ハッシュ]`
 
 ---
 
@@ -166,17 +165,12 @@ docker exec [container-name] cat /etc/os-release
 ### ソースからのビルド
 
 ```bash
-# リポジトリの更新
-git pull origin main
+git fetch --tags origin
 git checkout v[修正版バージョン]
-
-# ビルド
-make clean
-make build
-
-# テスト
-make test
 ```
+
+ビルドの手順は [BUILD_GUIDE.md](../developer/BUILD_GUIDE.md) を参照してください
+（`make build` は構成要素をビルドするだけで、Docker イメージは作りません）。
 
 ---
 
@@ -188,14 +182,23 @@ make test
 # バージョン確認
 docker exec [container-name] cat /etc/os-release | grep VERSION
 
-# 脆弱性スキャン
-trivy image ishinokazuki/kimigayo-os:[タグ]
+# 署名の確認（cosign v3 以上。v2 では no signatures found になる）
+cosign verify ishinokazuki/kimigayo-os:[修正版タグ] \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+# 既知の CVE の照合（リポジトリで実行。kimigayo-os:<variant>-<arch> を対象にする）
+make scan-image VARIANT=standard ARCH=x86_64
 ```
 
 期待される出力：
 ```
-# 脆弱性が検出されないこと、または修正済みであることを確認
+# cosign verify が成功し、scan-image が該当の CVE を検出しない
+# （パッチで塞いだ CVE は /.kimigayo-build-info の PATCHED_CVES に記録され、照合から除外される）
 ```
+
+`trivy image` は使いません（パッケージ DB の無い Kimigayo を識別できず、何も検査しない）。
+公開イメージの SBOM（CycloneDX）は GitHub Release に添付しています。
 
 ---
 
@@ -203,7 +206,7 @@ trivy image ishinokazuki/kimigayo-os:[タグ]
 
 | 日付 | イベント |
 |------|---------|
-| YYYY-MM-DD | 脆弱性を発見 |
+| YYYY-MM-DD | 脆弱性を発見（報告を受領） |
 | YYYY-MM-DD | 内部での影響評価完了 |
 | YYYY-MM-DD | 修正実装開始 |
 | YYYY-MM-DD | 修正完了・内部テスト |
@@ -228,9 +231,9 @@ Kimigayo OSプロジェクトは、責任ある脆弱性開示プロセスに従
 
 ### 関連リンク
 
-- **CVE詳細**: https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-YYYY-NNNNN
-- **GitHub Issue**: https://github.com/Kazuki-0731/Kimigayo/issues/[番号]
-- **修正PR**: https://github.com/Kazuki-0731/Kimigayo/pull/[番号]
+- **CVE詳細**: https://www.cve.org/CVERecord?id=CVE-YYYY-NNNNN
+- **修正コミット**: https://github.com/Kazuki-0731/Kimigayo/commit/[ハッシュ]
+- **CHANGELOG**: [CHANGELOG.md](../../CHANGELOG.md) の該当版の Security 節
 - **Kimigayo OSセキュリティポリシー**: [SECURITY_POLICY.md](./SECURITY_POLICY.md)
 
 ### 技術資料
@@ -246,8 +249,9 @@ Kimigayo OSプロジェクトは、責任ある脆弱性開示プロセスに従
 
 セキュリティに関する質問や懸念がある場合は、以下にご連絡ください：
 
-- **Email**: security@[プロジェクトドメイン]
 - **GitHub Security Advisories**: https://github.com/Kazuki-0731/Kimigayo/security/advisories
+  （窓口はここだけです。メールの窓口はありません）
+- **質問・相談**: https://github.com/Kazuki-0731/Kimigayo/discussions
 
 ### 脆弱性報告
 
@@ -275,4 +279,4 @@ Kimigayo OSプロジェクトは、責任ある脆弱性開示プロセスに従
 **公開ステータス**: [Draft / Published]
 **機密性**: Public
 
-© 2025 Kimigayo OS Project. All rights reserved.
+ライセンスはリポジトリの [LICENSE](../../LICENSE) に従います。
