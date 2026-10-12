@@ -30,12 +30,15 @@
 - **測定単位**: ミリ秒（ms）
 - **統計値**: 平均値、中央値
 - **比較対象**: Alpine Linux（既定は `alpine:latest`）
-- **Speedup**: Alpine の**平均** / Kimigayo の**平均**（1.00 より大きいと Kimigayo が速い）
+- **比（`ratio_median`）**: Alpine の**中央値** / Kimigayo の**中央値**（1.00 より大きいと Kimigayo が速い）。
+  画面の `Ratio(med)` 列はこれ
+- **平均の比（`ratio_avg`）**: Alpine の平均 / Kimigayo の平均。JSON にだけ残す
+- **`speedup`**: JSON 上の `ratio_median` の別名（既存の読み手のために残している）
 
-> **スクリプトの Speedup は平均から計算している**（`scripts/benchmark-busybox.sh` の
-> `calculate_speedup` に `*_avg` を渡している）。一方、[README.md](../../README.md) の
-> 「0.97〜1.01x」は**中央値の比**として書かれている。同じ「Speedup」でも両者は別の値なので、
-> 引用するときはどちらかを明記する。
+> **2026-10-13 まで、スクリプトの「Speedup」は平均の比だった。** 一方
+> [README.md](../../README.md) の「0.97〜1.01x」は**中央値の比**で、同じ名前で
+> 別の値を指していた（`docker run` の外れ値に平均が引っ張られる）。いまは中央値の比を
+> 主にしている。**それ以前の記録（下の 2026-10-10・2026-10-11）の「Speedup」は平均の比。**
 
 ## 使用方法
 
@@ -83,24 +86,30 @@ benchmark-results/
 
 ### コンソール出力例
 
-`benchmark-results/busybox.json`（2026-10-11、v3.0.1、arm64）の値を並べたもの:
+`benchmark-results/busybox.json`（2026-10-11、v3.0.1、arm64）の値を、いまの表示形式で
+並べたもの（`Ratio(med)` は中央値から計算し直した値）:
 
 ```
 === Benchmark Summary ===
 
-Command              Kimigayo (ms)     Alpine (ms)        K Median        A Median      Speedup
+Command                 Kimigayo Avg      Alpine Avg        K Median        A Median   Ratio(med)
 -------------------- --------------- --------------- --------------- --------------- ------------
-ls                              879             884             884             880        1.01x
-grep                            952             934             909             921        0.98x
-find                            861             850             862             849        0.99x
-awk                             871             883             868             867        1.01x
-sort                            828             845             825             850        1.02x
-cat                             847             854             833             856        1.01x
+ls                              879             884             884             880        1.00x
+grep                            952             934             909             921        1.01x
+find                            861             850             862             849        0.98x
+awk                             871             883             868             867        1.00x
+sort                            828             845             825             850        1.03x
+cat                             847             854             833             856        1.03x
 wc                              891             884             891             885        0.99x
-head                            880             885             873             871        1.01x
+head                            880             885             873             871        1.00x
+
+Ratio(med) = Alpine median / Kimigayo median (> 1.00 means Kimigayo is faster)
 ```
 
 ### JSON出力例
+
+いまの形式（値は上と同じ v3.0.1 の測定。当時のファイルには `ratio_median`・`ratio_avg`・
+`ratio_definition` が無く、`speedup` は平均の比だった）:
 
 ```json
 {
@@ -108,13 +117,16 @@ head                            880             885             873             
   "kimigayo_image": "ishinokazuki/kimigayo-os:3.0.1",
   "alpine_image": "alpine:3.24",
   "iterations": 10,
+  "ratio_definition": "ratio_median = alpine_median_ms / kimigayo_median_ms; ratio_avg = ...",
   "results": {
     "ls": {
       "kimigayo_avg_ms": 879,
       "kimigayo_median_ms": 884,
       "alpine_avg_ms": 884,
       "alpine_median_ms": 880,
-      "speedup": 1.01,
+      "ratio_median": 1.00,
+      "ratio_avg": 1.01,
+      "speedup": 1.00,
       "kimigayo_samples": [830, 910, 890, ...]
     },
     ...
@@ -134,7 +146,8 @@ head                            880             885             873             
 ### v3.0.1（2026-10-11）
 
 **測定条件:** `ishinokazuki/kimigayo-os:3.0.1` vs `alpine:3.24`、arm64 ネイティブ、各10回。
-値は上の「コンソール出力例」のとおりで、Speedup（平均の比）は **0.98〜1.02x**。
+値は上の「コンソール出力例」のとおりで、中央値の比は **0.98〜1.03x**
+（当時のスクリプトが出した Speedup ＝平均の比は 0.98〜1.02x）。
 生データは `benchmark-results/busybox.json`。
 
 ### Kimigayo OS vs Alpine Linux（2026-10-10）
@@ -144,7 +157,7 @@ arm64 ネイティブ、各10回。
 
 2回測った結果を並べる。**同じコマンドが走るたびに前後する。**
 
-| コマンド | 1回目 Speedup | 2回目 Speedup |
+| コマンド | 1回目 Speedup（平均の比） | 2回目 Speedup（平均の比） |
 |---------|-------------|-------------|
 | ls | 1.01x | 1.01x |
 | grep | 1.00x | **1.12x** |
@@ -267,7 +280,7 @@ make benchmark-busybox VARIANT=extended
 ### 測定精度について
 
 - **時間精度**: ミリ秒単位（1ms = 0.001秒）
-- **統計手法**: 平均値と中央値を併用（Speedup は平均から計算）
+- **統計手法**: 平均値と中央値を併用（比は中央値から計算。平均の比も JSON に残す）
 - **ばらつき**: 同じ条件で走らせ直しても ±10% 程度動く（→「実測値」節）
 
 ### Docker操作のオーバーヘッド
