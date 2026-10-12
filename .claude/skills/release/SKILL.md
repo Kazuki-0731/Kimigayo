@@ -33,7 +33,7 @@ v0.1.0 から v2.0.1 までの**公開済み4タグすべて**で次が同時に
 ## 1. 品質ゲート
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 526 件
+python3 -m pytest tests/unit tests/property -q     # 530 件（2026-10-12 時点）
 make shellcheck-scan                               # scripts/ と .claude/hooks/
 make security-scan                                 # scan-image（CVE + 秘密情報）+ Trivy FS + ShellCheck
 make ci-build-local                                # Linux ホストのみ
@@ -121,7 +121,7 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 （2026-10-11 まで `cat > CHANGELOG.md` で全消しする作りでした）。
 
 **破壊的変更・既知の問題を隠さないこと。** 前の版に無かった制約
-（例: イメージサイズが 1.17MB → 2.78MB になった理由は
+（例: v3.0.0 でイメージサイズが 1.17MB → 2.78MB になった理由は
 **v2.0.1 に Init も libc も入っていなかったから**）は明記します。
 
 `docs-reconciler` subagent で突合できます。
@@ -203,9 +203,9 @@ done
 
 | | 一致していること |
 | --- | --- |
-| イメージタグ | `3.0.0` |
-| `LABEL version` | `3.0.0` |
-| `/etc/os-release` の `VERSION_ID` | `3.0.0` |
+| イメージタグ | `<X.Y.Z>`（v なし） |
+| `LABEL version` | `<X.Y.Z>` |
+| `/etc/os-release` の `VERSION_ID` | `<X.Y.Z>` |
 | `LABEL io.kimigayo.variant` | そのタグのバリアント |
 | `/bin/busybox` の ELF type | `3`（DYN = PIE）|
 | `openrc default` | 終了コード 0 |

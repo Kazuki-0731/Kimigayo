@@ -66,8 +66,10 @@ done
 ls build/kernel/output/vmlinuz-* 2>/dev/null
 ```
 
-空欄は未ビルド。**BusyBox は `1.38.0+standard` のように版＋バリアント**で、
-バリアントが違えばビルドし直す必要があります。
+空欄は未ビルド。**BusyBox は `1.38.0+standard+dynamic+<hash>`**
+（版・バリアント・リンク方法・入力の内容ハッシュ）、**musl は `1.2.6+<hash>`**
+（版・パッチとビルドスクリプトの内容ハッシュ）、OpenRC は版だけです。
+先頭の版を `versions.mk` と突合します。
 musl のインストール先は arm64 のとき `musl-install-aarch64`（`arm64` ではない）。
 
 ### 3. チェックサムが上流と合っているか
@@ -102,21 +104,26 @@ for r in d["releases"]:
 - OpenRC: aports の `main/openrc/APKBUILD` の `pkgver`
 - Alpine: `https://alpinelinux.org/releases/`
 
-**カーネルは EOL も見ます。** 現在の 6.18.55 は EOL 2028-12。
+**カーネルは EOL も見ます。** 現在の版と EOL は `versions.mk` の
+`KERNEL_VERSION` の直前のコメントにあります。
 
 ### 5. パッチが黙ってスキップされていないか
 
 ```bash
-grep -iE 'skipped: [1-9]|not applicable' \
-  build/kernel-patches.log build/busybox-patches.log
+grep -iE 'skipped: [1-9]|not applicable|does not apply|failed: [1-9]' \
+  build/kernel-patches.log build/busybox-patches.log build/musl-patches.log
 ```
 
 `scripts/apply-kernel-patches.sh` は `patch -p1 --dry-run` が通らない
 パッチを `log_warn` して `return 0` します。**当たらないパッチは黙って
 飛ばされ、ビルドは成功したように見えます。**
+BusyBox（`apply-busybox-patches.sh`）と musl（`apply-musl-patches.sh`）は
+当たらなければビルドを止めます。
 
-さらに `src/busybox/patches/` と `src/kernel/patches/` の各パッチが
-**今の版に当たるか**を dry-run で確認します。
+さらに `src/busybox/patches/`・`src/libc/patches/`・`src/kernel/patches/` の
+各パッチが**新しい版に当たるか**を、新しい版の未パッチのソースで dry-run します
+（`build/busybox-<ver>` は既にパッチ済みのことがあり、その場合は
+「already applied」になります）。
 
 ```bash
 # 例
@@ -144,7 +151,8 @@ grep -oE "^option\('[a-z_-]+'" build/openrc-*/meson_options.txt
 バージョン監査 (YYYY-MM-DD)
 
 versions.mk の宣言
-  kernel 6.18.55 / musl 1.2.6 / busybox 1.38.0 / openrc 0.63.2 / alpine 3.24
+  kernel <ver> / musl <ver> / busybox <ver> / openrc <ver> / alpine <ver>
+  （make print-versions の出力をそのまま）
 
 実際にビルドされているもの
   <一覧。食い違いがあれば明示>

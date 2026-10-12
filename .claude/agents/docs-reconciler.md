@@ -20,10 +20,12 @@ color: blue
 - README が長く載せていた起動時間 439ms とメモリ 0.2MB は、ベンチマーク
   スクリプトが測り間違えた値だった（起動は `docker run -d <image> sleep 5`
   の終了まで、メモリは `KiB` を潰して整数 MB に丸めていた）。
-  **2026-10-10 に両方を直して実測済み**（arm64 ネイティブで 0.62 秒 /
-  232KB）。**この 2 つの旧値がまだ生きた数値として載っている箇所を探す**
+  **2026-10-10 に両方を直して測り直した**（v3.0.1 は arm64 ネイティブで
+  0.61 秒 / 232KB、v3.0.2 は 0.60 秒 / 288KB）。
+  **この 2 つの旧値がまだ生きた数値として載っている箇所を探す**
 - **v2.0.1 の 1.17MB は OpenRC も `libc.so` も `/tmp` も入っていない
-  イメージの値**で、現在の 2.78MB と同じものを測った数字ではない
+  イメージの値**で、現在の値（v3.0.2 の Standard x86_64 で 2.60MB）と
+  同じものを測った数字ではない
 
 **「書いてあるから正しい」と思わないこと。** `git ls-files` と `make help` で突合します。
 
@@ -62,10 +64,10 @@ grep -rn --include='*.md' -E '(6\.[0-9]+\.[0-9]+|1\.2\.[0-9]|1\.3[0-9]\.[0-9]|0\
 ### 3. 存在しないファイル・ターゲット・コマンドへの言及
 
 ```bash
-# ドキュメントが参照しているパスを拾って存在を確認する
-grep -rhoE '\[[^]]+\]\(([^)#]+)\)' --include='*.md' . |
-  sed -E 's/.*\(([^)#]+)\).*/\1/' | grep -v '^http' | sort -u |
-  while read -r p; do [ -e "$p" ] || echo "リンク切れ: $p"; done
+# リンク切れは追跡ファイル基準で判定する（CI でも走る）。
+# ファイルシステムの存在（[ -e ]）で判定しないこと: .gitignore された
+# TODO.md などは手元にあるので、clone した人にだけ壊れているリンクを見逃す
+make check-links        # = python3 scripts/check-links.py
 
 # make ターゲット
 # **Makefile は2つある。** ホストの Makefile と build-system/Makefile で、
@@ -132,8 +134,9 @@ grep -rhoE 'make [a-z][a-z0-9_-]+' --include='*.md' . | grep -v '^./build' |
   `DOCKERHUB_README.md` から削除したもの: 「seccomp をデフォルトで
   有効化」（rootfs にプロファイルが無い）、「Cosign で署名」
   （`release.yml` に工程が無い）、「再現可能ビルド＝ビット同一」
-  （`REPRODUCIBLE_BUILD` を誰も設定しておらず、`config.mk` 自体が
-  include されていない）、「`stable` / `edge` タグ」（Docker Hub に
+  （当時はビット同一性の検証記録が無かった。※`REPRODUCIBLE_BUILD` は
+  `build-system/Makefile` が設定しており、「誰も設定していない」とした当時の
+  説明は誤り。rootfs の tarball のビット同一は v3.0.2 で 1 組確認済み）、「`stable` / `edge` タグ」（Docker Hub に
   存在しない）
 - **`config.mk` を実装の根拠にしないこと。** どこからも include されて
   いないので、中の変数はすべて無効です。強化フラグの実体は

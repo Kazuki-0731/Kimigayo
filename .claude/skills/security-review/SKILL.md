@@ -101,7 +101,8 @@ musl 1.2.4 / OpenRC 0.40 で既知の 12 件が出る）。
 **Alpine aports のパッチを必ず見ます。** 上流が新版を出していなくても、
 Alpine が CVE パッチを当てていることがあります
 （2026-10-11: musl 1.2.6 の CVE-2026-40200 / CVE-2026-6042 は
-`main/musl` の pkgrel=5 でパッチ済み、Kimigayo は未適用）。
+`main/musl` の pkgrel=5 でパッチ済みだった。Kimigayo は v3.0.2 で
+`src/libc/patches/` に取り込んだ）。
 
 ```bash
 curl -s https://git.alpinelinux.org/aports/plain/main/musl/APKBUILD | grep -n 'CVE'
@@ -142,8 +143,8 @@ grep -n 'CONFIG_<APPLET>' src/busybox/config/*.config
 docker run --rm --platform linux/<arch> <image> busybox --list | grep -x '<applet>'
 ```
 
-**バリアントごとに結論が変わります。** minimal 370 / standard 403 /
-extended 413 アプレット。1つの答えで済ませないこと。
+**バリアントごとに結論が変わります。** v3.0.1 以降 minimal 367 /
+standard 400 / extended 411 アプレット。1つの答えで済ませないこと。
 
 `version-auditor` subagent に上流の新版調査を任せられます。
 
@@ -175,7 +176,8 @@ SECURITY_LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 >
 > **再現可能ビルドの配線はある**（`build-system/Makefile` の
 > `REPRODUCIBLE_BUILD ?= yes` と `SOURCE_DATE_EPOCH := 0`）。
-> ただしビット同一性は未検証（→ CLAUDE.md「セキュリティ」節）。
+> rootfs の tarball のビット同一は 2026-10-12 に 1 組（standard / x86_64）
+> 確認済み。Docker イメージの digest は未確認（→ CLAUDE.md「セキュリティ」節）。
 
 **PIE / RELRO / BIND_NOW / 非実行スタックは `verify-image.sh` が
 イメージ内の全 ELF で自動検査しています**（`scripts/check-elf-hardening.py`、
@@ -333,7 +335,10 @@ gh pr list --limit 10
 
 **利用者は `apk upgrade` で直せません。** 対応は必ずこの形になります。
 
-1. `versions.mk` で構成要素の版を上げる（→ `version-bump` skill）
+1. `versions.mk` で構成要素の版を上げる（→ `version-bump` skill）。
+   上流がまだ修正版を出していなければ、修正パッチを
+   `src/busybox/patches/`・`src/libc/patches/` に置く（ファイル名に CVE ID を
+   入れる。→ CLAUDE.md「パッチはなぜ存在するか」節）
 2. 再ビルド
 3. `rootfs-verifier` で成果物を検査
 4. 新しいタグを切って Docker Hub に出す（→ `release` skill、**要承認**）

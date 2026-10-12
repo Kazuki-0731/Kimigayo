@@ -66,8 +66,10 @@ docker run --rm --platform linux/<arch> <image> /bin/sh -c \
 1.1MB が 57.8KB の `start-stop-daemon` に化けた事故が実際にありました。
 
 ```bash
-ls -l "$ROOTFS/bin/busybox"          # 1.0〜1.3MB 程度あるか
-file "$ROOTFS/bin/busybox"           # 目的の arch の static な ELF か
+ls -l "$ROOTFS/bin/busybox"          # 1MB 前後あるか（57.8KB などは上書きの疑い）
+file "$ROOTFS/bin/busybox"           # 目的の arch の ELF か。既定は動的リンク
+                                     # （interpreter /lib/ld-musl-<arch>.so.1）。
+                                     # BUSYBOX_LINK=static なら static-pie
 ```
 
 ### 4. OpenRC が `/sbin` に揃っているか
@@ -95,13 +97,14 @@ grep -rIl 'DOCKER_HUB\|ACCESS_TOKEN' "$ROOTFS" 2>/dev/null | head
 ### 7. バリアントとアーキテクチャが宣言どおりか
 
 ```bash
-busybox --list | wc -l    # minimal 370 / standard 403 / extended 413 が目安
+busybox --list | wc -l    # v3.0.1 以降は minimal 367 / standard 400 / extended 411 が目安
 cat "$ROOTFS/.kimigayo-build-info"
 ```
 
 バリアントを切り替えたのにアプレット数が前と同じなら、BusyBox の
-ビルドがスキップされた疑いがあります（スタンプは `1.38.0+standard` の
-形式で版＋バリアントを持ちます）。
+ビルドがスキップされた疑いがあります（スタンプは
+`1.38.0+standard+dynamic+<hash>` の形式で、版・バリアント・リンク方法・
+入力の内容ハッシュを持ちます）。
 
 ### 8. セキュリティの回帰（イメージがあるとき）
 

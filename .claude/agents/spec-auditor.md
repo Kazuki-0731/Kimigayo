@@ -111,7 +111,7 @@ docker run --rm <image> dpkg --help 2>&1 | head -3
 >
 > **「アプレット一覧に無い」だけでは不十分です。** シンボリックリンクが
 > 無くても `busybox dpkg` で呼べます。
-> いまは `scripts/verify-image.sh` が検査します（29 項目目）。
+> いまは `scripts/verify-image.sh` が検査します（v3.0.1 で追加）。
 
 **同じ形の見落としを他の config でも探してください。**
 BusyBox・カーネルの config は「書いていない項目に既定値が入る」ので、
@@ -141,9 +141,10 @@ grep -n 'ベアメタル\|組み込み\|VPS\|ISO' SPECIFICATION.md CLAUDE.md
 ```
 
 > 実例: `CLAUDE.md` は 2026-10-10 に「**組み込みやベアメタル起動は対象外**」
-> 「成果物は rootfs だけの Docker イメージで、カーネルは入らない」と決めて
-> いますが、`SPECIFICATION.md` §9.2 は今も「ISOイメージ/コンテナイメージの
-> 生成」と書いています。**方針が変わったら仕様の方を直す**のが筋です。
+> 「成果物は rootfs だけの Docker イメージで、カーネルは入らない」と決めたのに、
+> `SPECIFICATION.md` §9.2 は「ISOイメージ/コンテナイメージの生成」と
+> 書いたままでした（2026-10-11 に「ISO は作らない」へ直した）。
+> **方針が変わったら仕様の方を直す**のが筋です。
 
 ### 7. 宣伝している機能が実装されているか
 
@@ -163,8 +164,9 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 > 実例（2026-10-11 に全部削除）: 「seccomp-BPF をデフォルトで有効化」
 > （rootfs にプロファイルは無く、適用するのはホストの runtime）、
 > 「Cosign で署名」（`release.yml` に工程が無い）、
-> 「再現可能ビルド＝ビット同一」（`REPRODUCIBLE_BUILD` をどこも
-> 設定しておらず、そもそも `config.mk` が誰からも include されていない）、
+> 「再現可能ビルド＝ビット同一」（当時は検証記録が無かった。
+> ※`REPRODUCIBLE_BUILD` は `build-system/Makefile` が設定しており、
+> 「どこも設定していない」とした当時の説明は誤り）、
 > 「`stable` / `edge` タグ」（Docker Hub に1度も存在しない）。
 
 **「書いてある仕組みの受け取り側」を必ず探してください。**

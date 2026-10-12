@@ -27,7 +27,7 @@ allowed-tools: Bash(make print-versions), Bash(git:*), Bash(find:*), Bash(ls:*),
 
 ## パッチが黙ってスキップされていないか
 
-!`grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-patches.log 2>/dev/null || echo '問題なし（またはログ未生成）'`
+!`grep -iE 'skipped: [1-9]|not applicable|does not apply|failed: [1-9]' build/kernel-patches.log build/busybox-patches.log build/musl-patches.log 2>/dev/null || echo '問題なし（またはログ未生成）'`
 
 ---
 
@@ -43,7 +43,8 @@ allowed-tools: Bash(make print-versions), Bash(git:*), Bash(find:*), Bash(ls:*),
 とくに次の食い違いは見逃さないこと:
 
 - 宣言バージョンと実ビルド版の不一致（古いバイナリが使われる事故）
-- BusyBox のスタンプにバリアントが入っていない、または測りたい
-  バリアントと違う（`1.38.0+standard` の形式）
+- BusyBox のスタンプが測りたいバリアント・リンク方法と違う
+  （`1.38.0+standard+dynamic+<hash>` の形式。バリアントもリンク方法も
+  入っていない古い形式なら作り直す）
 - 未追跡ファイルの放置（`.hypothesis/` の59ファイルが9か月放置された前例）
 - `not applicable` なパッチ

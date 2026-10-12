@@ -100,11 +100,14 @@ ALPINE_VERSION  ?= 3.24
 cd build/busybox-<新版> && patch -p1 --dry-run < ../../src/busybox/patches/<p>.patch
 ```
 
-**`apply-*-patches.sh` は当たらないパッチを `log_warn` して `return 0` します。**
+**`apply-kernel-patches.sh` は当たらないパッチを `log_warn` して `return 0` します。**
 黙ってスキップされ、ビルドは成功したように見えます。
+BusyBox（`apply-busybox-patches.sh`）と musl（`apply-musl-patches.sh`）は
+当たらなければビルドを止めます。
 
 ```bash
-grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-patches.log
+grep -iE 'skipped: [1-9]|not applicable|does not apply|failed: [1-9]' \
+  build/kernel-patches.log build/busybox-patches.log build/musl-patches.log
 ```
 
 出たら「上流が取り込んだので不要」か「当て直しが必要」かを判断します。
@@ -113,7 +116,7 @@ grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-
 
 > **前例**: カーネル 6.6 用の `0002-disable-retpoline-realmode.patch` ほか
 > 3本は `-std=gnu11` 回避策で、6.18 では上流が取り込んだため削除した。
-> ただし `0003`/`0004` を消したあと `build-kernel.sh` の
+> ただし `0002` を消したあと `build-kernel.sh` の
 > `REALMODE_CFLAGS` 上書きが残っていて
 > `undefined reference to '__x86_return_thunk'` でリンクが落ちた。
 > **上流の変数を「置き換える」と、その変数が持つ他の定義まで落ちます。**
@@ -133,8 +136,9 @@ grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-
 （`clean-musl` / `clean-kernel` / `clean-busybox` / `clean-openrc`）。
 `make clean-all` は約150MBの再取得を招くので最後の手段です。
 
-**BusyBox のスタンプは版＋バリアント**（`1.38.0+standard`）。
-バリアントを切り替えて測るときはスキップされていないことを確認します。
+**BusyBox のスタンプは版・バリアント・リンク方法・入力の内容ハッシュ**
+（`1.38.0+standard+dynamic+<hash>`）、musl は版と内容ハッシュ、
+OpenRC は版だけです。バリアントを切り替えて測るときはスキップされていないことを確認します。
 
 ## 8. ビルドして検証する
 
@@ -149,15 +153,12 @@ docker compose run --rm kimigayo-build sh -c \
   'cd /build/kimigayo && ARCH=x86_64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
 ```
 
-**arm64 のクロスビルドを手元で回すなら compose を使わない**
-（`memory: 2G` で `meson setup` が OOM kill される）:
+arm64 のクロスビルドも同じ compose で回せます（memory 上限は 8G。
+2026-10-09 に 2G から上げるまでは `meson setup` が OOM kill されていた）:
 
 ```bash
-docker run --rm --platform linux/amd64 --memory 8g \
-  -v "$PWD:/build/kimigayo:rw" \
-  -v kimigayo-downloads:/build/kimigayo/build/downloads \
-  -w /build/kimigayo kimigayo-os-build:latest \
-  sh -c 'ARCH=arm64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
+docker compose run --rm -T kimigayo-build sh -c \
+  'cd /build/kimigayo && ARCH=arm64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
 ```
 
 **成果物は `rootfs-verifier` subagent に検査させます。**
@@ -191,7 +192,7 @@ done
 | 種類 | 置き場所 |
 | --- | --- |
 | 版上げで壊れた箇所 | `TODO.md`、`CHANGELOG.md` |
-| パッチの経緯 | `src/{kernel,busybox}/patches/README.md` |
+| パッチの経緯 | `src/kernel/patches/README.md`、パッチ冒頭のコメント、CLAUDE.md「パッチはなぜ存在するか」節 |
 | 同じ罠の再発防止 | `docs/troubleshooting/` に追記 |
 | コードレベルのミス | `tests/unit/`・`tests/property/` に回帰テスト |
 | 機械的に止められるもの | `verify_rootfs`・`.claude/hooks/`・CI |
