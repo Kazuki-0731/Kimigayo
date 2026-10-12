@@ -188,7 +188,7 @@ json.dump({
         rc=$?
     fi
     if [ "$rc" -eq 0 ]; then
-        log_info "  ✓ no known vulnerabilities at or above '$FAIL_ON'"
+        log_info "  ✓ no known vulnerabilities at or above '$FAIL_ON' (NVD CPE match only; Alpine-only fixes are not visible)"
     else
         log_error "  ✗ known vulnerabilities at or above '$FAIL_ON' (or grype failed: rc=$rc)"
         log_error "      対応は security-review skill。上流の修正版か、Alpine aports のパッチを確認する"

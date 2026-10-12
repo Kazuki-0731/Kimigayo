@@ -137,7 +137,7 @@ verify_checksum() {
             log_info "Checksum verification: OK"
             return 0
         else
-            # チェックソムが合わないものは使わない（警告だけで通していた挙動を修正）
+            # チェックサムが合わないものは使わない（警告だけで通していた挙動を修正）
             log_error "Checksum mismatch!"
             log_error "Expected: $expected"
             log_error "Actual:   $actual"

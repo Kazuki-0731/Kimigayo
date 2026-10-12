@@ -107,7 +107,7 @@ echo -e "${GREEN}✓ draft written${NC}"
 echo "  $OUTPUT_FILE"
 if [ "$uncategorized" -gt 0 ]; then
     echo -e "${YELLOW}  ! ${uncategorized} version(s) have Uncategorized commits.${NC}"
-    echo -e "${YELLOW}    Their emoji is not in the CLAUDE.md table - check it before copying.${NC}"
+    echo -e "${YELLOW}    Their emoji is not mapped in section_of() (📌 and ⏪ always land here) - check them before copying.${NC}"
 fi
 echo ""
 echo "CHANGELOG.md is not touched. Copy what you need by hand."

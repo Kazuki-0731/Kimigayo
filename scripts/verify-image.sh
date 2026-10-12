@@ -55,7 +55,8 @@ case "$ARCH" in
 esac
 
 # バリアントごとのアプレット数の下限。
-# 2026-10-09 の実測は minimal 370 / standard 403 / extended 413。
+# 実測は minimal 367 / standard 400 / extended 411（v3.0.1 以降。
+# dpkg 等の 3 つを外す前の v3.0.0 までは 370 / 403 / 413）。
 # 下限で見るのは、アプレットが増える変更を落とさないため。
 # 上限も見るのは、バリアントの取り違え（minimal に standard の BusyBox が
 # 入る事故が実際にあった）を捕まえるため。
@@ -142,7 +143,7 @@ case "$bb_size" in
         # 1.1MB が 57.8KB の start-stop-daemon に化けた事故がある。
         #
         # 閾値は 500,000。以前は 1,000,000 だったが、それは静的リンク
-        # （libc を内包）前提の値で、動的リンクの minimal は 890KB になる。
+        # （libc を内包）前提の値で、動的リンクの minimal は約 870KB（x86_64）になる。
         # 事故の 57.8KB とは桁が違うので 500KB でも十分に検知できる。
         # 「本当に BusyBox か」は下の識別検査で直接確かめる。
         if [ "$bb_size" -ge 500000 ]; then
@@ -169,7 +170,7 @@ case "$applets" in
         else
             fail "$applets applets, outside ${APPLET_MIN}-${APPLET_MAX} for $VARIANT"
             log_error "      バリアントの取り違えか、BusyBox のビルドがスキップされた疑い"
-            log_error "      （.kimigayo-build-version は '1.38.0+<variant>+<link>+<hash>' の形式）"
+            log_error "      （.kimigayo-build-version は '${BUSYBOX_VERSION}+<variant>+<link>+<hash>' の形式）"
         fi
         ;;
 esac
