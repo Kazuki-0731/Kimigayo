@@ -19,7 +19,7 @@
 # → CLAUDE.md「判断が絡まないミスは文章にしない」節
 #
 # 判定は2条件の AND なので、ビルドしていないときは一切発火しない。
-#   1. kimigayo のビルドコンテナが走っている
+#   1. kimigayo のビルドコンテナ（kimigayo-os-build / kimigayo-build-env）が走っている
 #   2. 編集対象がビルド中に読まれるファイル（scripts/ か build-system/）
 
 set -uo pipefail
@@ -46,7 +46,19 @@ case "$REL" in
 esac
 
 command -v docker >/dev/null 2>&1 || exit 0
-running="$(docker ps --format '{{.Image}} {{.Names}}' 2>/dev/null | grep -i kimigayo || true)"
+# ビルドコンテナだけを見る。`grep -i kimigayo` では、計測やスモークテストで
+# 走らせた成果物のコンテナ（kimigayo-os:* / ishinokazuki/kimigayo-os:*）まで
+# 一致してしまい、ビルドしていないのに編集を止めていた（2026-10-13）。
+# 名前は docker-compose.yml の kimigayo-build サービスから取る:
+#   - image: kimigayo-os-build:latest（`docker run` で直接叩いた場合も含む）
+#   - container_name: kimigayo-build-env
+#   - `docker compose run` は container_name を使わず
+#     <project>-kimigayo-build-run-<id> になるので、compose のラベルでも見る
+running="$(docker ps --format '{{.Image}}|{{.Names}}|{{.Label "com.docker.compose.service"}}' 2>/dev/null |
+    awk -F'|' '
+        $1 ~ /^kimigayo-os-build(:|$)/ || $2 == "kimigayo-build-env" || $3 == "kimigayo-build" {
+            print $1 " " $2
+        }' || true)"
 [ -n "$running" ] || exit 0
 
 {
