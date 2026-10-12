@@ -13,12 +13,15 @@ services:
     volumes:
       # ソースコードをマウント
       - .:/build/kimigayo:rw
-      # ビルド出力を永続化
+      # 注: どのスクリプトも /output に書かない（実際の出力先は
+      # /build/kimigayo/output = リポジトリの output/）。このボリュームは未使用
       - kimigayo-output:/output
       # ダウンロードキャッシュを永続化（ローカルビルド高速化）
       # カーネル、musl、BusyBox、OpenRCのソースtarballをキャッシュ
       - kimigayo-downloads:/build/kimigayo/build/downloads
-      # Dockerソケットをマウント（テスト用）
+      # Dockerソケットをマウント（読み取り専用）
+      # 注: ビルド環境イメージに docker CLI は入っていないので、
+      # コンテナ内から docker / docker compose は使えない
       - /var/run/docker.sock:/var/run/docker.sock:ro
     working_dir: /build/kimigayo/build-system
     stdin_open: true

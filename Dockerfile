@@ -1,5 +1,5 @@
 # Kimigayo OS Build Environment
-# Alpine Linuxをベースとした軽量なビルド環境
+# Alpine Linuxをベースとしたビルド環境
 #
 # ALPINE_VERSION / KIMIGAYO_VERSION は versions.mk と git タグが真実の源。
 # docker-compose.yml / Makefile が build arg として渡す。
@@ -14,14 +14,14 @@ ARG ALPINE_VERSION
 ARG KIMIGAYO_VERSION=dev
 
 # メタデータ
-LABEL maintainer="Kimigayo OS Development Team"
+LABEL maintainer="Kimigayo OS"
 LABEL description="Build environment for Kimigayo OS"
 LABEL version="${KIMIGAYO_VERSION}"
 
 # OpenContainer Initiative (OCI) Labels
 LABEL org.opencontainers.image.title="Kimigayo OS Build Environment"
 LABEL org.opencontainers.image.description="Alpine Linux-based build environment for Kimigayo OS"
-LABEL org.opencontainers.image.authors="Kimigayo OS Team"
+LABEL org.opencontainers.image.authors="Kimigayo OS"
 LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
@@ -96,7 +96,7 @@ RUN apk update && apk add --no-cache \
     gnupg \
     openssl \
     openssl-dev \
-    # ドキュメントツール
+    # エディタ・ダウンロード（curl / wget は scripts/download-*.sh が使う）
     vim \
     nano \
     curl \
@@ -119,7 +119,8 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements-dev
 
 # ARM64 クロスコンパイラのインストール
 # Clangを使用したクロスコンパイル環境のセットアップ
-# cmake: compiler-rtビルド用
+# compiler-rt はビルドせず、下で Alpine の aarch64 版を apk fetch する。
+# cmake / ninja は上の apk add で入れ済み（ここでは重複指定になっている）。
 RUN apk add --no-cache clang llvm lld compiler-rt cmake ninja
 
 # ARM64用libgccとlinux-headersをAlpineリポジトリから取得

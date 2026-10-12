@@ -44,14 +44,14 @@ ARG VCS_REF
 ARG IMAGE_VARIANT=minimal
 
 # Metadata
-LABEL maintainer="Kimigayo OS Development Team"
+LABEL maintainer="Kimigayo OS"
 LABEL description="Kimigayo OS - Lightweight Container Operating System"
 LABEL version="${VERSION}"
 
 # OpenContainer Initiative (OCI) Labels
 LABEL org.opencontainers.image.title="Kimigayo OS"
 LABEL org.opencontainers.image.description="Lightweight, secure container OS combining the distroless and Alpine Linux approaches"
-LABEL org.opencontainers.image.authors="Kimigayo OS Team"
+LABEL org.opencontainers.image.authors="Kimigayo OS"
 LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
