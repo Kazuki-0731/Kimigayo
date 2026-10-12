@@ -69,13 +69,14 @@ git push origin v3.0.3
 Actions タブの **Release** ワークフロー、または:
 
 ```bash
-gh workflow run release.yml -f tag=v3.0.2
+gh workflow run release.yml -f tag=v3.0.3
 ```
 
-**手動実行でも Docker Hub に push します**（`verify-and-push` ジョブ）。
-一方でマルチアーキのマニフェスト作成・Cosign 署名・GitHub Release は
-タグ push のときだけなので飛ばされます。`tag` を省くと版は `latest` に
-なります。**公開物を変える操作なので、タグの push と同じく承認が要ります。**
+**手動実行は Docker Hub に push しません。** タグ push と同じ経路でビルドし、
+`verify-image.sh`・`scan-image.sh` を通して SBOM を成果物に残すところまでです。
+マルチアーキのマニフェスト作成・Cosign 署名・GitHub Release も走りません。
+`tag` を省くと版は `edge` になります。**公開は `v*.*.*` タグの push だけです**
+（2026-10-12 までは手動実行でも push していました）。
 詳細は [CICD_GUIDE.md](../developer/CICD_GUIDE.md#手動実行workflow_dispatch)。
 
 ## トラブルシューティング
