@@ -1,13 +1,13 @@
 # Kimigayo OS + Python
 
-Python runtime running on Kimigayo OS - ultra-lightweight container OS.
+Python runtime running on Kimigayo OS - a small container OS without a package manager.
 
 ## Features
 
-- **Lightweight**: Based on Kimigayo OS (1-3MB base) + Python (~40-50MB)
-- **Fast**: Optimized Python environment
-- **Modern**: Python 3.x with pip support
-- **Production-ready**: Environment variables and logging configured
+- **Small**: 49.5MB including Python and its standard library (arm64, measured 2026-10-12; `python:alpine` is 57.4MB)
+- **Python 3 from Alpine 3.24** (3.14 at the time of writing). The command is **`python3`** (there is no `python`). **pip is not in the image** - install packages in a build stage (below)
+- **Runs as non-root**: `USER 65534` (nobody)
+- **Health check**: `HEALTHCHECK` on `/api/health`, unbuffered output for `docker logs`
 
 ## Quick Start
 
@@ -19,11 +19,10 @@ docker build -t kimigayo-python:latest examples/python/
 
 ### Run the sample application
 
+The image contains the sample [app.py](app.py) and starts it by default.
+
 ```bash
-docker run -d -p 8000:8000 \
-  -v $(pwd)/examples/python/app.py:/app/app.py:ro \
-  kimigayo-python:latest \
-  python /app/app.py
+docker run -d -p 8000:8000 --name my-python kimigayo-python:latest
 ```
 
 ### Test
@@ -38,23 +37,32 @@ curl http://localhost:8000/api/health
 
 ### Use your own Python application
 
+**pip is not available in Kimigayo.** Install packages in an Alpine 3.24 build
+stage (the same Python version as the example, so compiled extensions match)
+into a directory, copy it, and point `PYTHONPATH` at it.
+
 Create `Dockerfile`:
 
 ```dockerfile
-FROM kimigayo-python:latest
-
-WORKDIR /app
-
-# Copy requirements
+# Build stage: has pip
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache python3 py3-pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
 
-# Copy application
-COPY . .
+# Runtime stage: Python only
+FROM kimigayo-python:latest
+COPY --from=builder /stage/app/lib /app/lib
+ENV PYTHONPATH=/app/lib
+WORKDIR /app
+COPY app.py .
 
-# Run application
-CMD ["python", "app.py"]
+CMD ["python3", "app.py"]
 ```
+
+Packages with C extensions that link to system libraries (e.g. a database
+driver) also need those shared libraries; collect them with `ldd` as the
+[Dockerfile](Dockerfile) does for `lib-dynload`.
 
 ### Flask Example
 
@@ -76,10 +84,10 @@ if __name__ == '__main__':
 
 Requirements:
 ```txt
-flask==3.0.0
+flask
 ```
 
-Build and run:
+Build and run (with the Dockerfile above):
 ```bash
 docker build -t my-flask-app .
 docker run -d -p 8000:8000 my-flask-app
@@ -111,29 +119,29 @@ if __name__ == "__main__":
 
 Requirements:
 ```txt
-fastapi==0.104.1
-uvicorn==0.24.0
+fastapi
+uvicorn
 ```
+
+Both examples were confirmed to run with the build-stage pattern above
+(2026-10-12, Flask 3.1.2 / FastAPI 0.143.0). Pin versions in your own
+`requirements.txt`.
 
 ## Production Deployment
 
 ### Docker Compose
 
 ```yaml
-version: '3.8'
-
 services:
   python-app:
-    image: kimigayo-python:latest
+    image: kimigayo-python:latest   # or your image built as above
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app:ro
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8000
+    command: ["python3", "app.py"]
     restart: unless-stopped
-    command: python /app/app.py
 ```
 
 ### Kubernetes
@@ -155,7 +163,8 @@ spec:
     spec:
       containers:
       - name: python-app
-        image: kimigayo-python:latest
+        image: kimigayo-python:latest   # or your image built as above
+        command: ["python3", "app.py"]
         ports:
         - containerPort: 8000
         env:
@@ -172,73 +181,47 @@ spec:
             cpu: "500m"
 ```
 
-## Performance
+## Image Size
 
-Based on Kimigayo OS benchmarks:
+| Image | Size |
+|-------|------|
+| `kimigayo-python` (this example) | 49.5MB |
+| `python:alpine` | 57.4MB |
 
-- **Image Size**: ~50-80MB (vs 150-200MB for python:alpine)
-- **Memory Usage**: 50-100MB for simple applications
-- **Startup Time**: <3 seconds
+Measured 2026-10-12 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's Python 3.14.8.
+`python:alpine` includes pip; this example does not.
+Memory usage and startup time have not been measured.
 
 ## Environment Variables
 
 - `PYTHONUNBUFFERED=1`: Disable Python output buffering
 - `PYTHONDONTWRITEBYTECODE=1`: Don't write .pyc files
+- `PYTHONPATH`: Where packages installed in the build stage live (e.g. `/app/lib`)
 - `PORT`: Application port (default: 8000)
-
-## Best Practices
-
-### Multi-stage build for smaller images
-
-```dockerfile
-# Builder stage
-FROM python:3.11-alpine AS builder
-WORKDIR /build
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-
-# Runtime stage
-FROM kimigayo-python:latest
-COPY --from=builder /root/.local /usr/local
-WORKDIR /app
-COPY app.py .
-CMD ["python", "app.py"]
-```
-
-### Use virtual environments
-
-```dockerfile
-FROM kimigayo-python:latest
-
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-CMD ["python", "app.py"]
-```
 
 ## Troubleshooting
 
 ### Module not found
 
-Ensure all dependencies are in `requirements.txt` and installed:
+Packages cannot be installed inside the running container (no pip).
+Add them to `requirements.txt` and rebuild (see
+[Use your own Python application](#use-your-own-python-application)).
+To see what is installed:
 ```bash
-docker exec -it container_name pip list
+docker exec -it my-python ls /app/lib
 ```
 
 ### Port already in use
 
-Change the port:
+Change the host port:
 ```bash
 docker run -p 8080:8000 kimigayo-python
 ```
 
 ### Permission errors
 
-Check file permissions in mounted volumes:
+The container runs as uid 65534. Mounted files must be readable by it:
 ```bash
 chmod -R 755 ./app
 ```

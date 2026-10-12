@@ -23,9 +23,8 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-# アプリの依存を入れるならここで
-# COPY requirements.txt .
-# RUN apk add --no-cache py3-pip && pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
+# pip は最終イメージに入らない。依存はビルドステージで入れてから COPY する
+# （→ README.md「Use your own Python application」）。
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
 FROM ishinokazuki/kimigayo-os:3.0.2
@@ -38,14 +37,19 @@ COPY --from=builder /stage/ /
 
 WORKDIR /app
 
-# COPY app.py .
+COPY app.py ./
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 EXPOSE 8000
 
+# BusyBox の wget は --tries を受け付けないので付けない
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:8000/api/health || exit 1
+
 # **root で動かさない。** Kimigayo のイメージには nobody (65534) が居ます。
 USER 65534
 
-CMD ["python3", "--version"]
+# `python` は無い。`python3` を使う
+CMD ["python3", "app.py"]
