@@ -18,7 +18,6 @@ body:
       options:
         - User Guide
         - Developer Guide
-        - API Documentation
         - Installation Instructions
         - Troubleshooting Guide
         - Architecture Documentation
