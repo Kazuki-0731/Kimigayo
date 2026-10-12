@@ -1,13 +1,13 @@
 # Kimigayo OS + Node.js
 
-Node.js runtime running on Kimigayo OS - ultra-lightweight container OS.
+Node.js runtime running on Kimigayo OS - a small container OS without a package manager.
 
 ## Features
 
-- **Lightweight**: Based on Kimigayo OS (1-3MB base) + Node.js (~40-60MB)
-- **Fast**: Optimized Node.js environment
-- **Modern**: Node.js 18+ with npm support
-- **Production-ready**: Health checks and graceful shutdown
+- **Small**: 72.9MB including Node.js and its shared libraries (arm64, measured 2026-10-12; `node:alpine` is 181MB)
+- **Node.js from Alpine 3.24** (v24 at the time of writing). **npm is not in the image** - install dependencies in a build stage (below)
+- **Runs as non-root**: `USER 65534` (nobody)
+- **Health check and graceful shutdown**: `HEALTHCHECK` on `/health`, `SIGTERM` closes the server
 
 ## Quick Start
 
@@ -19,11 +19,10 @@ docker build -t kimigayo-nodejs:latest examples/nodejs/
 
 ### Run the sample application
 
+The image contains the sample [app.js](app.js) and starts it by default.
+
 ```bash
-docker run -d -p 3000:3000 \
-  -v $(pwd)/examples/nodejs:/app:ro \
-  kimigayo-nodejs:latest \
-  node /app/app.js
+docker run -d -p 3000:3000 --name my-node kimigayo-nodejs:latest
 ```
 
 ### Test
@@ -38,28 +37,31 @@ curl http://localhost:3000/health
 
 ### Use your own Node.js application
 
+**npm is not available in Kimigayo.** Install `node_modules` in an Alpine 3.24
+build stage (the same Alpine version the example takes Node.js from, so native
+modules match) and copy the result. `npm ci` needs a `package-lock.json`.
+
 Create `Dockerfile`:
 
 ```dockerfile
-FROM kimigayo-nodejs:latest
-
+# Build stage: has npm
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache nodejs npm
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application
+RUN npm ci --omit=dev
 COPY . .
 
-# Expose port
-EXPOSE 3000
+# Runtime stage: Node.js only
+FROM kimigayo-nodejs:latest
+WORKDIR /app
+COPY --from=builder /app /app
 
-# Start application
+EXPOSE 3000
 CMD ["node", "app.js"]
 ```
+
+Add `node_modules` to `.dockerignore` so the host's copy is not sent.
 
 ### Express.js Example
 
@@ -92,12 +94,12 @@ app.listen(PORT, () => {
   "name": "my-express-app",
   "version": "1.0.0",
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.21.2"
   }
 }
 ```
 
-Build and run:
+Build and run (with the Dockerfile above):
 ```bash
 docker build -t my-express-app .
 docker run -d -p 3000:3000 my-express-app
@@ -138,22 +140,19 @@ start();
 ### Docker Compose
 
 ```yaml
-version: '3.8'
-
 services:
   nodejs-app:
-    image: kimigayo-nodejs:latest
+    image: kimigayo-nodejs:latest   # or your image built as above
     ports:
       - "3000:3000"
-    volumes:
-      - ./app:/app:ro
-      - /app/node_modules  # Anonymous volume for node_modules
     environment:
       - NODE_ENV=production
       - PORT=3000
+    command: ["node", "app.js"]
     restart: unless-stopped
+    # BusyBox wget does not accept --tries
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -178,7 +177,8 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: kimigayo-nodejs:latest
+        image: kimigayo-nodejs:latest   # or your image built as above
+        command: ["node", "app.js"]
         ports:
         - containerPort: 3000
         env:
@@ -220,14 +220,17 @@ spec:
   type: LoadBalancer
 ```
 
-## Performance
+## Image Size
 
-Based on Kimigayo OS benchmarks:
+| Image | Size |
+|-------|------|
+| `kimigayo-nodejs` (this example) | 72.9MB |
+| `node:alpine` | 181MB |
 
-- **Image Size**: ~50-90MB (vs 150-200MB for node:alpine)
-- **Memory Usage**: 50-150MB for typical applications
-- **Startup Time**: <2 seconds
-- **Cold start**: ~100ms
+Measured 2026-10-12 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's Node.js v24.18.1.
+`node:alpine` includes npm; this example does not.
+Memory usage and startup time have not been measured.
 
 ## Environment Variables
 
@@ -236,23 +239,6 @@ Based on Kimigayo OS benchmarks:
 - `NODE_OPTIONS`: Node.js CLI options
 
 ## Best Practices
-
-### Multi-stage build for smaller images
-
-```dockerfile
-# Builder stage
-FROM node:18-alpine AS builder
-WORKDIR /build
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Runtime stage
-FROM kimigayo-nodejs:latest
-WORKDIR /app
-COPY --from=builder /build/node_modules ./node_modules
-COPY . .
-CMD ["node", "app.js"]
-```
 
 ### Use .dockerignore
 
@@ -266,15 +252,11 @@ README.md
 .DS_Store
 ```
 
-### Optimize npm install
+### Install dependencies in the build stage
 
-```dockerfile
-# Use npm ci instead of npm install
-RUN npm ci --only=production
-
-# Clean npm cache
-RUN npm cache clean --force
-```
+Use `npm ci --omit=dev` (not the deprecated `--only=production`) in the
+build stage. The npm cache stays in the build stage, so there is nothing
+to clean up in the final image.
 
 ## Debugging
 
@@ -289,50 +271,45 @@ docker run -p 3000:3000 -p 9229:9229 \
 ### View logs
 
 ```bash
-docker logs -f container_name
+docker logs -f my-node
 ```
 
 ### Execute commands in container
 
 ```bash
-docker exec -it container_name /bin/sh
-docker exec -it container_name node --version
-docker exec -it container_name npm list
+docker exec -it my-node /bin/sh
+docker exec -it my-node node --version
 ```
 
 ## Troubleshooting
 
 ### Module not found
 
-Ensure dependencies are installed:
-```bash
-docker exec -it container_name npm install
-```
+Dependencies cannot be installed inside the running container (no npm).
+Add them to `package.json` and rebuild the image (see
+[Use your own Node.js application](#use-your-own-nodejs-application)).
 
 ### Port already in use
 
-Change the port:
+Change the host port:
 ```bash
-docker run -p 8080:3000 -e PORT=3000 kimigayo-nodejs
+docker run -p 8080:3000 kimigayo-nodejs
 ```
 
 ### Out of memory
 
-Increase Node.js heap size:
+Set the heap size below the container's memory limit:
 ```bash
-docker run -e NODE_OPTIONS="--max-old-space-size=4096" kimigayo-nodejs
+docker run --memory=512m -e NODE_OPTIONS="--max-old-space-size=384" kimigayo-nodejs
 ```
 
 ## Common Frameworks
 
-Compatible with popular Node.js frameworks:
-
-- ✅ Express.js
-- ✅ Fastify
-- ✅ Koa
-- ✅ NestJS
-- ✅ Next.js
-- ✅ Socket.io
+Express.js has been confirmed to run with the build-stage pattern above
+(2026-10-12). Other pure-JavaScript frameworks should work the same way;
+packages with native add-ons must be built in the Alpine 3.24 stage and may
+need extra shared libraries (collect them with `ldd`, as the
+[Dockerfile](Dockerfile) does for Node.js).
 
 ## Support
 

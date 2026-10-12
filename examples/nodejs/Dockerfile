@@ -23,9 +23,8 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-# アプリの依存を入れるならここで
-# COPY package*.json ./
-# RUN apk add --no-cache npm && npm ci --omit=dev && cp -r node_modules /stage/app/
+# npm は最終イメージに入らない。依存（node_modules）はビルドステージで
+# 入れてから COPY する（→ README.md「Use your own Node.js application」）。
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
 FROM ishinokazuki/kimigayo-os:3.0.2
@@ -38,14 +37,18 @@ COPY --from=builder /stage/ /
 
 WORKDIR /app
 
-# COPY . .
+COPY app.js package.json ./
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
+# BusyBox の wget は --tries を受け付けないので付けない
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:3000/health || exit 1
+
 # **root で動かさない。** Kimigayo のイメージには nobody (65534) が居ます。
 USER 65534
 
-CMD ["node", "--version"]
+CMD ["node", "app.js"]

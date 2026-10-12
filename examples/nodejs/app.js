@@ -4,15 +4,14 @@
  */
 
 const http = require('http');
-const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
 // Request handler
 const requestHandler = (req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+  // url.parse() は Node.js で非推奨（DEP0169）なので WHATWG URL を使う
+  const pathname = new URL(req.url, 'http://localhost').pathname;
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
