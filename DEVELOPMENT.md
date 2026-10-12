@@ -6,15 +6,20 @@
 Kimigayo/
 ├── .github/
 │   └── workflows/          # CI/CD設定
-├── build/                  # ビルド作業ディレクトリ
+├── build/                  # ビルド作業ディレクトリ（Git 管理外）
+├── build-system/           # ビルドコンテナ内で使う Makefile（kernel / musl / busybox などのターゲット）
+├── configs/                # OpenRC・sysctl などの設定
 ├── docs/                   # ドキュメント
+├── examples/               # ベースイメージとしての使用例（python / nginx / nodejs）
 ├── src/                    # ソースコード
 │   ├── kernel/             # カーネル設定・パッチ
-│   ├── libc/               # musl libc
+│   ├── libc/               # musl のパッチと補助モジュール
 │   ├── busybox/            # BusyBox設定・パッチ
 │   ├── init/, openrc/      # Initシステム（OpenRC）
+│   ├── build/              # ビルド設定・イメージの Python モジュール（テストが使う）
 │   ├── security/           # 強化設定
 │   ├── benchmark/          # 計測
+│   ├── system/, integration/, utilities/, utils/  # 補助の Python モジュール
 │   └── toolchain/          # クロスコンパイル
 ├── tests/                  # テストコード
 │   ├── unit/               # 単体テスト
@@ -51,12 +56,17 @@ docker compose run --rm kimigayo-build /bin/bash
 
 Alpine Linux以外の環境で開発する場合:
 
+必要なものの正本はビルド環境の `Dockerfile`（Alpine の `apk add` 一覧）。
+Ubuntu/Debian で揃えるときの目安（この一覧で通るかは検証していない）:
+
 ```bash
-# 必要なパッケージ（Ubuntu/Debian）
-sudo apt-get install build-essential gcc g++ make cmake \
-  musl-dev musl-tools linux-headers-generic \
+sudo apt-get install build-essential gcc g++ make cmake meson ninja-build \
+  musl-dev musl-tools linux-headers-generic libcap-dev \
+  clang lld llvm bison flex bc gawk cpio \
   python3 python3-pip git
 ```
+
+macOS では `make ci-build-local` は通らない（musl の `configure` が落ちる）。
 
 ## ビルドシステム
 
@@ -71,14 +81,18 @@ make help
 # OSをビルド（コンテナ内で musl -> kernel -> BusyBox -> OpenRC）
 make build
 
+# カーネル抜き（開発機ではこちらを推奨。イメージにカーネルは入らない）
+docker compose run --rm kimigayo-build make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard
+
 # アーキテクチャ指定ビルド
 # **ホストの `make build` に ARCH= を渡しても効かない。**
 # `docker compose run --rm kimigayo-build make build` へ転送していないため
 # （Makefile の build ターゲット）。compose は ARCH=x86_64 を固定しており、
 # build-system/Makefile が読むのは TARGET_ARCH。
 # arch を変えるならコンテナに直接渡す:
-docker compose run --rm kimigayo-build make build TARGET_ARCH=x86_64
-docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64
+# （IMAGE_TYPE は常に明示する。省くと BusyBox と rootfs の既定がずれることがある）
+docker compose run --rm kimigayo-build make build TARGET_ARCH=x86_64 IMAGE_TYPE=standard
+docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64 IMAGE_TYPE=standard
 
 # ホストの ARCH= が効くのは ci-build-local 系だけ
 make ci-build-local ARCH=arm64
@@ -90,7 +104,8 @@ make test
 make status
 make info
 
-# クリーン（clean=成果物のみ / clean-cache=ダウンロード / clean-all=全部）
+# クリーン（clean=成果物のみ / clean-cache=ダウンロードキャッシュ /
+#   clean-all=Docker のボリュームとビルド環境イメージ。ホストの build/ は消さない）
 make clean
 
 # セキュリティスキャン（scan-image + Trivy FS + ShellCheck）
@@ -105,8 +120,8 @@ Kimigayo OS はコンテナ向けで、成果物は rootfs の tarball と Docke
 
 ### ビルドプロセス
 
-1. **カーネル設定**: `src/kernel/config/`
-2. **musl libcビルド**: クロスコンパイル対応
+1. **musl libcビルド**: クロスコンパイル対応
+2. **カーネルビルド**: `make build` のときだけ（`make build-no-kernel` では飛ばす）
 3. **BusyBoxビルド**: カスタマイズ可能
 4. **Initシステムビルド**: OpenRCベース
 5. **ルートファイルシステム構築**
@@ -120,23 +135,25 @@ Kimigayo OS はコンテナ向けで、成果物は rootfs の tarball と Docke
 
 ### プロパティベーステスト
 
-すべての要件には対応するプロパティテストが必要です:
+要件ごとにプロパティテストを書く方針です（既存のプロパティテストの
+すべてが下の見出しコメントの形式に揃っているわけではありません）:
 
 ```python
-# tests/property/test_build_constraints.py
+# tests/property/test_build_constraints.py（抜粋）
 
-from hypothesis import given, strategies as st
-
-# 注: 下記は書き方の例。`kimigayo` という Python パッケージは
-# このリポジトリに無い（実物は src/ 配下のモジュールと
-# tests/property/test_build_constraints.py を見る）。
+import pytest
+from hypothesis import given
+from src.build.config import BuildConfig
+from src.build.image import build_base_image
 
 # **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
-@given(build_config=st.builds(BuildConfig))
-def test_build_size_constraint(build_config):
-    """任意のビルド設定に対して、Base_Imageは5MB未満"""
-    image = build_base_image(build_config)
-    assert image.size_bytes < 5 * 1024 * 1024
+@pytest.mark.property
+@given(build_config=build_configurations())  # 同じファイルで定義した strategy
+def test_build_size_constraint(build_config, tmp_path):
+    """任意のビルド設定に対して、イメージはバリアントの上限未満
+    （MINIMAL 5MB / STANDARD 15MB / EXTENDED 50MB。SPECIFICATION.md §8.3）"""
+    image = build_base_image(build_config, output_dir=tmp_path)
+    assert image.size_bytes < build_config.max_image_size
 ```
 
 ### 単体テスト
@@ -179,7 +196,8 @@ ARCH=x86_64 bash scripts/test-kernel-qemu.sh
 
 ### QEMUでのデバッグ
 
-`make qemu-debug` というターゲットは無い。スクリプトを直接使う。
+ホストの `Makefile` に `make qemu-debug` は無い。ビルドコンテナ側の `qemu-debug` /
+`qemu-test` は「Phase 4 で実装」と表示するだけの空ターゲット。スクリプトを直接使う。
 
 ```bash
 # QEMUでカーネルを起動
@@ -198,7 +216,7 @@ gdb -ex "target remote :1234" build/kernel-src/linux-$(make -s print-kernel)/vml
 # 各コンポーネントのビルドログ（最新100行）
 make log-kernel
 make log-musl
-make log-openrc
+# OpenRC のビルドはログファイルを書かない（make log-openrc は読む対象が無い）
 
 # パッチ適用の結果（版上げ後は必ず見る）
 grep -i 'skipped\|not applicable' build/kernel-patches.log build/busybox-patches.log
@@ -211,12 +229,15 @@ ls build/logs/
 
 ### セキュリティチェック
 
-すべてのビルドで以下が適用されます:
+`scripts/build-{musl,busybox,openrc}.sh` が次のフラグを渡します:
 
 - **PIE**: Position Independent Executables
-- **Stack Protection**: `-fstack-protector-strong`
-- **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2`
-- **RELRO**: `-Wl,-z,relro,-z,now`
+- **RELRO**: `-Wl,-z,relro -Wl,-z,now`（Full RELRO）
+- **非実行スタック**: `-Wl,-z,noexecstack`
+- **Stack Protection**: `-fstack-protector-strong` — **arm64 の OpenRC には渡していない**
+  （`scripts/build-openrc.sh` の arm64 の CFLAGS）
+- **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2` — musl は FORTIFY を実装しておらず、
+  効果は確認できていない
 
 成果物に効いているかは `scripts/verify-image.sh` が見る。イメージを
 `docker export` した tar を `scripts/check-elf-hardening.py` が読み、
@@ -283,8 +304,8 @@ CI 側では次のように回る:
   `release.yml` も Docker Hub への push 前に同じものを走らせる
 - **毎週月曜 04:00 UTC と手動** — `dependency-review.yml` の
   `published-image-scan` ジョブが Docker Hub の `latest` を pull し、
-  `scan-image.sh`（CVE + 秘密情報）を回す。失敗すれば
-  `create-security-issue` が Issue を起票する
+  `scan-image.sh`（CVE + 秘密情報）を回す。定期実行で失敗したときだけ
+  `create-security-issue` が Issue を起票する（手動実行では起票しない）
 - **PR** — `dependency-review.yml` の依存レビュー。リポジトリの Trivy FS スキャン
   （`vulnerability-scan`）は PR と定期の両方で走る
 
@@ -321,18 +342,17 @@ make benchmark
 # クリーンビルド（成果物のみ削除。ダウンロードキャッシュは残る）
 make clean && make build
 
-# 完全リセット（ダウンロードキャッシュも消える。再取得は約150MB）
-make clean-all && make build
+# Docker のボリュームごと消す（ダウンロードキャッシュも消える。再取得は約150MB）
+# ホストの build/ の成果物は残るので、make clean も合わせて叩く
+make clean && make clean-all && make build
 
 # 個別のコンポーネントだけやり直す
-# **ホストの Makefile に clean-kernel も kernel も無い**
-# （どちらも build-system/Makefile 側）。ホストで叩くと
+# **ホストの Makefile に clean-<component> も kernel も無い**
+# （どれも build-system/Makefile 側）。ホストで叩くと
 # No rule to make target になるので、コンテナに渡す:
 docker compose run --rm kimigayo-build make clean-kernel kernel
+docker compose run --rm kimigayo-build make clean-musl clean-busybox clean-openrc
 # または make shell で入ってから叩く
-
-# musl / BusyBox / OpenRC はホストにもある
-make clean-musl && make clean-busybox && make clean-openrc
 ```
 
 **版を上げた直後にビルドが通らないときは、まずパッチの適用結果を見る。**
@@ -383,7 +403,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
    書き換えない）
 4. README・docs の数値とバージョン表記を突合
 5. **ユーザーの明示的な承認を取る**
-6. タグ作成と push: `git tag -a v3.0.1 -m "..." && git push origin v3.0.1`
+6. タグ作成と push: `git tag -a v<版> -m "..." && git push origin v<版>`
 7. `release.yml` が走り Docker Hub と GitHub Release を公開
 8. **公開物を pull して中身を検証**
 
