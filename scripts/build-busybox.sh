@@ -31,8 +31,15 @@ BUSYBOX_INSTALL_DIR="${BUILD_DIR}/busybox-install-${ARCH}"
 
 # MUSL_INSTALL_DIR can be overridden by environment variable
 # This allows Makefile to pass the correct path based on MUSL_ARCH
-if [ -z "$MUSL_INSTALL_DIR" ]; then
-    MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+# ${MUSL_INSTALL_DIR:-} にしないと、未設定のとき set -u で
+# "unbound variable" になり既定値に辿り着けない。
+# musl のインストール先は aarch64 という名前（MUSL_ARCH のマッピング）。
+if [ -z "${MUSL_INSTALL_DIR:-}" ]; then
+    if [ "$ARCH" = "arm64" ]; then
+        MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-aarch64"
+    else
+        MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
+    fi
 fi
 
 # Reproducible build flags.
@@ -492,23 +499,36 @@ binary_size=$(stat -f%z busybox 2>/dev/null || stat -c%s busybox 2>/dev/null)
 binary_size_kb=$((binary_size / 1024))
 log_info "BusyBox binary size: ${binary_size_kb} KB"
 
-# Size targets per image type
-case "$IMAGE_TYPE" in
-    minimal)
-        target_size=500
-        ;;
-    standard)
-        target_size=800
-        ;;
-    extended)
-        target_size=1200
-        ;;
-esac
+# 大きな退行を拾うための上限（目標値ではない）。
+#
+# 以前は minimal 500 / standard 800 / extended 1200 KB を「目標」として
+# いたが、根拠の無い値で、実際のバイナリ（動的リンク）は毎回これを超え
+# 警告が出続けていた。出続ける警告は読まれない。
+# いまは実測値（v3.0.2 相当、動的リンク）に約 15% の余裕を足した上限にする:
+#   x86_64  minimal ~870 / standard ~1002 / extended ~1026 KB
+#   arm64   minimal ~941 / standard ~1085 / extended ~1120 KB
+# config を足して正当に大きくなったときは、ここの値も実測で更新する。
+# 静的リンク（BUSYBOX_LINK=static）は libc を取り込むので比較の基準が無く、
+# 見ない。
+size_limit=""
+if [ "$BUSYBOX_LINK" = "dynamic" ]; then
+    case "${ARCH}:${IMAGE_TYPE}" in
+        x86_64:minimal)  size_limit=1000 ;;
+        x86_64:standard) size_limit=1150 ;;
+        x86_64:extended) size_limit=1180 ;;
+        arm64:minimal|aarch64:minimal)   size_limit=1080 ;;
+        arm64:standard|aarch64:standard) size_limit=1250 ;;
+        arm64:extended|aarch64:extended) size_limit=1290 ;;
+    esac
+fi
 
-if [ "$binary_size_kb" -gt "$target_size" ]; then
-    log_warning "Binary size (${binary_size_kb} KB) exceeds target (${target_size} KB)"
+if [ -z "$size_limit" ]; then
+    log_info "No size reference for ${ARCH}/${IMAGE_TYPE}/${BUSYBOX_LINK}; size not checked"
+elif [ "$binary_size_kb" -gt "$size_limit" ]; then
+    log_warning "Binary size (${binary_size_kb} KB) exceeds the regression limit (${size_limit} KB)"
+    log_warning "  config の変更で意図して大きくしたなら、上限を実測で更新する"
 else
-    log_success "Binary size within target (${target_size} KB)"
+    log_success "Binary size within the regression limit (${size_limit} KB)"
 fi
 
 # Verify the link mode actually produced what was asked for
@@ -624,7 +644,7 @@ log_info "Build summary:"
 log_info "  Image type: ${IMAGE_TYPE}"
 log_info "  Architecture: ${ARCH}"
 log_info "  Binary size (stripped): ${stripped_size_kb} KB"
-log_info "  Target size: ${target_size} KB"
+log_info "  Size limit: ${size_limit:-none} KB (regression guard)"
 log_info "  Applets installed: ${applet_count}"
 log_info "  Installation directory: ${install_prefix}"
 
