@@ -20,8 +20,35 @@ BUILD_DATE := $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
 include $(dir $(lastword $(MAKEFILE_LIST)))../versions.mk
 
 # Build configuration
+#
+# Legacy ARCH variable support (for backward compatibility)
+#
+# **アーキのマッピングより前に処理する。** 以前はマッピングの後ろで
+# TARGET_ARCH := $(ARCH) としていたため、`make build ARCH=arm64` は
+# info に arm64 と出しながら musl / カーネル / BusyBox を x86_64 向けに
+# ビルドしていた（MUSL_ARCH などは既に x86_64 で確定済みだった）。
+#
+# コマンドラインで渡された ARCH だけを見る。環境変数の ARCH は
+# 別の道具（カーネルの make など）向けに設定されていることがあり、
+# 以前は docker-compose.yml が常に ARCH=x86_64 を入れていたため、
+# 毎回この警告が出ていた。TARGET_ARCH も渡されていればそちらを優先する。
+ifeq ($(origin ARCH),command line)
+    $(warning Warning: ARCH variable is deprecated. Use TARGET_ARCH instead.)
+    ifneq ($(origin TARGET_ARCH),command line)
+        TARGET_ARCH := $(if $(filter aarch64,$(ARCH)),arm64,$(ARCH))
+    endif
+endif
+
 # TARGET_ARCH: User-facing architecture name (x86_64, arm64)
 TARGET_ARCH ?= x86_64
+
+# IMAGE_TYPE: バリアント（minimal / standard / extended）。
+# 既定は standard。build-busybox.sh・build-rootfs.sh の既定と揃えてある
+# （以前は Makefile に既定が無く、BusyBox は standard・rootfs は minimal に
+#   落ちて、standard の BusyBox を minimal として包む食い違いが起きた）。
+# export して、ここから呼ぶスクリプトに同じ値が届くようにする。
+IMAGE_TYPE ?= standard
+export IMAGE_TYPE
 
 # Architecture mappings for different tools
 # - musl/gcc: uses aarch64 for ARM64
@@ -39,12 +66,6 @@ else ifeq ($(TARGET_ARCH),x86_64)
     CROSS_COMPILE ?= x86_64-linux-musl-
 else
     $(error Unsupported TARGET_ARCH: $(TARGET_ARCH). Supported: x86_64, arm64)
-endif
-
-# Legacy ARCH variable support (for backward compatibility)
-ifdef ARCH
-    $(warning Warning: ARCH variable is deprecated. Use TARGET_ARCH instead.)
-    TARGET_ARCH := $(ARCH)
 endif
 
 SECURITY_HARDENING ?= full
@@ -108,8 +129,7 @@ endif
 .PHONY: all build build-no-kernel clean help info status version \
         kernel musl busybox init rootfs \
         test test-unit test-property test-integration test-musl test-busybox test-openrc \
-        clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output clean-all \
-        docker-build docker-test
+        clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output clean-all
 
 # Default target
 all: build
@@ -135,6 +155,8 @@ help:
 	@echo "  clean-openrc     - Remove only OpenRC build artifacts"
 	@echo "  clean-rootfs     - Remove only rootfs build artifacts"
 	@echo "  clean-output     - Remove only output directory"
+	@echo "  clean-all        - clean + build/ and output/ (downloads cache is a"
+	@echo "                     separate volume and is kept; host: make clean-cache)"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test             - Run all tests"
@@ -153,8 +175,7 @@ help:
 	@echo "Variables:"
 	@echo "  TARGET_ARCH      - Target architecture (x86_64, arm64)"
 	@echo "  IMAGE_TYPE       - Image type (minimal, standard, extended)."
-	@echo "                     Always set it: without it BusyBox defaults to"
-	@echo "                     standard but rootfs defaults to minimal."
+	@echo "                     Default: standard (BusyBox and rootfs alike)"
 	@echo "  V                - Verbose output (0/1)"
 	@echo ""
 	@echo "Examples:"
@@ -261,24 +282,25 @@ test-integration:
 	@echo "[TEST] Integration tests"
 	$(Q)pytest $(TESTS_DIR)/integration/ -v
 
+# 統合スクリプトは ARCH でインストール先を決める（musl は aarch64、
+# BusyBox / OpenRC は arm64 という名前）。以前は docker-compose.yml の
+# ARCH=x86_64 に頼っていたので、TARGET_ARCH=arm64 でも x86_64 を見ていた。
 test-musl:
 	@echo "[TEST] musl libc integration tests"
-	$(Q)bash $(SCRIPTS_DIR)/test-musl-integration.sh
+	$(Q)ARCH=$(MUSL_ARCH) bash $(SCRIPTS_DIR)/test-musl-integration.sh
 
 test-busybox:
 	@echo "[TEST] BusyBox integration tests"
-	$(Q)bash $(SCRIPTS_DIR)/test-busybox-integration.sh
+	$(Q)ARCH=$(BUSYBOX_ARCH) bash $(SCRIPTS_DIR)/test-busybox-integration.sh
 
 test-openrc:
 	@echo "[TEST] OpenRC integration tests"
-	$(Q)bash $(SCRIPTS_DIR)/test-openrc-integration.sh
+	$(Q)ARCH=$(TARGET_ARCH) bash $(SCRIPTS_DIR)/test-openrc-integration.sh
 
-# Docker build
-docker-build:
-	docker-compose build
-
-docker-test:
-	docker-compose run --rm kimigayo-build make test
+# 注: 以前ここにあった docker-build / docker-test は docker-compose を
+# 呼んでいたが、このファイルはビルドコンテナの中で使うもので、
+# コンテナには docker CLI も docker-compose も無い。ホストの Makefile の
+# make docker-build / make test を使う。
 
 # Clean targets (individual components)
 clean-musl:
@@ -286,9 +308,14 @@ clean-musl:
 	$(Q)rm -rf $(BUILD_DIR)/musl-build-* $(BUILD_DIR)/musl-install-* $(BUILD_DIR)/musl-tools-* 2>/dev/null || true
 	@echo "[SUCCESS] musl clean completed"
 
+# カーネルはソースツリーの中でビルドする（O= を使っていない）ので、
+# オブジェクトは build/kernel-src/linux-<ver>/ に溜まる。展開済みの
+# ソースごと消す（tarball は build/downloads/ にあり、次回は展開し直すだけ）。
+# 以前は実在しない build/kernel-build-* を消していて、ソースツリーの
+# .config とオブジェクトが残っていた。
 clean-kernel:
 	@echo "[CLEAN] Removing kernel build artifacts..."
-	$(Q)rm -rf $(BUILD_DIR)/kernel-build-* $(BUILD_DIR)/kernel/output 2>/dev/null || true
+	$(Q)rm -rf $(BUILD_DIR)/kernel-src $(BUILD_DIR)/kernel
 	@echo "[SUCCESS] Kernel clean completed"
 
 clean-busybox:
@@ -315,11 +342,17 @@ clean-output:
 clean: clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output
 	@echo "[SUCCESS] All build artifacts cleaned"
 
-# Clean everything including downloads and Docker volumes
+# build/ と output/ を丸ごと消す（コンテナ内用）。
+#
+# ダウンロードキャッシュ（build/downloads/）は docker-compose.yml で
+# named volume をマウントしているので消えない（マウントポイント自体は
+# rm できない）。キャッシュとビルド環境イメージを消すのはホストの
+# make clean-cache / make clean-all。以前はここで docker-compose down -v を
+# 呼んでいたが、コンテナに docker-compose は無く必ず失敗していた。
 clean-all: clean
-	@echo "[CLEAN] Removing all generated files"
-	$(Q)docker-compose down -v
-	$(Q)rm -rf $(BUILD_DIR) $(OUTPUT_DIR)
+	@echo "[CLEAN] Removing build/ and output/ (downloads volume is kept)"
+	$(Q)if [ -d $(BUILD_DIR) ]; then find $(BUILD_DIR) -mindepth 1 -maxdepth 1 ! -name downloads -exec rm -rf {} +; fi
+	$(Q)rm -rf $(OUTPUT_DIR)
 
 # Build information
 info:

@@ -28,7 +28,10 @@ services:
     tty: true
     environment:
       - KIMIGAYO_VERSION=${KIMIGAYO_VERSION:-dev}
-      - ARCH=x86_64
+      # ARCH はここで渡さない。build-system/Makefile は TARGET_ARCH で
+      # アーキを決め、スクリプトには ARCH を明示して渡す。
+      # 以前は ARCH=x86_64 を常に入れていたため、毎回 deprecation 警告が出て、
+      # 素のスクリプト実行では TARGET_ARCH と無関係に x86_64 を見ていた。
       - SECURITY_HARDENING=full
     # リソース制限
     #
