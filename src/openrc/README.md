@@ -3,8 +3,9 @@
 This directory contains custom OpenRC init scripts and service definitions for Kimigayo OS.
 
 > **These files are NOT installed into the image (reference only).**
-> As of 2026-10-12, `scripts/build-rootfs.sh` does not read `src/openrc/`
-> (only `scripts/test-openrc-integration.sh` checks that the files exist).
+> As of 2026-10-13, no build script reads `src/openrc/`: `scripts/build-rootfs.sh`
+> does not copy it, and `scripts/test-openrc-integration.sh` no longer checks
+> these files either (it tests the built OpenRC in `build/openrc-install-<arch>`).
 > The same applies to `configs/openrc/` (`rc.conf`, `services-*.list`,
 > `inittab.optimized`).
 >
