@@ -89,7 +89,7 @@ CONFIG_STATIC_LIBGCC=y  # ARM64の場合はnでも可
 
 ## 解決方法
 
-### Option 1: BusyBoxを完全静的リンクでビルド（推奨）
+### Option 1: BusyBoxを完全静的リンクでビルド（当時の対処。いまは `BUSYBOX_LINK=static` のとき）
 
 `scripts/build-busybox.sh`で以下の設定を使用:
 
@@ -105,48 +105,44 @@ export LDFLAGS="-static -Wl,-z,relro -Wl,-z,now"
 - ✅ `CONFIG_STATIC=y`を設定
 - ✅ muslツールチェーンに標準的なリンクを任せる
 
-### Option 2: muslライブラリをイメージに含める（非推奨）
+### Option 2: muslライブラリをイメージに含める（v3.0.0 以降はこちら。v3.0.2 から BusyBox も使う）
 
 `scripts/build-rootfs.sh`の`copy_components()`関数で:
 
-```bash
-# Copy musl dynamic linker and libc
-if [ -d "$MUSL_INSTALL_DIR" ]; then
-    mkdir -p "$ROOTFS_DIR/lib"
+当時はこの案を退けたが、v3.0.0 で OpenRC のために `libc.so` を入れるように
+なった。いまの実装（`copy_components()`）は、musl が作る
+`/lib/ld-musl-<arch>.so.1`（`/usr/lib/libc.so` を指すシンボリックリンク）と、
+実体の `$MUSL_INSTALL_DIR/usr/lib/libc.so` を `/usr/lib/` にコピーする。
 
-    # Copy dynamic linker
-    if [ "$ARCH" = "arm64" ]; then
-        cp "$MUSL_INSTALL_DIR/lib/ld-musl-aarch64.so.1" "$ROOTFS_DIR/lib/"
-    else
-        cp "$MUSL_INSTALL_DIR/lib/ld-musl-x86_64.so.1" "$ROOTFS_DIR/lib/"
-    fi
-
-    # Copy libc
-    cp "$MUSL_INSTALL_DIR/lib/libc.so" "$ROOTFS_DIR/lib/"
-fi
-```
-
-デメリット:
-- イメージサイズが増加（+500KB〜1MB）
-- 静的リンクの利点（ポータビリティ、セキュリティ）を失う
+当時挙げていたデメリット（サイズ増・静的リンクの利点を失う）は、
+`libc.so` が OpenRC のために既に入っている今は当てはまらない。
+v3.0.2 で BusyBox を動的リンクにしたら、イメージは 160KB 前後小さくなった
+（CHANGELOG.md 3.0.2）。
 
 ## 検証手順
 
-1. **クリーンビルド**
+1. **クリーンビルド**（`scripts/build-busybox.sh` は直接叩かない）
    ```bash
-   rm -rf build/busybox-build-arm64
-   bash scripts/build-busybox.sh
+   rm -rf build/busybox-build-arm64 build/busybox-install-arm64
+   docker compose run --rm -T -e BUSYBOX_LINK=static kimigayo-build \
+     make busybox TARGET_ARCH=arm64 IMAGE_TYPE=standard
    ```
 
 2. **バイナリ検証**
    ```bash
-   file build/busybox-build-arm64/busybox | grep "statically linked"
+   file build/busybox-build-arm64/busybox | grep -E "statically linked|static-pie linked"
    ```
 
 3. **イメージビルドとテスト**
    ```bash
-   ARCH=arm64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh
-   docker build -t test-kimigayo:arm64 -f Dockerfile .
+   # rootfs もビルドコンテナ内で作る。build-rootfs.sh もリンク方法で
+   # ビルド済みを判定するので、同じ BUSYBOX_LINK を渡す
+   docker compose run --rm -T -e BUSYBOX_LINK=static kimigayo-build sh -c \
+     'cd /build/kimigayo && ARCH=arm64 IMAGE_TYPE=standard bash scripts/build-rootfs.sh'
+   # output/*.tar.gz に固める（手順は CLAUDE.md「ビルドの全体像」）
+   docker build --platform linux/arm64 -f Dockerfile.runtime \
+     --build-arg TARBALL_PATH=output/kimigayo-standard-latest-arm64.tar.gz \
+     -t test-kimigayo:arm64 .
    docker run --rm test-kimigayo:arm64 /bin/sh -c "echo 'Success!'"
    ```
 
