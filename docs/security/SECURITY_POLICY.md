@@ -2,7 +2,8 @@
 
 ## セキュリティ哲学
 
-Kimigayo OSは**セキュアバイデフォルト**の設計思想を採用しています。すべてのコンポーネントは、初期状態から最大限のセキュリティを提供し、ユーザーが明示的に変更しない限り、安全な設定を維持します。
+Kimigayo OSは**セキュアバイデフォルト**を目指しています。バイナリは強化フラグを付けてビルドし、パッケージマネージャーや sshd・sudo のような道具は入れていません。
+ただし既定のユーザーは root で、seccomp プロファイルも配布していないので、実行時の強化は利用者が `docker run` のオプションで行います（→ 下記「利用者向け」）。
 
 成果物は **rootfs だけを詰めた Docker イメージ**で、カーネルを含みません。
 コンテナはホストのカーネルとコンテナランタイムの上で動くので、
@@ -18,8 +19,8 @@ Docker Hub の `latest` 系のタグを差し替えます。
 
 | バージョン | サポート状況 |
 |-----------|-------------|
-| 3.0.x（最新） | ✅ サポート中 |
-| それより前（3.0.0 未満） | ❌ サポート終了 |
+| 最新の 3.0.x（現在 3.0.2） | ✅ サポート中 |
+| それより前（3.0.1 以前） | ❌ サポート終了 |
 
 ## 脆弱性報告
 
@@ -71,7 +72,8 @@ Docker Hub の `latest` 系のタグを差し替えます。
    - **High**: 30日以内
    - **Medium**: 90日以内
    - **Low**: 次回リリース時
-4. **セキュリティアドバイザリ公開**: 修正版リリースと同時
+4. **セキュリティアドバイザリ公開**: 報告を受けた脆弱性は、修正版リリースと同時に GitHub Security Advisories で公開
+   （上流が公表済みの CVE にパッチを当てた場合は、[CHANGELOG.md](../../CHANGELOG.md) の Security 節に記録します）
 
 ## セキュリティアップデート
 
@@ -94,7 +96,8 @@ Docker Hub の `latest` 系のタグを差し替えます。
 - 上流がまだ修正版を出していない CVE には、パッチを当てて出荷します。
   当てたものはイメージの `/.kimigayo-build-info` の `PATCHED_CVES` に
   記録され、照合結果から除外されます
-- **SBOM は GitHub Release に添付します**（v3.0.2 から）。
+- **SBOM は GitHub Release に添付します**（v3.0.2 から。イメージの
+  attestation ではなく Release の添付ファイルです）。
   自分の照合器にかけて確かめられます
 
 **「0 件」は「NVD の CPE に載っている範囲で 0 件」です。** CPE の版範囲が
@@ -105,20 +108,36 @@ Docker Hub の `latest` 系のタグを差し替えます。
 
 ### コンパイル時のセキュリティ強化
 
-Kimigayo OSのすべてのバイナリは、以下のセキュリティフラグでコンパイルされています：
+フラグの実体は `scripts/build-{musl,busybox,openrc}.sh` にあります。
 
 | 機能 | 説明 | 状態 |
 |------|------|------|
-| **PIE** | Position Independent Executables | ✅ 有効 |
-| **Stack Protector** | スタックバッファオーバーフロー保護 | ✅ 有効 |
-| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ✅ レベル2 |
-| **RELRO** | Relocation Read-Only | ✅ Full RELRO（BIND_NOW） |
-| **非実行スタック** | `PT_GNU_STACK` に実行権限なし | ✅ 有効 |
+| **PIE** | Position Independent Executables | ✅ 全 ELF（`verify-image.sh` が検査） |
+| **RELRO** | Relocation Read-Only | ✅ Full RELRO（BIND_NOW）。全 ELF（検査あり） |
+| **非実行スタック** | `PT_GNU_STACK` に実行権限なし | ✅ 全 ELF（検査あり） |
+| **Stack Protector** | スタックバッファオーバーフロー保護 | ⚠️ x86_64 は全 ELF。**arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません**（`build-openrc.sh` の arm64 の CFLAGS に無い）。検査なし |
+| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ⚠️ `-D_FORTIFY_SOURCE=2` を指定していますが、**musl は FORTIFY を実装しておらず、効果は確認できていません**。検査なし |
 
-確認方法（イメージ内の**全 ELF** を検査します。イメージに `checksec` は入っていません）：
+確認方法（イメージ内の**全 ELF** の PIE / RELRO / BIND_NOW / 非実行スタックを
+検査します。Stack Protector と FORTIFY は検査しません。
+イメージに `checksec` は入っていません）：
 ```bash
 bash scripts/verify-image.sh <image> <variant> <arch>
 ```
+
+### イメージの署名
+
+v3.0.2 から、公開イメージは `release.yml` の `sign` ジョブで
+Cosign のキーレス署名（Sigstore OIDC）をしています。v3.0.1 以前は未署名です。
+**検証には cosign v3 以上が必要です**（v2 では `no signatures found` になります）。
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:3.0.2 \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Docker Content Trust（DCT）は使っていません。
 
 ### ランタイムセキュリティ
 
@@ -178,9 +197,11 @@ docker run --rm \
 ### 開発者向け
 
 ```bash
-# セキュアなコンパイルオプション（実体は scripts/build-{musl,busybox,openrc}.sh）
-CFLAGS="-O2 -pipe -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-LDFLAGS="-Wl,-z,relro,-z,now -Wl,-z,noexecstack -pie"
+# コンパイルオプションの概略（実体は scripts/build-{musl,busybox,openrc}.sh。
+# 構成要素とアーキテクチャで少しずつ違う。arm64 の OpenRC には
+# -fstack-protector-strong が無い）
+CFLAGS="-Os -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+LDFLAGS="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
 # 静的解析と出荷物の検査（make static-analysis は存在しない）
 make shellcheck-scan
