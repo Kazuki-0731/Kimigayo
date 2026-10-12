@@ -51,7 +51,10 @@ detect_arch() {
 BUILD_DIR="${PROJECT_ROOT}/build"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARCH="${ARCH:-$(detect_arch)}"
-IMAGE_TYPE="${IMAGE_TYPE:-minimal}"
+# 既定は standard。build-busybox.sh・build-system/Makefile と揃える
+# （以前はここだけ minimal で、IMAGE_TYPE を省くと standard の BusyBox を
+#   minimal として包む食い違いが起きた）
+IMAGE_TYPE="${IMAGE_TYPE:-standard}"
 
 # Install directories for built components
 MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
@@ -1610,8 +1613,8 @@ main() {
     # OpenRC がビルドされず、copy_components が log_warn を出すだけで
     # init の無いイメージが出来上がっていた。
     local OPENRC_CHECK_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
-    if ! kimigayo_is_built "$OPENRC_CHECK_DIR" "$OPENRC_VERSION"; then
-        log_warn "OpenRC ${OPENRC_VERSION} not built yet, building..."
+    if ! kimigayo_is_built "$OPENRC_CHECK_DIR" "$(kimigayo_openrc_build_id "$OPENRC_VERSION")"; then
+        log_warn "OpenRC ${OPENRC_VERSION} not built yet (or its inputs changed), building..."
         bash "${SCRIPT_DIR}/download-openrc.sh" || { log_error "Failed to download OpenRC"; exit 1; }
         ARCH=$ARCH MUSL_INSTALL_DIR="${MUSL_INSTALL_DIR}" \
             bash "${SCRIPT_DIR}/build-openrc.sh" || { log_error "Failed to build OpenRC"; exit 1; }

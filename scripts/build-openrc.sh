@@ -39,6 +39,14 @@ if [ -z "${MUSL_INSTALL_DIR:-}" ]; then
     MUSL_INSTALL_DIR="${BUILD_DIR}/musl-install-${ARCH}"
 fi
 
+# ビルドログ。musl / カーネルと同じく build/logs/ に残す
+# （ホストの `make log-openrc` が読む。以前はどこにも書いておらず、
+# そのターゲットは毎回「ファイルが無い」で失敗していた）。
+# meson / ninja の出力も含めて残すため、標準出力と標準エラーを丸ごと tee する。
+BUILD_LOG="${BUILD_DIR}/logs/openrc-build.log"
+mkdir -p "$(dirname "$BUILD_LOG")"
+exec > >(tee -a "$BUILD_LOG") 2>&1
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,9 +78,12 @@ log_error() {
     echo -e "${RED}[ERROR] ${timestamp}${NC} $*"
 }
 
-# Check if OpenRC is already built at the version we want
-if kimigayo_is_built "$OPENRC_INSTALL_DIR" "$OPENRC_VERSION"; then
-    log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
+# Check if OpenRC is already built from the same inputs
+# （版だけでなく、このスクリプトと musl のパッチの内容も見る。
+#   → kimigayo_openrc_build_id のコメント）
+OPENRC_BUILD_ID="$(kimigayo_openrc_build_id "$OPENRC_VERSION")"
+if kimigayo_is_built "$OPENRC_INSTALL_DIR" "$OPENRC_BUILD_ID"; then
+    log_info "OpenRC ${OPENRC_BUILD_ID} already built and installed: ${OPENRC_INSTALL_DIR}"
     log_info "Skipping build (use 'make clean-openrc' in the container to rebuild)"
     log_info "OpenRC build check completed!"
     exit 0
@@ -80,7 +91,7 @@ fi
 
 installed_version="$(kimigayo_built_version "$OPENRC_INSTALL_DIR")"
 if [ -n "$installed_version" ]; then
-    log_warning "Installed OpenRC is ${installed_version}, want ${OPENRC_VERSION} -- rebuilding"
+    log_warning "Installed OpenRC is ${installed_version}, want ${OPENRC_BUILD_ID} -- rebuilding"
     rm -rf "${OPENRC_INSTALL_DIR}" "${OPENRC_BUILD_DIR}"
 fi
 
@@ -164,9 +175,17 @@ LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
 # Set compiler flags for musl
 # Alpine Linux's gcc is already configured to use musl
+#
+# -fstack-protector-strong は両アーキで付ける。
+# 2026-10-13 まで arm64 だけ「複雑さを避けるため」に外しており、
+# 公開済み v3.0.2 の arm64 では openrc・librc・libeinfo など OpenRC の
+# ほぼ全部が __stack_chk_fail を参照していなかった（x86_64 は付いていた）。
+# 必要なシンボルは自前の musl が持っている（libc.so が __stack_chk_fail と
+# __stack_chk_guard を定義する）ので、ラッパーが渡す -lc で解決する。
+# 抜けたら verify-image.sh（check-elf-hardening.py の SSP）が落とす。
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64 LLVM/Clang: use musl's strlcat (no stack protector to avoid complexity)
-    export CFLAGS="-Os -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY ${CFLAGS_REPRODUCIBLE}"
+    # For ARM64 LLVM/Clang: use musl's strlcat
+    export CFLAGS="-Os -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DBRANDING='\"Kimigayo\"' -DHAVE_STRLCAT -DHAVE_STRLCPY ${CFLAGS_REPRODUCIBLE}"
     # Standard linking - let musl-clang wrapper handle the details
     export LDFLAGS="${LDFLAGS_SECURITY}"
 else
@@ -535,8 +554,8 @@ for dir in "${OPENRC_INSTALL_DIR}/sbin" "${OPENRC_INSTALL_DIR}/usr/sbin"; do
 done
 set -o pipefail
 
-# どの版をインストールしたかを残す（次回のビルド済み判定に使う）
-kimigayo_write_build_stamp "$OPENRC_INSTALL_DIR" "$OPENRC_VERSION"
+# どの版・どの入力でインストールしたかを残す（次回のビルド済み判定に使う）
+kimigayo_write_build_stamp "$OPENRC_INSTALL_DIR" "$OPENRC_BUILD_ID"
 
 log_success "OpenRC is ready for integration"
 

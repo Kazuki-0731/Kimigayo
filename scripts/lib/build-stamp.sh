@@ -95,6 +95,21 @@ kimigayo_musl_build_id() {
     printf '%s+%s' "$1" "$id"
 }
 
+# OpenRC のスタンプ値。
+#
+# 版だけだと、build-openrc.sh のフラグを直しても（2026-10-13 に arm64 へ
+# -fstack-protector-strong を足した）古いバイナリが「ビルド済み」として
+# 残る。OpenRC は自前の musl に対してリンクするので、musl のパッチも入れる。
+# 例: 0.63.2+3f9a0c1d2e4b
+kimigayo_openrc_build_id() {
+    local root="${PROJECT_ROOT:?PROJECT_ROOT must be set}"
+    local id
+    id="$(kimigayo_inputs_id \
+        "${root}/src/libc/patches/"*.patch \
+        "${root}/scripts/build-openrc.sh")"
+    printf '%s+%s' "$1" "$id"
+}
+
 # 入力ファイル群（パッチ・config）の内容から短い ID を作る。
 #
 # 版とバリアントだけのスタンプでは、**同じ版のまま config やパッチを

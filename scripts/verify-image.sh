@@ -305,7 +305,8 @@ fi
 
 # **出荷されるイメージの全 ELF が強化されているか。**
 #
-# PIE / RELRO / BIND_NOW / 非実行スタックを、BusyBox だけでなく
+# PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護（__stack_chk_fail
+# の参照）を、BusyBox だけでなく
 # OpenRC・librc・libeinfo・libc.so を含む**すべての ELF**で見る。
 #
 # 2026-10-10 まで arm64 の BusyBox だけ ELF Type=EXEC（ASLR が効かない）
@@ -319,6 +320,12 @@ fi
 # `make install` がリンクし直して EXEC に戻した前例がある。
 # **ここは実際に配るイメージの中を見る。**
 #
+# スタック保護は 2026-10-13 に足した。公開済み v3.0.2 の arm64 は
+# OpenRC（openrc・librc・libeinfo ほか 20 本）が -fstack-protector-strong
+# なしでビルドされていた（build-openrc.sh が arm64 だけ外していた）。
+# この検査は v3.0.2 の arm64 で落ち、amd64 で通ることを確認済み。
+# 判定の基準は check-elf-hardening.py の冒頭。
+#
 # イメージにも開発機（macOS）にも readelf は無いので、docker export の
 # tar を Python で読む（scripts/check-elf-hardening.py）。
 cid="$(docker create --platform "$PLATFORM" "$IMAGE" /bin/true 2>/dev/null)"
@@ -330,7 +337,7 @@ else
     docker rm "$cid" >/dev/null 2>&1
     summary="$(printf '%s\n' "$out" | head -1)"
     if [ "$rc" -eq 0 ]; then
-        pass "every ELF is PIE + RELRO + BIND_NOW + non-exec stack (${summary})"
+        pass "every ELF is PIE + RELRO + BIND_NOW + non-exec stack + stack protector (${summary})"
     else
         fail "ELF hardening is missing (${summary})"
         show_output "$(printf '%s\n' "$out" | tail -n +2)"
