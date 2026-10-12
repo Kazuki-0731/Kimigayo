@@ -4,7 +4,8 @@
 
 ```
 tests/
-├── conftest.py         # Pytest設定とフィクスチャ
+├── conftest.py         # Pytest設定とフィクスチャ（hypothesis のプロファイルもここ）
+├── fixtures/           # テスト用のデータ
 ├── unit/               # 単体テスト
 ├── property/           # プロパティベーステスト
 └── integration/        # 統合テスト
@@ -15,15 +16,19 @@ tests/
 ### すべてのテスト
 
 ```bash
-make test
-# または
+make test        # ビルドコンテナ内で pytest tests/ -v
+# または（ホストで、pip install -r requirements-dev.txt のあと）
 pytest
 ```
+
+`make test-unit` / `make test-property` はビルドコンテナ側（`build-system/Makefile`）の
+ターゲットです。ホストで叩くと `No rule to make target` になるので、
+`make shell` で入ってから叩くか、ホストでは `pytest` を直接使います。
 
 ### 単体テストのみ
 
 ```bash
-make test-unit
+make test-unit           # ビルドコンテナ内
 # または
 pytest tests/unit/
 ```
@@ -31,7 +36,7 @@ pytest tests/unit/
 ### プロパティテストのみ
 
 ```bash
-make test-property
+make test-property       # ビルドコンテナ内
 # または
 pytest tests/property/ -v --hypothesis-show-statistics
 ```
@@ -39,10 +44,14 @@ pytest tests/property/ -v --hypothesis-show-statistics
 ### 統合テストのみ
 
 ```bash
-make test-integration
-# または
 pytest tests/integration/
 ```
+
+**ホストの `make test-integration` はこれと同じではありません。**
+`tests/integration/test_phase1_integration.py` だけを回し、
+`output/` に rootfs の tarball があるかを確かめます（`make ci-build-local` の一段）。
+シェルの統合テストは `make test-docker`（`test_docker_startup.sh`）と
+`make test-func`（`test_functionality.sh`）で、どちらもイメージが要ります。
 
 ### 特定のマーカー
 
@@ -56,32 +65,37 @@ pytest -m "not slow"
 
 ## プロパティベーステスト
 
-すべてのプロパティテストは以下の形式に従います:
+プロパティテストは次の形式で書きます（既存のファイルには、見出しコメントが
+この形式に揃っていないものもあります。「要件 1.1」などの番号が指す要件定義の
+文書はリポジトリにありません）:
 
 ```python
+# tests/property/test_build_constraints.py（抜粋）
 # **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
 # **検証対象: 要件 1.1**
-
-from hypothesis import given
-import hypothesis.strategies as st
-
-@given(build_config=st.builds(BuildConfig))
-def test_build_size_constraint(build_config):
-    """任意のビルド設定に対して、Base_Imageは5MB未満"""
-    image = build_base_image(build_config)
-    assert image.size_bytes < 5 * 1024 * 1024
+@pytest.mark.property
+@given(build_config=build_configurations())  # 同じファイルで定義した strategy
+def test_build_size_constraint(build_config, tmp_path):
+    """任意のビルド設定に対して、イメージはバリアントの上限未満
+    （MINIMAL 5MB / STANDARD 15MB / EXTENDED 50MB。SPECIFICATION.md §8.3）"""
+    image = build_base_image(build_config, output_dir=tmp_path)
+    assert image.size_bytes < build_config.max_image_size
 ```
 
 ### Hypothesis設定
 
-- デフォルト: 100回の反復
-- CI環境: 200回の反復
-- 開発環境: 50回の反復
+`tests/conftest.py` にプロファイルがあります（`deadline` はすべて無効）。
 
-環境変数で設定:
+- `kimigayo`（デフォルト）: 100回の反復
+- `ci`: 200回の反復
+- `dev`: 50回の反復
+
+環境変数で切り替えます:
 ```bash
 HYPOTHESIS_PROFILE=ci pytest
 ```
+
+**CI（`ci.yml`）は `HYPOTHESIS_PROFILE` を設定していない**ので、CI でも 100 回です。
 
 ## カバレッジ
 
@@ -93,8 +107,10 @@ pytest --cov=src --cov-report=html
 
 ## 継続的インテグレーション
 
-GitHub Actionsで自動的に実行されます:
+GitHub Actions（`ci.yml` の Tests ジョブ）が、`main` への push と PR で
+`pytest tests/unit tests/property -q` を回します。
 
-- プッシュ時: すべてのテスト
-- プルリクエスト時: すべてのテスト + カバレッジ
-- スケジュール: セキュリティスキャン
+- `tests/integration/` の pytest とカバレッジ測定は CI では回していません
+- イメージの検証は pytest ではなく `scripts/verify-image.sh` が、variant × arch の
+  ビルドごとに行います
+- スケジュール実行はセキュリティスキャン（`security.yml`・`dependency-review.yml`）です
