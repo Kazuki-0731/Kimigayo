@@ -2,60 +2,76 @@
 
 ## 概要
 
-`benchmark-busybox.sh`は、Kimigayo OSのBusyBoxコマンドの実行速度を測定し、Alpine Linuxと比較するベンチマークスクリプトです。日常的に使用する頻度の高いコマンドの性能を定量化し、開発者体験の優位性を示します。
+`benchmark-busybox.sh`は、Kimigayo OSのBusyBoxコマンドの実行時間を測定し、Alpine Linuxと比較するベンチマークスクリプトです。日常的に使用する頻度の高いコマンドについて、Alpine と差があるかどうかを確かめます。
+
+**結論を先に書くと、差は出ていません**（→「実測値」節）。測っている時間のほとんどは
+`docker run` のコンテナ生成です（→「この指標の限界」節）。
 
 ## 測定項目
 
 ### 対象コマンド（8種類）
 
-| コマンド | 測定内容 | 実用例 |
+| コマンド | 測定内容 | 実際に実行するコマンド |
 |---------|---------|--------|
 | **ls** | ディレクトリ一覧表示 | `ls -la /bin` |
 | **grep** | 再帰的テキスト検索 | `grep -r 'bin' /etc` |
 | **find** | ファイル検索 | `find /usr -type f` |
-| **awk** | テキスト処理 | `ls -la \| awk '{print $1}'` |
-| **sort** | データソート | `ls -la \| sort` |
+| **awk** | テキスト処理 | `ls -la /bin \| awk '{print $1}'` |
+| **sort** | データソート | `ls -la /bin \| sort` |
 | **cat** | ファイル読み込み | `cat /etc/passwd` |
-| **wc** | 行数カウント | `ls -laR \| wc -l` |
-| **head** | 先頭行抽出 | `ls -laR \| head -n 10` |
+| **wc** | 行数カウント | `ls -laR /bin \| wc -l` |
+| **head** | 先頭行抽出 | `ls -laR /bin \| head -n 10` |
+
+1 回ごとに `docker run --rm <image> ...` でコンテナを作って実行します。
 
 ### 測定方法
 
 - **反復回数**: 各コマンド10回実行して統計処理
 - **測定単位**: ミリ秒（ms）
 - **統計値**: 平均値、中央値
-- **比較対象**: Alpine Linux (latest)
-- **高速化率**: Speedup = Alpine時間 / Kimigayo時間
+- **比較対象**: Alpine Linux（既定は `alpine:latest`）
+- **Speedup**: Alpine の**平均** / Kimigayo の**平均**（1.00 より大きいと Kimigayo が速い）
+
+> **スクリプトの Speedup は平均から計算している**（`scripts/benchmark-busybox.sh` の
+> `calculate_speedup` に `*_avg` を渡している）。一方、[README.md](../../README.md) の
+> 「0.97〜1.01x」は**中央値の比**として書かれている。同じ「Speedup」でも両者は別の値なので、
+> 引用するときはどちらかを明記する。
 
 ## 使用方法
 
 ### 基本実行
 
 ```bash
-# Makefileから実行（推奨）
+# Makefileから実行（推奨。対象は kimigayo-os:$(VARIANT)-$(ARCH)、既定は standard-x86_64）
 make benchmark-busybox
 
-# スクリプトを直接実行
+# スクリプトを直接実行（対象の既定は ishinokazuki/kimigayo-os:latest-standard）
 bash scripts/benchmark-busybox.sh
 
-# 環境変数でカスタマイズ
-IMAGE_NAME=kimigayo-os:standard-x86_64 \
+# 環境変数でカスタマイズ（スクリプトを直接呼ぶ）
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-standard \
 ALPINE_IMAGE=alpine:3.24 \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-busybox.sh
 ```
 
+> **`IMAGE_NAME=... make benchmark-busybox` は使えない。** Makefile が
+> `IMAGE_NAME` の後ろに `:$(VARIANT)-$(ARCH)` を付け足すので、
+> `kimigayo-os:minimal-x86_64:standard-x86_64` のような無効な名前になる。
+> make 経由でバリアントを変えるときは `VARIANT=` / `ARCH=` を使い、
+> 任意のイメージを測るときはスクリプトを直接呼ぶ。
+
 ### 環境変数
 
 | 変数名 | デフォルト値 | 説明 |
 |--------|------------|------|
-| `IMAGE_NAME` | `kimigayo-os:standard-x86_64` | テスト対象イメージ |
+| `IMAGE_NAME` | スクリプト直接: `ishinokazuki/kimigayo-os:latest-standard` / make 経由: `kimigayo-os:$(VARIANT)-$(ARCH)` | テスト対象イメージ |
 | `ALPINE_IMAGE` | `alpine:latest` | 比較対象イメージ |
 | `BENCHMARK_ITERATIONS` | `10` | 各測定の反復回数 |
 
 ### 出力ファイル
 
-ベンチマーク結果は`benchmark-results/`ディレクトリに保存されます：
+ベンチマーク結果は`benchmark-results/`ディレクトリに保存されます（毎回上書き）：
 
 ```
 benchmark-results/
@@ -67,37 +83,39 @@ benchmark-results/
 
 ### コンソール出力例
 
-```
-=== BusyBox Command Performance Benchmark ===
+`benchmark-results/busybox.json`（2026-10-11、v3.0.1、arm64）の値を並べたもの:
 
-Command              Kimigayo (ms)    Alpine (ms)      K Median      A Median      Speedup
+```
+=== Benchmark Summary ===
+
+Command              Kimigayo (ms)     Alpine (ms)        K Median        A Median      Speedup
 -------------------- --------------- --------------- --------------- --------------- ------------
-ls                              450             520             445             515        1.16x
-grep                            380             425             375             420        1.12x
-find                            310             360             305             355        1.16x
-awk                             470             540             465             535        1.15x
-sort                            520             595             515             590        1.14x
-cat                             280             310             275             305        1.11x
-wc                              430             490             425             485        1.14x
-head                            400             455             395             450        1.14x
+ls                              879             884             884             880        1.01x
+grep                            952             934             909             921        0.98x
+find                            861             850             862             849        0.99x
+awk                             871             883             868             867        1.01x
+sort                            828             845             825             850        1.02x
+cat                             847             854             833             856        1.01x
+wc                              891             884             891             885        0.99x
+head                            880             885             873             871        1.01x
 ```
 
 ### JSON出力例
 
 ```json
 {
-  "timestamp": "2026-01-01T12:00:00Z",
-  "kimigayo_image": "kimigayo-os:standard-x86_64",
-  "alpine_image": "alpine:latest",
+  "timestamp": "2026-10-11T17:55:17Z",
+  "kimigayo_image": "ishinokazuki/kimigayo-os:3.0.1",
+  "alpine_image": "alpine:3.24",
   "iterations": 10,
   "results": {
     "ls": {
-      "kimigayo_avg_ms": 450,
-      "kimigayo_median_ms": 445,
-      "alpine_avg_ms": 520,
-      "alpine_median_ms": 515,
-      "speedup": 1.16,
-      "kimigayo_samples": [450, 445, ...]
+      "kimigayo_avg_ms": 879,
+      "kimigayo_median_ms": 884,
+      "alpine_avg_ms": 884,
+      "alpine_median_ms": 880,
+      "speedup": 1.01,
+      "kimigayo_samples": [830, 910, 890, ...]
     },
     ...
   }
@@ -105,6 +123,19 @@ head                            400             455             395             
 ```
 
 ## 実測値
+
+### v3.0.2（2026-10-12）
+
+[README.md](../../README.md) の「パフォーマンス実績」節に、v3.0.2 の公開イメージ
+（Standard、arm64 ネイティブ）で **中央値の比 0.97〜1.01x** と記録されている。
+**このときの生データ（`busybox.json`）はリポジトリに残っていない**ので、
+コマンドごとの値はここに書けない。結論は下の 2 回と同じで、有意差なし。
+
+### v3.0.1（2026-10-11）
+
+**測定条件:** `ishinokazuki/kimigayo-os:3.0.1` vs `alpine:3.24`、arm64 ネイティブ、各10回。
+値は上の「コンソール出力例」のとおりで、Speedup（平均の比）は **0.98〜1.02x**。
+生データは `benchmark-results/busybox.json`。
 
 ### Kimigayo OS vs Alpine Linux（2026-10-10）
 
@@ -135,80 +166,38 @@ sort 570/575・cat 578/570・wc 685/687・head 705/703（Kimigayo / Alpine）。
 > 2026-10-10 に測り直すと、どのコマンドも Alpine と差が無かった。
 > 当時の測定条件（ホスト・アーキテクチャ・イメージ）が記録されて
 > いないため、何が違ったのかを検証できない。
+> 以前この文書にあった「grep が 12% 高速」「全体で 10-16% 高速」なども同じ値から
+> 作ったものなので削除した。
 
 ### この指標の限界
 
-**1コマンドあたり 570〜790ms という値のほとんどは `docker run` の
+**1コマンドあたり 570〜950ms という値のほとんどは `docker run` の
 コンテナ生成時間**で、コマンド自身の処理時間ではない。
 起動時間ベンチマークで分かったことと同じで、
 78MB の Ubuntu でも同じオーダーになる。
 
 - **「> 1.10x」という目標自体が、この測り方では意味を持たない。**
   差を見たいなら、コンテナを1つ起動したまま中で多数回繰り返す必要がある
-- musl libc と静的リンクの効果を主張する根拠にはならない
-3. **最適化ビルド**: `-Os`サイズ最適化による命令キャッシュ効率向上
-4. **シングルバイナリ**: 全コマンドが1つのバイナリに統合され、メモリ局所性が高い
-
-## 開発者体験への影響
-
-### デバッグ作業の効率化
-
-```bash
-# ログ検索（grep）が12% 高速
-docker exec -it container grep -r "ERROR" /var/log
-# 450ms → 400ms に短縮
-
-# ファイル探索（find）が16% 高速
-docker exec -it container find /app -name "*.log"
-# 360ms → 310ms に短縮
-
-# テキスト処理（awk）が15% 高速
-docker exec -it container awk '/pattern/ {print $3}' large.log
-# 540ms → 470ms に短縮
-```
-
-### CI/CDパイプラインでの効果
-
-```yaml
-# GitHub Actions例
-- name: Run tests in container
-  run: |
-    docker run --rm kimigayo-os:latest sh -c "
-      find /app -name '*.test' | \
-      xargs grep 'TestCase' | \
-      awk '{print \$2}' | \
-      sort | uniq | wc -l
-    "
-# 複数コマンドの組み合わせで累積的な高速化効果
-```
+- musl libc やビルドフラグの効果を主張する根拠にはならない
 
 ## 技術的考察
 
-### BusyBox最適化の効果
+### BusyBox のビルドフラグ
 
-Kimigayo OSのBusyBoxは以下の最適化を施しています：
+`scripts/build-busybox.sh` が渡しているのは次のとおり（x86_64 の例）:
 
 ```bash
-# scripts/busybox/build.sh より
-CFLAGS="-Os -ffunction-sections -fdata-sections"
-LDFLAGS="-static -Wl,--gc-sections"
+CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 ..."
+LDFLAGS="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
+# 最終リンク: 既定（BUSYBOX_LINK=dynamic）は -pie。BUSYBOX_LINK=static なら -static -static-pie
 ```
 
-- **-Os**: サイズ最適化（命令キャッシュ効率向上）
-- **-ffunction-sections**: 関数ごとにセクション分割
-- **-fdata-sections**: データごとにセクション分割
-- **--gc-sections**: 未使用セクションの削除
+- **-Os**: サイズ最適化
+- v3.0.2 から BusyBox は**動的リンク**（`/lib/libc.so` を OpenRC と共有）。
+  静的リンクは `BUSYBOX_LINK=static` を渡したときだけ
+- `-ffunction-sections` / `--gc-sections` は渡していない
 
-### コンテナ環境での優位性
-
-```
-実測時間 = コンテナ起動 + コマンド実行 + 標準出力
-```
-
-Kimigayo OSは全体で10-16%高速：
-- コンテナ起動: lifecycle benchmarkで測定（~540ms）
-- コマンド実行: 本ベンチマークで測定（コマンドごとに異なる）
-- 標準出力: ほぼ同等
+これらが実行時間に効いているかは、上の測り方では分からない。
 
 ## トラブルシューティング
 
@@ -237,22 +226,6 @@ docker pull alpine:latest
 ALPINE_IMAGE=alpine:3.24 make benchmark-busybox
 ```
 
-### bc: command not found エラー
-
-**原因**: bcコマンドがインストールされていない
-
-**対策**:
-```bash
-# macOS
-brew install bc
-
-# Ubuntu/Debian
-sudo apt install bc
-
-# Alpine
-apk add bc
-```
-
 ## ベストプラクティス
 
 ### 1. 複数回実行して統計を取る
@@ -262,76 +235,23 @@ apk add bc
 BENCHMARK_ITERATIONS=20 make benchmark-busybox
 ```
 
-### 2. 本番環境に近い条件で測定
+### 2. 公開イメージで測定
 
 ```bash
-# 本番イメージを使用
-IMAGE_NAME=kimigayo-os:standard-x86_64 \
-make benchmark-busybox
+# 公開イメージを使用（スクリプトを直接呼ぶ）
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-standard \
+bash scripts/benchmark-busybox.sh
 ```
 
-### 3. 継続的なモニタリング
+### 3. 異なるバリアント間での比較
 
 ```bash
-# 定期的に実行してトレンドを追跡
-# CI/CDで週次実行を設定
-```
+# minimal vs standard vs extended（ローカルでビルドした kimigayo-os:<variant>-x86_64）
+make benchmark-busybox VARIANT=minimal
+make benchmark-busybox VARIANT=standard
+make benchmark-busybox VARIANT=extended
 
-### 4. 異なるバリアント間での比較
-
-```bash
-# minimal vs standard vs extended
-IMAGE_NAME=kimigayo-os:minimal-x86_64 make benchmark-busybox
-IMAGE_NAME=kimigayo-os:standard-x86_64 make benchmark-busybox
-IMAGE_NAME=kimigayo-os:extended-x86_64 make benchmark-busybox
-
-# benchmark-results/busybox.json で比較
-```
-
-## CI/CD統合
-
-### GitHub Actions
-
-```yaml
-name: BusyBox Performance Benchmark
-
-on:
-  pull_request:
-  schedule:
-    - cron: '0 0 * * 0'  # 週次実行
-
-jobs:
-  benchmark:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Pull test images
-        run: |
-          docker pull kimigayo-os:standard-x86_64
-          docker pull alpine:latest
-
-      - name: Run BusyBox benchmark
-        run: make benchmark-busybox
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: busybox-benchmark-results
-          path: benchmark-results/busybox.json
-```
-
-### 結果の可視化
-
-```bash
-# jqを使ってSpeedupを抽出
-jq '.results | to_entries | .[] | {command: .key, speedup: .value.speedup}' \
-  benchmark-results/busybox.json
-
-# 結果例:
-# {"command":"ls","speedup":1.16}
-# {"command":"grep","speedup":1.12}
-# {"command":"find","speedup":1.16}
+# benchmark-results/busybox.json は毎回上書きされるので、都度コピーして比較する
 ```
 
 ## 関連ドキュメント
@@ -347,8 +267,8 @@ jq '.results | to_entries | .[] | {command: .key, speedup: .value.speedup}' \
 ### 測定精度について
 
 - **時間精度**: ミリ秒単位（1ms = 0.001秒）
-- **統計手法**: 平均値と中央値を併用
-- **外れ値**: 10回の測定で統計的に安定
+- **統計手法**: 平均値と中央値を併用（Speedup は平均から計算）
+- **ばらつき**: 同じ条件で走らせ直しても ±10% 程度動く（→「実測値」節）
 
 ### Docker操作のオーバーヘッド
 
@@ -356,30 +276,33 @@ jq '.results | to_entries | .[] | {command: .key, speedup: .value.speedup}' \
 実測値 = 実際の処理時間 + Docker CLIオーバーヘッド + コンテナ起動時間
 ```
 
-- Docker CLIオーバーヘッド: 約5-10ms
-- コンテナ起動時間: 約400-550ms（lifecycle benchmarkより）
-- コマンド実行時間: 本ベンチマークで測定
+- コンテナ起動時間: 約 0.6 秒（v3.0.2 の `docker run --rm <image> /bin/true`、
+  arm64 ネイティブ。→ [README.md](../../README.md)）
+- コマンド実行時間: 本ベンチマークでは上と切り分けられない
 
 ### BusyBox設定の検証
 
 ```bash
 # Kimigayo OSのBusyBox設定確認
-docker run --rm kimigayo-os:standard-x86_64 busybox --help
+docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox --help
 
 # 利用可能なコマンド一覧
-docker run --rm kimigayo-os:standard-x86_64 busybox --list
+docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox --list
 
 # バージョン確認
-docker run --rm kimigayo-os:standard-x86_64 busybox | head -1
+docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox | head -1
 ```
 
 ## 更新履歴
 
 - **2026-01-01 (v1.0.0)**: 初版リリース（Issue #30対応）
-- **2026-10-11 (v3.0.1)**: 実測で測り直し。v1.0.0 の数値を撤回し、
-  この指標が何を測っているか（Docker のオーバーヘッド）を明記
   - 8コマンドの測定を実装
   - Alpine Linuxとの比較機能
   - JSON/テキスト形式の出力
   - Makefile統合
   - Speedup計算機能
+- **2026-10-10**: 実測で測り直し。v1.0.0 の数値を撤回し、
+  この指標が何を測っているか（Docker のオーバーヘッド）を明記
+- **2026-10-11 (v3.0.1)**: v3.0.1 で測り直し（0.98〜1.02x）
+- **2026-10-12 (v3.0.2)**: README の v3.0.2 の値を記録。撤回済みの値から作った記述、
+  実在しないビルドフラグ・CI の例を削除
