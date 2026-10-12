@@ -5,6 +5,8 @@
 #
 # 読み込み方:
 #   Makefile              : include versions.mk
+#   build-system/Makefile : include ../versions.mk
+#   config.mk             : include versions.mk（config.mk 自体は誰も読まない）
 #   scripts/*.sh          : source scripts/lib/versions.sh
 #
 # バージョンを上げる手順:
@@ -13,7 +15,9 @@
 #   3. scripts/download-*.sh のチェックサム表に新しい版を追加する
 #      （上流の公開値、または Alpine aports の sha512sums と突合してから書く）
 #   4. ビルドして build/kernel-patches.log・build/busybox-patches.log に
-#      "not applicable" が出ていないか確認する（当たらないパッチは黙って飛ぶ）
+#      "not applicable" が出ていないか確認する（カーネルの適用スクリプトは
+#      当たらないパッチを警告だけで飛ばす。BusyBox と musl は当たらなければ
+#      ビルドが止まる）
 #   5. README.md・docs/ のバージョン表記を突合する
 
 # Linux カーネル

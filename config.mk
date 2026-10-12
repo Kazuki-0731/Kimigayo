@@ -13,18 +13,29 @@
 #   musl     scripts/build-musl.sh    CFLAGS_SECURITY / LDFLAGS_SECURITY
 #   BusyBox  scripts/build-busybox.sh CONFIG_EXTRA_CFLAGS + exported CFLAGS
 #   OpenRC   scripts/build-openrc.sh  exported CFLAGS / LDFLAGS
-#   kernel   scripts/build-kernel.sh  KCFLAGS + src/kernel/config/*.config
+#   kernel   scripts/build-kernel.sh  KCFLAGS + upstream defconfig hardened by
+#            apply_security_hardening (scripts/config). It only reads
+#            src/kernel/config/<arch>.config, and the tracked x86_64.config is
+#            ignored because it contains placeholder lines. The other files in
+#            src/kernel/config/ (minimal/standard/extended-*, kimigayo_*_defconfig)
+#            are not used by the build.
 #
 # Consequences, measured rather than assumed:
 #
 #   -fPIE / -fstack-protector-strong / -D_FORTIFY_SOURCE=2
-#       applied - the three build scripts set them directly.
-#       scripts/verify-image.sh checks the ELF type of every executable.
+#       set directly by the three build scripts, with exceptions:
+#       the arm64 OpenRC build (scripts/build-openrc.sh) does not pass
+#       -fstack-protector-strong, so openrc / librc / libeinfo on arm64 have
+#       no stack protector. musl does not implement FORTIFY, so the effect of
+#       -D_FORTIFY_SOURCE=2 is not confirmed.
+#       scripts/verify-image.sh checks PIE, RELRO, BIND_NOW and a non-exec
+#       stack on every ELF in the image.
 #   -Wl,-z,noexecstack
 #       used to appear only here. The artifacts did have a non-exec stack,
-#       but only because lld defaults to it - not because we asked.
+#       but only because the linker defaulted to it - not because we asked.
 #       Since 2026-10-11 the three build scripts pass it explicitly.
-#       Measured on the rebuilt x86_64 busybox:
+#       Measured 2026-10-11 on the rebuilt x86_64 busybox (static at the time;
+#       BusyBox has been dynamically linked since v3.0.2, so the size differs):
 #           GNU_STACK ... RW   (no E)
 #           Type: DYN (Position-Independent Executable file)
 #           GNU_RELRO present, BIND_NOW present
@@ -60,9 +71,13 @@
 #
 # Do not advertise more than what has been checked this way.
 #
-# BUSYBOX_CONFIG below is wrong: there is no src/busybox/kimigayo_defconfig.
-# The real configs are src/busybox/config/{minimal,standard,extended}.config,
-# selected by IMAGE_TYPE in scripts/build-busybox.sh.
+# BUSYBOX_CONFIG below is wrong: it points at src/utils/busybox/config/,
+# which does not exist. The real configs are
+# src/busybox/config/{minimal,standard,extended}.config, selected by
+# IMAGE_TYPE in scripts/build-busybox.sh.
+#
+# KERNEL_CONFIG below points at src/kernel/config/kimigayo_<arch>_defconfig.
+# The file exists but the build does not use it (see "kernel" above).
 #
 # Wiring the *rest* of this file in would change the flags every binary is
 # compiled with (note BASE_CFLAGS carries -Werror), so it needs its own change
