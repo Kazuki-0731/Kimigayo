@@ -40,7 +40,7 @@ HTTPS を使うなら `curl` を持ち込んでください。
 
 ### ♻️ BusyBox を動的リンクにしました
 
-BusyBox も OpenRC と同じ `/lib/libc.so` を使います。
+BusyBox も OpenRC と同じ `/usr/lib/libc.so` を使います。
 静的リンクだった v3.0.1 では、x86_64 の `/bin/sh` がビルド環境の
 musl を取り込んでおり、**Kimigayo が musl に当てたパッチが効いて
 いませんでした**（今回の musl の 2 件は、取り込んだ側でたまたま
@@ -71,7 +71,26 @@ x86_64 2.76MB / arm64 3.13MB）
   v3.0.1 では展開先の外にファイルを作れました）
 - 同じコミットから**バイト単位で同じ** rootfs の tarball ができるようにしました
   （並び順・mtime・gzip ヘッダの固定、`/.kimigayo-build-info` の時刻をコミット時刻に）。
-  CI で 2 回ビルドして SHA-256 の一致を確認しています（standard / x86_64）
+  同じコミットを CI と Manual Build で別々にビルドし、SHA-256 の一致を確認しています
+  （standard / x86_64 の 1 組。Docker イメージの digest は見ていません）
+
+### ✍️ 公開イメージに署名を付けました
+
+v3.0.2 から、Docker Hub に出すイメージに Cosign のキーレス署名を付けます
+（v3.0.1 以前の公開イメージは未署名です）。検証には **cosign v3 以上**が
+要ります（v2 では `no signatures found` になります）。
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:3.0.2 \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+### 🔧 ビルドの強化
+
+- 非実行スタック（`-Wl,-z,noexecstack`）を musl / BusyBox / OpenRC の
+  ビルドで明示しました（以前もリンカの既定で非実行でしたが、宣言していませんでした）
+- カーネルのビルドから `-Wno-error` を外しました（カーネルはイメージに入りません）
 
 ### 📝 脆弱性の報告窓口
 
@@ -199,7 +218,7 @@ Kimigayo は独自のパッケージマネージャを作りません（2026-10-
 | 消した記述 | 実態 |
 | --- | --- |
 | seccomp-BPF をデフォルトで有効化 | 成果物は rootfs だけでカーネルを含まない。seccomp を適用するのはホストの `docker run` 側 |
-| 再現可能ビルド（ビット同一） | `REPRODUCIBLE_BUILD=yes` のときだけ効くフラグを、どこも設定していない |
+| 再現可能ビルド（ビット同一） | 検証の記録が無かった（**訂正**: 当時「`REPRODUCIBLE_BUILD` をどこも設定していない」と書いたのは誤りで、`build-system/Makefile` が設定している。v3.0.2 で rootfs の tarball のビット同一を 1 組確認） |
 | イメージ署名（Docker Content Trust / Cosign） | `release.yml` に署名工程が無い |
 | Trivy でイメージを自動スキャン | パッケージデータベースが無いため対象を1つも識別できない |
 | Minimal は「カーネル + musl libc + BusyBox」 | カーネルはイメージに入らない |
@@ -351,7 +370,28 @@ v1.0 と v2.0 はコードネームの運用開始前に公開済みのため名
 
 ---
 
-## バージョン 0.1.0 - Phase 1完了 (2025-12-15)
+> v0.1.1（2025-12-22）・v1.0.0（2026-01-02）・v2.0.1（2026-01-16）の
+> リリースノートはありません。変更点は [CHANGELOG.md](CHANGELOG.md) を参照してください。
+
+---
+
+## バージョン 0.1.0 - Phase 1完了 (2025-12-22)
+
+> **当時の記録です（2026-10-12 注記）。** 以下には実装されていなかった
+> 主張が含まれます。v0.1.0〜v2.0.1 の公開イメージには OpenRC のバイナリも
+> musl の `libc.so` も入っておらず、Init は動きませんでした（→ 3.0.0 の節）。
+> とくに次は事実ではありません:
+>
+> - **Seccomp-BPF・名前空間分離**: イメージにプロファイルは無く、
+>   適用するのはホストのランタイム
+> - **再現可能ビルド「ビット同一出力の保証」**: 当時は未検証。
+>   rootfs の tarball のビット同一を確認したのは v3.0.2
+> - **isn 互換パッケージ生成・暗号化検証**: isn は v0.1.1 で削除。
+>   Kimigayo はパッケージマネージャーを持たない
+> - **iptables・SSH 強化**: イメージに iptables も SSH も無い
+> - **カーネル**: カーネルはイメージに入らない
+> - **ベアメタル・仮想化環境へのインストール、RISC-V / ARM32 の予定**:
+>   対象外（想定は VPS 上の Docker コンテナ）
 
 ### 🎉 初回リリース
 
@@ -627,7 +667,7 @@ Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
 ## 📅 リリース履歴
 
-### v0.1.0 (2025-12-15) - Phase 1完了
+### v0.1.0 (2025-12-22) - Phase 1完了
 - 初回リリース
 - コアインフラストラクチャの完成
 - 31のプロパティテスト実装
@@ -645,4 +685,4 @@ Kimigayo OSは以下のプロジェクトの成果を活用しています：
 
 **Made with ❤️ by the Kimigayo OS Team**
 
-*Kimigayo OS - 軽量・高速・セキュアなオペレーティングシステム*
+*Kimigayo OS - 軽量なコンテナ向けオペレーティングシステム*
