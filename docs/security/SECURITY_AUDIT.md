@@ -207,12 +207,17 @@ ASLR・NX・KASLR・カーネルの CVE はホスト側の監査項目です。
 **外部 Action はコミット SHA で固定します**（`@master` は供給網の
 リスクかつ再現性がない）。
 
+ShellCheck は Action を使わず、ダイジェストで固定した `koalaman/shellcheck` の
+イメージを直接動かします（`release.yml` も同じ。2026-10-13 まで使っていた
+`ludeeus/action-shellcheck` は `.claude/hooks` を実際には検査していなかった）。
+
 ```yaml
-- name: Run ShellCheck (Static Analysis)
-  uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
-  with:
-    additional_files: '.claude/hooks'
-    scandir: './scripts'
+- name: Run ShellCheck
+  run: |
+    docker run --rm -v "${PWD}:/mnt" -w /mnt \
+      koalaman/shellcheck:v0.11.0@sha256:61862eba... \
+      --severity=warning \
+      scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 
 - name: Run Trivy (filesystem)
   uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -230,7 +235,7 @@ GitHub Release に添付します。
 
 `verify-image.sh` のうちセキュリティに関わる検査:
 
-- イメージ内の**全 ELF**の PIE / RELRO / BIND_NOW / 非実行スタック
+- イメージ内の**全 ELF**の PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護
   （`scripts/check-elf-hardening.py` が `docker export` の tar を読む）
 - イメージ内のバイナリを実行して読んだ BusyBox / musl / OpenRC の版と
   `versions.mk` の突合（`scripts/lib/image-components.sh`）
