@@ -18,7 +18,7 @@ Kimigayo OSは3つのバリアントを提供しています:
 |-----------|-----------|--------|------|
 | **Minimal** | `ishinokazuki/kimigayo-os:latest-minimal` | 2.46MB | 最小限の環境、特化したコンテナ |
 | **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | 2.60MB | 一般的な用途、開発、本番環境 |
-| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.62MB | Standard + 11 アプレット（MTD/flash・framebuffer 系）|
+| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.62MB | Standard + 11 アプレット（[Q4](#q4-どのバリアントを選ぶべきですか) 参照）|
 
 （x86_64、v3.0.2 を 2026-10-12 実測。arm64 は +0.37〜0.39MB。
 最新は [README.md](../../README.md) の「パフォーマンス実績」節）
@@ -46,8 +46,8 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 # Extendedバリアント
 docker pull ishinokazuki/kimigayo-os:latest-extended
 
-# 特定バージョンを指定
-docker pull ishinokazuki/kimigayo-os:0.1.0
+# 特定バージョンを指定（v なし）
+docker pull ishinokazuki/kimigayo-os:3.0.2
 ```
 
 ### 基本的な起動
@@ -105,11 +105,16 @@ docker run -d \
 
 最小限のフットプリントでマイクロサービスを実行:
 
+**持ち込むバイナリは静的リンクにするか、共有ライブラリを `ldd` で集めて一緒に
+`COPY` します**（実行ファイルだけでは `Error relocating ...: symbol not found`
+で落ちます。→ [8. マルチステージビルド](#8-マルチステージビルド)、
+[examples/python/Dockerfile](../../examples/python/Dockerfile)）。
+
 ```dockerfile
 # Dockerfile
-FROM ishinokazuki/kimigayo-os:latest-minimal
+FROM ishinokazuki/kimigayo-os:3.0.2-minimal
 
-# アプリケーションバイナリをコピー
+# 静的リンクしたアプリケーションバイナリをコピー
 COPY myapp /usr/local/bin/myapp
 RUN chmod +x /usr/local/bin/myapp
 
@@ -145,7 +150,13 @@ docker run -it \
 
 ### 4. CIパイプライン
 
-GitHub ActionsやGitLab CIでのテスト環境:
+GitHub Actions でのテスト環境:
+
+**`container:` でジョブ全体を Kimigayo で動かす形は使えません。**
+`actions/checkout` のような JavaScript アクションはランナーが持ち込む
+Node.js で動きますが、それに必要な glibc や libstdc++ がイメージに
+入っていないためです。チェックアウトはランナー側で行い、
+`docker run` で中を叩きます。
 
 ```yaml
 # .github/workflows/test.yml
@@ -156,14 +167,12 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    container:
-      image: ishinokazuki/kimigayo-os:latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
+      - name: Run tests in Kimigayo OS
         run: |
-          echo "Testing in Kimigayo OS"
-          /bin/sh test.sh
+          docker run --rm -v "$PWD:/work" -w /work \
+            ishinokazuki/kimigayo-os:3.0.2 /bin/sh test.sh
 ```
 
 ### 5. セキュアな実行環境
@@ -208,8 +217,6 @@ docker run --rm \
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
-
 services:
   app:
     image: ishinokazuki/kimigayo-os:latest
@@ -229,7 +236,7 @@ services:
 
   monitoring:
     image: ishinokazuki/kimigayo-os:latest-extended
-    command: /bin/sh -c "while true; do ps aux; sleep 60; done"
+    command: /bin/sh -c "while true; do ps; sleep 60; done"
 ```
 
 ```bash
@@ -272,9 +279,9 @@ Error response from daemon: manifest for ishinokazuki/kimigayo-os:latest not fou
 
 **解決策:**
 1. イメージ名のスペルを確認
-2. タグが存在するか確認:
+2. タグが存在するか確認（版は `v` なしの `3.0.2` 形式。`0.1.0`・`stable`・`edge` はありません）:
 ```bash
-docker pull ishinokazuki/kimigayo-os:0.1.0
+docker pull ishinokazuki/kimigayo-os:3.0.2
 ```
 3. ネットワーク接続を確認
 
@@ -354,12 +361,12 @@ docker stats
 
 **解決策:**
 
-1. 絶対パスを使用:
+1. 絶対パスを使用（Docker 23 未満は `-v` の相対パスを名前付きボリュームと解釈します）:
 ```bash
-# ❌ 間違い
+# ❌ Docker 23 未満では意図どおりにならない
 docker run -v ./data:/data ishinokazuki/kimigayo-os:latest
 
-# ✅ 正しい
+# ✅ どの版でも動く
 docker run -v $(pwd)/data:/data ishinokazuki/kimigayo-os:latest
 ```
 
@@ -410,8 +417,8 @@ docker images | grep kimigayo-os
 
 **A:** Kimigayo OSはGoogleのdistrolessと同様の設計思想を採用し、以下の特徴があります:
 
-- パッケージマネージャを意図的に排除（不変インフラの徹底）
-- より強力なセキュリティ強化（最小攻撃面、デフォルト設定）
+- パッケージマネージャを意図的に排除（不変インフラの徹底。侵入されても追加ツールを取得できない）
+- イメージが小さい（Standard 2.60MB。Alpine は 8.42MB）。起動時間と常駐メモリは Alpine と差がありません
 - デバッグ可能性（BusyBoxによるシェル・ツール提供）
 - バージョンを固定した決定的な構成（`versions.mk` + チェックサム検証）
 - 日本語ドキュメントの充実
@@ -422,22 +429,32 @@ docker images | grep kimigayo-os
 
 **A:** Kimigayo OSはdistroless設計を採用しており、パッケージマネージャは含まれていません。必要なソフトウェアは、マルチステージビルドでコンパイルしてから、Kimigayo OSイメージにコピーすることを推奨します。
 
-```bash
+**実行ファイルだけを `COPY` しても動きません。** 共有ライブラリを `ldd` で集めて一緒に持ち込みます。
+
+```dockerfile
 # マルチステージビルドの例
 FROM alpine:3.24 AS builder
 RUN apk add --no-cache curl
 
-FROM ishinokazuki/kimigayo-os:latest
-COPY --from=builder /usr/bin/curl /usr/bin/curl
+RUN mkdir -p /stage/usr/bin /stage/usr/lib \
+    && cp /usr/bin/curl /stage/usr/bin/ \
+    && ldd /usr/bin/curl \
+       | awk '/=>/ { print $3 } /^\/lib|^\/usr\/lib/ { print $1 }' \
+       | grep -v 'ld-musl' \
+       | sort -u \
+       | xargs -I{} cp -L {} /stage/usr/lib/
+
+FROM ishinokazuki/kimigayo-os:3.0.2
+COPY --from=builder /stage/ /
 ```
 
 ---
 
 ### Q3: 本番環境で使用できますか？
 
-**A:** Kimigayo OSは現在**開発段階**です。本番環境での使用は推奨しません。
-
-安定版リリース（v1.0.0）まではテスト・開発環境での使用を推奨します。
+**A:** 使えます。ただし**本番では版を固定してください**（`3.0.2-standard` のように
+版番号つきのタグ）。`latest` は毎リリースで中身が変わります。
+開発はメンテナー 1 人で行っているので、サポートの体制はそれを前提に判断してください。
 
 ---
 
@@ -482,7 +499,9 @@ docker run -it \
 
 ### Q7: セキュリティアップデートはどうなりますか？
 
-**A:** 定期的に脆弱性スキャンを実施し、セキュリティアドバイザリを公開します:
+**A:** 出荷するイメージの中のバイナリから SBOM を作って CVE と照合しています（CI・リリース前・
+毎週の公開 `latest`）。v3.0.2 からはイメージに Cosign のキーレス署名が付き（検証には cosign v3 以上が必要）、
+SBOM は GitHub Release に添付しています。脆弱性の報告と対応期限は以下を参照してください:
 
 - [セキュリティポリシー](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/SECURITY_POLICY.md)
 - [脆弱性報告](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/VULNERABILITY_REPORTING.md)
