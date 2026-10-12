@@ -16,8 +16,8 @@
 
 ### 1. 動的リンクの実行ファイルは共有ライブラリも要る
 
-**このベースイメージには musl libc しか入っていません**
-（`/usr/lib/libc.so` だけです）。他のイメージから動的リンクの実行ファイルを
+**このベースイメージの共有ライブラリは musl libc と OpenRC のものだけです**
+（`/usr/lib/libc.so` と `/lib/librc.so`・`/lib/libeinfo.so`）。他のイメージから動的リンクの実行ファイルを
 `COPY` すると、実行時に落ちます。
 
 ```
@@ -128,8 +128,9 @@ CMD ["/usr/local/bin/myapp"]
 ### Go言語アプリケーション
 
 ```dockerfile
-# ビルドステージ
-FROM golang:1-alpine AS builder   # 版は自分のプロジェクトに合わせる
+# ビルドステージ（ビルドするマシンのアーキで動かし、クロスコンパイルする）
+FROM --platform=$BUILDPLATFORM golang:1-alpine AS builder   # 版は自分のプロジェクトに合わせる
+ARG TARGETARCH
 
 WORKDIR /build
 
@@ -140,10 +141,9 @@ RUN go mod download
 # ソースコードをコピー
 COPY . .
 
-# 静的リンクでビルド
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -a -installsuffix cgo \
-    -ldflags '-extldflags "-static" -w -s' \
+# 静的リンクでビルド（GOARCH は BuildKit が渡す TARGETARCH から決める）
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
+    go build -ldflags '-w -s' \
     -o app .
 
 # 実行ステージ
@@ -171,6 +171,8 @@ RUN apk add --no-cache musl-dev
 WORKDIR /build
 
 # 依存関係のみ先にビルド（キャッシュ効率化）
+# Alpine の rust イメージはそのアーキの musl ターゲットが既定なので、
+# --target を付けなくても静的リンクになる
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
@@ -180,12 +182,12 @@ RUN mkdir src && \
 # 実際のソースコードをコピーしてビルド
 COPY . .
 RUN touch src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl
+    cargo build --release
 
 # 実行ステージ
 FROM ishinokazuki/kimigayo-os:latest-minimal
 
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/myapp /usr/local/bin/myapp
+COPY --from=builder /build/target/release/myapp /usr/local/bin/myapp
 
 USER nobody
 
@@ -340,9 +342,7 @@ RUN chmod +x /usr/local/bin/myapp
 
 USER nobody
 
-# Capabilityのメタデータ（実行時に適用）
-LABEL security.capabilities="NET_BIND_SERVICE"
-
+# ケーパビリティはイメージ側では指定できない。実行時に --cap-add で渡す
 CMD ["/usr/local/bin/myapp"]
 ```
 
@@ -414,17 +414,24 @@ COPY . /app/
 
 ### 3. キャッシュ戦略
 
+Kimigayo にはパッケージマネージャーが無いので、依存の取得とビルドは
+ビルドステージで行い、そこでキャッシュを効かせます。
+
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:latest
+FROM golang:1-alpine AS builder
+WORKDIR /build
 
 # 1. 変更頻度の低いものを先にコピー（依存関係など）
-COPY requirements.txt /app/
-RUN install-dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
 # 2. 変更頻度の高いものを後にコピー（ソースコードなど）
-COPY src/ /app/src/
+COPY . .
+RUN CGO_ENABLED=0 go build -o app .
 
-CMD ["/app/src/main"]
+FROM ishinokazuki/kimigayo-os:latest
+COPY --from=builder /build/app /usr/local/bin/app
+CMD ["/usr/local/bin/app"]
 ```
 
 ## ベストプラクティス
@@ -522,21 +529,24 @@ docker buildx build \
 Dockerfileの例:
 
 ```dockerfile
-FROM --platform=$BUILDPLATFORM ishinokazuki/kimigayo-os:latest AS base
-
-ARG TARGETARCH
-ARG TARGETOS
-
 # **ビルドステージに Kimigayo を使わないこと。**
 # コンパイラもパッケージマネージャーも入っていないので、
 # ここで何かをビルドすることはできない。
-FROM alpine:3.24 AS builder
+#
+# --platform=$BUILDPLATFORM はビルドステージだけに付ける。
+# ビルドするマシンのアーキで動かし、TARGETARCH 向けにクロスコンパイルする。
+FROM --platform=$BUILDPLATFORM golang:1-alpine AS builder
 
+ARG TARGETOS
 ARG TARGETARCH
-COPY build-${TARGETARCH}.sh /tmp/
-RUN apk add --no-cache build-base && sh /tmp/build-${TARGETARCH}.sh
+WORKDIR /build
+COPY . .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /build/output .
 
-FROM base
+# 実行ステージには --platform を付けない。
+# 付けると、どのプラットフォーム向けでもビルドマシンのアーキの
+# Kimigayo が使われ、マルチアーキのイメージが壊れる。
+FROM ishinokazuki/kimigayo-os:latest
 
 COPY --from=builder /build/output /usr/local/bin/app
 
