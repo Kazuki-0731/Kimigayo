@@ -5,7 +5,7 @@
 **軽量・セキュアなコンテナ向けオペレーティングシステム**
 
 [![Release](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml)
-[![License: GPL-2.0](https://img.shields.io/badge/License-GPL%202.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
+[![License: GPL-2.0 / MIT / BSD-2-Clause](https://img.shields.io/badge/License-GPL--2.0%20%7C%20MIT%20%7C%20BSD--2--Clause-blue.svg)](LICENSE)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-ishinokazuki%2Fkimigayo--os-blue?logo=docker)](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -28,14 +28,14 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 - 🪶 **軽量**: Standard で **2.60MB**（同じ platform で実測した
   Alpine 8.42MB の約 1/3、Ubuntu 24.04 78.2MB の約 1/30）
-- 🔒 **セキュアバイデフォルト**: パッケージマネージャー排除による最小攻撃面、包括的なセキュリティ強化
+- 🔒 **セキュアバイデフォルト**: パッケージマネージャー排除による最小攻撃面、全 ELF を PIE・Full RELRO・非実行スタックでビルド
 - 🧩 **モジュラー設計**: 必要な機能のみを選択可能な3つのバリアント（Minimal/Standard/Extended）
 - 📦 **musl + BusyBox + OpenRC のみ**: BusyBox と OpenRC は同じ musl の
   `libc.so` に動的リンクする（v3.0.2 から。Kimigayo が musl に当てた
   パッチが `/bin/sh` にも効く）。OpenRC はほかに自身の `librc` / `libeinfo`
   だけに依存し、libcap は静的リンク済みなので
   イメージ内に第三者の共有ライブラリを持たない
-- 🌐 **マルチアーキテクチャ**: ARM64/x86_64完全対応（Apple Silicon M1/M2/M3最適化済み）
+- 🌐 **マルチアーキテクチャ**: x86_64 / ARM64 のイメージを公開（arm64 はネイティブイメージなので、Apple Silicon でもエミュレーションなしで動く）
 
 ### 🎯 パフォーマンス実績
 
@@ -44,19 +44,21 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | イメージサイズ (Minimal) | **2.46MB** / arm64 **2.83MB** | < 5MB | ✅ **目標の49%** / 57% |
 | イメージサイズ (Standard) | **2.60MB** / arm64 **2.98MB** | < 15MB | ✅ **目標の17%** / 20% |
 | イメージサイズ (Extended) | **2.62MB** / arm64 **3.01MB** | < 50MB | ✅ **目標の5%** / 6% |
-| 起動時間 | **0.60秒** | < 10秒 | ✅ **目標の6%** |
-| 常駐メモリ | **288KB** | < 128MB | ✅ **目標の0.2%** |
-| BusyBoxコマンド性能 | Alpine比 **0.97〜1.01x** | Alpine同等 | ✅ **有意差なし** |
+| 起動時間 | **0.60秒** | —（目標は未定義） | —（Alpine・Ubuntu も 0.59秒で差なし） |
+| 常駐メモリ | **288KB** | —（目標は未定義） | —（Alpine 272KB・Ubuntu 312KB） |
+| BusyBoxコマンド性能 | Alpine比 **0.97〜1.01x** | —（目標は未定義） | —（Alpine と有意差なし） |
 
 <details>
 <summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
 
 目標値は [SPECIFICATION.md](SPECIFICATION.md) §8.3 の定義
-（Minimal 5MB / Standard 15MB / Extended 50MB）。
+（Minimal 5MB / Standard 15MB / Extended 50MB）。仕様が目標を定めているのはサイズだけで、
+起動時間・常駐メモリ・コマンド性能には目標値が無い。
 **実際には 3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っている。**
 
 v3.0.2 の公開イメージを 2026-10-12 に実測。サイズは 6 イメージすべて、起動時間・メモリ・
-コマンド性能は arm64 ネイティブの Standard。6 バリアントすべてが
+コマンド性能は arm64 ネイティブの Standard（Minimal / Extended の起動時間とメモリも
+同じ条件で測っており、値は「競合OS比較」節の表）。6 バリアントすべてが
 `scripts/verify-image.sh` の検査（34 項目、wget を持たない Minimal は 33）を通過している。
 
 > **起動時間の 0.60 秒は「Kimigayo が速い」という意味ではない。**
@@ -65,7 +67,7 @@ v3.0.2 の公開イメージを 2026-10-12 に実測。サイズは 6 イメー�
 > コンテナ生成なので、イメージの中身はほとんど効かない。
 >
 > **常駐メモリは v3.0.2 で Alpine をわずかに上回った**（Kimigayo **288KB** /
-> Alpine 272KB / Ubuntu 312KB）。v3.0.1 は 236KB だった。BusyBox を
+> Alpine 272KB / Ubuntu 312KB）。v3.0.1 は 232KB だった。BusyBox を
 > 動的リンクにしたため、`sleep` のような BusyBox のコマンドも `libc.so` を
 > 読み込むようになった分（約 56KB）。Kimigayo が musl に当てた CVE パッチを
 > `/bin/sh` にも効かせるための選択で、目標（128MB 未満）には影響しない。
@@ -111,9 +113,10 @@ OpenRC（バイナリ9個 + 共有ライブラリ2本 + ヘルパ）で、どの
 （aarch64 は固定長命令なので同じコードでもコード量が増える）。
 
 > **v2.0.1（2026-01-16）では Standard 1.17MB だった。** 増えた主因は
-> BusyBox 1.38.0 本体が単体で 1.16MB あること、および
 > **v2.0.1 までは musl の `libc.so` と OpenRC のバイナリがイメージに
-> 入っていなかった**こと（2026-10-09 に修正）。つまり 1.17MB は
+> 入っていなかった**こと（2026-10-09 に修正）。v3.0.1 までは BusyBox 1.38.0 を
+> 静的リンクしており、本体が単体で 1.16MB あったことも効いていた
+> （v3.0.2 で動的リンクにして約 1,001KB）。つまり 1.17MB は
 > 「Init システムが入っていない状態」の数字で、現在の 2.60MB と
 > 同じものを測った値ではない。
 >
@@ -146,12 +149,14 @@ OpenRC（バイナリ9個 + 共有ライブラリ2本 + ヘルパ）で、どの
 └─────────────────────────────────────────┘
 ```
 
+下2層（カーネル・ハードウェア）はイメージに含まれない。コンテナはホストのものを使う。
+
 ### 🔧 主要コンポーネント
 
 | コンポーネント | バージョン | 役割 |
 |---|---|---|
-| **Linux カーネル** | 6.18.55 (LTS) | セキュリティ強化（ASLR, DEP, PIE 等）。EOL 2028-12 |
-| **musl libc** | 1.2.6 | C ライブラリ（軽量・高速・セキュア） |
+| **Linux カーネル** | 6.18.55 (LTS) | ベアメタル／QEMU 検証用（イメージには含まれない）。EOL 2028-12 |
+| **musl libc** | 1.2.6 | C ライブラリ（軽量でシンプル） |
 | **BusyBox** | 1.38.0 | コアユーティリティ（単一バイナリで多数の Unix コマンド） |
 | **OpenRC** | 0.63.2 | Init システム（systemd より軽量でシンプル） |
 | Alpine Linux | 3.24 | ビルド環境のベース（成果物には含まれない） |
@@ -170,9 +175,9 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 
 **パッケージマネージャーを意図的に排除**することで、以下を実現：
 
-- ✅ **最小攻撃面**: パッケージインストール機能がないため、実行時の脆弱性リスクを大幅に削減
+- ✅ **最小攻撃面**: パッケージインストール機能がないため、侵入者がパッケージマネージャーで道具を足せない
 - ✅ **超軽量**: 数MBのイメージサイズ（実測は「パフォーマンス実績」を参照）
-- ✅ **不変インフラ**: コンテナ時代の「Build once, run anywhere」思想に完全準拠
+- ✅ **不変インフラ**: 実行時にソフトウェアを足さず、変更はイメージを作り直して入れ替える
 - ✅ **予測可能性**: 実行時にソフトウェアを足す仕組みを持たないため、動くものはビルド時に決まる
 
 #### Alpine Linux からの継承
@@ -180,7 +185,7 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: 基本的なUnixコマンドとシェルを提供（デバッグ可能）
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: 全実行ファイルを PIE・Stack Protector・FORTIFY_SOURCE・Full RELRO でビルド（ASLR はホストのカーネルが効かせる）
+- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO（BIND_NOW）・非実行スタックでビルド（`scripts/verify-image.sh` が検査。ASLR はホストのカーネルが効かせる）。Stack Protector は x86_64 では全 ELF に付くが、arm64 の OpenRC には付いていない
 
 この組み合わせにより、**distroless のセキュリティ** と **Alpine の実用性** を両立し、コンテナ環境に最適化されたOSを実現しています。
 
@@ -241,7 +246,7 @@ docker run -it ishinokazuki/kimigayo-os:latest-minimal
 | -------------- | ------ | ---- | -------------- |
 | **Minimal** | **2.46MB**（367 アプレット） | コンテナ、最小限の環境 | `ishinokazuki/kimigayo-os:latest-minimal` |
 | **Standard** | **2.60MB**（400 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
-| **Extended** | **2.62MB**（411 アプレット） | MTD/flash・framebuffer を扱う場合 | `ishinokazuki/kimigayo-os:latest-extended` |
+| **Extended** | **2.62MB**（411 アプレット） | Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの | `ishinokazuki/kimigayo-os:latest-extended` |
 
 いずれも x86_64 / v3.0.2 を 2026-10-12 実測。arm64 は Minimal 2.83MB /
 Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）。
@@ -267,10 +272,10 @@ Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）�
 
 #### コンパイル時
 
-- PIE (Position Independent Executables)
-- Stack-smashing protection
-- FORTIFY_SOURCE
-- RELRO (Relocation Read-Only)
+- PIE (Position Independent Executables) — 全 ELF（`scripts/verify-image.sh` が検査）
+- Full RELRO (Relocation Read-Only + BIND_NOW) — 全 ELF（同上）
+- Stack-smashing protection — x86_64 は全 ELF。**arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**
+- FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2` を指定しているが、musl は FORTIFY を実装しておらず効果は確認できていない
 
 #### ランタイム（イメージ側）
 
@@ -299,7 +304,8 @@ docker run --rm \
 代わりに次の2点で担保しています。
 
 - **上流ソースのチェックサム検証**: ダウンロードした musl / カーネル /
-  BusyBox / OpenRC の tarball の SHA256 を、上流の公開値と突合した値で検証
+  BusyBox / OpenRC の tarball の SHA256 を検証。登録する値は、カーネルと BusyBox は
+  上流の公開値と、公式一覧の無い musl と OpenRC は Alpine aports の `sha512sums` と突合したもの
 - **リリース資産のハッシュ配布**: `SHA256SUMS` と `SHA512SUMS` を
   GitHub Release に添付
 
@@ -307,7 +313,7 @@ docker run --rm \
 `sign` ジョブ）。鍵を持たないキーレス署名（Sigstore OIDC）で、署名は
 Rekor の透明性ログに載ります。**検証には cosign v3 以降が必要です**
 （署名は新しい形式で置いてあり、cosign v2 では `no signatures found` になる。
-2026-10-12 に v3.0.6 で検証を確認）。
+2026-10-12 に cosign v3.0.6 で検証を確認）。
 
 ```bash
 cosign verify ishinokazuki/kimigayo-os:latest \
@@ -322,7 +328,8 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 
 ### 🎯 ターゲット環境
 
-- **コンテナ環境**: Docker, Kubernetes, Podman
+- **コンテナ環境**: VPS 上の Docker を想定（クラウドのマネージドなコンテナサービスでも使える）
+- Kubernetes・Podman の手順は [インストールガイド](docs/user/INSTALLATION.md) にあるが、CI では検証していない
 
 ### 🤝 コントリビューション
 
@@ -384,7 +391,8 @@ distroless は 2026-10-11 の値。
 >
 > **`docker stop` はどのイメージでも約 10.4 秒かかる**（PID 1 が SIGTERM を
 > 処理しない場合。Alpine も 10.4 秒）。アプリ側で SIGTERM を扱えば
-> 両者 0.67 秒（→ [docs/benchmarks/lifecycle.md](docs/benchmarks/lifecycle.md)）。
+> 両者 0.67 秒（→ [docs/benchmarks/lifecycle.md](docs/benchmarks/lifecycle.md)。
+> この 2 つは v3.0.1 で 2026-10-11 に測った値で、v3.0.2 では測り直していない）。
 >
 > distroless は実行ファイルを1つも持たないため、この方法では起動時間も
 > メモリも測れない（`/bin/true` すら無い）。これは欠陥ではなく設計。
@@ -398,12 +406,13 @@ distroless は 2026-10-11 の値。
 
 #### vs distroless
 - ✅ **デバッグ可能**: シェルとUnixコマンドを含む（distroless はシェルなし）
-- ✅ **Init がある**: サービスを起動・監視できる
+- ✅ **Init がある**: OpenRC でサービスを起動・監視できる（既定の PID 1 は `/bin/sh`。
+  OpenRC を使うのは `--entrypoint /sbin/init` で起動したときだけ）
 - ⚠️ **サイズ**: Distroless Static（2.11MB）より大きいが、機能が豊富
 
 #### 独自の強み
 - 🏆 **シェルと Init を備えて 2.60MB**
-- 🚀 **Apple Silicon最適化**: ARM64ネイティブ対応（M1/M2/M3）
+- 🚀 **arm64 ネイティブイメージ**: Apple Silicon や arm64 の VPS でエミュレーションなしで動く
 - 🔒 **セキュリティとデバッグの両立**: 不変インフラ + シェルアクセス
 - 🇯🇵 **充実した日本語ドキュメント**: 日本発のOSS
 
@@ -438,15 +447,15 @@ distroless は 2026-10-11 の値。
 
 | ワークフロー | トリガー | 目的 | 処理内容 |
 |------------|---------|------|---------|
-| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck<br>• **全variant × 全arch**ビルド（6パターン）<br>• セキュリティスキャン（Trivy）<br>• Discord通知 |
-| **release.yml** | タグpush (v*.*.*) | リリース成果物生成 | • 全variant × 全archビルド<br>• Docker Hubへpush（マルチアーチマニフェスト作成）<br>• **前回タグからのPRリスト自動生成**<br>• GitHub Release作成<br>• Discord通知 |
-| **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• 統合テスト<br>• Docker imageビルド・push<br>• Trivyセキュリティスキャン |
-| **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• アーティファクトアップロード |
-| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • バージョンチェック（日次）<br>• Trivyスキャン（日次）<br>• イメージスキャン（週次・日曜） |
-| **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox バージョンチェック<br>• 更新があればPR自動作成 |
-| **dependency-review.yml** | PR時 | 依存関係レビュー | • 依存関係の変更を検証 |
+| **ci.yml** | PR、main/develop push | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit / property）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、build-workflow.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
+| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
+| **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
+| **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
+| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら Issue）<br>• Trivy ファイルシステムスキャン |
+| **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox/OpenRC バージョンチェック<br>• 更新があればPR自動作成 |
+| **dependency-review.yml** | PR時、週次（月曜 04:00 UTC） | 依存関係レビュー | • 依存関係の変更を検証（PR）<br>• Trivy ファイルシステムスキャン<br>• 公開中の `latest` を `scan-image.sh` で照合（定期実行で失敗したら Issue） |
 
-**CI/CD改善点（v1.0.0）:**
+**CI/CD改善点（v1.0.0 時点の記録）:**
 - ✅ **全フレーバー×全アーキテクチャのテスト**: minimal/standard/extended × x86_64/arm64の6パターンを自動テスト
 - ✅ **Docker Buildx標準準拠**: タグ命名規則を統一（`{version}-{variant}-{arch}`形式）
 - ✅ **リリースノート自動生成**: 前回タグからのPRリストを自動抽出
@@ -472,7 +481,7 @@ distroless は 2026-10-11 の値。
 
 - **GitHub Issues**: バグ報告、機能リクエスト
 - **GitHub Discussions**: 質問、アイデア共有
-- **Wiki**: 詳細なドキュメント（作成予定）
+- **ドキュメント**: 正本はこのリポジトリの `docs/` 配下（Wiki は使っていない）
 
 ### 🙏 謝辞
 
@@ -480,7 +489,7 @@ Kimigayo OS は以下のプロジェクトにインスパイアされ、技術�
 
 - [Google Distroless](https://github.com/GoogleContainerTools/distroless) - 不変インフラとセキュリティ優先の設計思想
 - [Alpine Linux](https://alpinelinux.org/) - 軽量性とセキュリティのベストプラクティス
-- [musl libc](https://musl.libc.org/) - 軽量・高速・セキュアな C ライブラリ
+- [musl libc](https://musl.libc.org/) - 軽量でシンプルな C ライブラリ
 - [BusyBox](https://busybox.net/) - 最小限の Unix ユーティリティ
 - [OpenRC](https://github.com/OpenRC/openrc) - シンプルで軽量な Init システム
 
@@ -505,7 +514,7 @@ Kimigayo OS is a lightweight, secure container-focused operating system that com
 - ✅ **musl libc**: a lightweight, simple C library
 - ✅ **BusyBox**: a shell and the basic Unix commands
 - ✅ **OpenRC**: a simple, lightweight init system
-- ✅ **Hardening**: every executable is built with PIE, Stack Protector, FORTIFY_SOURCE and full RELRO (ASLR itself is provided by the host kernel)
+- ✅ **Hardening**: every ELF is built with PIE, full RELRO (BIND_NOW) and a non-executable stack, checked by `scripts/verify-image.sh` (ASLR itself is provided by the host kernel). Stack Protector covers every ELF on x86_64 but not OpenRC on arm64
 
 A working multi-stage example is in [examples/python/Dockerfile](examples/python/Dockerfile) (nginx and Node.js examples are there too).
 
@@ -513,13 +522,13 @@ A working multi-stage example is in [examples/python/Dockerfile](examples/python
 
 - 🪶 **Lightweight**: 2.60MB for Standard (vs. Alpine 8.42MB and Ubuntu 24.04 78.2MB,
   measured on the same host)
-- 🔒 **Secure-by-Default**: No package manager, minimal attack surface, comprehensive hardening
+- 🔒 **Secure-by-Default**: No package manager, minimal attack surface, PIE / full RELRO / non-executable stack on every ELF
 - 🧩 **Modular Design**: 3 variants (Minimal/Standard/Extended) for different use cases
 - 📦 **musl + BusyBox + OpenRC only**: BusyBox and OpenRC link dynamically against
   the same musl `libc.so` (since v3.0.2, so the musl patches Kimigayo applies also
   cover `/bin/sh`). OpenRC otherwise links only against its own `librc`/`libeinfo`,
   with libcap linked statically, so the image carries no third-party shared libraries
-- 🌐 **Multi-Architecture**: ARM64/x86_64 fully supported (Apple Silicon M1/M2/M3 optimized)
+- 🌐 **Multi-Architecture**: x86_64 and ARM64 images (arm64 is native, so it runs without emulation on Apple Silicon)
 
 ### 🎯 Performance Achievements
 
@@ -528,19 +537,21 @@ A working multi-stage example is in [examples/python/Dockerfile](examples/python
 | Image size (Minimal) | **2.46MB** / arm64 **2.83MB** | < 5MB | ✅ **49% of target** / 57% |
 | Image size (Standard) | **2.60MB** / arm64 **2.98MB** | < 15MB | ✅ **17% of target** / 20% |
 | Image size (Extended) | **2.62MB** / arm64 **3.01MB** | < 50MB | ✅ **5% of target** / 6% |
-| Boot time | **0.60s** | < 10s | ✅ **6% of target** |
-| Resident memory | **288KB** | < 128MB | ✅ **0.2% of target** |
-| BusyBox performance | **0.97-1.01x** of Alpine | Alpine equivalent | ✅ **no measurable difference** |
+| Boot time | **0.60s** | — (no target defined) | — (Alpine and Ubuntu: 0.59s, no difference) |
+| Resident memory | **288KB** | — (no target defined) | — (Alpine 272KB, Ubuntu 312KB) |
+| BusyBox performance | **0.97-1.01x** of Alpine | — (no target defined) | — (no measurable difference from Alpine) |
 
 <details>
 <summary><b>Per-variant breakdown, and where the bytes go</b></summary>
 
 Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
-(Minimal 5MB / Standard 15MB / Extended 50MB). **In practice all three
+(Minimal 5MB / Standard 15MB / Extended 50MB). The specification sets targets for size only;
+boot time, memory and command performance have none. **In practice all three
 variants come in under 5MB — the strictest of the three targets.**
 
 The published v3.0.2 images measured on 2026-10-12: sizes for all six images, and
-boot time, memory and command performance for Standard on native arm64. Every
+boot time, memory and command performance for Standard on native arm64 (Minimal and Extended
+boot time and memory were measured the same way; see the comparison table in the Japanese section). Every
 variant passes `scripts/verify-image.sh` (34 checks; 33 for Minimal, which has no wget).
 
 > **The 0.60s boot time does not mean Kimigayo is fast.** Measured in the same
@@ -548,7 +559,7 @@ variant passes `scripts/verify-image.sh` (34 checks; 33 for Minimal, which has n
 > 0.6s is Docker creating the container, so the image barely matters.
 >
 > **Resident memory went slightly above Alpine in v3.0.2** (Kimigayo **288KB** /
-> Alpine 272KB / Ubuntu 312KB; v3.0.1 was 236KB). BusyBox is now dynamically
+> Alpine 272KB / Ubuntu 312KB; v3.0.1 was 232KB). BusyBox is now dynamically
 > linked, so BusyBox commands such as `sleep` map `libc.so` too (about 56KB).
 > That is the price of having Kimigayo's musl CVE patches cover `/bin/sh`; it is
 > nowhere near the 128MB target.
@@ -617,10 +628,10 @@ git clone https://github.com/Kazuki-0731/Kimigayo.git
 cd Kimigayo
 
 # Build Docker environment
-docker-compose build
+make docker-build
 
-# Run tests
-docker-compose run --rm kimigayo-build make test
+# Run tests (inside the build container)
+make test
 ```
 
 Building from source, build artifacts and troubleshooting are covered in the
@@ -650,7 +661,7 @@ See [LICENSE](LICENSE) for details.
 
 #### For Users
 
-- [Installation Guide](docs/user/INSTALLATION.md) - Install on Docker, virtualization, and bare metal
+- [Installation Guide](docs/user/INSTALLATION.md) - Install on Docker, Kubernetes and Podman
 - [Quick Start Guide](docs/user/QUICKSTART.md) - Basic operations and usage
 - [Configuration Guide](docs/user/CONFIGURATION.md) - Network, services, and security configuration
 
