@@ -8,8 +8,8 @@
 
 > 2026-10-11 までこのファイルは Conventional Commits（`✨ feat: ...`）を
 > 推奨していましたが、**実態と違っていました**。
-> このリポジトリの 609 コミットのうち、テキストプレフィックスが
-> 付いているのは 1 件だけです。
+> このリポジトリの 723 コミット（2026-10-12 時点）のうち、
+> テキストプレフィックスが付いているのは 1 件だけです。
 
 ---
 
@@ -58,7 +58,7 @@ DPKG を default y にしており、書いていない項目には既定値が�
 git commit -m "🐛 比較ベンチマークが既定で v2.0.1 のイメージを引いていた"
 git commit -m "🧹 Kimigayo では絶対に動かない init スクリプト9本を落とす"
 git commit -m "📊 起動時間・メモリ・コマンド性能を実測して「未測定」を消す"
-git commit -m "⬆️ カーネルを 6.18.55 に上げる"
+git commit -m "🧹 カーネル 6.18 で不要になったパッチ3本を削除する"
 ```
 
 **避ける形:**
@@ -84,9 +84,16 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 作りで、手で書いた内容が消える状態でした）。使える行をコピーして、
 理由を足してください。
 
-上の表に無い絵文字のコミットは `Uncategorized` に入ります。
-黙って落とさないためです（以前は7種類しか分類できず、
+分類先の無い絵文字（表にある ⏪ 🔀 📌 と、表に無い絵文字）のコミットは
+`Uncategorized` に入ります。黙って落とさないためです（以前は7種類しか分類できず、
 🧹 📊 🔧 ⚡ ⬆️ 🐳 ✅ のコミットが消えていました）。
+
+> **Dependabot の PR は形式が違います。** `.github/dependabot.yml` が
+> `prefix: "⬆️"`（Docker は `🐳`）と `include: "scope"` を指定しているため、
+> `⬆️(deps): Bump ...` のような件名になります。テキストの scope が付く点で
+> 上の規則とは食い違っています（扱いは決めていません）。
+> CHANGELOG の下書きでは先頭の絵文字で分類されるので、`⬆️` は `Changed`、
+> `🐳` は `Build/CI` に入ります。
 
 ## 間違えたとき
 
@@ -106,8 +113,11 @@ git push origin main
 
 ## コミットテンプレート
 
+リポジトリの中に置くと未追跡ファイルになる（`.gitignore` の対象外）ので、
+ホームディレクトリに置きます。
+
 ```bash
-cat > .gitmessage <<'EOF'
+cat > ~/.gitmessage <<'EOF'
 # <絵文字> <何をしたか>
 #
 # <なぜそうしたか>
@@ -117,7 +127,7 @@ cat > .gitmessage <<'EOF'
 #         ⬆️ 依存更新 / 🐳 Docker / 📊 計測 / ⏪ 取り消し / 📌 その他
 EOF
 
-git config commit.template .gitmessage
+git config commit.template ~/.gitmessage
 ```
 
 ## 参考資料
