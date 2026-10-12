@@ -14,21 +14,17 @@ Kimigayo OSへようこそ！このガイドでは、Kimigayo OSのインスト�
 
 ## システム要件
 
-### 最小要件
 - **CPU**: x86_64 または ARM64
-- **RAM**: 128MB
-- **ストレージ**: 512MB
-- **コンテナランタイム**: Docker 20.10以降、Podman 3.0以降、またはKubernetes 1.20以降
-
-### 推奨要件
-- **CPU**: x86_64 または ARM64（2コア以上）
-- **RAM**: 512MB以上
-- **ストレージ**: 2GB以上
+- **コンテナランタイム**: Docker（Podman・Kubernetes でも動きます）。
+  対応する最低バージョンは検証していません
+- **メモリ・ストレージ**: イメージ自体は 3MB 未満、`/bin/sh` だけなら常駐メモリは
+  約 288KB（v3.0.2 実測）です。必要量は載せるアプリで決まります
 
 ### サポートアーキテクチャ
 - x86_64 (AMD64)
 - ARM64 (AArch64)
-- 将来的に: RISC-V
+
+RISC-V・ARM32 には対応していません。
 
 ## インストール方法
 
@@ -85,9 +81,12 @@ docker run -it -v kimigayo-data:/data ishinokazuki/kimigayo-os:latest
 
 #### デーモンモードでの起動
 
+既定の PID 1 は `/bin/sh` なので、そのまま `-d` で起動すると入力が無く
+すぐ終了します。常駐するコマンドを渡します。
+
 ```bash
 # バックグラウンドで起動
-docker run -d --name kimigayo-app ishinokazuki/kimigayo-os:latest
+docker run -d --name kimigayo-app ishinokazuki/kimigayo-os:latest sleep infinity
 
 # コンテナに接続
 docker exec -it kimigayo-app /bin/sh
@@ -115,7 +114,10 @@ spec:
     spec:
       containers:
       - name: kimigayo-os
-        image: ishinokazuki/kimigayo-os:latest
+        image: ishinokazuki/kimigayo-os:3.0.2
+        # 既定の /bin/sh は入力が無いとすぐ終了し CrashLoopBackOff になる。
+        # 実際にはアプリのイメージと、そのコマンドを指定する
+        command: ["sleep", "infinity"]
         resources:
           requests:
             memory: "128Mi"
@@ -150,20 +152,35 @@ podman pull ishinokazuki/kimigayo-os:latest
 # コンテナを起動
 podman run -it ishinokazuki/kimigayo-os:latest
 
-# システムdサービスとして実行
-podman generate systemd --name kimigayo-app > /etc/systemd/system/kimigayo-app.service
-systemctl enable --now kimigayo-app
+```
+
+systemd から起動したい場合は、Podman の Quadlet（`.container` ファイル）を
+使ってください（`podman generate systemd` は Podman 4.4 以降で非推奨です）。
+
+```ini
+# /etc/containers/systemd/kimigayo-app.container
+[Container]
+Image=docker.io/ishinokazuki/kimigayo-os:3.0.2
+Exec=sleep infinity
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl daemon-reload
+systemctl start kimigayo-app
 ```
 
 ## インストール後の設定
 
 ### 初回起動
 
-コンテナ起動後、以下の設定を行います：
+**ホスト名はコンテナの外から指定します。** コンテナ内で
+`/etc/hostname` を書き換えてもホスト名は変わりません。
 
 ```bash
-# ホスト名の設定（コンテナでは docker run --hostname の方が確実）
-echo "kimigayo" > /etc/hostname
+docker run -it --hostname kimigayo ishinokazuki/kimigayo-os:3.0.2
 ```
 
 **タイムゾーンのデータベースは入っていません。** `/usr/share/zoneinfo` が
@@ -194,7 +211,9 @@ adduser username
 docker run -it --user 1000:1000 ishinokazuki/kimigayo-os:latest
 ```
 
-root へ昇格する必要がある場合は BusyBox の `su` を使います。
+**`su` で root へ昇格することはできません**（`busybox` は setuid されておらず、
+root のパスワードもロックされています）。root から権限を落とすときは
+`su -s /bin/sh -c '<コマンド>' nobody` のように使えます。
 
 ### 追加ソフトウェアのインストール
 
@@ -251,9 +270,9 @@ docker run -it --network kimigayo-net --ip 192.168.100.10 \
 
 ### コンテナが起動しない
 
-- **メモリ不足**: 最低128MBのRAMが必要です
-- **ストレージ不足**: 最低512MBのストレージが必要です
-- **アーキテクチャ不一致**: x86_64またはARM64アーキテクチャを確認してください
+- **すぐ終了する**: 既定の PID 1 は `/bin/sh` です。`-it` を付けるか、
+  常駐するコマンド（`sleep infinity`・アプリ本体）を渡してください
+- **アーキテクチャ不一致**（`exec format error`）: x86_64またはARM64アーキテクチャを確認してください
 
 ```bash
 # コンテナのログを確認
