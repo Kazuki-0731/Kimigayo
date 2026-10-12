@@ -300,14 +300,17 @@ published `latest` image matches a CVE (`published-image-scan` →
 
 **Creates Pull Requests:**
 - Component version updates (musl, BusyBox, OpenRC) in `versions.mk`
-- Includes an `UPDATES.md` summary and a testing checklist
+- The summary and a review checklist are in the PR body (no `UPDATES.md` is committed)
+- Fails instead of opening a PR when a fetched version is empty, not a version,
+  or not newer than the current one
 
 **Labels:** `dependencies`, `automated`
 
 **Handling:**
 1. Review automated PR
-2. **Start CI yourself** — the PR is created with `GITHUB_TOKEN`, so `ci.yml`
-   does not run on it automatically
+2. Check the `ci.yml` run on the PR branch — the PR is created with `GITHUB_TOKEN`,
+   which does not trigger workflows, so the workflow starts `ci.yml` itself
+   via `workflow_dispatch` (the PR body links to the run)
 3. Update checksums and verify patches (`version-bump` skill)
 4. Merge if all checks pass
 5. Update CHANGELOG.md / RELEASE_NOTES.md at the next release
