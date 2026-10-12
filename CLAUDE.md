@@ -955,6 +955,7 @@ PERFORMANCE_TUNING.md` が、追跡していない `TODO.md` を指していた�
 
 ```bash
 make check-links        # scripts/check-links.py
+make check-stale-docs   # 一度直した古い記述が戻っていないか（scripts/check-stale-docs.py の RULES）
 ```
 
 `ci.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
@@ -1034,7 +1035,7 @@ make check-links        # scripts/check-links.py
 | --- | --- |
 | `rootfs-verifier` | rootfs / イメージを作った直後、リリース前。**「起動した」は検証ではない** |
 | `version-auditor` | 版上げの前後、リリース前。`versions.mk` の突合・チェックサム・上流の新版・パッチのスキップ |
-| `docs-reconciler` | 計測のあと、版上げのあと。数値とバージョンの文書間の食い違い |
+| `docs-reconciler` | 計測のあと、版上げのあと。数値とバージョンの文書間の食い違い。`docs-audit` では束ごとの全行監査の担当 |
 | `spec-auditor` | 仕様を変えたあと、リリース前。**`SPECIFICATION.md`・`CLAUDE.md` の方針が実装と成果物で守られているか**。目標値・コードネーム・設計原則を実態と照合する |
 | `workflow-auditor` | ワークフローを編集したあと、リリース前、**CI が緑なのに成果物がおかしいとき**。スクリプトと Dockerfile が要求する値を各ワークフローが渡しているか |
 
@@ -1057,6 +1058,7 @@ make check-links        # scripts/check-links.py
 | `measure-and-land` | 計測して数値を着地させる |
 | `release` | リリースの準備と承認の取り方 |
 | `security-review` | セキュリティ点検（CVE 追跡・強化フラグの検証・攻撃面・供給網・脆弱性報告への対応） |
+| `docs-audit` | ドキュメントを横串で監査して一度に直す。**古い記述を 1 つ見つけたら、1 ファイルだけ直さずにこれを使う**（小出しの「これもありました」をしない） |
 
 ### カスタムコマンド
 
@@ -1281,7 +1283,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `ci.yml` | `main`/`develop` への push、`main` への PR | ShellCheck → リンク検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
+| `ci.yml` | `main`/`develop` への push、`main` への PR | ShellCheck → リンク検査 → 古い記述の検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
 | `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・GitHub Release 作成・SARIF 連携 |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作る |

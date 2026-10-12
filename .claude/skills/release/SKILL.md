@@ -124,7 +124,9 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 （例: v3.0.0 でイメージサイズが 1.17MB → 2.78MB になった理由は
 **v2.0.1 に Init も libc も入っていなかったから**）は明記します。
 
-`docs-reconciler` subagent で突合できます。
+`docs-reconciler` subagent で突合できます。**大きな変更を含むリリースでは
+`docs-audit` skill で全文書を横串で見直してからタグを打ちます**
+（`make check-stale-docs` は機械で拾える分だけ）。
 
 ---
 
