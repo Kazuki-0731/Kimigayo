@@ -1,32 +1,38 @@
 # Kimigayo OS - パフォーマンスチューニング結果
 
-**最終更新:** 2026-01-16
-**最新バージョン:** v2.0.1
+**最終更新:** 2026-10-12
+**最新バージョン:** v3.0.2（現在の値は末尾近くの「競合OSとの比較」節。それより前は過去の記録）
 
 > ## ⚠️ この文書の数値は古く、一部は無効（2026-10-09 追記）
 >
 > **1. 構成要素を 2026-10-09 にまとめて更新したので、サイズは全部古い。**
 > カーネル 6.6.11 → 6.18.55、musl 1.2.4 → 1.2.6、
 > BusyBox 1.36.1 → 1.38.0、OpenRC 0.52.1 → 0.63.2。
-> Standard の実測は **2.78MB**（x86_64、2026-10-10）。
+> Standard の現在の実測は **2.60MB**（x86_64、v3.0.2、2026-10-12）。
 >
 > **2. ここに書かれたサイズは「Init が入っていないイメージ」の値。**
 > v2.0.1 までの rootfs は musl の `libc.so` も OpenRC のバイナリも
 > コピーしておらず、実質 BusyBox のみのイメージだった（2026-10-09 に修正）。
 >
-> **3. 起動時間（439ms / 平均541ms）とメモリ（0.2MB / 平均4MB）は無効。**
+> **3. 起動時間とメモリの値は、この文書の過去の節では全部無効。**
+> v2.0.1 の 439ms / 平均541ms / 0.2MB だけでなく、v0.1.0 の
+> 5.52秒 → 5.10秒・最良 3.55秒・「最大35%短縮」・平均4MB・「8秒目のスパイク 11MB」も
+> 同じ壊れたスクリプトの値。そこから出した結論（並列起動の効果、OpenRC 1.5秒 → 0.8秒、
+> 「全目標達成」など）も根拠にならない。
 > `scripts/benchmark-startup.sh` は `docker run -d <image> sleep 5` が
 > 終了するまでを測るため、正常なイメージでは約 5,600ms になっていた
 > （2026-10-09 実測）。439ms はこの `sleep` が成立しなかった場合の値で、
 > 起動時間ではない。`benchmark-memory.sh` も `KiB` を `0.001` に置換した
 > うえ整数 MB に丸めており、1MB 未満を 0 としか表せなかった。
-> **2026-10-10 に両方を書き直し、測り直した**（arm64 ネイティブで
-> 起動 0.62 秒 / 常駐 232KB。v3.0.2 では 0.60 秒 / 288KB → 下の比較の節）。
-> 下表の v2.0.1 列は当時の壊れた値なので
-> **引用しない**。
+> **2026-10-10 に両方を書き直し、測り直した**（arm64 ネイティブで、
+> v3.0.1 は起動 0.61 秒 / 常駐 232KB、v3.0.2 は 0.60 秒 / 288KB → 下の比較の節）。
+> 下表の v2.0.1 列・v0.1.0 の節は当時の壊れた値なので **引用しない**。
 >
-> なお同スクリプトは `mapfile` を使うため macOS の bash 3.2 では落ちる。
-> `/opt/homebrew/bin/bash` で実行する。
+> **4. 「実施した最適化」の節にある設定ファイルの一部は、ビルドに使われていない。**
+> `configs/openrc/`（`rc.conf`・`inittab.optimized`・`services-*.list`）と
+> `configs/sysctl/` はどのスクリプトからも読まれない。イメージの
+> `/etc/rc.conf`・`/etc/inittab`・`/etc/sysctl.d/99-kimigayo-performance.conf` は
+> `scripts/build-rootfs.sh` の heredoc が書き出している。
 >
 > 現在の値は [README.md](../../README.md) の「パフォーマンス実績」節を見る。
 
@@ -53,6 +59,7 @@
    - muslライブラリ依存を完全排除
    - `/lib`ディレクトリ不要
    - セキュリティ攻撃対象領域の縮小
+   - ※ v3.0.2 で動的リンクに戻した（musl に当てた CVE パッチを `/bin/sh` にも効かせるため。`/lib/libc.so` を OpenRC と共有）
 
 2. **ARM64アーキテクチャ対応** (PR #60, #61)
    - Apple Silicon (M1/M2/M3) ネイティブ実行
@@ -76,7 +83,8 @@
 | **Standard** | 1,171KB | 1.14MB | 実用構成（推奨） |
 | **Extended** | 1,321KB | 1.29MB | 全機能搭載 |
 
-**注目点:** Standard版が最も小さい（1,171KB）理由は、最適化されたコマンドセット選択
+**注:** Standard版が最も小さい（1,171KB）理由は記録が残っていない。
+当時のイメージは Init も `libc.so` も入っていない状態だった（冒頭の注意書き 2）。
 
 ### 起動時間詳細
 
@@ -85,7 +93,7 @@
 > **⚠️ この節の数値は無効（2026-10-10）。** 以下は
 > `docker run -d <image> sleep 5` の終了までを測った値で、起動時間では
 > ない。**イメージが壊れているほど速く見える**計測だった。
-> 現在の実測は下の「2026-10-10 の実測」節を見る。
+> 現在の実測は下の「競合OSとの比較（2026-10-12 の実測）」節を見る。
 
 ```
 平均: 541ms   ← 無効
@@ -121,6 +129,9 @@
 **実施日:** 2025-12-22
 **対象バージョン:** v0.1.0
 
+> **⚠️ この節の起動時間とメモリは無効**（冒頭の注意書き 3）。サイズも整数 MB に
+> 丸めた値で、1MB の差は丸めの誤差の範囲。
+
 ### パフォーマンス改善
 
 | 指標 | 最適化前 | 最適化後 | 改善率 |
@@ -132,11 +143,11 @@
 
 ### 主要な発見
 
-1. **イメージサイズ削減**: rc.conf と sysctl 設定追加で 1MB 削減
-2. **起動時間の改善**:
-   - 平均: 5.52秒 → 5.10秒 (0.42秒短縮)
-   - **最良ケース**: 3.55秒（並列化効果）
-3. **メモリ使用量**: 変化なし（すでに最適化済み）
+当時は次のように結論していたが、いずれも根拠にならない:
+
+1. ~~rc.conf と sysctl 設定追加で 1MB 削減~~ — 設定ファイルを足してサイズが減ることはない。整数 MB の丸め
+2. ~~平均 5.52秒 → 5.10秒、最良 3.55秒（並列化効果）~~ — `sleep 5` の終了を測った無効な値。3.55秒は sleep が成立しなかった回
+3. ~~メモリ使用量は変化なし~~ — `KiB` を潰した無効な値
 
 ---
 
@@ -144,25 +155,22 @@
 
 ### 1. OpenRC 並列起動の有効化
 
-**ファイル:** `/etc/rc.conf`
+**ファイル:** イメージの `/etc/rc.conf`（`scripts/build-rootfs.sh` の heredoc が書き出す。
+`configs/openrc/rc.conf` は使われていない）。主な項目:
 
 ```bash
-# 並列起動を有効化（起動時間短縮）
 rc_parallel="YES"
-
-# ログレベルを警告以上に設定（起動時間短縮）
+rc_logger="YES"
 rc_log_level="warn"
-
-# 依存関係の厳密チェックを緩和（起動高速化）
-rc_depend_strict="NO"
-
-# ホットプラグを無効化（コンテナでは不要）
 rc_hotplug="hwclock net.lo"
+rc_depend_strict="NO"
 ```
 
-**効果:**
-- サービス起動の並列化により、最大35%の起動時間短縮
-- 平均7.6%の改善
+- `rc_hotplug` は**ホットプラグを許すサービスの一覧**で、無効化ではない
+  （上の値は hwclock と net.lo だけを許す。生成元のコメントは「無効化」と書いているが不正確）
+- `rc_depend_strict="NO"` は依存の解釈を緩める設定で、速度のための設定ではない
+
+**効果:** 測れていない。当時の「最大35%短縮・平均7.6%改善」は無効な計測の値。
 
 ### 2. inittab の最適化
 
@@ -173,66 +181,64 @@ l0:0:wait:/sbin/openrc shutdown
 l6:6:wait:/sbin/reboot
 ```
 
-**変更後:**
+**現在（`scripts/build-rootfs.sh` が書き出す `/etc/inittab`）:**
 ```
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
 ::respawn:/sbin/getty 38400 console
 ::shutdown:/sbin/openrc shutdown
 ```
 
-**効果:**
-- 不要なランレベル指定を削除
-- シンプル化により起動プロセスを高速化
+**効果:** 測れていない。なお既定の PID 1 は `/bin/sh`（`Dockerfile.runtime` の CMD）なので、
+この inittab はコンテナで `/sbin/init` を PID 1 にしたときだけ使われる。
 
 ### 3. カーネルパラメータのチューニング
 
-**ファイル:** `/etc/sysctl.d/99-kimigayo-performance.conf`
+**ファイル:** `/etc/sysctl.d/99-kimigayo-performance.conf`（`scripts/build-rootfs.sh` の
+heredoc が書き出す。`configs/sysctl/` は使われていない）
 
-#### メモリ管理最適化
 ```bash
-vm.swappiness = 0                    # スワップ使用を最小化
-vm.dirty_ratio = 10                  # ダーティページ書き込み閾値
-vm.dirty_background_ratio = 5        # バックグラウンド書き込み閾値
-vm.overcommit_memory = 1             # メモリオーバーコミット許可
+# Memory management
+vm.swappiness = 0
+vm.dirty_ratio = 10
+vm.dirty_background_ratio = 5
+vm.overcommit_memory = 1
+
+# Network optimization
+net.core.rmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_default = 262144
+net.core.wmem_max = 16777216
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_syncookies = 1
+
+# File system
+fs.file-max = 65536
+vm.vfs_cache_pressure = 50
+
+# Kernel
+kernel.pid_max = 32768
+
+# Security
+kernel.randomize_va_space = 2
+fs.suid_dumpable = 0
 ```
 
-#### ネットワーク最適化
-```bash
-net.core.rmem_max = 16777216         # 受信バッファ最大サイズ
-net.core.wmem_max = 16777216         # 送信バッファ最大サイズ
-net.ipv4.tcp_window_scaling = 1      # TCPウィンドウスケーリング
-net.ipv4.tcp_tw_reuse = 1            # TIME_WAITソケット再利用
-```
-
-#### ファイルシステム最適化
-```bash
-fs.file-max = 65536                  # ファイルディスクリプタ最大数
-vm.vfs_cache_pressure = 50           # キャッシュ圧力調整
-```
-
-**効果:**
-- ネットワークスループット向上
-- ファイルI/O性能向上
-- コンテナ環境での安定性向上
+**効果:** 未測定。コンテナはホストのカーネルで動くので、`vm.*`・`fs.file-max`・
+`kernel.*` などはホスト全体の値で、**特権コンテナで sysctl を適用したときにしか効かない**
+（通常のコンテナでは書き込めない）。「スループット向上」などの効果は確かめていない。
 
 ### 4. サービス構成の最適化
 
-最小限のサービスリストを定義:
+当時はバリアントごとのサービス一覧を `configs/openrc/services-{minimal,standard,extended}.list`
+に書いたが、**このファイルはビルドで読まれていない**。udev・dbus・iptables・sshd は
+どのバリアントのイメージにも入っていない。
 
-**Minimal構成:**
-- sysinit: devfs, dmesg, mdev
-- boot: bootmisc, hostname, loopback, sysctl, urandom
-- default: （なし）
-- shutdown: killprocs, mount-ro, savecache
-
-**Standard構成:**
-- 上記 + networking, syslog, crond, local
-
-**Extended構成:**
-- 上記 + udev, dbus, iptables, sshd
-
-**効果:**
-- 不要サービスの削除による起動時間短縮
-- メモリフットプリントの削減
+**3バリアントの違いは BusyBox のアプレットだけ**（→ [README.md](../../README.md) の
+「パフォーマンス実績」節）。ランレベルの中身は OpenRC のインストールで決まる。
 
 ---
 
@@ -243,15 +249,16 @@ vm.vfs_cache_pressure = 50           # キャッシュ圧力調整
 | イメージ | 最適化前 | 最適化後 | 削減量 |
 |----------|----------|----------|--------|
 | Kimigayo Minimal | 1MB | 1MB | - |
-| Kimigayo Standard | 3MB | **2MB** | -1MB (-33%) |
+| Kimigayo Standard | 3MB | 2MB | （丸め誤差） |
 | Kimigayo Extended | 3MB | 3MB | - |
 
-**削減要因:**
-- `/etc/rc.conf` の追加（わずかな増加）
-- `/etc/sysctl.d/` 設定の追加（わずかな増加）
-- 全体的な最適化効果により逆に1MB削減
+**注:** 当時は「全体的な最適化効果により1MB削減」としていたが、追加したのは設定ファイルだけで、
+サイズが減る理由は無い。整数 MB に丸めた値の揺れと見るのが妥当。
 
 ### 起動時間の詳細
+
+> **⚠️ 以下の起動時間とメモリの表は無効**（`sleep 5` の終了 / `KiB` を潰した値）。
+> 記録として残しているだけで、分析・結論も根拠にならない。
 
 #### 5回測定の結果
 
@@ -294,56 +301,40 @@ vm.vfs_cache_pressure = 50           # キャッシュ圧力調整
 
 ---
 
-## 🎯 目標達成状況
+## 🎯 目標達成状況（v0.1.0 当時）
 
-| 指標 | 目標値 | 実測値 | 達成率 |
-|------|--------|--------|--------|
-| イメージサイズ (Minimal) | < 5MB | 1MB | ✅ 20% |
-| イメージサイズ (Standard) | < 10MB | 2MB | ✅ 20% |
-| 起動時間 | < 10秒 | 5.1秒 | ✅ 51% |
-| 起動時間 (ベスト) | - | 3.5秒 | 🚀 35% |
-| メモリ使用量 | < 128MB | 4MB | ✅ 3% |
+目標値は [SPECIFICATION.md](../../SPECIFICATION.md) §8.3
+（Minimal < 5MB / Standard < 15MB / Extended < 50MB、起動 < 10秒、メモリ < 128MB）。
 
-**全目標達成！** 🎉
+| 指標 | 目標値 | 当時の値 |
+|------|--------|--------|
+| イメージサイズ (Minimal) | < 5MB | 1MB（Init なし） |
+| イメージサイズ (Standard) | < 15MB | 2MB（Init なし） |
+| 起動時間 | < 10秒 | ~~5.1秒~~（無効） |
+| メモリ使用量 | < 128MB | ~~4MB~~（無効） |
+
+当時は「全目標達成」としていたが、起動時間とメモリは測れていなかった。
+現在の達成状況は [README.md](../../README.md) の「パフォーマンス実績」節。
 
 ---
 
 ## 🔍 ボトルネック分析（最適化後）
 
-### 残存するボトルネック
+当時の分析（Docker 初期化 約3秒・OpenRC 1.5秒 → 0.8秒・8秒目のメモリスパイク・
+カスタム init で 0.3秒）は、無効な計測から作った推定なので撤回する。
+カスタム init の開発は採用していない。
 
-1. **Docker初期化オーバーヘッド**
-   - 影響: 約3秒
-   - 改善余地: 限定的（Dockerの制約）
+現在分かっていること（v3.0.2、2026-10-12）:
 
-2. **OpenRC起動処理**
-   - 影響: 約1.5秒 → 最適化により0.8秒に短縮
-   - さらなる改善: カスタムinitシステムで0.3秒まで短縮可能
-
-3. **メモリスパイク（8秒目）**
-   - 原因: タイマーベースのメンテナンスタスク
-   - 影響: 一時的に11MBまで増加
-   - 改善策: 要詳細調査
-
-### 今後の最適化機会
-
-1. **カスタムinitシステムの開発**
-   - 目標起動時間: 2秒以下
-   - OpenRCを軽量initに置き換え
-
-2. **メモリスパイクの解消**
-   - 8秒目のプロセスを特定
-   - 不要であれば削除
-
-3. **さらなるサイズ削減**
-   - カスタムBusyBoxビルド
-   - 不要機能の削除
+- `docker run --rm <image> /bin/true` は 0.60 秒で、Alpine・Ubuntu（0.59 秒）と差が無い。
+  ほとんどが Docker 自身のコンテナ生成
+- OpenRC が `default` ランレベルを完走するまでは 0.72 秒（`/bin/true` との差 約 0.12 秒が Init の分）
 
 ---
 
 ## 📋 変更されたファイル
 
-### 新規作成
+### 新規作成（いずれもビルドから読まれていない）
 
 1. `configs/openrc/rc.conf` - OpenRC設定テンプレート
 2. `configs/openrc/inittab.optimized` - 最適化済みinittab
@@ -351,6 +342,8 @@ vm.vfs_cache_pressure = 50           # キャッシュ圧力調整
 4. `configs/openrc/services-standard.list` - 標準サービスリスト
 5. `configs/openrc/services-extended.list` - 拡張サービスリスト
 6. `configs/sysctl/99-kimigayo-performance.conf` - カーネルパラメータ
+
+イメージに入る中身は、下の `scripts/build-rootfs.sh` が書き出したもの。
 
 ### 変更
 
@@ -366,8 +359,9 @@ vm.vfs_cache_pressure = 50           # キャッシュ圧力調整
 ### 最適化済みイメージのビルド
 
 ```bash
-# Standardイメージをビルド（最適化適用済み）
-make build-image IMAGE_TYPE=standard
+# Standardイメージをビルド（Linux ホスト。macOS では build-rootfs が通らない →
+# CLAUDE.md の「ビルドの全体像」節の 2 段階の手順を使う）
+make build-image VARIANT=standard
 
 # ベンチマーク実行
 make benchmark
@@ -378,14 +372,16 @@ cat benchmark-results/BENCHMARK_REPORT.md
 
 ### カスタム最適化
 
-rc.confの設定をカスタマイズする場合:
+`/etc/rc.conf` などの設定を変える場合:
 
 ```bash
-# 1. configs/openrc/rc.conf を編集
-vi configs/openrc/rc.conf
+# 1. scripts/build-rootfs.sh の heredoc（/etc/rc.conf・/etc/inittab・
+#    /etc/sysctl.d/99-kimigayo-performance.conf を書き出す箇所）を編集
+#    （configs/openrc/rc.conf を編集しても成果物は変わらない）
+vi scripts/build-rootfs.sh
 
 # 2. 再ビルド
-make build-image
+make build-image VARIANT=standard
 
 # 3. 効果測定
 make benchmark-startup
@@ -395,11 +391,12 @@ make benchmark-startup
 
 ## 🔍 競合OSとの比較（2026-10-12 の実測）
 
-**測定条件:** macOS / Apple Silicon、**arm64 ネイティブ**、
-Kimigayo v3.0.2 Standard の公開イメージ、各10回の中央値（常駐メモリは 20 標本）。
-Alpine 3.24・Ubuntu 24.04 と同時に測った。distroless は 2026-10-11 の値。
-`docker-compose.yml` は linux/amd64 を強制するので、
-x86_64 を QEMU 経由で測った値は比較に使わない。
+**測定条件:** macOS / Apple Silicon、Kimigayo v3.0.2 Standard の公開イメージ。
+起動時間・常駐メモリは **arm64 ネイティブ**、各10回の中央値（常駐メモリは 20 標本）で、
+Alpine 3.24・Ubuntu 24.04 と同時に測った。
+**イメージサイズは `docker inspect` の値で、比較表は `--platform linux/amd64`**
+（Kimigayo は 2026-10-12、他は 2026-10-11 に同じホストで測った値）。
+x86_64 の起動時間・メモリを QEMU 経由で測った値は比較に使わない。
 
 ### イメージサイズ
 
@@ -437,7 +434,7 @@ OpenRC が `default` ランレベルを完走するまでは **0.72 秒**。
 | `alpine:latest` | 272KB | 0.94x |
 | `ubuntu:24.04` | 312KB | 1.08x |
 
-**v3.0.1 では差の出る指標だったが、v3.0.2 で同程度になった**（v3.0.1 は 236KB）。
+**v3.0.1 では差の出る指標だったが、v3.0.2 で同程度になった**（v3.0.1 は 232KB）。
 BusyBox を動的リンクにしたので、`sleep` などの BusyBox のコマンドも
 `libc.so` を読み込む（約 56KB）。musl に当てた CVE パッチを `/bin/sh` に
 効かせるための選択。単位は KB。
@@ -447,9 +444,9 @@ BusyBox を動的リンクにしたので、`sleep` などの BusyBox のコマ�
 
 ### コマンド実行性能
 
-BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.01x**（中央値の比）。
-**有意差なし**。平均は 1 回の外れ値に引っ張られるので中央値で見る
-（→ [docs/benchmarks/busybox.md](../benchmarks/busybox.md)）。
+BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.01x**（中央値の比、v3.0.2、
+[README.md](../../README.md) の値）。**有意差なし**。平均は 1 回の外れ値に引っ張られるので
+中央値で見る。測り方と限界は [docs/benchmarks/busybox.md](../benchmarks/busybox.md)。
 
 ### 機能比較
 
@@ -462,55 +459,13 @@ BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.01x**（中央�
 
 **最新の値は [README.md](../../README.md) の「パフォーマンス実績」節が正本。**
 
-- ⚠️ 起動時間はAlpineに+16ms劣る（誤差範囲）
-
-### BusyBoxコマンド性能比較
-
-**Kimigayo OS vs Alpine Linux:**
-
-| コマンド | Kimigayo | Alpine | 速度比 | 評価 |
-|---------|----------|--------|--------|------|
-| ls | 442ms | 420ms | 0.95x | 誤差範囲 |
-| grep | 509ms | 443ms | 0.87x | やや遅い |
-| find | 424ms | 414ms | 0.97x | 誤差範囲 |
-| awk | 463ms | 423ms | 0.91x | 誤差範囲 |
-| sort | 478ms | 423ms | 0.88x | やや遅い |
-| cat | 417ms | 413ms | 0.99x | 誤差範囲 |
-| wc | 445ms | 414ms | 0.93x | 誤差範囲 |
-| head | 443ms | 409ms | 0.92x | 誤差範囲 |
-
-**分析:**
-- 平均で**5-10%の差**（誤差範囲内）
-- コンテナ起動オーバーヘッドの影響
-- 実用上はAlpine Linuxと**同等性能**
-
 ---
 
 ## 📊 比較: 最適化前後 (v0.1.0時代)
 
-### 起動時間の分布
-
-**最適化前:**
-```
-Min: 5.49s ████████████████████████████ 100%
-Avg: 5.52s ████████████████████████████ 100.5%
-Max: 5.57s ████████████████████████████ 101.5%
-```
-
-**最適化後:**
-```
-Min: 3.55s ████████████████ 64.7% ⚡
-Avg: 5.10s ██████████████████████████ 92.9%
-Max: 5.52s ████████████████████████████ 100.5%
-```
-
-### サイズ比較チャート
-
-```
-Before: [███████] 3MB
-After:  [█████] 2MB   (-33%)
-Target: [████████████] 10MB (達成率 20%)
-```
+当時はここに起動時間の分布（最良 3.55 秒）とサイズのチャート（3MB → 2MB、目標 10MB）を
+載せていたが、起動時間は無効な計測、サイズは整数 MB の丸め、目標値は誤り
+（Standard の目標は §8.3 で 15MB）なので削除した。
 
 ---
 
@@ -521,20 +476,21 @@ Target: [████████████] 10MB (達成率 20%)
 サービスの依存関係を適切に定義し、並列起動を最大限活用:
 
 ```bash
-# /etc/rc.conf
+# /etc/rc.conf（scripts/build-rootfs.sh が書き出す）
 rc_parallel="YES"
-rc_depend_strict="NO"  # 依存チェックを緩和
+rc_depend_strict="NO"  # 依存の解釈を緩める（速度のための設定ではない）
 ```
+
+効果は測れていない（並列化の効果として記録していた値は無効）。
 
 ### 2. 不要サービスの無効化
 
 コンテナ環境では不要なサービスを削除:
 
 ```bash
-# 削除推奨
-- hwclock (コンテナではホストの時刻を使用)
-- udev (minimal/standardでは不要)
-- sshd (外部からexecで接続)
+# コンテナでは不要
+- hwclock (コンテナではホストの時刻を使用。OpenRC 側が keyword -docker で飛ばす)
+# udev・sshd はどのバリアントにも入っていない（シェルは docker exec で使う）
 ```
 
 ### 3. ログレベルの調整
@@ -547,13 +503,14 @@ rc_log_level="warn"  # info/debug を出力しない
 
 ### 4. カーネルパラメータのチューニング
 
-用途に応じてsysctlを調整:
+用途に応じてsysctlを調整（**特権コンテナで適用したときだけ効く**。ネットワーク名前空間の
+`net.*` の一部は `docker run --sysctl` でも渡せる。効果は未測定）:
 
 ```bash
 # Webサーバー用途
 net.core.somaxconn = 1024
 
-# メモリ集約型
+# メモリ集約型（ホスト全体に効く）
 vm.swappiness = 0
 ```
 
@@ -562,10 +519,16 @@ vm.swappiness = 0
 ## 🔬 測定環境
 
 ```
-ホストOS: macOS (Darwin 25.1.0)
-Docker: Docker Desktop
-測定ツール: カスタムベンチマークスクリプト
-測定回数: 5回（平均値を採用）
+v0.1.0 / v2.0.1 の節:
+  ホストOS: macOS (Darwin 25.1.0)
+  Docker: Docker Desktop
+  測定ツール: カスタムベンチマークスクリプト（起動時間・メモリは壊れていた）
+  測定回数: 5回（平均値を採用）
+
+「競合OSとの比較（2026-10-12 の実測）」の節:
+  ホスト: macOS / Apple Silicon、Docker Desktop
+  起動時間・常駐メモリ: arm64 ネイティブ、10回の中央値（常駐メモリは 20 標本）
+  サイズ: docker inspect（比較表は --platform linux/amd64）
 ```
 
 ---
@@ -579,4 +542,4 @@ Docker: Docker Desktop
 ---
 
 **作成者:** Claude (Anthropic)
-**次回更新:** カスタムinitシステム実装後
+**次回更新:** 次の計測時（[README.md](../../README.md) と同じターンで突合する）
