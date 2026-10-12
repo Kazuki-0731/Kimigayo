@@ -87,10 +87,10 @@ docker compose run --rm kimigayo-build make build-no-kernel TARGET_ARCH=x86_64 I
 # アーキテクチャ指定ビルド
 # **ホストの `make build` に ARCH= を渡しても効かない。**
 # `docker compose run --rm kimigayo-build make build` へ転送していないため
-# （Makefile の build ターゲット）。compose は ARCH=x86_64 を固定しており、
-# build-system/Makefile が読むのは TARGET_ARCH。
-# arch を変えるならコンテナに直接渡す:
-# （IMAGE_TYPE は常に明示する。省くと BusyBox と rootfs の既定がずれることがある）
+# （Makefile の build ターゲット）。build-system/Makefile が読むのは TARGET_ARCH
+# （ARCH= も受け付けるが非推奨で、警告を出して TARGET_ARCH に読み替える）。
+# arch を変えるならコンテナに直接渡す
+# （IMAGE_TYPE の既定は standard。何を作るか読み手に分かるよう明示を勧める）:
 docker compose run --rm kimigayo-build make build TARGET_ARCH=x86_64 IMAGE_TYPE=standard
 docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64 IMAGE_TYPE=standard
 
@@ -105,7 +105,8 @@ make status
 make info
 
 # クリーン（clean=成果物のみ / clean-cache=ダウンロードキャッシュ /
-#   clean-all=Docker のボリュームとビルド環境イメージ。ホストの build/ は消さない）
+#   clean-all=Docker のボリュームとビルド環境イメージ。ホストの build/ は消さない。
+#   コンテナ内の make clean-all は build/（downloads を除く）と output/ を消す）
 make clean
 
 # セキュリティスキャン（scan-image + Trivy FS + ShellCheck）
@@ -216,7 +217,7 @@ gdb -ex "target remote :1234" build/kernel-src/linux-$(make -s print-kernel)/vml
 # 各コンポーネントのビルドログ（最新100行）
 make log-kernel
 make log-musl
-# OpenRC のビルドはログファイルを書かない（make log-openrc は読む対象が無い）
+make log-openrc   # build/logs/openrc-build.log
 
 # パッチ適用の結果（版上げ後は必ず見る）
 grep -i 'skipped\|not applicable' build/kernel-patches.log build/busybox-patches.log
@@ -234,15 +235,17 @@ ls build/logs/
 - **PIE**: Position Independent Executables
 - **RELRO**: `-Wl,-z,relro -Wl,-z,now`（Full RELRO）
 - **非実行スタック**: `-Wl,-z,noexecstack`
-- **Stack Protection**: `-fstack-protector-strong` — **arm64 の OpenRC には渡していない**
-  （`scripts/build-openrc.sh` の arm64 の CFLAGS）
+- **Stack Protection**: `-fstack-protector-strong` — 両アーキの全構成要素に渡す。
+  **v3.0.2 の arm64 の OpenRC には付いていない**（`build-openrc.sh` が arm64 だけ
+  外していた。main で修正済み、次のリリースから付く。`verify-image.sh` が検査する）
 - **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2` — musl は FORTIFY を実装しておらず、
   効果は確認できていない
 
 成果物に効いているかは `scripts/verify-image.sh` が見る。イメージを
 `docker export` した tar を `scripts/check-elf-hardening.py` が読み、
-**イメージ内のすべての ELF** について PIE・RELRO・BIND_NOW・非実行スタックを
-検査する（以前は `/bin/busybox` が PIE かどうかだけだった）。
+**イメージ内のすべての ELF** について PIE・RELRO・BIND_NOW・非実行スタック・
+スタック保護（libc から 20 個以上の関数を取り込む動的 ELF が `__stack_chk_fail`
+を参照しているか）を検査する（以前は `/bin/busybox` が PIE かどうかだけだった）。
 
 `verify-image.sh` の「セキュリティの回帰」ではほかに次を見る:
 
@@ -394,7 +397,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 ### リリース手順
 
 **`develop` ブランチは存在しない。** 作業は `main` で行う
-（`ci.yml` のトリガーには `develop` が残っているが、ブランチ自体が無い）。
+（`ci.yml` のトリガーからも 2026-10-13 に外した）。
 
 1. すべてのテストが通ることを確認（`make test` / `make shellcheck-scan`）
 2. 成果物を検査（`rootfs-verifier` subagent、`scripts/verify-image.sh`）
