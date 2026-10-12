@@ -66,7 +66,7 @@ strategy:
 - 手動実行 (workflow_dispatch、`tag` を入力)
 
 **処理内容:**
-1. 版の解決（`scripts/get-version.sh`）
+1. 版の解決（`meta` ジョブ。タグ名から `v` を外す。手動実行では入力 `tag`）
 2. ShellCheck
 3. マルチアーキテクチャ・マルチバリアントビルド（6 ジョブ）
 4. イメージ検証と Docker Hub への push
@@ -88,7 +88,8 @@ strategy:
 
 **トリガー:** 他のワークフローからの `workflow_call` のみ
 
-`ci.yml` と `release.yml` と `manual-build.yml` が共有するビルド本体です。
+`ci.yml` と `manual-build.yml` が共有するビルド本体です
+（`release.yml` はこれを呼ばず、同じ入口の `make build-no-kernel` を自前のジョブで回します）。
 入力に `variant` / `arch` / `build_kernel` / `upload_artifacts` を取ります。
 `build_kernel` の既定は `false` です。
 
@@ -97,7 +98,7 @@ strategy:
 
 1. `scripts/verify-image.sh` — イメージを起動しての検証（34 項目、minimal は 33）
 2. `bash scripts/scan-image.sh` — 出荷物の秘密情報スキャン（Trivy の
-   secret スキャナで rootfs を見る）と CVE 照合（出荷物の版から SBOM を作り
+   secret スキャナでイメージを見る）と CVE 照合（出荷物の版から SBOM を作り
    Grype で照合する）。SBOM は `sbom-<variant>-<arch>` の成果物として残ります
 
 > **NVD に新しい CVE が載ると、コードを変えていない push でも落ちます。**
@@ -123,9 +124,10 @@ gh workflow run manual-build.yml \
 - 手動実行
 
 **処理内容:**
-1. 構成要素の版の確認（`version-check`）
+1. 構成要素の版の確認（`version-check`。musl と BusyBox の新版、
+   Alpine の secdb に載っているパッケージ数）
 2. リポジトリのファイルシステムスキャン（Trivy、`trivy-filesystem-scan`）
-3. 脆弱性検出時に Issue を自動作成
+3. musl か BusyBox の新版を検知したときに Issue を自動作成（脆弱性の検出では起票しない）
 
 > **イメージの Trivy スキャン（`trivy-image-scan`）は 2026-10-09 に外しました。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
@@ -143,9 +145,16 @@ gh workflow run manual-build.yml \
 
 **トリガー:** 毎週月曜 03:00 UTC、手動（`force_rebuild` を入力）
 
-上流（カーネル / musl / BusyBox / OpenRC / Alpine）の更新を検知して
-PR を作成します。**この PR は「上流が動いた」という一次情報**なので、
+上流（musl / BusyBox / OpenRC）の更新を検知して、`versions.mk` を
+書き換える PR を作成します（カーネルと Alpine は見ていません。
+チェックサム表は更新しないので、マージ前に手で足します）。
+PR は `GITHUB_TOKEN` で作るため、その PR では CI が自動では走りません。**この PR は「上流が動いた」という一次情報**なので、
 バージョン更新の起点として先に見てください。
+
+### Dependabot（`.github/dependabot.yml`）
+
+ワークフローではありませんが、毎週月曜に GitHub Actions（03:00 UTC）と
+Dockerfile のベースイメージ（04:00 UTC）の更新 PR を作ります。
 
 ### 7. Dependency Review (`.github/workflows/dependency-review.yml`)
 
@@ -166,9 +175,11 @@ PR を作成します。**この PR は「上流が動いた」という一次�
 > ステップは、CVE データベースを一切照会せず `versions.mk` の版を
 > 表示するだけでした（2026-10-11 に `published-image-scan` に置き換え）。
 
-> **2026-10-11 時点の公開イメージ（v3.0.1）では、このジョブは失敗します。**
-> 既知の CVE が 5 件検出されます。3 件は `main` でパッチ済みで次のリリースから
-> 除外されますが、パッチの無い 2 件は残ります（→ [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)）。
+> v3.0.1 の公開時点では既知の CVE が 5 件検出され、このジョブは失敗していました。
+> v3.0.2 では 5 件すべてにパッチを当て、`/.kimigayo-build-info` の
+> `PATCHED_CVES` に記録して照合から除外しています
+> （→ [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)）。
+> 新しい CVE が NVD に載れば、コードを変えていなくても再び失敗します。
 
 ## ビルドプロセス
 
@@ -178,7 +189,7 @@ PR を作成します。**この PR は「上流が動いた」という一次�
 
 ```yaml
 - name: Checkout repository
-  uses: actions/checkout@v4
+  uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 ```
 
 #### 2. ビルド環境イメージの用意
@@ -193,8 +204,9 @@ PR を作成します。**この PR は「上流が動いた」という一次�
     KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
 ```
 
-> **QEMU は使いません。** arm64 のジョブは **`ubuntu-24.04-arm`
-> ネイティブランナー**で走ります。
+> **QEMU は使いません。** arm64 のビルドは `ubuntu-latest`（x86_64）からの
+> clang / lld によるクロスコンパイルで、**イメージの検証（と release の push）
+> だけが `ubuntu-24.04-arm` ネイティブランナー**で走ります。
 >
 > ```yaml
 > runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -227,8 +239,9 @@ PR を作成します。**この PR は「上流が動いた」という一次�
 
 #### 4. メタデータの抽出
 
-版は `meta` ジョブが `scripts/get-version.sh` で解決し、
-後続のジョブへ `needs.meta.outputs.version` として渡します。
+版は `meta` ジョブがタグ名（`refs/tags/v3.0.2` → `3.0.2`）から解決し、
+後続のジョブへ `needs.meta.outputs.version` として渡します
+（`scripts/get-version.sh` を使うのは `build-workflow.yml` の方です）。
 
 > **ここを渡し忘れると、タグ名だけ合っていて中身の版がずれます。**
 > 以前 `release.yml` が版を渡さず、`os-release` が `dev` になる事故が
@@ -276,8 +289,10 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
     docker build \
       --platform "${{ steps.tags.outputs.platform }}" \
       -f Dockerfile.runtime \
-      --build-arg TARBALL_PATH="output/kimigayo-${{ matrix.variant }}-${VERSION}-${{ matrix.arch }}.tar.gz" \
-      --build-arg VERSION="${VERSION}" \
+      --build-arg TARBALL_PATH="output/kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}.tar.gz" \
+      --build-arg VERSION="${{ needs.meta.outputs.version }}" \
+      --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      --build-arg VCS_REF="${{ github.sha }}" \
       --build-arg IMAGE_VARIANT="${{ matrix.variant }}" \
       -t "${{ steps.tags.outputs.primary }}" \
       -t "${{ steps.tags.outputs.moving }}" \
@@ -304,11 +319,12 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
 
-> **`release.yml` に Trivy も pytest も統合テストもありません。**
-> Trivy のイメージスキャンは、パッケージデータベースが無く
+> **`release.yml` に Trivy の脆弱性スキャンも pytest も統合テストもありません。**
+> Trivy のイメージの脆弱性スキャンは、パッケージデータベースが無く
 > 何も識別できないため 2026-10-09 に外しました。
-> `release.yml` でも push の前に `scripts/scan-image.sh` で秘密情報と
-> CVE を照合し、作った SBOM を GitHub Release に添付します。
+> `release.yml` では push の前に `scripts/scan-image.sh` で秘密情報
+> （Trivy の secret スキャナ）と CVE（Grype）を照合し、作った SBOM を
+> GitHub Release に添付します。
 > pytest は `ci.yml` 側で回ります。
 > 以前は検証に `continue-on-error` が付いており、
 > tarball が小さくても `exit 0` でスキップしていました。
@@ -321,42 +337,6 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
     docker push "${{ steps.tags.outputs.primary }}"
     docker push "${{ steps.tags.outputs.moving }}"
 ```
-
-#### 11. Cosign のキーレス署名
-
-**鍵を持ちません。** GitHub Actions の OIDC トークンで署名し、署名は
-Rekor の透明性ログに載ります。Secrets を増やさずに済みます。
-
-```yaml
-  sign:
-    permissions:
-      contents: read
-      id-token: write      # これが無いと OIDC が取れない
-    steps:
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      ...
-      - run: cosign sign --yes "${repo}@${digest}"
-```
-
-**署名するのはタグではなくダイジェストです。** タグは動くので、
-タグへの署名では「どのイメージを署名したか」を特定できません。
-`docker buildx imagetools inspect` の `Digest:` 行から引き
-（`--format` は古い buildx に無い）、**重複を落としてから署名します**
-（実測で 22 タグ → 9 ダイジェスト）。
-
-署名した直後に `cosign verify` で検証まで行います
-（「署名した」と「検証できる」は別）。
-
-利用者側の検証:
-
-```bash
-cosign verify ishinokazuki/kimigayo-os:latest \
-  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-> **v3.0.1 以前の公開イメージは署名されていません。**
-> 配線は 2026-10-11 に入れたもので、効くのは次のリリース以降です。
 
 #### 10. マルチアーキテクチャマニフェスト作成
 
@@ -393,6 +373,43 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 > `docs/RELEASE_CHECKLIST.md` がこのタグを案内しているため、
 > 作る対象から漏らさないこと。
 
+#### 11. Cosign のキーレス署名
+
+**鍵を持ちません。** GitHub Actions の OIDC トークンで署名し、署名は
+Rekor の透明性ログに載ります。Secrets を増やさずに済みます。
+
+```yaml
+  sign:
+    permissions:
+      contents: read
+      id-token: write      # これが無いと OIDC が取れない
+    steps:
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      ...
+      - run: cosign sign --yes "${repo}@${digest}"
+```
+
+**署名するのはタグではなくダイジェストです。** タグは動くので、
+タグへの署名では「どのイメージを署名したか」を特定できません。
+`docker buildx imagetools inspect` の `Digest:` 行から引き
+（`--format` は古い buildx に無い）、**重複を落としてから署名します**
+（実測で 22 タグ → 9 ダイジェスト）。
+
+署名した直後に `cosign verify` で検証まで行います
+（「署名した」と「検証できる」は別）。
+
+利用者側の検証:
+
+```bash
+cosign verify ishinokazuki/kimigayo-os:latest \
+  --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+> **署名されているのは v3.0.2 以降です。** v3.0.1 以前の公開イメージは
+> 署名されていません。検証には cosign v3 以上が要ります
+> （v2 では `no signatures found` になります）。
+
 ## テスト戦略
 
 ### 1. 単体テスト
@@ -401,8 +418,9 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 # ローカル実行
 docker compose run --rm kimigayo-build pytest tests/unit/ -v
 
-# CI実行
-python3 -m pytest tests/unit/ -v --cov
+# CI（ci.yml の tests ジョブ）は unit と property をまとめて回す
+docker compose run --rm -w /build/kimigayo kimigayo-build \
+  pytest tests/unit tests/property -q
 ```
 
 ### 2. プロパティテスト
@@ -419,12 +437,16 @@ python3 -m pytest tests/property/ -v
 python3 -m pytest tests/integration/test_phase1_integration.py -v
 ```
 
-### 4. スモークテスト
+### 4. イメージの検証
 
 ```bash
-# Dockerイメージの基本動作確認
-docker run --rm test-image /bin/sh -c "echo 'Test' && busybox --help"
+# イメージを実際に起動して検査する（CI・release と同じスクリプト）
+bash scripts/verify-image.sh kimigayo-os:standard-x86_64 standard x86_64
 ```
+
+> 以前の「`/bin/sh` と `busybox --help` が動くか」だけのスモークテストは、
+> OpenRC も `libc.so` も入っていないイメージでも通っていたため、
+> `verify-image.sh` に置き換えました。
 
 ### 5. セキュリティテスト
 
@@ -458,7 +480,7 @@ make shellcheck-scan
 供給網のリスクであり、再現性もありません（2026-10-09 に固定しました）。
 
 ```yaml
-- name: Run ShellCheck (Static Analysis)
+- name: Run ShellCheck
   uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
   with:
     additional_files: '.claude/hooks'
@@ -472,8 +494,10 @@ make shellcheck-scan
 
 ### Trivy（リポジトリのファイルシステムスキャン）
 
-Trivy は**リポジトリ**に対してだけ使います（`ci.yml`・`security.yml`・
-`dependency-review.yml`）。イメージには使いません（何も識別できないため）。
+Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使います（`ci.yml`・
+`security.yml`・`dependency-review.yml`）。イメージの脆弱性スキャンには
+使いません（何も識別できないため）。イメージに対しては
+`scripts/scan-image.sh` の中で**秘密情報スキャン（`--scanners secret`）だけ**に使います。
 
 ```yaml
 - name: Run Trivy filesystem scan
@@ -503,7 +527,7 @@ Trivy は**リポジトリ**に対してだけ使います（`ci.yml`・`securit
 | --- | --- | --- |
 | `build-workflow.yml`（ビルドごと） | CVE 照合 + 秘密情報 | ジョブが落ちる |
 | `release.yml`（Docker Hub への push 前） | CVE 照合 + 秘密情報。SBOM を Release に添付 | push しない |
-| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | Issue を起票 |
+| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | ジョブが落ちる。定期実行のときだけ Issue を起票 |
 
 ## リリースプロセス
 
@@ -523,8 +547,8 @@ Kimigayo OSは[Semantic Versioning](https://semver.org/)に従います:
 # 現在のバージョンを確認
 make version
 
-# 新しいバージョンでタグを作成（現行は v3.0.1）
-git tag -a v3.0.2 -m "Release v3.0.2
+# 新しいバージョンでタグを作成（例。2026-10-12 時点の最新は v3.0.2）
+git tag -a v3.0.3 -m "Release v3.0.3
 
 - 新機能A
 - バグ修正B
@@ -532,14 +556,14 @@ git tag -a v3.0.2 -m "Release v3.0.2
 "
 
 # タグをプッシュ（**ユーザーの明示的な承認が必要**）
-git push origin v3.0.2
+git push origin v3.0.3
 ```
 
 #### 2. 自動ビルドとリリース
 
 タグがプッシュされると、GitHub Actionsが自動的に:
 
-1. 版の解決（`scripts/get-version.sh`）
+1. 版の解決（タグ名から）
 2. ShellCheck
 3. 全バリアント・全アーキテクチャをビルド（6 ジョブ）
 4. **イメージを起動して検証**（`scripts/verify-image.sh`、34 項目、minimal は 33）
@@ -549,9 +573,9 @@ git push origin v3.0.2
 8. GitHub Releases を作成
 9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS）を添付
 
-**Trivy スキャンと pytest は `release.yml` では走りません**
-（pytest は `ci.yml` 側。Trivy のイメージスキャンは何も識別できないため
-2026-10-09 に外しました）。
+**Trivy の脆弱性スキャンと pytest は `release.yml` では走りません**
+（pytest は `ci.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
+2026-10-09 に外しました。秘密情報と CVE は `scan-image.sh` で見ます）。
 
 **`CHANGELOG.md` は自動生成されません。** タグを打つ前に手で更新して
 おいてください（→ [2. Release](#2-release-githubworkflowsreleaseyml)）。
@@ -565,14 +589,22 @@ GitHub Releasesページで以下を確認:
 - ビルド成果物（tar.gz）
 - チェックサム（SHA256, SHA512）
 
-### 手動リリース（workflow_dispatch）
+### 手動実行（workflow_dispatch）
 
 ```bash
-# GitHub CLI を使用
+# GitHub CLI を使用（**ユーザーの明示的な承認が必要**）
 gh workflow run release.yml -f tag=v3.0.2
 ```
 
 または、GitHubのActionsタブから手動実行。
+
+> **手動実行でも Docker Hub に push します。** `verify-and-push` には
+> タグ push に限る条件が無いため、`<ver>-<variant>-<arch>` と
+> `latest-<variant>-<arch>` が差し替わります。一方で `create-manifest`・
+> `sign`・`create-github-release` はタグ push のときだけなので**飛ばされ**、
+> マルチアーキのマニフェストも署名も Release もできません。
+> `tag` を省くと既定値の `latest` が版になります。
+> 完全なリリースはタグの push で行ってください。
 
 ## ローカルでのCI実行
 
@@ -598,9 +630,9 @@ act
 act push
 
 # 特定のジョブのみ実行
-# release.yml の実際のジョブ名は次の7つ:
+# release.yml の実際のジョブ名は次の8つ:
 #   meta / shellcheck / build / verify-and-push /
-#   create-manifest / create-github-release / notify
+#   create-manifest / sign / create-github-release / notify
 act -j build
 
 # 環境変数を指定
@@ -613,16 +645,21 @@ act -s DOCKER_HUB_ACCESS_TOKEN=your_token
 # CI相当のビルド
 make ci-build-local
 
-# CI相当のビルド + プッシュ
+# CI相当のビルド + Docker Hub へのプッシュ
 make ci-build-push
 ```
+
+> **`ci-build-push` は Docker Hub に直接 push します**
+> （`ishinokazuki/kimigayo-os:<variant>-<arch>` と
+> `<VERSION>-<variant>-<arch>`。リリースのタグとは名前の形が違います）。
+> 公開物を変える操作なので承認が要り、`.claude/hooks/guard-bash.sh` も止めます。
 
 > **`make ci-build-local` は macOS ホストでは通りません。**
 > ホスト側で `scripts/build-rootfs.sh` を直接叩き、その中で
 > `build-musl.sh` を実際に呼ぶため、musl の `configure` が
 > `unsupported long double type` で落ちます。
-> さらに `ARCH` を省略すると `uname -m` から自動検出するので、
-> Apple Silicon では `arm64` になります。
+> `ARCH` を省略するとホストの `Makefile` の既定値 `x86_64` が渡ります
+> （`build-rootfs.sh` を直接叩いたときだけ `uname -m` から自動検出します）。
 > **Linux ホストならそのまま通ります**（GitHub Actions はこの経路）。
 > macOS での回避手順は
 > [CLAUDE.md](../../CLAUDE.md) の「ビルドの全体像」節にあります。
@@ -723,6 +760,8 @@ jobs:
       - name: Build image
         run: docker build -t myapp:scan .
 
+      # Kimigayo をベースにしたイメージでは、Trivy はベース側の構成要素を
+      # 識別できない（パッケージ DB が無い）。自分で持ち込んだものだけが対象
       - name: Run Trivy scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -778,11 +817,10 @@ strategy:
 - name: Run tests
   run: pytest tests/ -v
   continue-on-error: false  # エラー時は停止
-
-- name: Optional check
-  run: shellcheck scripts/*.sh
-  continue-on-error: true  # エラーでも続行
 ```
+
+> **`continue-on-error: true` は付けません。** Kimigayo 自身は ShellCheck を
+> 含む検査のどれにも付けていません（止められない検査は意味がないため）。
 
 ### 5. 条件付き実行
 
