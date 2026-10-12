@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Comparison Benchmark Script for Kimigayo OS
-# Compares performance against Alpine, Distroless, and Ubuntu Minimal
+# Compares performance against Alpine, Distroless, and Ubuntu 24.04
 #
 # Note: Requires bash 4.0+ for associative arrays
 # macOS: brew install bash, then use /usr/local/bin/bash or /opt/homebrew/bin/bash
@@ -404,7 +404,8 @@ cat >> "$MD_FILE" <<EOF
 
 **Startup time does not differ between images.** Most of the measured time is
 Docker's own container creation, so Ubuntu lands within noise of Kimigayo
-despite being ~30x larger. Memory is where the difference shows.
+despite being ~30x larger. Image size is where the difference shows;
+resident memory is on par with Alpine.
 
 ## Notes
 

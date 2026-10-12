@@ -156,11 +156,11 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     echo "startup_max_ms=$max" >> "$GITHUB_OUTPUT"
 fi
 
-# 目標値チェック（10秒 = 10000ms以下）
+# 参考値チェック（10秒 = 10000ms 未満。仕様上の目標ではない）
 if [ $avg -lt 10000 ]; then
-    echo -e "${GREEN}✓ 目標達成: 平均起動時間が10秒以下です${NC}"
+    echo -e "${GREEN}✓ 参考値（10秒）未満: 平均起動時間 ${avg}ms（仕様上の目標ではない）${NC}"
     exit 0
 else
-    echo -e "${YELLOW}⚠ 警告: 平均起動時間が10秒を超えています${NC}"
+    echo -e "${YELLOW}⚠ 警告: 平均起動時間が参考値の10秒を超えています（仕様上の目標ではない）${NC}"
     exit 1
 fi

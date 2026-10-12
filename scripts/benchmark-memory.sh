@@ -4,8 +4,10 @@
 set -e
 
 # Colors
+BOLD='\033[1m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -169,11 +171,11 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     echo "memory_max_kb=$max" >> "$GITHUB_OUTPUT"
 fi
 
-# 目標値チェック（128MB以下）
+# 参考値チェック（128MB 未満。仕様上の目標ではない）
 if [ $avg -lt 131072 ]; then
-    echo -e "${GREEN}✓ 目標達成: 平均メモリ使用量が128MB以下です${NC}"
+    echo -e "${GREEN}✓ 参考値（128MB）未満: 平均 ${avg}KB（仕様上の目標ではない）${NC}"
     exit 0
 else
-    echo -e "${YELLOW}⚠ 警告: 平均メモリ使用量が128MBを超えています${NC}"
+    echo -e "${YELLOW}⚠ 警告: 平均メモリ使用量が参考値の128MBを超えています（仕様上の目標ではない）${NC}"
     exit 1
 fi

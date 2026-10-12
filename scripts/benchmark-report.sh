@@ -64,7 +64,7 @@ if [ -f "$INPUT_DIR/benchmark-size.json" ]; then
             jq -r '.results | to_entries |
                 map(select(.key | contains("distroless"))) |
                 .[] |
-                # Distroless Staticは1MBなのでKB単位で表示
+                # size_mb がちょうど 1 のときだけ KB でも表示する（実測は約 2MB）
                 if (.key | contains("static")) then
                     if .value.size_mb == 1 then "| Distroless Static | \(.value.size_mb * 1024)KB (\(.value.size_mb)MB) |"
                     else "| Distroless Static | \(.value.size_mb)MB |"
@@ -147,12 +147,12 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ]; then
     echo "- 平均: ${avg}ms | 中央値: ${median}ms | 最小: ${min}ms | 最大: ${max}ms" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
-    # 目標値評価
+    # 参考値評価（10秒。仕様上の目標ではない）
     avg_sec=$((avg / 1000))
     if [ $avg_sec -lt 10 ]; then
-        echo "✅ **目標達成:** 平均起動時間が10秒以下です" >> "$OUTPUT_FILE"
+        echo "✅ **参考値（10秒）未満:** 平均起動時間が10秒未満です（仕様上の目標ではない）" >> "$OUTPUT_FILE"
     else
-        echo "⚠️ **警告:** 平均起動時間が10秒を超えています (${avg_sec}秒)" >> "$OUTPUT_FILE"
+        echo "⚠️ **警告:** 平均起動時間が参考値の10秒を超えています (${avg_sec}秒。仕様上の目標ではない)" >> "$OUTPUT_FILE"
     fi
     echo "" >> "$OUTPUT_FILE"
 fi
@@ -224,11 +224,11 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ]; then
     echo "- 平均: ${avg}KB | 中央値: ${median}KB | 最小: ${min}KB | 最大: ${max}KB" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
 
-    # 目標値評価（128MB = 131072KB）
+    # 参考値評価（128MB = 131072KB。仕様上の目標ではない）
     if [ "$avg" -lt 131072 ]; then
-        echo "✅ **目標達成:** 平均メモリ使用量が128MB以下です" >> "$OUTPUT_FILE"
+        echo "✅ **参考値（128MB）未満:** 平均メモリ使用量が128MB未満です（仕様上の目標ではない）" >> "$OUTPUT_FILE"
     else
-        echo "⚠️ **警告:** 平均メモリ使用量が128MBを超えています (${avg}KB)" >> "$OUTPUT_FILE"
+        echo "⚠️ **警告:** 平均メモリ使用量が参考値の128MBを超えています (${avg}KB。仕様上の目標ではない)" >> "$OUTPUT_FILE"
     fi
     echo "" >> "$OUTPUT_FILE"
 fi
@@ -320,7 +320,7 @@ if [ -n "$LATEST_COMPARISON" ] && [ -f "$LATEST_COMPARISON" ] && command -v jq >
     # レポートは測った値だけを載せる。
     echo "**Kimigayo OSの特徴:**" >> "$OUTPUT_FILE"
     echo "- ✅ シェルと Init を備えたうえで distroless に近いサイズ" >> "$OUTPUT_FILE"
-    echo "- ✅ 常駐メモリは上の表のとおり（差が出るのはここ）" >> "$OUTPUT_FILE"
+    echo "- 常駐メモリは上の表のとおり（v3.0.2 では Alpine とほぼ同じ。差が出るのはイメージサイズ）" >> "$OUTPUT_FILE"
     echo "- ⚠️ パッケージマネージャー非搭載（設計方針）" >> "$OUTPUT_FILE"
     echo "- ⚠️ **起動時間はイメージでは変わらない。** 測っている時間の" >> "$OUTPUT_FILE"
     echo "  ほとんどが Docker のコンテナ生成なので、Ubuntu でも同じになる" >> "$OUTPUT_FILE"
@@ -351,14 +351,15 @@ EOF
 #
 # **「確認中」と固定文字列で書かないこと。** 2026-10-11 まで3項目すべてが
 # 「確認中」で、すぐ上に実測値が載っているのに達成状況が分からなかった。
-# 目標値は SPECIFICATION.md 8.3（Minimal 5MB / Standard 15MB /
-# Extended 50MB）と 8.1（RAM 128MB）。
+# イメージサイズの目標値は SPECIFICATION.md 8.3（Minimal 5MB /
+# Standard 15MB / Extended 50MB）。起動 10 秒・常駐メモリ 128MB は
+# 仕様に無い参考値（8.1 に 128MB の目標は無い）。
 # ---------------------------------------------------------------------------
 {
     echo ""
     echo "## 🎯 パフォーマンス目標"
     echo ""
-    echo "目標値は [SPECIFICATION.md](../SPECIFICATION.md) 8.3 と 8.1。"
+    echo "イメージサイズの目標値は [SPECIFICATION.md](../SPECIFICATION.md) 8.3。起動時間と常駐メモリは仕様に目標が無いので参考値。"
     echo ""
     echo "| 指標 | 目標値 | 実測 | 達成 |"
     echo "|------|--------|------|------|"
@@ -399,9 +400,9 @@ if [ -f "$INPUT_DIR/benchmark-startup.json" ] && command -v jq > /dev/null 2>&1;
     ms=$(jq -r '.results.median_ms // empty' "$INPUT_DIR/benchmark-startup.json" 2>/dev/null)
     if [ -n "$ms" ]; then
         if [ "$ms" -lt 10000 ]; then ok=yes; else ok=no; fi
-        emit_goal "起動時間" "< 10秒" "${ms}ms" "$ok"
+        emit_goal "起動時間" "< 10秒（参考）" "${ms}ms" "$ok"
     else
-        emit_goal "起動時間" "< 10秒" "" ""
+        emit_goal "起動時間" "< 10秒（参考）" "" ""
     fi
 fi
 
@@ -409,9 +410,9 @@ if [ -f "$INPUT_DIR/benchmark-memory.json" ] && command -v jq > /dev/null 2>&1; 
     kb=$(jq -r '.results.median_kb // empty' "$INPUT_DIR/benchmark-memory.json" 2>/dev/null)
     if [ -n "$kb" ]; then
         if [ "$kb" -lt 131072 ]; then ok=yes; else ok=no; fi
-        emit_goal "常駐メモリ" "< 128MB (131,072KB)" "${kb}KB" "$ok"
+        emit_goal "常駐メモリ" "< 128MB (131,072KB)（参考）" "${kb}KB" "$ok"
     else
-        emit_goal "常駐メモリ" "< 128MB (131,072KB)" "" ""
+        emit_goal "常駐メモリ" "< 128MB (131,072KB)（参考）" "" ""
     fi
 fi
 
