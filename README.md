@@ -48,6 +48,9 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | 常駐メモリ | **288KB** | < 128MB | ✅ **目標の0.2%** |
 | BusyBoxコマンド性能 | Alpine比 **0.97〜1.01x** | Alpine同等 | ✅ **有意差なし** |
 
+<details>
+<summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
+
 目標値は [SPECIFICATION.md](SPECIFICATION.md) §8.3 の定義
 （Minimal 5MB / Standard 15MB / Extended 50MB）。
 **実際には 3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っている。**
@@ -67,8 +70,6 @@ v3.0.2 の公開イメージを 2026-10-12 に実測。サイズは 6 イメー�
 > 読み込むようになった分（約 56KB）。Kimigayo が musl に当てた CVE パッチを
 > `/bin/sh` にも効かせるための選択で、目標（128MB 未満）には影響しない。
 
-<details>
-<summary><b>6 バリアントの内訳と、サイズの中身の説明</b></summary>
 
 **測定条件**: 2026-10-12 / 対象は v3.0.2 の公開イメージ / ホストは macOS（Apple Silicon, arm64）/
 Alpine 3.24 ベースのビルド環境 /
@@ -797,6 +798,9 @@ A working multi-stage example is in [examples/python/Dockerfile](examples/python
 | Resident memory | **288KB** | < 128MB | ✅ **0.2% of target** |
 | BusyBox performance | **0.97-1.01x** of Alpine | Alpine equivalent | ✅ **no measurable difference** |
 
+<details>
+<summary><b>Per-variant breakdown, and where the bytes go</b></summary>
+
 Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
 (Minimal 5MB / Standard 15MB / Extended 50MB). **In practice all three
 variants come in under 5MB — the strictest of the three targets.**
@@ -815,8 +819,6 @@ variant passes `scripts/verify-image.sh` (34 checks; 33 for Minimal, which has n
 > That is the price of having Kimigayo's musl CVE patches cover `/bin/sh`; it is
 > nowhere near the 128MB target.
 
-<details>
-<summary><b>Per-variant breakdown, and where the bytes go</b></summary>
 
 **Measurement conditions**: 2026-10-12, published v3.0.2 images, host is macOS on Apple Silicon
 (arm64). Build environment is based on Alpine 3.24, with kernel 6.18.55 /
