@@ -17,7 +17,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: デバッグ可能なシェルとUnixコマンド
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO・非実行スタックでビルド（Stack Protector は x86_64 の全 ELF。arm64 の OpenRC には付いていない）
+- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO・非実行スタックでビルド（Stack Protector は x86_64 の全 ELF。v3.0.2 の arm64 の OpenRC には付いていない。main で修正済み、次のリリースから付く。verify-image.sh が検査する）
 
 ### Alpine/distroless との違い
 
