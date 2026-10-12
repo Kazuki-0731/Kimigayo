@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
+  # base-image-update.yml が作る更新 PR のブランチで CI を回すため。
+  # GITHUB_TOKEN で作った PR・push ではワークフローが起動しない
+  # （workflow_dispatch だけは例外）ので、あちらが明示的にここを起動する。
+  workflow_dispatch:
 
 # 連続して push したときに前の run を止める。
 # 2026-10-09 に2回、前の run が走り続けて CI 時間を二重に消費し、
@@ -36,18 +40,24 @@ jobs:
       - name: Check for stale statements in docs
         run: python3 scripts/check-stale-docs.py
 
-      # ローカルの make shellcheck-scan と同じ対象（.claude/hooks/ を含む）に
-      # するつもりで additional_files を渡しているが、このアクションは
-      # additional_files を ./scripts の中での find -name のパターンとして
-      # 扱うため、**.claude/hooks/ は実際には検査されていない**
-      # （CI ログで `-o -name *.claude/hooks` を確認、2026-10-12）。
+      # ローカルの make shellcheck-scan と同じ対象・同じ重大度で回す
+      # （Makefile の SHELLCHECK_TARGETS）。
+      #
+      # 以前は ludeeus/action-shellcheck に additional_files: '.claude/hooks' を
+      # 渡していたが、このアクションは additional_files を ./scripts の中での
+      # find -name のパターンとして扱うため、**.claude/hooks/ は検査されて
+      # いなかった**（CI ログで `-o -name *.claude/hooks` を確認、2026-10-12）。
+      #
+      # shellcheck は版をダイジェストで固定したイメージで動かす
+      # （Makefile のフォールバックと同じ koalaman/shellcheck）。
+      # ランナーにプリインストールの shellcheck は版が勝手に変わる。
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
-        with:
-          additional_files: '.claude/hooks'
-          scandir: './scripts'
-          severity: warning
-          ignore_paths: build output
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${PWD}:/mnt" -w /mnt \
+            koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d \
+            --severity=warning \
+            scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 
   # pytest はビルド結果に依存しないので matrix から外す。
   # 以前は build ジョブの make test と独立した test ジョブの両方で
