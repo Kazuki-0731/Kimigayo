@@ -234,6 +234,21 @@ docker run --rm ghcr.io/sigstore/cosign/cosign:v3.0.6 verify "ishinokazuki/kimig
 （v3.0.2 で確認。ログインは通るが説明文の書き換え権限が無い）。
 ユーザーに Web から貼ってもらうか、説明文を書き換えられる権限のトークンを用意してもらう。
 
+**貼ってもらったら、全文が一致するかを確かめる**（説明文の読み取りに権限は要らない）:
+
+```bash
+curl -s https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/ |
+    python3 -I -c 'import json,sys; print(json.load(sys.stdin)["full_description"])' |
+    diff <(sed 's/[[:space:]]*$//' DOCKERHUB_README.md) <(sed 's/[[:space:]]*$//' -) &&
+    echo "Overview は DOCKERHUB_README.md と一致"
+```
+
+> 2026-10-12 まで、Docker Hub には未マージのブランチ
+> （`docs/update-readme-hybrid-approach`）で書いた 2026-01 の版が載ったままで、
+> `main` 側で 10 回直した内容が一度も届いていなかった
+> （カーネル 6.6.11・seccomp を既定で有効・`stable` タグなど、実態と違う記述が公開されていた）。
+> 説明文が変わるのは誰かが貼ったときだけなので、定期実行は要らない。リリースのたびにここで見る。
+
 **`latest` 系も含めて確認します。** `sign` ジョブはタグを全部並べて
 ダイジェストに解決し、重複を落としてから署名します。
 **新しいタグを `create-manifest` に足したら `sign` の `tags` にも足すこと。**
