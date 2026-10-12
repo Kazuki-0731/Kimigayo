@@ -99,7 +99,8 @@ ENV TZ=Asia/Tokyo
 ```
 
 ゾーン一式が必要なら `/usr/share/zoneinfo/` ごと `COPY` しますが、
-数 MB 増えてイメージサイズが倍以上になります。**使うゾーンだけに絞るのが
+約 0.45MB 増えます（arm64 の Standard 3.0.2 で 2.98MB → 3.43MB。
+Alpine 3.24 の tzdata を使い 2026-10-12 に測定）。**使うゾーンだけに絞るのが
 この OS の趣旨に合います。**
 
 ### ロケールの設定
@@ -223,7 +224,9 @@ CMD ["/sbin/init"]
 ```
 
 **権限が足りない処理は失敗しますが、起動そのものは続行します。**
-通常の `docker run` では次がログに出ます（いずれも無害です）。
+通常の `docker run` では次がログに出ます（いずれも無害です。
+`/run` のマウントに失敗したときは `* Can't continue.` とも出ますが、
+実際には続行して `default` ランレベルまで進みます）。
 
 | ログ | 理由 |
 |------|------|
@@ -334,8 +337,11 @@ docker exec -it myapp /bin/sh
 ### ユーザーと権限
 
 **`sudo` と `wheel` グループはありません。** `/etc/group` に `wheel` が
-無いので `adduser username wheel` は失敗します。root からの降格には
-BusyBox の `su`、実行ユーザーの指定にはコンテナのオプションを使います。
+無いので `adduser username wheel` は失敗します。実行ユーザーの指定には
+コンテナのオプションを使います。`su` は root から権限を落とすときだけ使えます
+（`su -s /bin/sh -c '<コマンド>' nobody`。`nobody` のログインシェルは
+`/sbin/nologin` なので `-s` が要ります）。`busybox` は setuid されていないので、
+非 root から `su` で root になることはできません。
 
 ```bash
 # 非 root で実行する
@@ -393,8 +399,9 @@ free -m
 top
 ```
 
-**`ps aux --sort=-%mem` は使えません**（BusyBox の `ps` は `--sort` を
-解しません）。`top` を使うか、ホストから `docker stats` を見てください。
+**Minimal と Standard では `ps aux` は使えません**（BusyBox の `ps` が `aux`・`-o` を
+受け付けません。Extended は受け付けますが、`--sort` はどのバリアントにもありません）。
+`top` を使うか、ホストから `docker stats` を見てください。
 
 ### 一時ファイルを RAM に置く
 
@@ -407,7 +414,8 @@ docker run -it --tmpfs /tmp:rw,noexec,nosuid,size=64m \
 
 ```bash
 df -h
-find / -xdev -type f -size +10M -exec ls -lh {} \;
+# BusyBox の find は M 単位を受け付けないので k で書く
+find / -xdev -type f -size +10240k -exec ls -lh {} \;
 ```
 
 **`logrotate` は入っていません。** ログは `docker logs` 側で扱い、
@@ -422,7 +430,7 @@ docker run -d --log-opt max-size=10m --log-opt max-file=3 \
 
 **イメージを軽くしても起動は速くなりません。** v3.0.2 の実測は
 `docker run` が 0.60 秒ですが、同じ条件で Alpine・Ubuntu 24.04 とも
-0.59 秒で、**100MB の Ubuntu と差がありません**。
+0.59 秒で、**Ubuntu（arm64 で約 100MB）と差がありません**。
 測っている時間のほとんどがコンテナランタイム自身の処理なので、
 イメージの中身はほとんど効きません。
 
