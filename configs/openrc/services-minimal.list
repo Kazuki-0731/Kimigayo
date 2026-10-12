@@ -1,5 +1,7 @@
 # Kimigayo OS - Minimal Service Configuration
 # コンテナ環境向け最小サービスリスト
+# ビルドでは使われていない（どこからも読まれていない）。イメージの
+# /etc/runlevels とも一致しない（mdev・urandom はイメージに無い）。
 
 # === sysinit ランレベル ===
 # システム初期化に必須のサービスのみ

@@ -1,5 +1,7 @@
 # Kimigayo OS - Extended Service Configuration
 # フル機能コンテナ環境向けサービスリスト
+# ビルドでは使われていない（どこからも読まれていない）。イメージの
+# /etc/runlevels とも一致しない（mdev・udev・urandom・syslog・networking・crond・dbus・iptables・sshd はイメージに無い）。
 
 # === sysinit ランレベル ===
 devfs

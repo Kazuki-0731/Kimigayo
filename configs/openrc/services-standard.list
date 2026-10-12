@@ -1,5 +1,7 @@
 # Kimigayo OS - Standard Service Configuration
 # 標準的なコンテナ環境向けサービスリスト
+# ビルドでは使われていない（どこからも読まれていない）。イメージの
+# /etc/runlevels とも一致しない（mdev・urandom・syslog・networking・crond はイメージに無い）。
 
 # === sysinit ランレベル ===
 devfs

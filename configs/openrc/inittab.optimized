@@ -1,5 +1,6 @@
-# Kimigayo OS - Optimized inittab for Containers
-# パフォーマンス最適化版
+# Kimigayo OS - inittab for Containers
+# ビルドでは使われていない。イメージの /etc/inittab は scripts/build-rootfs.sh の
+# heredoc が作る（エントリはここと同じ）。
 
 # システム初期化
 ::sysinit:/sbin/openrc sysinit
