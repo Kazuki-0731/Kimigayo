@@ -111,7 +111,7 @@ cat "$ROOTFS/.kimigayo-build-info"
 **まず `scripts/verify-image.sh <image> <variant> <arch>` を回します。**
 次の4つはそこに入っており、手で再現しなくてよい:
 
-- **全 ELF の強化**（PIE / RELRO / BIND_NOW / 非実行スタック）。
+- **全 ELF の強化**（PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護）。
   BusyBox だけでなく OpenRC・librc・libeinfo・libc.so も見る
   （`scripts/check-elf-hardening.py`。v3.0.1 では 29 個）
 - **出荷物の版と `versions.mk` の突合**。バイナリを実行して読む
