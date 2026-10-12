@@ -60,7 +60,6 @@ def cross_compile_configs(draw):
 
 
 # **Feature: kimigayo-os-core, Property 16: マルチアーキテクチャサポート**
-# **検証対象: 要件 5.1**
 @pytest.mark.property
 @given(arch=architectures)
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -92,7 +91,6 @@ def test_multi_architecture_support(arch, tmp_path):
 
 
 # **Feature: kimigayo-os-core, Property 17: クロスアーキテクチャ機能一貫性**
-# **検証対象: 要件 5.2**
 @pytest.mark.property
 @given(
     arch1=architectures,

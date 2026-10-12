@@ -3,7 +3,9 @@ Unit Tests for Memory Usage Measurement
 
 Tests memory usage measurement and optimization.
 
-Design Goal: RAM consumption under 128MB
+旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
+
+テストは src/benchmark/memory_benchmark.py（モック）の判定ロジックを見ている。
 """
 
 import pytest
@@ -185,13 +187,13 @@ class TestMemoryProfiler:
         profiler = MemoryProfiler()
 
         assert profiler is not None
-        assert profiler.target_mb == 128.0  # Design goal
+        assert profiler.target_mb == 128.0  # 旧設計目標（現在の仕様には無い）
 
     def test_memory_target_is_128mb(self):
         """
         Test: Memory target is 128MB
 
-        Design Goal: RAM consumption under 128MB
+        旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
         """
         profiler = MemoryProfiler()
 
@@ -641,7 +643,7 @@ class TestMemoryTargetCompliance:
         """
         Test: 128MB target is enforced
 
-        Design Goal: RAM consumption under 128MB
+        旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
         """
         profiler = MemoryProfiler()
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Task 23.1 - Automatic Startup Test Script
+# Automatic Startup Test Script
 # Tests Docker container startup, measures boot time and memory usage
 #
 
@@ -21,8 +21,10 @@ NC='\033[0m' # No Color
 IMAGE_NAME="${IMAGE_NAME:-kimigayo-os:minimal-latest}"
 CONTAINER_NAME="kimigayo-test-$$"
 TEST_TIMEOUT=30
-TARGET_BOOT_TIME=10  # Target: < 10 seconds
-TARGET_MEMORY_MB=128 # Target: < 128 MB
+# Former design goals (not in the current SPECIFICATION.md). The measured
+# startup time is mostly Docker's container creation, not the image.
+TARGET_BOOT_TIME=10  # Former goal: < 10 seconds
+TARGET_MEMORY_MB=128 # Former goal: < 128 MB
 
 # Test results
 TESTS_PASSED=0
@@ -64,7 +66,7 @@ echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════╗
 ║   Kimigayo OS - Startup Test         ║
-║   Task 23.1: Automatic Test Script   ║
+║   Automatic Test Script              ║
 ╚═══════════════════════════════════════╝
 EOF
 echo -e "${NC}"
@@ -116,10 +118,9 @@ section "Test 2: Container Startup Test"
 info "Starting container..."
 START_TIME=$(date +%s.%N)
 
-# On macOS with QEMU emulation, the musl binary may not work
-# In this case, we test using Alpine base for validation
+# On macOS the runtime tests are skipped (this script was written for Linux CI)
 if [ "$PLATFORM" = "macOS" ]; then
-    info "macOS detected - skipping container runtime tests (QEMU emulation issues)"
+    info "macOS detected - skipping container runtime tests"
     info "These tests are designed to run on Linux (e.g., GitHub Actions CI)"
 
     # Still record a nominal boot time for the image pull/start

@@ -2,7 +2,6 @@
 Property 25: Service Failure Handling
 
 Verifies that the init system properly logs failures and attempts recovery.
-Testing requirement 7.3.
 """
 
 import pytest

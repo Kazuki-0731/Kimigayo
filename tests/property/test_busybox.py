@@ -46,7 +46,6 @@ def busybox_configs(draw):
 
 
 # **Feature: kimigayo-os-core, Property 3: 必須ユーティリティ完全性**
-# **検証対象: 要件 1.4**
 @pytest.mark.property
 @given(config=busybox_configs())
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])

@@ -2,7 +2,6 @@
 Property 24: Service Dependency Order
 
 Verifies that the init system starts services in correct dependency order.
-Testing requirement 7.2.
 """
 
 import pytest

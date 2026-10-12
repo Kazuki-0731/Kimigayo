@@ -42,7 +42,6 @@ def build_configurations(draw):
 
 
 # **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
-# **検証対象: 要件 1.1**
 @pytest.mark.property
 @given(build_config=build_configurations())
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])

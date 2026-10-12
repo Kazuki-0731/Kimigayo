@@ -4,7 +4,9 @@ Property Tests for Memory Usage Optimization
 Tests memory monitoring, optimization, and resource limits.
 
 Properties tested:
-- Property 2: メモリ使用量制約 (Memory Usage Constraint) - 要件 1.2
+- Property 2: メモリ使用量制約 (Memory Usage Constraint)
+
+128MB は旧設計目標（現在の仕様には無い）。テストはモックの判定ロジックを見ている。
 """
 
 import pytest
@@ -27,8 +29,6 @@ class TestMemoryUsageConstraint:
     Property 2: メモリ使用量制約
 
     任意のシステム設定に対して、通常動作時のRAM消費量は128MB未満でなければならない
-
-    Requirement: 1.2
     """
 
     def test_memory_usage_creation(self):
@@ -72,13 +72,13 @@ class TestMemoryUsageConstraint:
         monitor = MemoryMonitor()
 
         assert monitor is not None
-        assert monitor.memory_limit_mb == 128  # Requirement: 1.2
+        assert monitor.memory_limit_mb == 128  # 旧設計目標（現在の仕様には無い）
 
     def test_memory_limit_is_128mb(self):
         """
         Test: Memory limit is set to 128MB
 
-        Requirement 1.2: RAM consumption must be under 128MB
+        RAM consumption must be under 128MB
         """
         monitor = MemoryMonitor()
 
@@ -88,7 +88,7 @@ class TestMemoryUsageConstraint:
         """
         Test: Can check if memory usage is within limit
 
-        Requirement 1.2: Verify RAM consumption under 128MB
+        Verify RAM consumption under 128MB
         """
         monitor = MemoryMonitor()
 
@@ -384,7 +384,7 @@ class TestMemoryManager:
         """
         Test: Can verify memory constraint
 
-        Requirement 1.2: Verify RAM consumption under 128MB
+        Verify RAM consumption under 128MB
         """
         manager = MemoryManager()
 
@@ -455,7 +455,7 @@ class TestMemoryConstraintCompliance:
         """
         Test: 128MB limit is defined as constant
 
-        Requirement 1.2: 128MB is the hard limit
+        128MB is the hard limit
         """
         monitor = MemoryMonitor()
 

@@ -4,8 +4,8 @@ Property Tests for Service Control System
 Tests service startup control and management commands.
 
 Properties tested:
-- Property 12: サービス起動制御 (Service Startup Control) - 要件 3.4
-- Property 27: サービス管理コマンド (Service Management Commands) - 要件 7.5
+- Property 12: サービス起動制御 (Service Startup Control)
+- Property 27: サービス管理コマンド (Service Management Commands)
 """
 
 import pytest
@@ -28,8 +28,6 @@ class TestServiceStartupControl:
     Property 12: サービス起動制御
 
     任意のサービス設定に対して、明示的に有効化されたサービスのみが起動されなければならない
-
-    Requirement: 3.4
     """
 
     def test_service_config_creation(self):
@@ -62,7 +60,7 @@ class TestServiceStartupControl:
         """
         Test: Only explicitly enabled services are in enabled list
 
-        Requirement 3.4: Only explicitly enabled services should start
+        Only explicitly enabled services should start
         """
         manager = ServiceManager()
 
@@ -150,7 +148,7 @@ class TestServiceStartupControl:
         """
         Test: Disabled services are never started automatically
 
-        Critical test for Requirement 3.4
+        Critical test: only explicitly enabled services start
         """
         manager = ServiceManager()
 
@@ -172,8 +170,6 @@ class TestServiceManagementCommands:
 
     任意のサービスに対して、Init_Systemは開始、停止、再起動、ステータス操作の
     ためのコマンドを提供しなければならない
-
-    Requirement: 7.5
     """
 
     def test_start_command_available(self):

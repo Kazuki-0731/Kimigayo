@@ -130,7 +130,7 @@ def size_constraints():
         "minimal": 5 * 1024 * 1024,      # 5 MB
         "standard": 15 * 1024 * 1024,    # 15 MB
         "extended": 50 * 1024 * 1024,    # 50 MB
-        "ram_minimum": 128 * 1024 * 1024,  # 128 MB
+        "ram_minimum": 128 * 1024 * 1024,  # 128 MB（旧設計目標（現在の仕様には無い））
     }
 
 

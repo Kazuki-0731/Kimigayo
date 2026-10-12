@@ -6,6 +6,9 @@ Tests QEMU/KVM and VirtualBox deployment functionality.
 Target Environments:
 - QEMU/KVM
 - VirtualBox
+
+テストしているのは src/integration/virtualization_test.py（ホスト環境を調べるモック）。
+VM での起動は対象外（成果物は Docker イメージのみ）。
 """
 
 import pytest

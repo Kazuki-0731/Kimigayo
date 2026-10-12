@@ -2,7 +2,6 @@
 Property 26: System Shutdown Processing
 
 Verifies that system shutdown stops all services gracefully and unmounts filesystems.
-Testing requirement 7.4.
 """
 
 import pytest

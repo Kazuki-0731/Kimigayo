@@ -6,6 +6,9 @@ Tests physical hardware deployment functionality.
 Target Environments:
 - x86_64 bare metal
 - ARM64 devices
+
+テストしているのは src/integration/baremetal_test.py（ホスト環境を調べるモック）。
+ベアメタル・組み込み・IoT は対象外（2026-10-10 決定）。
 """
 
 import pytest
@@ -511,8 +514,8 @@ class TestBaremetalEnvironmentCompliance:
         """
         Test: x86_64 is supported
 
-        Requirement 5.1: x86_64 support
-        Target Environment: Bare metal servers
+        x86_64 support
+        Target Environment: Bare metal servers（対象外）
         """
         assert Architecture.X86_64.value == "x86_64"
 
@@ -520,8 +523,8 @@ class TestBaremetalEnvironmentCompliance:
         """
         Test: ARM64 is supported
 
-        Requirement 5.1: ARM64 support
-        Target Environment: Embedded devices, IoT
+        ARM64 support
+        Target Environment: Embedded devices, IoT（対象外）
         """
         assert Architecture.ARM64.value == "aarch64"
 
@@ -529,7 +532,7 @@ class TestBaremetalEnvironmentCompliance:
         """
         Test: Server hardware type is defined
 
-        Target Environment: Bare metal servers
+        Target Environment: Bare metal servers（対象外）
         """
         assert HardwareType.SERVER.value == "server"
 
@@ -537,7 +540,7 @@ class TestBaremetalEnvironmentCompliance:
         """
         Test: Embedded hardware type is defined
 
-        Target Environment: Embedded devices
+        Target Environment: Embedded devices（対象外）
         """
         assert HardwareType.EMBEDDED.value == "embedded"
 
@@ -545,6 +548,6 @@ class TestBaremetalEnvironmentCompliance:
         """
         Test: IoT hardware type is defined
 
-        Target Environment: IoT devices
+        Target Environment: IoT devices（対象外）
         """
         assert HardwareType.IOT.value == "iot"

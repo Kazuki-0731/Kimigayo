@@ -3,7 +3,9 @@ Unit Tests for Boot Time Measurement
 
 Tests boot time measurement and optimization.
 
-Design Goal: Boot time under 10 seconds
+旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
+
+テストは src/benchmark/boot_time.py（モック）の判定ロジックを見ている。
 """
 
 import pytest
@@ -102,13 +104,13 @@ class TestBootTimer:
         timer = BootTimer()
 
         assert timer is not None
-        assert timer.boot_target_seconds == 10.0  # Design goal
+        assert timer.boot_target_seconds == 10.0  # 旧設計目標（現在の仕様には無い）
 
     def test_boot_target_is_10_seconds(self):
         """
         Test: Boot target is 10 seconds
 
-        Design Goal: Boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
         """
         timer = BootTimer()
 
@@ -162,7 +164,7 @@ class TestBootTimer:
         """
         Test: Can check if boot time meets target
 
-        Design Goal: Verify boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Verify boot time under 10 seconds
         """
         timer = BootTimer()
 
@@ -317,7 +319,7 @@ class TestBootBenchmark:
         """
         Test: Can verify boot target
 
-        Design Goal: Verify boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Verify boot time under 10 seconds
         """
         measurements = [
             BootMeasurement("phase1", 0.0, 8.0, 8.0)
@@ -450,7 +452,7 @@ class TestBootTargetCompliance:
         """
         Test: 10 second target is enforced
 
-        Design Goal: Boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
         """
         timer = BootTimer()
 

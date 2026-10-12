@@ -4,8 +4,8 @@ Property Tests for Modular System Configuration
 Tests kernel module selection and component management.
 
 Properties tested:
-- Property 9: カーネルモジュール選択柔軟性 (Kernel Module Selection Flexibility) - 要件 3.1
-- Property 10: コンポーネント動的管理 (Dynamic Component Management) - 要件 3.2
+- Property 9: カーネルモジュール選択柔軟性 (Kernel Module Selection Flexibility)
+- Property 10: コンポーネント動的管理 (Dynamic Component Management)
 """
 
 import pytest
@@ -32,8 +32,6 @@ class TestKernelModuleSelectionFlexibility:
 
     任意のモジュール選択に対して、Build_Systemは個別のカーネルモジュール選択を
     許可しなければならない
-
-    Requirement: 3.1
     """
 
     def test_kernel_module_creation(self):
@@ -132,8 +130,6 @@ class TestDynamicComponentManagement:
 
     任意のCore_Utilitiesコンポーネントに対して、システム設定時の追加・削除操作が
     正常に動作しなければならない
-
-    Requirement: 3.2
     """
 
     def test_component_creation(self):

@@ -5,6 +5,9 @@ Tests the integration of:
 - Linux Kernel (hardened)
 - musl libc
 - BusyBox utilities
+
+いずれも src/ のモック／参考実装を組み合わせたテスト。実際のビルドは scripts/build-*.sh で、
+カーネルはイメージに入らず、BusyBox は動的リンク（BUSYBOX_LINK、既定 dynamic）。
 """
 
 import pytest
@@ -63,7 +66,7 @@ def test_kernel_musl_busybox_integration_x86_64(tmp_path):
         busybox_result.size_bytes
     )
 
-    # Minimal system should be under 2MB
+    # モックの合計サイズの確認（実際のイメージにカーネルは入らない）
     assert total_size < 2 * 1024 * 1024, (
         f"Minimal system too large: {total_size} bytes"
     )

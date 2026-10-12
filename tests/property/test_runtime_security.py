@@ -4,7 +4,7 @@ Property Tests for Runtime Security Enforcement
 Tests ASLR and DEP enforcement at runtime.
 
 Properties tested:
-- Property 5: ランタイムセキュリティ強制 (Runtime Security Enforcement) - 要件 2.2
+- Property 5: ランタイムセキュリティ強制 (Runtime Security Enforcement)
 """
 
 import pytest
@@ -27,8 +27,6 @@ class TestRuntimeSecurityEnforcement:
     Property 5: ランタイムセキュリティ強制
 
     任意のシステム起動に対して、ASLRとDEPがランタイムで強制されなければならない
-
-    Requirement: 2.2
     """
 
     def test_security_enforcer_initialization(self):
@@ -60,7 +58,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Security status contains ASLR and DEP information
 
-        Requirement 2.2: Must check both ASLR and DEP
+        Must check both ASLR and DEP
         """
         enforcer = RuntimeSecurityEnforcer()
         status = enforcer.get_security_status()
@@ -81,7 +79,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Runtime security verification checks ASLR and DEP
 
-        Requirement 2.2: Both ASLR and DEP must be verified
+        Both ASLR and DEP must be verified
         """
         enforcer = RuntimeSecurityEnforcer()
 
@@ -122,7 +120,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Security policy can be enforced
 
-        Requirement 2.2: Security policy must be enforceable
+        Security policy must be enforceable
         """
         enforcer = RuntimeSecurityEnforcer()
 
@@ -166,7 +164,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Can check ASLR for current process
 
-        Requirement 2.2: Runtime monitoring capability
+        Runtime monitoring capability
         """
         import os
         checker = ProcessSecurityChecker()
@@ -182,7 +180,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Can check stack NX for current process
 
-        Requirement 2.2: DEP enforcement checking
+        DEP enforcement checking
         """
         import os
         checker = ProcessSecurityChecker()
@@ -215,7 +213,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Security policy can be applied
 
-        Requirement 2.2: Runtime security policy application
+        Runtime security policy application
         """
         manager = SecurityPolicyManager()
 
@@ -228,7 +226,7 @@ class TestRuntimeSecurityEnforcement:
         """
         Test: Security policy compliance can be verified
 
-        Requirement 2.2: Policy verification
+        Policy verification
         """
         manager = SecurityPolicyManager()
 
@@ -266,7 +264,7 @@ class TestASLREnforcement:
         """
         Test: ASLR can be enabled programmatically
 
-        Requirement 2.2: ASLR must be enforceable
+        ASLR must be enforceable
         """
         enforcer = RuntimeSecurityEnforcer()
 
@@ -299,7 +297,7 @@ class TestDEPEnforcement:
         """
         Test: DEP check examines CPU features
 
-        Requirement 2.2: DEP must be checked at runtime
+        DEP must be checked at runtime
         """
         enforcer = RuntimeSecurityEnforcer()
 
@@ -312,7 +310,7 @@ class TestDEPEnforcement:
         """
         Test: Binary NX bit can be checked
 
-        Requirement 2.2: Verify DEP enforcement in binaries
+        Verify DEP enforcement in binaries
         """
         enforcer = RuntimeSecurityEnforcer()
 
@@ -356,7 +354,7 @@ class TestSecurityStatusReporting:
         """
         Test: Status includes error information
 
-        Requirement 2.2: Security violations must be reported
+        Security violations must be reported
         """
         enforcer = RuntimeSecurityEnforcer()
         status = enforcer.get_security_status()

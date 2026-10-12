@@ -45,7 +45,6 @@ def reproducible_build_configs(draw):
 
 
 # **Feature: kimigayo-os-core, Property 19: 再現可能ビルド一貫性**
-# **検証対象: 要件 6.1**
 @pytest.mark.property
 @pytest.mark.slow
 @given(config=reproducible_build_configs())
@@ -93,7 +92,6 @@ def test_reproducible_build_consistency(config, tmp_path):
 
 
 # **Feature: kimigayo-os-core, Property 20: 環境独立ビルド**
-# **検証対象: 要件 6.2**
 @pytest.mark.property
 @pytest.mark.slow
 @given(config=reproducible_build_configs())
@@ -201,7 +199,6 @@ def test_reproducible_build_size_consistency(config, tmp_path):
 
 
 # **Feature: kimigayo-os-core, Property 21: ビルド依存関係記録**
-# **検証対象: 要件 6.3**
 @pytest.mark.property
 @given(
     dep_name=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Nd', 'Pd'))),
@@ -262,7 +259,6 @@ def test_automatic_dependency_recording():
 
 
 # **Feature: kimigayo-os-core, Property 22: ビルド検証機能**
-# **検証対象: 要件 6.4**
 @pytest.mark.property
 @given(config=reproducible_build_configs())
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -288,7 +284,6 @@ def test_build_cryptographic_verification(config, tmp_path):
 
 
 # **Feature: kimigayo-os-core, Property 23: ビルドメタデータ包含**
-# **検証対象: 要件 6.5**
 @pytest.mark.property
 @given(arch=st.sampled_from(Architecture), image_type=st.sampled_from(ImageType))
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])

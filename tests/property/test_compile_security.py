@@ -4,7 +4,7 @@ Property Tests for Compile-time Security Hardening
 Tests compile-time security flag application and verification.
 
 Properties tested:
-- Property 4: セキュリティ強化適用 (Security Hardening Application) - 要件 2.1
+- Property 4: セキュリティ強化適用 (Security Hardening Application)
 """
 
 import pytest
@@ -30,8 +30,6 @@ class TestSecurityHardeningApplication:
 
     任意のシステムコンポーネントに対して、コンパイル時にPIE、スタック保護、
     FORTIFY_SOURCEが有効化されなければならない
-
-    Requirement: 2.1
     """
 
     def test_security_flags_creation(self):
@@ -47,7 +45,7 @@ class TestSecurityHardeningApplication:
         """
         Test: PIE flags are present
 
-        Requirement 2.1: PIE must be enabled at compile time
+        PIE must be enabled at compile time
         """
         flags = SecurityFlags()
 
@@ -61,7 +59,7 @@ class TestSecurityHardeningApplication:
         """
         Test: Stack protection flags are present
 
-        Requirement 2.1: Stack protection must be enabled
+        Stack protection must be enabled
         """
         flags = SecurityFlags()
 
@@ -75,7 +73,7 @@ class TestSecurityHardeningApplication:
         """
         Test: FORTIFY_SOURCE flags are present
 
-        Requirement 2.1: FORTIFY_SOURCE must be enabled
+        FORTIFY_SOURCE must be enabled
         """
         flags = SecurityFlags()
 
@@ -114,7 +112,7 @@ class TestSecurityHardeningApplication:
         """
         Test: Standard security level has all required flags
 
-        Requirement 2.1: All required security features must be present
+        All required security features must be present
         """
         flags = SecurityFlags.from_level(SecurityLevel.STANDARD)
 
@@ -142,7 +140,7 @@ class TestSecurityHardeningApplication:
         """
         Test: Can get required security flags
 
-        Requirement 2.1: Required flags must be accessible
+        Required flags must be accessible
         """
         manager = SecurityHardeningManager()
         required = manager.get_required_flags()
@@ -289,7 +287,7 @@ class TestBinarySecurityVerification:
         """
         Test: Can verify required security features
 
-        Requirement 2.1: Verify required features in binaries
+        Verify required features in binaries
         """
         verifier = BinarySecurityVerifier()
 
@@ -456,7 +454,7 @@ class TestSecurityConfigManager:
         """
         Test: Can verify build meets security requirements
 
-        Requirement 2.1: Build-time verification
+        Build-time verification
         """
         # Create test binary with security features
         with tempfile.NamedTemporaryFile(delete=False, suffix='.elf') as f:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Task 23.2 - Functionality Test Script
-# Tests BusyBox commands, network functionality, and package manager
+# Functionality Test Script
+# Tests BusyBox commands, network functionality, and that no package manager is shipped
 #
 
 set -uo pipefail
@@ -62,7 +62,7 @@ echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════╗
 ║   Kimigayo OS - Functionality Test   ║
-║   Task 23.2: Feature Testing         ║
+║   Feature Testing                    ║
 ╚═══════════════════════════════════════╝
 EOF
 echo -e "${NC}"
@@ -188,17 +188,17 @@ else
         if timeout 5 docker exec "$CONTAINER_NAME" /bin/sh -c "ping -c 1 127.0.0.1" >/dev/null 2>&1; then
             pass "Loopback ping works"
         else
-            info "Loopback ping not available (expected in minimal image)"
+            info "Loopback ping failed (ping needs the NET_RAW capability)"
         fi
     else
-        info "ping command not available (expected in minimal image)"
+        info "ping command not available"
     fi
 
     # Check if network interfaces can be listed
     if docker exec "$CONTAINER_NAME" /bin/sh -c "command -v ip >/dev/null 2>&1 || command -v ifconfig >/dev/null 2>&1"; then
         pass "Network interface tools available"
     else
-        info "Network interface tools not available (expected in minimal image)"
+        info "Network interface tools not available"
     fi
 fi
 

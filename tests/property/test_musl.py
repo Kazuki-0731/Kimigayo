@@ -51,7 +51,6 @@ def musl_configs(draw):
 
 
 # **Feature: kimigayo-os-core, Property 28: musl libc使用**
-# **検証対象: 要件 8.2**
 @pytest.mark.property
 @given(config=musl_configs())
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -81,7 +80,6 @@ def test_musl_libc_usage(config, tmp_path):
 
 
 # **Feature: kimigayo-os-core, Property 29: リンクオプションサポート**
-# **検証対象: 要件 8.3**
 @pytest.mark.property
 @given(
     link_mode=link_modes,

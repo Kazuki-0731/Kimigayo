@@ -2,7 +2,6 @@
 Property 7: Service Security Application
 
 Verifies that namespace isolation and seccomp-BPF filtering are applied to services.
-Testing requirement 2.4.
 """
 
 import pytest

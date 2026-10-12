@@ -4,7 +4,9 @@ Unit Tests for Storage Optimization
 Tests storage monitoring, optimization, and efficiency.
 
 Requirements:
-- 1.5: Storage optimization - Minimum storage requirement 512MB
+- Storage optimization - Minimum storage requirement 512MB
+
+512MB は旧設計目標（現在の仕様には無い）。テストはモックの判定ロジックを見ている。
 """
 
 import pytest
@@ -88,13 +90,13 @@ class TestStorageMonitor:
         monitor = StorageMonitor()
 
         assert monitor is not None
-        assert monitor.minimum_storage_mb == 512  # Requirement: 1.5
+        assert monitor.minimum_storage_mb == 512  # 旧設計目標（現在の仕様には無い）
 
     def test_minimum_storage_is_512mb(self):
         """
         Test: Minimum storage is set to 512MB
 
-        Requirement 1.5: Minimum storage 512MB
+        Minimum storage 512MB
         """
         monitor = StorageMonitor()
 
@@ -119,7 +121,7 @@ class TestStorageMonitor:
         """
         Test: Can check if storage meets minimum
 
-        Requirement 1.5: Verify minimum storage
+        Verify minimum storage
         """
         monitor = StorageMonitor()
 
@@ -308,7 +310,7 @@ class TestStorageManager:
         """
         Test: Can verify storage requirements
 
-        Requirement 1.5: Verify minimum storage
+        Verify minimum storage
         """
         manager = StorageManager()
 
@@ -400,7 +402,7 @@ class TestStorageRequirements:
         """
         Test: 512MB minimum requirement is enforced
 
-        Requirement 1.5: Minimum storage 512MB
+        Minimum storage 512MB
         """
         monitor = StorageMonitor()
 

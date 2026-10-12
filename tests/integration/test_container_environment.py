@@ -6,6 +6,9 @@ Tests Docker and Kubernetes deployment functionality.
 Target Environments:
 - Docker
 - Kubernetes
+
+テストしているのは src/integration/container_test.py（モック）。そこで使うイメージは
+alpine:latest / nginx:alpine で、Kimigayo のイメージではない。
 """
 
 import pytest
@@ -548,6 +551,6 @@ class TestContainerEnvironmentCompliance:
         """
         Test: Podman runtime is defined
 
-        Target Environment: Podman (alternative)
+        Target Environment: Podman (alternative。enum のみで実装は無い)
         """
         assert ContainerRuntime.PODMAN.value == "podman"

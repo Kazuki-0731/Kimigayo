@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Test service 1: Simple echo service
   echo-service:

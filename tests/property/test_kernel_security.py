@@ -42,7 +42,6 @@ def kernel_configs(draw):
 
 
 # **Feature: kimigayo-os-core, Property 31: カーネルセキュリティ設定**
-# **検証対象: 要件 6.3**
 @pytest.mark.property
 @given(arch=kernel_architectures)
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])

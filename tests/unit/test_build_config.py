@@ -91,7 +91,7 @@ class TestBuildConfig:
 
 
 class TestSystemRequirements:
-    """Unit tests for SystemRequirements class"""
+    """Unit tests for SystemRequirements class（値は旧設計目標（現在の仕様には無い））"""
 
     def test_default_requirements(self):
         """Test default system requirements"""
