@@ -15,7 +15,7 @@ description: リポジトリのドキュメント（とコード内のコメン�
 ## 0. 機械で拾えるものを先に回す
 
 ```bash
-make check-links          # 追跡ファイル基準のリンク切れ
+make check-links          # 追跡ファイル基準のリンク切れ（#見出し も）
 make check-stale-docs     # 一度直した古い記述が戻っていないか（RULES）
 ```
 
