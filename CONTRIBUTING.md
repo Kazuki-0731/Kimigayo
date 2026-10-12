@@ -6,29 +6,30 @@ Kimigayo OSへの貢献に興味を持っていただきありがとうござい
 
 ### 必要な環境
 
-- Docker & Docker Compose
+- Docker（`docker compose` が使えること）
 - Git
-- 最低2GB RAM、4GB推奨
+- Docker に割り当てるメモリ: arm64 のクロスビルドまで回すなら 8GB
+  （`docker-compose.yml` の上限。2GB では OpenRC の `meson setup` が OOM で落ちたことがある）
 
 ### セットアップ手順
 
 1. リポジトリをクローン:
 ```bash
-git clone https://github.com/your-org/Kimigayo.git
+git clone https://github.com/Kazuki-0731/Kimigayo.git
 cd Kimigayo
 ```
 
 2. Docker環境を構築:
 ```bash
-docker-compose build
+make docker-build
 ```
 
-3. コンテナを起動:
+3. コンテナに入る:
 ```bash
-docker-compose run --rm kimigayo-build
+make shell
 ```
 
-4. ビルドシステムをテスト:
+4. ビルドシステムをテスト（コンテナ内で）:
 ```bash
 make test
 ```
@@ -37,11 +38,9 @@ make test
 
 ### ブランチ戦略
 
-- `main`: 安定版リリース
-- `develop`: 開発版
-- `feature/*`: 新機能開発
-- `bugfix/*`: バグ修正
-- `security/*`: セキュリティ修正（優先）
+現在はメンテナー 1 人で、ブランチは `main` だけです（`develop` はありません）。
+外部からの貢献は、fork した上で任意の名前のブランチを切り、`main` に向けて
+Pull Request を出してください。
 
 ### コミットメッセージ
 
@@ -57,8 +56,8 @@ make test
 ```
 
 絵文字は先頭に1つだけで、`✨ feat: ...` のように併記しない。
-このリポジトリの 609 コミットのうち、テキストプレフィックスが
-付いているのは 1 件だけです（それが例外）。
+テキストプレフィックスが付いているコミットは 1 件だけです
+（2026-10-12 時点、723 コミット中。それが例外）。
 
 #### 絵文字の一覧
 
@@ -103,7 +102,7 @@ BusyBox の既定が有効なため、config に書かなければ入ってし�
 ```
 📝 CONTRIBUTING.md のコミット規約を実態に合わせる
 
-テキストプレフィックスは 609 コミット中 1 件しか使われていなかった
+テキストプレフィックスは 1 件しか使われていなかった
 ```
 
 #### CHANGELOG
@@ -125,42 +124,46 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 
 ## コーディング規約
 
-### C言語
+このリポジトリに C のソースはありません（構成要素は上流の tarball に
+パッチを当ててビルドします）。書くのは主にシェルスクリプトと Python です。
 
-- GNU Coding Standards に準拠
-- インデント: 4スペース
-- 関数名: `snake_case`
-- 定数: `UPPER_SNAKE_CASE`
+### シェルスクリプト（`scripts/`）
 
-### Python（テストコード）
+- `#!/bin/bash` と `set -e` / `set -o pipefail` で始める
+- ログは既存のスクリプトと同じ `log_info` / `log_warn` / `log_error`（JST タイムスタンプ付き）を使う。
+  新しいスクリプトは既存の `scripts/*.sh` から雛形を取る
+- `make shellcheck-scan` を通す（CI でも走る）
+- 構成要素のバージョンを直書きしない（`scripts/lib/versions.sh` 経由で `versions.mk` を読む）
+- 失敗を `|| true` や `-Wno-error` で黙らせない
 
-- PEP 8 に準拠
-- インデント: 4スペース
-- 関数名: `snake_case`
-- クラス名: `PascalCase`
+### Python（`src/`・`tests/`）
+
+- PEP 8 に準拠（インデント 4 スペース、関数名 `snake_case`、クラス名 `PascalCase`）
+- テストは pytest。プロパティテストは hypothesis（設定は `tests/conftest.py` のプロファイル）
+- マーカーは `pytest.ini` に定義済みのもの（`unit`・`property`・`integration`・`slow`・`security`）
+  だけを使う（`--strict-markers`）
 
 ### セキュリティ
 
-すべてのコードは以下を満たす必要があります:
-
-- コンパイル時セキュリティフラグの適用
-- 入力検証の実装
-- メモリ安全性の確保
-- バッファオーバーフロー対策
+- コンパイル時の強化フラグ（`scripts/build-{musl,busybox,openrc}.sh`）を緩めない
+- 成果物の強化は `scripts/verify-image.sh` が全 ELF で検査する（PIE・RELRO・BIND_NOW・非実行スタック）
 
 ## テスト
 
 ### プロパティベーステスト
 
-各機能には対応するプロパティテストが必要です:
+新しい機能にはプロパティテストを足してください。実物の例
+（`tests/property/test_build_constraints.py` の抜粋）:
 
 ```python
 # **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
-@given(build_config=build_configurations())
-def test_build_size_constraint(build_config):
-    """任意のビルド設定に対して、生成されるBase_Imageのサイズは5MB未満"""
-    image = build_base_image(build_config)
-    assert image.size_bytes < 5 * 1024 * 1024
+@pytest.mark.property
+@given(build_config=build_configurations())  # 同じファイルで定義した strategy
+def test_build_size_constraint(build_config, tmp_path):
+    """任意のビルド設定に対して、イメージはバリアントの上限未満
+    （MINIMAL 5MB / STANDARD 15MB / EXTENDED 50MB。SPECIFICATION.md §8.3）"""
+    image = build_base_image(build_config, output_dir=tmp_path)
+    assert image.size_bytes < build_config.max_image_size
 ```
 
 ### テスト実行
@@ -183,7 +186,7 @@ make test-integration
 
 ### プルリクエストの作成
 
-1. `develop`ブランチから新しいブランチを作成
+1. fork した上で `main` から新しいブランチを作成
 2. 変更を実装
 3. テストを追加・更新
 4. すべてのテストが通ることを確認
@@ -200,7 +203,8 @@ make test-integration
 
 ## ライセンス
 
-貢献されたコードは、プロジェクトのライセンス（GPLv2/MIT/BSD）に従います。
+ビルドシステム・ドキュメント・テストへの貢献は MIT ライセンスに従います（→ [LICENSE](LICENSE)）。
+上流の構成要素（BusyBox・musl・OpenRC・カーネル）に当てるパッチは、その構成要素のライセンスに従います。
 
 ## サポート
 
