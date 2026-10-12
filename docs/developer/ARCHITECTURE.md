@@ -27,10 +27,8 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 ┌─────────────────────────────────────────────────────────┐
 │                  ユーザー空間                            │
 ├─────────────────────────────────────────────────────────┤
-│         アプリケーション層                               │
-│  - Webサーバー (nginx, apache)                          │
-│  - データベース (PostgreSQL, MySQL)                     │
-│  - コンテナランタイム (Docker, Podman)                  │
+│         アプリケーション層（利用者が持ち込む）           │
+│  - 例: Webサーバー、言語ランタイム、自作バイナリ        │
 ├─────────────────────────────────────────────────────────┤
 │         システムユーティリティ層                         │
 │  - BusyBox (coreutils, findutils, etc.)                │
@@ -44,7 +42,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 ├─────────────────────────────────────────────────────────┤
 │         Cライブラリ層 (musl libc)                       │
 │  - POSIX準拠API                                         │
-│  - 軽量・高速な実装                                     │
+│  - 軽量な実装                                           │
 │  - UTF-8サポート                                        │
 ├═════════════════════════════════════════════════════════┤
 │                  カーネル空間                            │
@@ -105,14 +103,14 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 
 **セキュリティ関連のカーネルパラメータ**:
 
-イメージが**実際に出荷している**のは
-`configs/sysctl/99-kimigayo-performance.conf` の内容で、
-セキュリティに関わるのは次の 3 つだけです。
+イメージが**実際に出荷している**のは `/etc/sysctl.d/99-kimigayo-performance.conf` で、
+中身は `scripts/build-rootfs.sh` が書き出します（リポジトリの
+`configs/sysctl/99-kimigayo-performance.conf` はイメージに入りません）。
+セキュリティに関わるのは次の 2 つだけです。
 
 ```ini
 kernel.randomize_va_space = 2        # ASLR 完全有効化
 fs.suid_dumpable = 0                 # setuid プロセスのコアダンプ禁止
-kernel.core_uses_pid = 1
 ```
 
 > **`kernel.kptr_restrict` / `kernel.dmesg_restrict` /
@@ -129,8 +127,8 @@ kernel.core_uses_pid = 1
 - **overlay**: コンテナのルートファイルシステム（通常はこれ）
 - **tmpfs**: 一時ファイル用メモリファイルシステム
 - **ext4**: ベアメタル／VM でルートに使う場合
-- **squashfs**: 読み取り専用圧縮ファイルシステム（カーネル config では
-  `=m`。minimal / standard の defconfig のみ）
+- **squashfs**: 読み取り専用圧縮ファイルシステム（ビルドで有効になるかは
+  未確認。→ [カーネル設定](#カーネル設定)）
 
 ### 3. Cライブラリ層 (musl libc)
 
@@ -148,7 +146,7 @@ kernel.core_uses_pid = 1
   静的リンクが必要なら `BUSYBOX_LINK=static` でビルドできる
 - **コンパイル時の強化を有効化**: `-fPIE` /
   `-fstack-protector-strong` / `-D_FORTIFY_SOURCE=2` /
-  `-Wl,-z,relro -Wl,-z,now`（`scripts/build-musl.sh`）
+  `-Wl,-z,relro -Wl,-z,now` / `-Wl,-z,noexecstack`（`scripts/build-musl.sh`）
 
 > **「glibc より高速」とは書きません。** musl の malloc は実装が単純で、
 > **マルチスレッドで競合する場面では glibc より遅いことが知られています。**
@@ -206,9 +204,9 @@ command_args="-c /etc/nginx/nginx.conf"
 pidfile="/var/run/nginx.pid"
 
 depend() {
-    need net
+    need localmount
     use dns
-    after firewall
+    after bootmisc
 }
 
 start_pre() {
@@ -235,8 +233,9 @@ networking
 > **これは OpenRC 一般の例で、Kimigayo が同梱しているサービスでは
 > ありません。** `networking` / `firewall` / `sshd` / `ntpd` / `nginx` /
 > `php-fpm` はどれもイメージに入っていません。
-> **自分のサービスの `depend()` に `need net` や `after firewall` と
-> 書くと、依存が解決できず起動しません。**
+> **自分のサービスの `depend()` に `need net` と書くと、`net` を提供する
+> サービスが無いため依存が解決できず起動しません。**
+> （`after` / `use` は順序と任意の依存なので、相手が無くても起動は止まりません。）
 > 同梱しているのは `/etc/init.d/` の 28 個（`localmount`・`netmount`・
 > `sysctl`・`bootmisc`・`local` など）で、`default` ランレベルに
 > 登録されているのは `local` と `netmount` だけです。
@@ -252,7 +251,7 @@ networking
 
 **提供コマンド（一部）**:
 ```bash
-# ファイル操作
+# ファイル操作（less は Minimal に無い）
 ls, cp, mv, rm, mkdir, cat, less, grep, find, tar
 
 # システム管理
@@ -287,12 +286,14 @@ sed, awk, cut, sort, uniq, head, tail
 
 **目的**: ユーザーアプリケーションの実行環境
 
-**サポートされるアプリケーション**:
-- Webサーバー: nginx, Apache
-- データベース: PostgreSQL, MySQL, SQLite
-- 言語ランタイム: Python, Node.js, Ruby, Go
-- コンテナ: Docker, Podman
-- その他: 任意のLinuxアプリケーション
+**イメージに入っているアプリケーションはありません。** 利用者が
+マルチステージビルドで持ち込みます（→ [CUSTOM_BUILD.md](CUSTOM_BUILD.md)、
+動く例は [examples/](../../examples/) の nginx / Node.js / Python）。
+
+- **静的リンクのバイナリ**（Go・Rust の musl ターゲットなど）はそのまま動く
+- **動的リンクのバイナリ**は依存する共有ライブラリも一緒に持ち込む必要がある
+  （イメージにあるのは musl の `libc.so` と OpenRC の `librc` / `libeinfo` だけ）
+- glibc 向けにビルドされたバイナリは動かない
 
 ## コアコンポーネント
 
@@ -303,52 +304,53 @@ sed, awk, cut, sort, uniq, head, tail
 > ベアメタルや VM で使う場合だけです。コンテナでは**ホストの**
 > カーネル設定が効きます。
 
-`src/kernel/config/` の config 断片で**明示している**もの:
+**`scripts/build-kernel.sh` が読む config は `src/kernel/config/<arch>.config`
+だけです。** 手順は次のとおりです。
+
+1. `<arch>.config` があり、プレースホルダ行（`# This is a placeholder`）を
+   含まなければ、それを `.config` にして `olddefconfig` する
+2. そうでなければ上流の defconfig（x86_64 は `x86_64_defconfig`、arm64 は
+   `defconfig`）を使う。追跡中の `x86_64.config` はプレースホルダなので、
+   **今は x86_64 も上流の defconfig です**（arm64 は `arm64.config` が無い）
+3. そのあと `apply_security_hardening` が `scripts/config` で項目を上書きし、
+   もう一度 `olddefconfig` する
+
+`apply_security_hardening` が**意図している**設定:
 
 ```ini
-# セキュリティ機能
-CONFIG_SECURITY=y
-CONFIG_SECURITY_YAMA=y
-
-# ASLR
+# 有効にする
 CONFIG_RANDOMIZE_BASE=y
 CONFIG_RANDOMIZE_MEMORY=y
+CONFIG_SECURITY=y
+CONFIG_SECURITY_DMESG_RESTRICT=y
+CONFIG_HARDENED_USERCOPY=y
+CONFIG_FORTIFY_SOURCE=y
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+CONFIG_PANIC_ON_OOPS=y         # PANIC_TIMEOUT=10
 
-# Namespace isolation
-CONFIG_NAMESPACES=y
-CONFIG_PID_NS=y
-CONFIG_NET_NS=y
-CONFIG_USER_NS=y
-
-# ファイルシステム
-CONFIG_EXT4_FS=y
-CONFIG_OVERLAY_FS=y
-CONFIG_TMPFS=y
-CONFIG_SQUASHFS=y        # minimal / standard のみ
-
-# ネットワーク
-CONFIG_NETFILTER=y
-CONFIG_IP_NF_IPTABLES=y
+# 無効にする
+# CONFIG_NETFILTER / NETFILTER_ADVANCED / NETFILTER_XTABLES
+# CONFIG_IP_NF_IPTABLES / IP6_NF_IPTABLES / BRIDGE_NETFILTER
+# CONFIG_RETPOLINE（x86_64 のみ）
 ```
 
-**`defconfig` の既定で有効になっているもの**（こちらの config 断片には
-書いていないが、ビルド結果の `.config` では `y`。カーネル 6.18.55 で確認）:
+> **実際にビルドされた `.config` でこれらが効いているかは未確認です。**
+> 手元に残っている 6.18.55 の `.config` は上の意図と食い違っており
+> （`CONFIG_NETFILTER=y`・`# CONFIG_SECURITY_DMESG_RESTRICT is not set`）、
+> 上書きが効いていないのか、途中で止まった実行の残骸なのかを確かめていません。
+> 確かめるには `manual-build.yml` を `build_kernel=true` で回し、
+> `build/kernel/output/config-<version>-<arch>` を読みます。
+> 6.18 では `RETPOLINE` が `MITIGATION_RETPOLINE` に改名されているため、
+> 無効化が効いていない可能性もあります。
 
-```ini
-CONFIG_SECCOMP=y
-CONFIG_SECCOMP_FILTER=y
-CONFIG_UTS_NS=y
-CONFIG_IPC_NS=y
-CONFIG_NETFILTER_XTABLES=y
-```
-
-> **BusyBox と同じで、カーネル config も「書かないと既定値が入る」。**
-> 上の 5 つは意図して選んだものではなく、既定で付いてきています。
-> 上流が既定を変えれば黙って消えるので、**保証として引かないこと。**
-
-**`CONFIG_SECURITY_DMESG_RESTRICT` は無効です**
-（ビルド結果は `# CONFIG_SECURITY_DMESG_RESTRICT is not set`）。
-`kernel.dmesg_restrict` を sysctl で設定する方針のためです。
+> **`src/kernel/config/` のほかのファイルはビルドで使われていません。**
+> `minimal-x86_64.config` / `standard-x86_64.config` /
+> `extended-x86_64.config` / `kimigayo_x86_64_defconfig` /
+> `kimigayo_arm64_defconfig` はどのスクリプトからも参照されていません。
+> そこに書かれた `CONFIG_SECURITY_YAMA=y`・`CONFIG_USER_NS=y`・
+> `CONFIG_OVERLAY_FS=y`・`CONFIG_SQUASHFS` などを、ビルド結果の
+> 設定として引かないでください。
 
 > **seccomp はカーネルが対応しているだけで、Kimigayo は
 > seccomp プロファイルを配布していません。**
@@ -358,7 +360,8 @@ CONFIG_NETFILTER_XTABLES=y
 ### BusyBoxアプレット選択
 
 ```ini
-# 必須アプレット（Minimal）
+# 主なアプレット（全バリアント。SED / AWK は minimal.config には
+# 書いておらず、既定値で入っている）
 CONFIG_LS=y
 CONFIG_CP=y
 CONFIG_MV=y
@@ -421,9 +424,10 @@ CONFIG_UNLZOP=y
 │  - 侵入後に道具を持ち込めない            │
 ├─────────────────────────────────────────┤
 │  Layer 4: コンパイル層                  │★ Kimigayo が担保
-│  - PIE, RELRO (-Wl,-z,relro -Wl,-z,now) │
-│  - FORTIFY_SOURCE                       │
-│  - Stack canaries                       │
+│  - PIE / Full RELRO / 非実行スタック    │
+│    （verify-image.sh が全 ELF を検査）  │
+│  - Stack canaries（arm64 の OpenRC 除く）│
+│  - FORTIFY_SOURCE（指定のみ。下記）      │
 ├─────────────────────────────────────────┤
 │  Layer 3: 最小の実行面                  │★ Kimigayo が担保
 │  - 第三者の共有ライブラリ無し            │
@@ -441,11 +445,18 @@ CONFIG_UNLZOP=y
 ```
 
 **★ の 3 層が Kimigayo 自身が担保している部分です。**
+ただし Layer 4 のうち、Stack Protector は arm64 の OpenRC
+（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません
+（`scripts/build-openrc.sh` の arm64 の `CFLAGS` に無い）。
+`-D_FORTIFY_SOURCE=2` は指定していますが、musl は FORTIFY を実装して
+いないため、効果は確認できていません。
 Layer 1 と 2 はホストと利用者の設定によります
 （→ [システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)）。
 
 **配布していないもの**: seccomp プロファイル、SELinux / AppArmor の
-ポリシー、`iptables`、Cosign による署名。
+ポリシー、`iptables`。
+（イメージの署名は v3.0.2 から `release.yml` の `sign` ジョブで
+Cosign のキーレス署名をしています。検証には cosign v3 以上が要ります。）
 **ファイアウォールはイメージに入っていません**（`iptables` 無し）。
 
 
@@ -507,7 +518,8 @@ Layer 1 と 2 はホストと利用者の設定によります
 > 常駐メモリも同程度（Kimigayo 288KB / Alpine 272KB / Ubuntu 312KB）で、
 > 差が出るのはサイズの方です。
 >
-> **OpenRC が default ランレベルを完走するまでは 0.72 秒**で、
+> **OpenRC が default ランレベルを完走するまでは 0.72 秒**
+> （Standard、v3.0.2 の公開イメージ、2026-10-12、arm64 ネイティブ、10 回の中央値）で、
 > `/bin/true` の 0.60 秒との差が Init の分です。
 
 **コンテナでは `quiet splash` や initrd の調整は効きません**
@@ -552,14 +564,17 @@ docker run --rm <image> /sbin/openrc default
 
 - バージョン固定（`versions.mk` + チェックサム検証）
 
-**再現可能ビルドは未達**（2026-10-11 に確認）。[config.mk](../../config.mk) に
-`SOURCE_DATE_EPOCH` と prefix-map を入れる仕組みはあるが、
-`REPRODUCIBLE_BUILD=yes` のときだけ有効で、この変数をどこも設定して
-いない。そもそも [config.mk](../../config.mk) 自体がどの Makefile からも include されて
-いないため、ビット同一性は検証も保証もされていない。
+**rootfs の tarball はビット同一になった**（2026-10-12）。
+同じコミット（46b05da）を CI と Manual Build で別々にビルドし、
+standard / x86_64 の tarball の SHA-256 が一致した。
+`build-system/Makefile` が `REPRODUCIBLE_BUILD ?= yes` と
+`SOURCE_DATE_EPOCH` を設定し、tarball は並び順・mtime・gzip ヘッダを
+固定して作っている（→ [BUILD_GUIDE.md](BUILD_GUIDE.md#再現可能ビルド)）。
 
-**「ビット同一の出力」「決定論的ビルド」は 2026-10-11 に削除した。**
-一度も検証していない主張だった。
+**確かめたのは 1 組・1 バリアントだけで、Docker イメージの digest は
+見ていない。** 名乗る範囲は「rootfs の tarball」に留める。
+（[config.mk](../../config.mk) はどこからも include されていないので、
+そこにある設定は効いていない。）
 
 ### 5. パフォーマンス
 
