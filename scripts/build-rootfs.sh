@@ -1100,7 +1100,7 @@ EOF
         echo
         printf '    ╔%s╗\n' "$(printf '═%.0s' $(seq 1 "$motd_width"))"
         printf '    ║%*s%s%*s║\n' "$motd_pad_l" "" "$motd_title" "$motd_pad_r" ""
-        echo '    ║        Lightweight, Fast, and Secure Container OS      ║'
+        echo '    ║          Lightweight and Secure Container OS           ║'
         printf '    ╚%s╝\n' "$(printf '═%.0s' $(seq 1 "$motd_width"))"
         echo
         echo '    Documentation: https://github.com/Kazuki-0731/Kimigayo'
