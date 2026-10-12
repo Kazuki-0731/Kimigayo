@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 #
 # OpenRC Integration Test Script for Kimigayo OS
-# Tests OpenRC installation and service definitions
+# Tests the OpenRC installation (build/openrc-install-<arch>)
 #
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck source=scripts/lib/versions.sh
+source "${PROJECT_ROOT}/scripts/lib/versions.sh"
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
+
 # Configuration
-BUILD_DIR="${BUILD_DIR:-./build}"
-ARCH="${ARCH:-x86_64}"
+# `make test-openrc` はコンテナ内の build-system/ から呼ばれるので、
+# ./build（カレント基準）ではなくプロジェクトルート基準で解決する。
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
+ARCH="${ARCH:-${TARGET_ARCH:-x86_64}}"
 
 OPENRC_INSTALL_DIR="${BUILD_DIR}/openrc-install-${ARCH}"
 
@@ -69,29 +79,45 @@ else
     test_fail "OpenRC installation directory not found: $OPENRC_INSTALL_DIR"
     echo ""
     echo "Test suite cannot continue without OpenRC."
-    echo "Please run: make init ARCH=${ARCH}"
+    echo "Please run (inside the build container): make init TARGET_ARCH=${ARCH}"
     exit 1
 fi
 
-# Test 2: Verify essential OpenRC binaries
-log_test "Test 2: Verify essential OpenRC binaries"
+# Test 2: ビルドした版が versions.mk と合っているか
+# スタンプは "<版>" または "<版>+<入力ハッシュ>"（scripts/lib/build-stamp.sh）
+log_test "Test 2: Verify built version matches versions.mk"
+built_id="$(kimigayo_built_version "$OPENRC_INSTALL_DIR")"
+case "$built_id" in
+    "${OPENRC_VERSION}"|"${OPENRC_VERSION}+"*)
+        test_pass "OpenRC build stamp ${built_id} matches versions.mk (${OPENRC_VERSION})" ;;
+    *)
+        test_fail "OpenRC build stamp '${built_id:-<none>}' does not match versions.mk (${OPENRC_VERSION})" ;;
+esac
+
+# Test 3: Verify essential OpenRC binaries
+#
+# scripts/build-openrc.sh は --sbindir=/usr/sbin で入れる（rootfs では
+# build-rootfs.sh が /sbin へ移す）。rc-status だけは /bin に入る。
+# OpenRC 0.63 には sbin/rc は無い。
+log_test "Test 3: Verify essential OpenRC binaries"
 essential_binaries=(
-    "sbin/openrc"
-    "sbin/rc"
-    "sbin/rc-status"
-    "sbin/rc-service"
-    "sbin/rc-update"
-    "sbin/openrc-init"
-    "sbin/openrc-run"
-    "sbin/openrc-shutdown"
+    "usr/sbin/openrc"
+    "usr/sbin/openrc-init"
+    "usr/sbin/openrc-run"
+    "usr/sbin/openrc-shutdown"
+    "usr/sbin/rc-service"
+    "usr/sbin/rc-update"
+    "usr/sbin/start-stop-daemon"
+    "usr/sbin/supervise-daemon"
+    "bin/rc-status"
 )
 
 all_found=true
 for binary in "${essential_binaries[@]}"; do
-    if [ -f "${OPENRC_INSTALL_DIR}/${binary}" ] || [ -L "${OPENRC_INSTALL_DIR}/${binary}" ]; then
+    if [ -f "${OPENRC_INSTALL_DIR}/${binary}" ] && [ -x "${OPENRC_INSTALL_DIR}/${binary}" ]; then
         log_info "  ✓ ${binary}"
     else
-        log_error "  ✗ ${binary} not found"
+        log_error "  ✗ ${binary} not found or not executable"
         all_found=false
     fi
 done
@@ -102,23 +128,40 @@ else
     test_fail "Some essential OpenRC binaries are missing"
 fi
 
-# Test 3: Verify OpenRC library files
-log_test "Test 3: Verify OpenRC library files"
-lib_dir="${OPENRC_INSTALL_DIR}/lib/rc"
-if [ -d "$lib_dir" ]; then
-    lib_count=$(find "$lib_dir" -type f 2>/dev/null | wc -l)
-    log_info "Found ${lib_count} library files"
-    if [ "$lib_count" -gt 0 ]; then
-        test_pass "OpenRC library files found"
+# Test 4: Verify OpenRC shared libraries (librc / libeinfo)
+log_test "Test 4: Verify OpenRC shared libraries"
+all_found=true
+for lib in librc.so.1 libeinfo.so.1; do
+    if [ -e "${OPENRC_INSTALL_DIR}/usr/lib/${lib}" ]; then
+        log_info "  ✓ usr/lib/${lib}"
     else
-        test_fail "No library files found in $lib_dir"
+        log_error "  ✗ usr/lib/${lib} not found"
+        all_found=false
     fi
+done
+if [ "$all_found" = true ]; then
+    test_pass "OpenRC shared libraries found"
 else
-    test_fail "OpenRC library directory not found: $lib_dir"
+    test_fail "Some OpenRC shared libraries are missing"
 fi
 
-# Test 4: Verify runlevel directories
-log_test "Test 4: Verify runlevel directories"
+# Test 5: Verify OpenRC support files (--libexecdir=/lib/rc)
+log_test "Test 5: Verify OpenRC support files"
+lib_dir="${OPENRC_INSTALL_DIR}/lib/rc"
+if [ -d "$lib_dir" ]; then
+    lib_count=$(find "$lib_dir" -type f | wc -l)
+    log_info "Found ${lib_count} files in lib/rc"
+    if [ "$lib_count" -gt 0 ]; then
+        test_pass "OpenRC support files found"
+    else
+        test_fail "No files found in $lib_dir"
+    fi
+else
+    test_fail "OpenRC support directory not found: $lib_dir"
+fi
+
+# Test 6: Verify runlevel directories
+log_test "Test 6: Verify runlevel directories"
 runlevels=("sysinit" "boot" "default" "shutdown")
 runlevel_dir="${OPENRC_INSTALL_DIR}/etc/runlevels"
 
@@ -138,189 +181,32 @@ else
     test_fail "Some runlevel directories are missing"
 fi
 
-# Test 5: Verify custom init scripts from src/openrc/init.d
-log_test "Test 5: Verify custom init scripts availability"
-custom_scripts=(
-    "bootmisc"
-    "hostname"
-    "syslog"
-    "klogd"
-    "networking"
-    "crond"
-)
-
-script_dir="src/openrc/init.d"
-all_found=true
-
-for script in "${custom_scripts[@]}"; do
-    if [ -f "${script_dir}/${script}" ]; then
-        log_info "  ✓ ${script}"
-        # Check if executable
-        if [ -x "${script_dir}/${script}" ]; then
-            log_info "    (executable)"
-        else
-            log_error "    (not executable)"
-            all_found=false
-        fi
-    else
-        log_error "  ✗ ${script} not found"
-        all_found=false
-    fi
-done
-
-if [ "$all_found" = true ]; then
-    test_pass "All custom init scripts found and executable"
-else
-    test_fail "Some custom init scripts are missing or not executable"
-fi
-
-# Test 6: Verify custom configuration files
-log_test "Test 6: Verify custom configuration files"
-custom_configs=(
-    "syslog"
-    "klogd"
-    "crond"
-    "hostname"
-)
-
-config_dir="src/openrc/conf.d"
-all_found=true
-
-for config in "${custom_configs[@]}"; do
-    if [ -f "${config_dir}/${config}" ]; then
-        log_info "  ✓ ${config}"
-    else
-        log_error "  ✗ ${config} not found"
-        all_found=false
-    fi
-done
-
-if [ "$all_found" = true ]; then
-    test_pass "All custom configuration files found"
-else
-    test_fail "Some custom configuration files are missing"
-fi
-
-# Test 7: Verify runlevel setup script
-log_test "Test 7: Verify runlevel setup script"
-setup_script="src/openrc/runlevels/setup-runlevels.sh"
-
-if [ -f "$setup_script" ]; then
-    if [ -x "$setup_script" ]; then
-        test_pass "Runlevel setup script found and executable"
-    else
-        test_fail "Runlevel setup script not executable"
-    fi
-else
-    test_fail "Runlevel setup script not found"
-fi
-
-# Test 8: Check init script syntax (basic validation)
-log_test "Test 8: Validate init script syntax"
-validation_passed=true
-
-for script in "${custom_scripts[@]}"; do
-    script_path="${script_dir}/${script}"
-    if [ -f "$script_path" ]; then
-        # Check for shebang
-        if head -n 1 "$script_path" | grep -q "^#!/sbin/openrc-run"; then
-            log_info "  ✓ ${script}: Valid shebang"
-        else
-            log_error "  ✗ ${script}: Invalid or missing shebang"
-            validation_passed=false
-        fi
-
-        # Check for depend() function
-        if grep -q "^depend()" "$script_path"; then
-            log_info "  ✓ ${script}: Has depend() function"
-        else
-            log_info "  ⚠ ${script}: No depend() function (optional)"
-        fi
-    fi
-done
-
-if [ "$validation_passed" = true ]; then
-    test_pass "Init script syntax validation passed"
-else
-    test_fail "Some init scripts have syntax issues"
-fi
-
-# Test 9: Check service dependencies in init scripts
-log_test "Test 9: Check service dependency declarations"
-dependency_check_passed=true
-
-# Expected dependencies
-declare -A expected_deps=(
-    ["syslog"]="localmount"
-    ["klogd"]="syslog"
-    ["networking"]="localmount"
-    ["crond"]="localmount"
-)
-
-for script in "${!expected_deps[@]}"; do
-    script_path="${script_dir}/${script}"
-    expected="${expected_deps[$script]}"
-
-    if [ -f "$script_path" ]; then
-        if grep -A 5 "^depend()" "$script_path" | grep -q "$expected"; then
-            log_info "  ✓ ${script}: Has expected dependency '${expected}'"
-        else
-            log_error "  ✗ ${script}: Missing expected dependency '${expected}'"
-            dependency_check_passed=false
-        fi
-    fi
-done
-
-if [ "$dependency_check_passed" = true ]; then
-    test_pass "Service dependencies correctly declared"
-else
-    test_fail "Some service dependencies are missing"
-fi
-
-# Test 10: Verify OpenRC configuration files
-log_test "Test 10: Verify OpenRC core configuration"
-openrc_conf="${OPENRC_INSTALL_DIR}/etc/rc.conf"
-
-if [ -f "$openrc_conf" ]; then
+# Test 7: Verify OpenRC core configuration
+log_test "Test 7: Verify OpenRC core configuration"
+if [ -f "${OPENRC_INSTALL_DIR}/etc/rc.conf" ]; then
     test_pass "OpenRC configuration file found: rc.conf"
 else
-    log_info "OpenRC configuration file not found (may be optional)"
-    ((TESTS_RUN++)) || true
+    test_fail "OpenRC configuration file not found: etc/rc.conf"
 fi
 
-# Test 11: Check init.d directory structure in installation
-log_test "Test 11: Check OpenRC init.d directory in installation"
+# Test 8: Verify init.d scripts installed by OpenRC
+log_test "Test 8: Verify OpenRC init.d scripts in installation"
 init_dir="${OPENRC_INSTALL_DIR}/etc/init.d"
-
 if [ -d "$init_dir" ]; then
-    init_count=$(find "$init_dir" -type f -o -type l 2>/dev/null | wc -l)
+    init_count=$(find "$init_dir" \( -type f -o -type l \) | wc -l)
     log_info "Found ${init_count} init scripts in installation"
     if [ "$init_count" -gt 0 ]; then
         test_pass "OpenRC init.d directory populated"
     else
-        log_info "No init scripts in installation (custom scripts not yet installed)"
-        ((TESTS_RUN++)) || true
+        test_fail "OpenRC init.d directory is empty: $init_dir"
     fi
 else
-    log_info "Init.d directory not found (will be created during rootfs build)"
-    ((TESTS_RUN++)) || true
+    test_fail "OpenRC init.d directory not found: $init_dir"
 fi
 
-# Test 12: Verify OpenRC documentation
-log_test "Test 12: Verify OpenRC documentation"
-readme="src/openrc/README.md"
-
-if [ -f "$readme" ]; then
-    word_count=$(wc -w < "$readme")
-    log_info "README contains ${word_count} words"
-    if [ "$word_count" -gt 100 ]; then
-        test_pass "OpenRC documentation found and substantial"
-    else
-        test_fail "OpenRC documentation too short"
-    fi
-else
-    test_fail "OpenRC README.md not found"
-fi
+# src/openrc/ の init.d・conf.d・runlevels は検査しない。
+# scripts/build-rootfs.sh はそれらを rootfs に入れておらず、
+# イメージに含まれないファイルを検査しても成果物の保証にならない。
 
 # Summary
 echo ""
@@ -334,12 +220,6 @@ echo ""
 
 if [ "$TESTS_FAILED" -eq 0 ]; then
     log_success "All tests passed!"
-    echo ""
-    log_info "OpenRC integration ready for deployment"
-    log_info "Next steps:"
-    log_info "  1. Build rootfs with OpenRC integration"
-    log_info "  2. Test boot sequence in QEMU"
-    log_info "  3. Verify service startup order"
     exit 0
 else
     log_error "Some tests failed"

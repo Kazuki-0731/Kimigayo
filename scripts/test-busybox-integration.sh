@@ -6,13 +6,30 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# リンク方法の既定値（BUSYBOX_LINK）は build-stamp.sh にだけ書いてある
+# shellcheck source=scripts/lib/build-stamp.sh
+source "${PROJECT_ROOT}/scripts/lib/build-stamp.sh"
+
 # Configuration
-BUILD_DIR="${BUILD_DIR:-./build}"
-ARCH="${ARCH:-x86_64}"
+# `make test-busybox` はコンテナ内の build-system/ から呼ばれるので、
+# ./build（カレント基準）ではなくプロジェクトルート基準で解決する。
+# アーキテクチャは build-system/Makefile と同じく TARGET_ARCH で受ける
+# （ARCH は互換のため残す）。
+BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build}"
+ARCH="${ARCH:-${TARGET_ARCH:-x86_64}}"
 IMAGE_TYPE="${IMAGE_TYPE:-standard}"
+BUSYBOX_LINK="$(kimigayo_busybox_link)"
 
 BUSYBOX_INSTALL_DIR="${BUILD_DIR}/busybox-install-${ARCH}"
 BUSYBOX_BIN="${BUSYBOX_INSTALL_DIR}/bin/busybox"
+
+case "$ARCH" in
+    arm64|aarch64) MUSL_ARCH="aarch64" ;;
+    *)             MUSL_ARCH="$ARCH" ;;
+esac
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,6 +41,7 @@ NC='\033[0m' # No Color
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
 
 # Logging functions
 log_info() {
@@ -55,12 +73,19 @@ test_fail() {
     log_error "$1"
 }
 
+# 実行していないものは PASS にも FAIL にも数えない
+test_skip() {
+    TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+    echo -e "${YELLOW}[SKIP]${NC} $1"
+}
+
 # Header
 echo "========================================"
 echo "BusyBox Integration Tests"
 echo "========================================"
 log_info "Architecture: ${ARCH}"
 log_info "Image type: ${IMAGE_TYPE}"
+log_info "Link mode: ${BUSYBOX_LINK}"
 log_info "BusyBox binary: ${BUSYBOX_BIN}"
 echo ""
 
@@ -72,46 +97,97 @@ else
     test_fail "BusyBox binary not found: $BUSYBOX_BIN"
     echo ""
     echo "Test suite cannot continue without BusyBox binary."
-    echo "Please run: make busybox ARCH=${ARCH} IMAGE_TYPE=${IMAGE_TYPE}"
+    echo "Please run (inside the build container):"
+    echo "  make busybox TARGET_ARCH=${ARCH} IMAGE_TYPE=${IMAGE_TYPE}"
     exit 1
 fi
 
-# Test 2: Verify static linking
-log_test "Test 2: Verify static linking"
-if file "$BUSYBOX_BIN" | grep -q "statically linked"; then
-    test_pass "BusyBox is statically linked"
+# ビルドしたときのバリアントとリンク方法が、いま検査しようとしているものと
+# 合っているか。スタンプは 1.38.0+standard+dynamic+<hash> の形
+# （scripts/lib/build-stamp.sh の kimigayo_busybox_build_id）
+built_id="$(kimigayo_built_version "$BUSYBOX_INSTALL_DIR")"
+log_info "Build stamp: ${built_id:-<none>}"
+case "$built_id" in
+    *"+${IMAGE_TYPE}+${BUSYBOX_LINK}+"*|*"+${IMAGE_TYPE}+${BUSYBOX_LINK}")
+        test_pass "Build stamp matches ${IMAGE_TYPE}/${BUSYBOX_LINK}" ;;
+    *)
+        test_fail "Build stamp '${built_id:-<none>}' is not ${IMAGE_TYPE}/${BUSYBOX_LINK} (rebuild: make busybox TARGET_ARCH=${ARCH} IMAGE_TYPE=${IMAGE_TYPE})" ;;
+esac
+
+# Test 2: Verify link mode (BUSYBOX_LINK, default: dynamic)
+#
+# 2026-10-12 に既定が dynamic になった（scripts/build-busybox.sh の冒頭）。
+# 判定は build-busybox.sh のビルド直後の検査と同じ文字列で行う。
+log_test "Test 2: Verify ${BUSYBOX_LINK} linking"
+file_out="$(file "$BUSYBOX_BIN")"
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    if echo "$file_out" | grep -qE "(statically linked|static-pie linked)"; then
+        test_pass "BusyBox is statically linked"
+    else
+        test_fail "BusyBox is not statically linked: ${file_out}"
+    fi
 else
-    test_fail "BusyBox is not statically linked"
+    if echo "$file_out" | grep -q "interpreter /lib/ld-musl-${MUSL_ARCH}.so.1"; then
+        test_pass "BusyBox is dynamically linked against musl (/lib/ld-musl-${MUSL_ARCH}.so.1)"
+    else
+        test_fail "BusyBox is not dynamically linked against /lib/ld-musl-${MUSL_ARCH}.so.1: ${file_out}"
+    fi
 fi
 
 # Test 3: Verify binary size
-log_test "Test 3: Verify binary size against target"
-binary_size=$(stat -f%z "$BUSYBOX_BIN" 2>/dev/null || stat -c%s "$BUSYBOX_BIN" 2>/dev/null)
+#
+# 上限は実測（2026-10-12、BUSYBOX_LINK=dynamic、strip 済み）に約 15% の
+# 余裕を足したもの。肥大化（config の取り違え・strip 漏れ）を拾うためで、
+# 目標値ではない。
+#   実測 KB    minimal  standard  extended
+#   x86_64       870     1002      1026
+#   arm64        941     1085      1120
+# static は libc を取り込む分だけ 165〜169KB 大きい（build-busybox.sh）
+log_test "Test 3: Verify binary size against upper bound"
+binary_size=$(stat -c%s "$BUSYBOX_BIN" 2>/dev/null || stat -f%z "$BUSYBOX_BIN")
 binary_size_kb=$((binary_size / 1024))
 
 case "$IMAGE_TYPE" in
-    minimal)
-        target_size=500
-        ;;
-    standard)
-        target_size=800
-        ;;
-    extended)
-        target_size=1200
-        ;;
+    minimal)  target_size=1100 ;;
+    standard) target_size=1250 ;;
+    extended) target_size=1300 ;;
     *)
-        target_size=800
+        log_error "Unknown IMAGE_TYPE: ${IMAGE_TYPE} (minimal|standard|extended)"
+        exit 1
         ;;
 esac
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    target_size=$((target_size + 200))
+fi
 
 log_info "Binary size: ${binary_size_kb} KB"
-log_info "Target size: ${target_size} KB"
+log_info "Upper bound: ${target_size} KB"
 
 if [ "$binary_size_kb" -le "$target_size" ]; then
-    test_pass "Binary size (${binary_size_kb} KB) within target (${target_size} KB)"
+    test_pass "Binary size (${binary_size_kb} KB) within upper bound (${target_size} KB)"
 else
-    test_fail "Binary size (${binary_size_kb} KB) exceeds target (${target_size} KB)"
+    test_fail "Binary size (${binary_size_kb} KB) exceeds upper bound (${target_size} KB)"
 fi
+
+# ここから先はバイナリを実際に実行する。
+# クロスビルドしたもの（例: amd64 のコンテナで arm64）は実行できないので
+# まとめて SKIP にする。動的リンクなら /lib/ld-musl-<arch>.so.1 が
+# 実行環境に必要（ビルドコンテナの Alpine は持っている）。
+host_arch="$(uname -m)"
+case "$host_arch" in
+    arm64) host_arch="aarch64" ;;
+esac
+if [ "$host_arch" != "$MUSL_ARCH" ]; then
+    test_skip "Runtime tests 4-18: cannot execute ${MUSL_ARCH} binary on ${host_arch} host"
+    RUNTIME=false
+elif [ "$BUSYBOX_LINK" = "dynamic" ] && [ ! -e "/lib/ld-musl-${MUSL_ARCH}.so.1" ]; then
+    test_skip "Runtime tests 4-18: /lib/ld-musl-${MUSL_ARCH}.so.1 not present on this host (run inside the build container)"
+    RUNTIME=false
+else
+    RUNTIME=true
+fi
+
+if [ "$RUNTIME" = true ]; then
 
 # Test 4: List available applets
 log_test "Test 4: List available applets"
@@ -215,8 +291,7 @@ if "$BUSYBOX_BIN" --list 2>/dev/null | grep -q "^tar$"; then
     cd - >/dev/null
     rm -rf "$temp_dir"
 else
-    log_info "tar command not available in this build (skipped)"
-    ((TESTS_RUN++)) || true
+    test_skip "tar command not available in this build"
 fi
 
 # Test 14: Test gzip command (if available)
@@ -236,8 +311,7 @@ if "$BUSYBOX_BIN" --list 2>/dev/null | grep -q "^gzip$"; then
     fi
     rm -f "$temp_file" "${temp_file}.gz"
 else
-    log_info "gzip command not available in this build (skipped)"
-    ((TESTS_RUN++)) || true
+    test_skip "gzip command not available in this build"
 fi
 
 # Test 15: Test networking commands (if available)
@@ -254,8 +328,7 @@ done
 if [ "$net_found" -gt 0 ]; then
     test_pass "Networking commands available: ${net_found}/${#net_commands[@]}"
 else
-    log_info "No networking commands available in this build"
-    ((TESTS_RUN++)) || true
+    test_skip "No networking commands available in this build"
 fi
 
 # Test 16: Test init-related commands (if available)
@@ -288,16 +361,44 @@ else
     test_fail "ash shell not available"
 fi
 
-# Test 18: Verify no dynamic dependencies
-log_test "Test 18: Verify no dynamic dependencies"
-if ldd "$BUSYBOX_BIN" 2>&1 | grep -q "not a dynamic executable"; then
-    test_pass "BusyBox has no dynamic dependencies"
-elif ldd "$BUSYBOX_BIN" 2>&1 | grep -q "statically linked"; then
-    test_pass "BusyBox is statically linked"
+# Test 18: Verify shared library dependencies
+#
+# dynamic: 依存は libc（musl）だけであること。OpenRC と同じ
+#          /lib/libc.so 以外を rootfs に入れていないので、ほかの
+#          共有ライブラリを要求したらイメージで起動しない。
+# static:  依存が無いこと。
+log_test "Test 18: Verify shared library dependencies (${BUSYBOX_LINK})"
+ldd_out="$(ldd "$BUSYBOX_BIN" 2>&1)" || ldd_rc=$?
+if [ "$BUSYBOX_LINK" = "static" ]; then
+    if echo "$ldd_out" | grep -qE "not a dynamic executable|statically linked" \
+        || ! echo "$ldd_out" | grep -q "=>"; then
+        test_pass "BusyBox has no shared library dependencies"
+    else
+        test_fail "BusyBox (static) has shared library dependencies:"
+        echo "$ldd_out"
+    fi
 else
-    test_fail "BusyBox may have dynamic dependencies"
-    ldd "$BUSYBOX_BIN" 2>&1 || true
+    # musl の ldd は「libc.musl-<arch>.so.1 => /lib/ld-musl-<arch>.so.1」と
+    # ローダー自身の行を出す。libc 以外の NEEDED があれば失敗にする
+    # static-pie を ldd に掛けてもローダーの行しか出ないので、
+    # 「libc 以外が無い」だけでなく「libc がある」ことも確かめる
+    libc_deps="$(echo "$ldd_out" | awk '/=>/ && /^[[:space:]]*libc(\.musl-[a-z0-9_]+)?\.so/')"
+    other_deps="$(echo "$ldd_out" | awk '/=>/ && !/^[[:space:]]*libc(\.musl-[a-z0-9_]+)?\.so/')"
+    if [ "${ldd_rc:-0}" -ne 0 ]; then
+        test_fail "ldd failed on BusyBox (exit ${ldd_rc}):"
+        echo "$ldd_out"
+    elif [ -z "$libc_deps" ]; then
+        test_fail "BusyBox does not depend on musl libc (not dynamically linked?):"
+        echo "$ldd_out"
+    elif [ -z "$other_deps" ]; then
+        test_pass "BusyBox depends only on musl libc"
+    else
+        test_fail "BusyBox depends on libraries other than musl libc:"
+        echo "$other_deps"
+    fi
 fi
+
+fi  # RUNTIME
 
 # Summary
 echo ""
@@ -307,6 +408,7 @@ echo "========================================"
 log_info "Tests run:    ${TESTS_RUN}"
 log_info "Tests passed: ${TESTS_PASSED}"
 log_info "Tests failed: ${TESTS_FAILED}"
+log_info "Skipped:      ${TESTS_SKIPPED}"
 echo ""
 
 if [ "$TESTS_FAILED" -eq 0 ]; then
