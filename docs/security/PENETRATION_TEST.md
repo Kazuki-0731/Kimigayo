@@ -5,6 +5,7 @@
 ## 目次
 
 1. [ペネトレーションテストの目的](#ペネトレーションテストの目的)
+   - [攻撃面のベースライン](#攻撃面のベースラインv302-実測2026-10-12)
 2. [テストスコープ](#テストスコープ)
 3. [テスト環境](#テスト環境)
 4. [テスト手法](#テスト手法)
@@ -21,7 +22,7 @@ Kimigayo OSのペネトレーションテストは以下の目的で実施され
 - **攻撃シナリオの理解**: 実際の攻撃者の視点でシステムを評価
 - **インシデント対応の訓練**: セキュリティインシデント対応手順の検証
 
-## 攻撃面のベースライン（v3.0.1 実測、2026-10-11）
+## 攻撃面のベースライン（v3.0.2 実測、2026-10-12）
 
 **テストを始める前に、何が「無い」かを把握してください。**
 Kimigayo の攻撃面の小ささは、まず欠落によって成り立っています。
@@ -32,22 +33,30 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
 | world-writable なファイル | **0 個**（`find / -xdev -type f -perm -0002`）|
 | 既定のリスニングポート | **0 個**（`netstat -tuln`）|
 | 共有ライブラリ | **3 個のみ**（musl の `libc.so`、OpenRC の `librc` / `libeinfo`）|
+| 既定のユーザー | **root**（`USER` 指定なし）|
 | パッケージマネージャー | **無し**（`apk` / `apt` / `dpkg` / `rpm` / `yum` / `pacman`）|
 
 **イメージに入っていないもの**（権限昇格・横展開の道具として想定されるもの）:
 `sudo` / `/etc/sudoers` / `wheel` グループ / `sshd` / `/etc/ssh` /
 `iptables` / `curl` / `gcc` / `strace` / `tcpdump` / `logrotate` /
-`auditd` / `/usr/share/zoneinfo` / `/boot`。
+`auditd` / `capsh` / `bash` / `/etc/cron.*` / `/usr/share/zoneinfo` / `/boot`。
+
+**入っているが起動していないもの**（BusyBox のアプレット）:
+`telnetd`・`ftpd`・`httpd`・`crond`・`su`・`nsenter`・`unshare`（全バリアント）、
+`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
+サーバー系のアプレットは、利用者が起動しない限り待ち受けません。
 
 **既定の PID 1 は `/bin/sh`** で、OpenRC は起動していません。
 `/etc/init.d/` のサービスは `/sbin/init` を PID 1 にしたときだけ動きます。
 
 ### 既知の弱点
 
-- **`cpio` と `ar` はディレクトリを脱出できる。**
-  `CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION` が無効なため
-  `../` を剥がしません（Alpine も同じ挙動）。`tar` と `unzip` は安全。
-  → [HARDENING_GUIDE.md](HARDENING_GUIDE.md#busybox-の-cpio-はディレクトリを脱出できる)
+- **`cpio` と `ar` のディレクトリ脱出は v3.0.2 で修正済み**
+  （`CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y`。v3.0.1 までは `../` を
+  剥がさなかった。`verify-image.sh` が回帰を見る）。
+  `tar` のリンク経由の脱出（CVE-2026-108119）は、NVD に CPE が無く
+  `make scan-image` では検出できず、1.38.0 への影響は未確認。
+  → [HARDENING_GUIDE.md](HARDENING_GUIDE.md#busybox-の-cpio-はディレクトリを脱出できたv301-まで修正済み)
 - **`wget` の HTTPS は v3.0.1 以前で、取得後に Segmentation fault で落ちる**
   （x86_64 / arm64 とも。v3.0.2 で修正）。可用性の問題であり、情報漏洩の
   経路ではない。**証明書は検証しない**（BusyBox の仕様。中間者攻撃に弱い）。
@@ -117,13 +126,12 @@ Docker: 最新安定版
 # 1. テスト用ネットワークの作成
 docker network create --driver bridge pentest-network
 
-# 2. Kimigayo OSコンテナの起動
+# 2. Kimigayo OSコンテナの起動（既定の CMD は /bin/sh なので常駐させる）
 docker run -d \
   --name kimigayo-target \
   --network pentest-network \
   --cap-drop=ALL \
-  --cap-add=NET_ADMIN \
-  ishinokazuki/kimigayo-os:latest
+  ishinokazuki/kimigayo-os:3.0.2 sleep infinity
 
 # 3. 攻撃用コンテナの起動（Kali Linux）
 docker run -d \
@@ -133,6 +141,7 @@ docker run -d \
   kalilinux/kali-rolling
 
 # 4. ログ収集の設定
+mkdir -p logs
 docker logs -f kimigayo-target > logs/target.log &
 docker logs -f pentest-kali > logs/attacker.log &
 ```
@@ -188,8 +197,9 @@ masscan -p1-65535 <target-ip> --rate=1000
 
 #### 2. 脆弱性スキャン
 ```bash
-# Trivy - コンテナスキャン
-trivy image ishinokazuki/kimigayo-os:latest
+# 出荷物の CVE 照合（リポジトリで実行。SBOM + Grype）
+# `trivy image` はパッケージ DB の無い Kimigayo を識別できず、何も検査しない
+make scan-image VARIANT=standard ARCH=x86_64
 
 # Nikto - Webサーバースキャン（該当する場合）
 nikto -h http://<target-ip>
@@ -220,8 +230,8 @@ searchsploit <software-name>
 #### 5. コンテナエスケープ
 ```bash
 # Docker脱出テスト
-# ケーパビリティ確認
-capsh --print
+# ケーパビリティ確認（capsh はイメージに無い）
+grep Cap /proc/self/status
 
 # マウントポイント確認
 mount | grep docker
@@ -255,10 +265,10 @@ ls -la /proc/self/ns/
 
 1. **ケーパビリティの確認**
    ```bash
-   # コンテナ内で実行
-   capsh --print
+   # コンテナ内で実行（capsh はイメージに無いので /proc で見る）
+   grep Cap /proc/self/status
    ```
-   期待結果: 最小限のケーパビリティのみ（CAP_NET_ADMIN等の危険なケーパビリティなし）
+   期待結果: `--cap-drop=ALL` なら `CapEff` が 0（CAP_NET_ADMIN 等の危険なケーパビリティなし）
 
 2. **マウントの確認**
    ```bash
@@ -289,28 +299,27 @@ ls -la /proc/self/ns/
    ```bash
    find / -perm -4000 -type f 2>/dev/null
    ```
-   期待結果: 必要最小限のSetUIDバイナリのみ
+   期待結果: 0 個（公開イメージに setuid / setgid は無い。`verify-image.sh` が検査）
 
 2. **書き込み可能なcronジョブ確認**
    ```bash
-   ls -la /etc/cron.*
-   ls -la /var/spool/cron
+   ls -la /etc/crontabs /var/spool/cron 2>&1
    ```
-   期待結果: 非特権ユーザーは書き込み不可
+   期待結果: 存在しない（`crond` のアプレットはあるが、設定も起動も無い）
 
 3. **sudoers設定確認**
    ```bash
-   sudo -l
-   cat /etc/sudoers
+   command -v sudo; ls /etc/sudoers
    ```
-   期待結果: 適切な制限
+   期待結果: どちらも無い（`su` はあるが、root 以外のユーザーは `nobody` だけ）
 
-4. **カーネル脆弱性確認**
+4. **カーネル脆弱性確認**（**ホスト側の評価**）
    ```bash
    uname -a
    # Linux Exploit Suggesterで既知の脆弱性確認
    ```
-   期待結果: 既知の脆弱性なし
+   カーネルはホストのもので、イメージの性質ではありません。
+   結果はホストの評価として記録します
 
 ### シナリオ 3: ネットワーク攻撃
 
@@ -322,7 +331,7 @@ ls -la /proc/self/ns/
    ```bash
    nmap -sV -p- <target-ip>
    ```
-   期待結果: 必要最小限のポートのみ開放
+   期待結果: 既定では開放ポートなし（待ち受けるのは利用者が起動したアプリだけ）
 
 2. **サービス脆弱性スキャン**
    ```bash
@@ -334,7 +343,7 @@ ls -la /proc/self/ns/
    ```bash
    hping3 -S --flood -p 80 <target-ip>
    ```
-   期待結果: レート制限により影響最小限
+   期待結果: イメージ側にレート制限は無い。結果はホスト・ランタイム側（`--pids-limit`・`--memory`・ホストのファイアウォール）の評価として記録する
 
 ### シナリオ 4: ファイルシステム攻撃
 
@@ -346,14 +355,15 @@ ls -la /proc/self/ns/
    ```bash
    find / -perm -002 -type f 2>/dev/null
    ```
-   期待結果: /tmp, /var/tmp以外になし
+   期待結果: なし（world-writable なのは `/tmp`・`/var/tmp` のディレクトリだけで、どちらも sticky bit 付き）
 
 2. **シンボリックリンク攻撃**
    ```bash
    # /tmpでシンボリックリンクを使った攻撃試行
    ln -s /etc/shadow /tmp/symlink
    ```
-   期待結果: 保護機能により攻撃失敗
+   期待結果: 攻撃失敗。ただし防ぐのはホストのカーネルの `fs.protected_symlinks` で、
+   イメージの性質ではない（結果はホストの評価として記録する）
 
 3. **ディレクトリトラバーサル**
    ```bash
@@ -426,20 +436,16 @@ ls -la /proc/self/ns/
 
 ### フォローアップ
 
-1. **即時対応（Critical）**
-   - 24時間以内に緊急会議
-   - 48時間以内に暫定対策
-   - 1週間以内に恒久対策
+修正の期限は[セキュリティポリシー](SECURITY_POLICY.md#報告後の流れ)に合わせます。
 
-2. **優先対応（High）**
-   - 1週間以内に対策計画
-   - 2週間以内に修正実施
-   - 1ヶ月以内に再テスト
+| 重大度 | 修正の期限 |
+| --- | --- |
+| Critical | 7日以内 |
+| High | 30日以内 |
+| Medium | 90日以内 |
+| Low | 次回リリース時 |
 
-3. **通常対応（Medium/Low）**
-   - 1ヶ月以内に対策計画
-   - 3ヶ月以内に修正実施
-   - 次回定期テストで再確認
+修正後は、該当するシナリオを再実行して確認します。
 
 ## セキュリティに関する注意事項
 
@@ -459,7 +465,7 @@ ls -la /proc/self/ns/
 
 - [セキュリティ監査ガイドライン](./SECURITY_AUDIT.md)
 - [脆弱性報告手順](./VULNERABILITY_REPORTING.md)
-- [インシデント対応計画](./VULNERABILITY_REPORTING.md)
+- [インシデント対応](./SECURITY_GUIDE.md#インシデント対応)
 - [セキュリティポリシー](./SECURITY_POLICY.md)
 
 ## 参考資料
@@ -478,3 +484,4 @@ ls -la /proc/self/ns/
 | バージョン | 日付 | 変更内容 |
 |----------|------|---------|
 | 1.0.0 | 2025-12-21 | 初版作成 |
+| 1.1.0 | 2026-10-12 | 攻撃面のベースラインを v3.0.2 で測り直し、コンテナ前提に合わせて手順と期待結果を修正 |
