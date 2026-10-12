@@ -268,12 +268,15 @@ if [ -f "$INPUT_DIR/busybox.json" ]; then
     if command -v jq > /dev/null 2>&1; then
         echo "**Kimigayo OS vs Alpine Linux**" >> "$OUTPUT_FILE"
         echo "" >> "$OUTPUT_FILE"
-        echo "| コマンド | Kimigayo OS | Alpine Linux | 速度比 |" >> "$OUTPUT_FILE"
+        echo "| コマンド | Kimigayo OS（中央値） | Alpine Linux（中央値） | 中央値の比 |" >> "$OUTPUT_FILE"
         echo "|---------|-------------|--------------|--------|" >> "$OUTPUT_FILE"
 
-        # 各コマンドの結果を抽出
+        # 各コマンドの結果を抽出。比は中央値どうし（benchmark-busybox.sh の
+        # ratio_median。古い JSON には無いので speedup に落とす。2026-10-13 までの
+        # speedup は平均の比だった）。以前は平均の ms と並べていて、
+        # 列の値と比が別の統計量だった。
         jq -r '.results | to_entries | .[] |
-            "| \(.key) | \(.value.kimigayo_avg_ms)ms | \(.value.alpine_avg_ms)ms | \(.value.speedup)x |"' \
+            "| \(.key) | \(.value.kimigayo_median_ms)ms | \(.value.alpine_median_ms)ms | \(.value.ratio_median // .value.speedup)x |"' \
             "$INPUT_DIR/busybox.json" >> "$OUTPUT_FILE" 2>/dev/null || \
             echo "詳細データは \`busybox.json\` を参照してください。" >> "$OUTPUT_FILE"
     else
