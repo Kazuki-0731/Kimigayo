@@ -50,14 +50,14 @@ docker run -d --name myapp ishinokazuki/kimigayo-os:3.0.2 sleep infinity
 docker exec -it myapp /bin/sh
 ```
 
-**既定の PID 1 は `/bin/sh` です。** `Dockerfile` に `ENTRYPOINT` が無く
+**既定の PID 1 は `/bin/sh` です。** 公開イメージを作る `Dockerfile.runtime` に `ENTRYPOINT` が無く
 `CMD ["/bin/sh"]` なので、**OpenRC（Init）は動いていません。**
 サービスを使いたい場合は [サービスの管理](#サービスの管理)を参照してください。
 
 ```bash
 # 中身の確認
 cat /etc/os-release
-# => VERSION_ID=3.0.2
+# => VERSION_ID="3.0.2"
 # => VERSION_CODENAME=himawari
 ```
 
@@ -69,8 +69,9 @@ cat /etc/os-release
 | **Standard**（推奨）| 2.60MB / arm64 2.98MB | 400 | `latest` / `latest-standard` / `3.0.2-standard` |
 | Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.0.2-extended` |
 
-**Minimal には `vi`・`wget`・`du`・`less` が入っていません。**
-対話的に触るなら Standard 以上を選んでください。
+**Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
+（Standard との差は 33 アプレット）。対話的に触る・シェルスクリプトを動かすなら
+Standard 以上を選んでください。
 
 ```bash
 # 使えるコマンドの一覧
@@ -120,14 +121,18 @@ uptime
 ### プロセス管理
 
 ```bash
-ps aux
-top
+ps
+ps w          # 長いコマンドラインを切らずに表示
+top -b -n1    # 一度だけ表示して終わる
 kill <PID>
 kill -9 <PID>
 ```
 
-**`ps aux --sort=-%mem` は使えません**（BusyBox の `ps` は `--sort` を
-解しません）。`top` を使ってください。
+**Minimal と Standard では `ps aux` は使えません**（BusyBox の `ps` は `aux` を
+受け付けず `ps: unrecognized option: a` で失敗します。`-o` もありません）。
+使えるのは `ps`・`ps w`・`ps T`（Standard 以上は `ps l` も）だけです。
+`ps aux` と `ps -o pid,user,comm` が通るのは Extended だけで、
+`--sort` はどのバリアントにもありません。並べ替えたいときは `top` を使ってください。
 
 ### ネットワーク
 
@@ -146,14 +151,16 @@ netstat -tuln
 wget -O- http://example.com
 ```
 
-**`ping` は既定では失敗します**（ICMP ソケットに `CAP_NET_RAW` が必要で、
-通常の `docker run` では付きません）。疎通確認には `nslookup` を使うか、
-`--cap-add NET_RAW` を付けて起動してください。
+**`ping` には `CAP_NET_RAW` が要ります。** Docker の既定のケーパビリティには
+含まれているので通常の `docker run` では使えますが、`--cap-drop ALL` や
+Podman の一部の設定では外れるので `--cap-add NET_RAW` を付けてください。
+なお Docker Desktop では外部宛ての ICMP が届かないことがあります
+（その場合は Alpine でも同じで、イメージの問題ではありません）。
 
 > **既知の問題（v3.0.1 以前）: `wget` の HTTPS は、取得に成功したあと
-> Segmentation fault（終了コード 139）で落ちます。** HTTP は正常です。
+> Segmentation fault（終了コード 139）で落ちていました。** HTTP は正常です。
 > 原因は BusyBox の config（`FEATURE_WGET_OPENSSL`）で、
-> **v3.0.2 で直ります**
+> **v3.0.2 で直りました**
 > （→[原因と修正](../troubleshooting/busybox-wget-https-segfault.md)）。
 >
 > **`wget` は TLS 証明書を検証しません**（`TLS certificate validation
@@ -341,7 +348,8 @@ docker network inspect bridge
 
 ```bash
 df -h
-find / -xdev -type f -size +10M -exec ls -lh {} \;
+# BusyBox の find は M 単位を受け付けないので k で書く
+find / -xdev -type f -size +10240k -exec ls -lh {} \;
 ```
 
 ## 次のステップ
