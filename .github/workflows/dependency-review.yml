@@ -66,33 +66,40 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
-      - name: Scan build scripts for vulnerabilities
+      # シェルスクリプトの静的な点検。**当たれば落とす。**
+      #
+      # 以前は毎回 ⚠️ を出しながら一度も失敗しない作りで、
+      # check-links.py のコメント中の http:// と versions.sh の eval に
+      # 毎回当たっていた。警告が常に出るので「✅」も「⚠️」も意味を持たなかった。
+      #
+      # いまはコメント行を除いたシェルスクリプトだけを見て、既知の安全な
+      # 箇所だけを許可リストで外す。秘密情報の検出は上の Trivy
+      # （scanners: secret）と scripts/scan-image.sh が受け持つので、ここではやらない。
+      - name: Check shell scripts for insecure downloads and eval
         run: |
-          echo "=== Scanning shell scripts for common issues ==="
+          set -euo pipefail
+          files=(scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh)
+          found=0
 
-          # Check for hardcoded secrets
-          echo "Checking for hardcoded secrets..."
-          if grep -rn -E '(password|secret|api_key|token).*=.*["\047]' scripts/ 2>/dev/null; then
-            echo "⚠️ Warning: Possible hardcoded secrets found"
-          else
-            echo "✅ No hardcoded secrets detected"
+          # コメント行（先頭が #）を除いた http://（localhost は除く）
+          if grep -nE 'http://' "${files[@]}" \
+               | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+               | grep -v 'http://localhost'; then
+            echo "::error::http:// の URL がある（https にする）"
+            found=1
           fi
 
-          # Check for insecure downloads (http instead of https)
-          echo "Checking for insecure downloads..."
-          if grep -rn 'http://' scripts/ | grep -v 'http://localhost' 2>/dev/null; then
-            echo "⚠️ Warning: Insecure HTTP downloads found"
-          else
-            echo "✅ All downloads use HTTPS"
+          # eval。許可リスト:
+          #   scripts/lib/versions.sh — versions.mk の "NAME ?= value" を
+          #   sed で NAME="${NAME:-value}" に変換したものだけを eval する
+          if grep -nwE 'eval' "${files[@]}" \
+               | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+               | grep -vE '^scripts/lib/versions\.sh:'; then
+            echo "::error::eval がある（必要なら理由を書いて許可リストに足す）"
+            found=1
           fi
 
-          # Check for unsafe bash practices
-          echo "Checking for unsafe bash practices..."
-          if grep -rn 'eval\s' scripts/ 2>/dev/null; then
-            echo "⚠️ Warning: 'eval' usage found (potential security risk)"
-          else
-            echo "✅ No unsafe eval usage"
-          fi
+          exit "$found"
 
       - name: Upload dependency report
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
