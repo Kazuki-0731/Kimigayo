@@ -92,6 +92,13 @@ docker rm -f <動いているコンテナ>
 docker pull (already up to date)
 ```
 
+**`docker pull` が失敗した回は記録しません。** ローカルでビルドしただけの
+イメージ（`kimigayo-os:standard-arm64` など、レジストリに無いもの）では pull が
+必ず失敗するので、この項目は **N/A**（JSON では `"skipped": true`・`median_ms: null`）
+になります。測るなら Docker Hub にあるイメージ（`ishinokazuki/kimigayo-os:3.0.2` など）を
+`IMAGE_NAME` に渡します。2026-10-13 までは失敗までの時間を「pull (warm)」として
+記録していました。
+
 **重要性**:
 - CI/CDでのキャッシュ活用
 - デプロイ時間の予測
@@ -151,14 +158,16 @@ Container start                                 561             556
 Container stop                                10368           10365
 Container restart                             10643           10645
 Container cleanup                               299             298
-Image pull (warm cache)                        2258            2282
+Image pull (warm cache)                         N/A             N/A
 
 Image size (MB)                                3.13
 Layer count                                       2
 ```
 
 （2026-10-11 実測。stop / restart の 10 秒は Docker の猶予時間 →
-下の「stop と restart の 10 秒は Kimigayo のせいではない」節）
+下の「stop と restart の 10 秒は Kimigayo のせいではない」節。
+pull の行は当時 2258 / 2282 と出ていたが、ローカル専用のイメージに対する
+**失敗した pull の時間**だったので、いまのスクリプトの表示（N/A）に置き換えた）
 
 ### JSON出力例
 
@@ -187,7 +196,7 @@ Layer count                                       2
 > 「v3.0.2 の起動と常駐メモリ」節）。
 
 **測定条件:** `kimigayo-os:standard-arm64`、macOS / Apple Silicon、
-arm64 ネイティブ、10回（warm pull のみ3回）の中央値。
+arm64 ネイティブ、10回の中央値。
 
 | 項目 | 中央値 | 何を測っているか |
 |------|--------|----------------|
@@ -196,7 +205,7 @@ arm64 ネイティブ、10回（warm pull のみ3回）の中央値。
 | Container stop | **10,365ms** | **Docker の猶予時間**（下記）|
 | Container restart | **10,645ms** | 同上（stop を含む）|
 | Container cleanup | 298ms | 動いているコンテナへの `docker rm -f` |
-| Image pull (warm) | 2,282ms | キャッシュ済みの `docker pull` |
+| Image pull (warm) | **N/A** | キャッシュ済みの `docker pull`。当時記録された 2,282ms は、レジストリに無いローカル専用のイメージ（`kimigayo-os:standard-arm64`）に対する**失敗した pull の時間**で、pull の性能ではない（2026-10-13 に判明。スクリプトは失敗した回を記録しないように直した）。測り直していない |
 
 ### stop と restart の 10 秒は Kimigayo のせいではない
 
