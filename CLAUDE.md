@@ -797,7 +797,7 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 
 ```bash
 make test                      # コンテナ内で pytest
-python3 -m pytest tests/unit -q          # 単体（275 件、2026-10-12 時点）
+python3 -m pytest tests/unit -q          # 単体（344 件、2026-10-13 時点）
 python3 -m pytest tests/property -q      # プロパティ（hypothesis、255 件、同）
 python3 -m pytest -m "not slow" -q       # 遅いものを除く
 pip install -r requirements-dev.txt      # pytest / hypothesis 等
@@ -829,7 +829,10 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   キャッシュされるが**これは Git 管理下に置かない**
   （2026-10-09 に 59 ファイルを追跡から外した）
 - `tests/integration/` の `.sh` は実際に Docker を叩く。
-  `test_docker_startup.sh`・`test_functionality.sh` はイメージが必要
+  `test_docker_startup.sh`・`test_functionality.sh` はイメージが必要で、
+  既定で `kimigayo-os:<variant>-<arch>`（`make ci-build-local` が作る名前）を見る。
+  ホストの `make test-docker` / `test-func` が `VARIANT` / `ARCH` / `VERSION` を渡す
+  （2026-10-13 までは実在しない名前を既定にして、何も検査せずに通っていた）
 - **CI のテストを `|| echo "... not ready yet"` で握り潰さない。**
   2026-10-09 まで `build-workflow.yml`・`release.yml`・`Makefile` の
   `test-integration` がこの形になっていて、**522 件すべて通るのに CI では
@@ -886,7 +889,7 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   **NVD に CVE が載るとコードを変えていない push でも落ちる**（正しい信号）
 - **ビルド後の検査は `scripts/verify-image.sh` に集める**（CI・release・
   ローカル共通）。強化まわりでは、全 ELF の PIE / RELRO / BIND_NOW /
-  非実行スタック、出荷物の版と `versions.mk` の突合、cpio の
+  非実行スタック / スタック保護、出荷物の版と `versions.mk` の突合、cpio の
   パストラバーサル回帰を見る。**ビルド前の検査（ShellCheck・Trivy FS・
   Dependency Review）だけでは、出荷物に何が入ったかは分からない**
 - `.github/workflows/security.yml` が毎日 02:00 UTC に走り、
@@ -894,7 +897,10 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   **これらが作る PR / Issue は「上流が動いた」という一次情報**なので、
   バージョン更新の起点として先に見る
 - **外部 Action は tag で固定する。** `@master` 参照は供給網のリスクかつ
-  再現性がない（2026-10-09 に `trivy-action`・`action-shellcheck` を固定した）
+  再現性がない（2026-10-09 に `trivy-action`・`action-shellcheck` を固定した）。
+  ShellCheck は 2026-10-13 に Action をやめ、ダイジェストで固定した
+  `koalaman/shellcheck` を `ci.yml`・`release.yml` から直接 `docker run` している
+  （`ludeeus/action-shellcheck` は `.claude/hooks` を実際には検査していなかった）
 - 脆弱性の報告・運用は [docs/security/](docs/security/) 配下
   （`SECURITY_POLICY.md`・`VULNERABILITY_REPORTING.md`・`HARDENING_GUIDE.md`）
 
@@ -932,7 +938,10 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   **部分一致は使えない**（このリポジトリには `memory.py`・
   `memory_benchmark.py`・`benchmark-memory.sh` があり `memo` を含む。
   `RELEASE_NOTES.md` も `NOTES` を含むが実ドキュメント）。
-  basename に対する厳密な規則だけを使い、
+  basename に対する厳密な規則だけを使う。`memo-` のような接頭辞の規則は
+  文書系の拡張子（なし・`.md`・`.txt` など）のときだけ効かせる
+  （2026-10-13 まで `memo-paths.py` 自身がメモ判定され、Hook が自分の編集を止めていた）。
+  規則は `tests/unit/test_memo_paths.py` で固定してあり、
   **追跡中の全ファイルに誤爆しないことを実測で確認してから変える**:
 
   ```bash
@@ -954,7 +963,7 @@ PERFORMANCE_TUNING.md` が、追跡していない `TODO.md` を指していた�
 **判定は追跡ファイル基準で機械的に行う:**
 
 ```bash
-make check-links        # scripts/check-links.py
+make check-links        # scripts/check-links.py（#見出し へのリンク切れも見る）
 make check-stale-docs   # 一度直した古い記述が戻っていないか（scripts/check-stale-docs.py の RULES）
 ```
 
@@ -1017,7 +1026,7 @@ make check-stale-docs   # 一度直した古い記述が戻っていないか（
 | --- | --- | --- |
 | `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`reset --hard`／`filter-branch`・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add をブロック |
 | `guard-memo-files.sh` | PreToolUse(Bash) | メモ・下書きのファイルの `git add` / `git commit` をブロック（→「メモは機密扱いにする」節） |
-| `guard-edit-during-build.sh` | PreToolUse(Edit\|Write\|MultiEdit) | ビルドコンテナが走っている間の `scripts/`・`build-system/` の編集をブロック（bash は実行中のスクリプトを読み進めるため） |
+| `guard-edit-during-build.sh` | PreToolUse(Edit\|Write\|MultiEdit) | ビルドコンテナが走っている間の `scripts/`・`build-system/` の編集をブロック（bash は実行中のスクリプトを読み進めるため）。見るのはビルド環境のコンテナ（イメージ `kimigayo-os-build`・名前 `kimigayo-build-env`・compose のサービス `kimigayo-build`）だけで、`kimigayo-os:*` で動かす計測・テストのコンテナには反応しない |
 | `after-edit.sh` | PostToolUse(Edit\|Write\|MultiEdit) | `.sh` の構文エラーをブロック。`versions.mk` を触ったら連動先を出す。`-Wno-error` や `\|\| true` を**新しく足したら**指摘する |
 | `check-untracked.sh` | Stop | 未追跡の新規ファイルが残っていたら1度だけ止める |
 
@@ -1283,10 +1292,10 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `ci.yml` | `main`/`develop` への push、`main` への PR | ShellCheck → リンク検査 → 古い記述の検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
-| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・GitHub Release 作成・SARIF 連携 |
+| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
+| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM の保存までで push しない） |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・Issue 起票 |
-| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作る |
+| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り、その PR ブランチで `ci.yml` を起動する |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
@@ -1301,7 +1310,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 **ローカルで変更したら、外に出す前に最低これを通す:**
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 530 件（2026-10-12 時点）
+python3 -m pytest tests/unit tests/property -q     # 599 件（2026-10-13 時点）
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
 make security-scan                                 # scan-image + Trivy FS + ShellCheck
@@ -1353,5 +1362,4 @@ Bash コマンドを自動で `rtk` 付きに書き換える（`git status` → 
   未対応コマンドは素通しなので安全
 - 生出力が必要なとき: `rtk proxy <cmd>`。削減量の確認: `rtk gain`
 - **ビルドログは大きい。** `build/*.log` を読むときは `grep` で絞るか
-  `make log-kernel` / `log-musl`（最新100行）を使う。
-  `make log-openrc` は `build-openrc.sh` がログを書かないため何も出ない
+  `make log-kernel` / `log-musl` / `log-openrc`（最新100行）を使う
