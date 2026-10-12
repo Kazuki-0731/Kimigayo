@@ -12,33 +12,36 @@ include versions.mk
 KIMIGAYO_VERSION ?= $(shell bash scripts/get-version.sh 2>/dev/null || echo dev)
 export ALPINE_VERSION KIMIGAYO_VERSION
 
-.PHONY: help up down build rebuild clean logs shell test test-docker build-os clean-cache clean-all info
+.PHONY: help up down build clean logs shell test test-docker test-func status clean-cache clean-all info
+.PHONY: docker-build docker-rebuild log-kernel log-musl log-openrc
 .PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs test-integration test-smoke ci-build-local ci-build-all
-.PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan version show-version changelog
-.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-all
+.PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan trivy-fs-scan shellcheck-scan version show-version changelog
+.PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-busybox benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
 
 # デフォルトターゲット
 help:
 	@echo "╔════════════════════════════════════════════════════════════════╗"
 	@echo "║         Kimigayo OS - コンテナ向けOSビルドシステム             ║"
-	@echo "║           軽量・高速・セキュアなDockerイメージOS               ║"
+	@echo "║              軽量・セキュアなDockerイメージOS                  ║"
 	@echo "╚════════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "📦 クイックスタート:"
 	@echo "  1. make docker-build  # ビルド環境を構築"
-	@echo "  2. make build         # OSをビルド"
+	@echo "  2. make build         # OSをビルド（カーネル込み。開発機では数時間かかる）"
 	@echo "  3. make test          # テストを実行"
 	@echo ""
 	@echo "🔧 OSビルドコマンド:"
-	@echo "  make build        - Kimigayo OSをビルド [1/4]～[4/4]"
+	@echo "  make build        - Kimigayo OSをビルド [1/4]～[4/4]（カーネル込み・長時間）"
+	@echo "                     カーネル抜き: docker compose run --rm kimigayo-build \\"
+	@echo "                       make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard"
 	@echo "  make test         - テストを実行"
 	@echo "  make test-docker  - Dockerイメージ起動テストを実行"
 	@echo "  make test-func    - 機能テストを実行 (BusyBox, Network)"
 	@echo "  make status       - ビルド状態を表示（どこまで完了したか確認）"
 	@echo "  make info         - ビルド設定情報を表示"
 	@echo ""
-	@echo "🚀 CI/CDローカル実行（GitHub Actions相当）:"
+	@echo "🚀 CI/CDローカル実行（GitHub Actions相当。Linux ホストのみ、macOS では通らない）:"
 	@echo "  make ci-build-local      - 完全なCI/CDビルド（rootfs→テスト→イメージ）"
 	@echo "  make ci-build-push       - ビルド＋Docker Hubへプッシュ"
 	@echo "  make build-rootfs        - rootfsのみビルド"
@@ -47,6 +50,7 @@ help:
 	@echo "  make build-image         - Dockerイメージをビルド"
 	@echo "  make test-smoke          - スモークテストを実行"
 	@echo "  make ci-build-all        - 全バリアントをビルド"
+	@echo "  make verify-image        - 既にあるイメージを検証（ビルドしない）"
 	@echo ""
 	@echo "🐳 Docker Hub連携:"
 	@echo "  make docker-hub-login    - Docker Hubにログイン"
@@ -56,6 +60,10 @@ help:
 	@echo "  make scan-image          - 成果物の CVE 照合（SBOM + Grype）と秘密情報スキャン"
 	@echo "  make trivy-scan          - Trivyでイメージスキャン（Kimigayo は識別されない）"
 	@echo "  make security-scan       - 総合セキュリティスキャン（scan-image + Trivy FS + ShellCheck）"
+	@echo "  make trivy-fs-scan       - Trivyでリポジトリをスキャン"
+	@echo "  make shellcheck-scan     - ShellCheckでスクリプトを静的解析"
+	@echo "  make check-links         - ドキュメントのリンク切れ検査（追跡ファイル基準）"
+	@echo "  make check-stale-docs    - 古い記述の検査（scripts/check-stale-docs.py）"
 	@echo ""
 	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
 	@echo "    1. .envファイルを作成: cp .env.example .env"
@@ -64,7 +72,7 @@ help:
 	@echo ""
 	@echo "  パラメータ例:"
 	@echo "    make ci-build-local                              # .envの設定を使用"
-	@echo "    VARIANT=minimal make ci-build-local              # .envを上書き"
+	@echo "    make ci-build-local VARIANT=minimal              # .envを上書き（環境変数では上書きできない）"
 	@echo "    make ci-build-push                               # ビルド＆プッシュ"
 	@echo ""
 	@echo "🐳 Docker管理:"
@@ -78,15 +86,17 @@ help:
 	@echo "🗑️  クリーンアップ:"
 	@echo "  make clean        - ビルド成果物のみ削除（ダウンロードキャッシュ保持）"
 	@echo "  make clean-cache  - ダウンロードキャッシュを削除"
-	@echo "  make clean-all    - すべて削除（推奨：完全リセット）"
+	@echo "  make clean-all    - ダウンロードキャッシュとビルド環境イメージを削除"
+	@echo "                     （約150MBの再取得になる。最後の手段。build/・output/ は残る）"
 	@echo ""
 	@echo "📌 バージョン管理:"
 	@echo "  make version      - バージョン番号を取得"
 	@echo "  make show-version - バージョン情報を表示"
+	@echo "  make print-versions - versions.mk の構成要素の版を表示"
 	@echo "  make changelog    - CHANGELOGの下書きをbuild/に出す（CHANGELOG.mdは書き換えない）"
 	@echo ""
 	@echo "⚡ ベンチマーク:"
-	@echo "  make benchmark            - 全ベンチマーク実行"
+	@echo "  make benchmark            - 全ベンチマーク実行（benchmark-all と同じ）"
 	@echo "  make benchmark-startup    - 起動時間測定"
 	@echo "  make benchmark-memory     - メモリ使用量測定"
 	@echo "  make benchmark-size       - ディスクサイズ比較"
@@ -97,16 +107,16 @@ help:
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
 	@echo "  make log-musl     - musl libcビルドログ（最新100行）"
-	@echo "  make log-openrc   - OpenRCビルドログ（最新100行）"
 	@echo ""
 	@echo "💡 推奨ワークフロー（リアルタイム出力）:"
 	@echo "  1. make shell               # コンテナに入る"
-	@echo "  2. make build               # コンテナ内でビルド"
-	@echo "  3. tmux new -s build        # tmuxでバックグラウンド実行"
-	@echo "  4. make build && echo ✅    # ビルド＆完了通知"
-	@echo "  5. Ctrl+B → D               # デタッチ（バックグラウンド化）"
+	@echo "  2. tmux new -s build        # tmuxを起こす"
+	@echo "  3. make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard && echo ✅"
+	@echo "                              # tmux内でビルド（開発機ではカーネル抜き）"
+	@echo "  4. Ctrl+B → D               # デタッチ（バックグラウンド化）"
 	@echo ""
 	@echo "⚙️  コンテナ内で使える個別ビルド:"
+	@echo "  make build-no-kernel        # カーネル以外すべて（IMAGE_TYPE を明示する）"
 	@echo "  make musl                   # musl libcのみ [1/4]"
 	@echo "  make kernel                 # Linuxカーネルのみ [2/4]"
 	@echo "  make busybox                # BusyBoxのみ [3/4]"
@@ -214,8 +224,6 @@ VARIANT ?= standard
 VERSION ?= latest
 DOCKER_HUB_USERNAME ?= ishinokazuki
 IMAGE_NAME ?= kimigayo-os
-BUILD_JOBS ?= 4
-DEBUG ?= false
 DOCKER_HUB_ACCESS_TOKEN ?=
 
 TARBALL_NAME = kimigayo-$(VARIANT)-$(VERSION)-$(ARCH).tar.gz
@@ -506,7 +514,6 @@ version:
 show-version:
 	@bash scripts/show-version.sh
 
-# CHANGELOG.mdを生成
 # versions.mk の値を単発で取り出す（スクリプト・ドキュメントから使う）
 print-kernel:
 	@echo $(KERNEL_VERSION)
@@ -521,6 +528,7 @@ print-alpine:
 print-versions:
 	@echo "kernel=$(KERNEL_VERSION) musl=$(MUSL_VERSION) busybox=$(BUSYBOX_VERSION) openrc=$(OPENRC_VERSION) alpine=$(ALPINE_VERSION)"
 
+# CHANGELOG の下書きを build/ に出す（CHANGELOG.md は書き換えない）
 changelog:
 	@bash scripts/generate-changelog.sh
 
@@ -551,12 +559,12 @@ benchmark-comparison:
 		bash scripts/benchmark-comparison.sh; \
 	fi
 
-# コンテナライフサイクルベンチマーク（Phase 2 - Issue #29）
+# コンテナライフサイクルベンチマーク
 # コンテナ起動、停止、再起動のライフサイクル全体の性能を測定
 benchmark-lifecycle:
 	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-lifecycle.sh
 
-# BusyBoxコマンド性能ベンチマーク（Phase 3 - Issue #30）
+# BusyBoxコマンド性能ベンチマーク
 # ls, grep, find, awk, sort, cat, wc, headの実行速度測定
 benchmark-busybox:
 	@IMAGE_NAME=$(IMAGE_NAME):$(VARIANT)-$(ARCH) bash scripts/benchmark-busybox.sh
