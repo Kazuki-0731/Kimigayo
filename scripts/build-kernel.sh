@@ -87,7 +87,6 @@ init_build_dirs() {
     mkdir -p "$KERNEL_BUILD_DIR"
     mkdir -p "$KERNEL_OUTPUT_DIR"
     mkdir -p "$(dirname "$BUILD_LOG")"
-    mkdir -p "$KERNEL_CONFIG_DIR"
 
     log_info "Build directories initialized"
 }
@@ -167,15 +166,12 @@ generate_kernel_config() {
             }
         fi
 
-        # Create default custom config template
-        log_info "Creating default config template: $custom_config"
-        cat > "$custom_config" << 'EOF'
-# Kimigayo OS Kernel Configuration
-# This is a placeholder config file
-# scripts/build-kernel.sh ignores any config containing the line above and
-# uses the upstream defconfig plus apply_security_hardening (scripts/config).
-# To use a custom config, replace this whole file with a real .config.
-EOF
+        # 以前はここで src/kernel/config/<arch>.config にプレースホルダを
+        # 書き出していた。ビルドがソースツリー（src/）を書き換えるうえ、
+        # arm64 では追跡していない src/kernel/config/arm64.config が毎回
+        # 生まれていた。中身は「無視される」と書いただけのファイルなので
+        # 作らない（2026-10-13）。
+        log_info "No custom config at $custom_config; using $KERNEL_CONFIG + hardening"
     fi
 
     log_info "Kernel configuration generated"
@@ -214,16 +210,13 @@ apply_security_hardening() {
         scripts/config --disable IP6_NF_IPTABLES
         scripts/config --disable BRIDGE_NETFILTER
 
-        # 注: 6.18 ではシンボル名が MITIGATION_RETPOLINE に変わっており、
-        # 下の --disable RETPOLINE は存在しないシンボルを指すので何もしていない
-        # （arch/x86/Kconfig の config MITIGATION_RETPOLINE。この行の扱いは別途判断）。
-        # 6.6 系を GCC 15 でビルドするための回避策の残骸。realmode の
+        # 注: 以前ここにあった `scripts/config --disable RETPOLINE` は
+        # 2026-10-13 に外した。6.6 系を GCC 15 でビルドするための回避策の
+        # 残骸で、6.18 ではシンボル名が MITIGATION_RETPOLINE に変わっており
+        # 何もしていなかった。MITIGATION_RETPOLINE を無効にし直すことは
+        # しない（Spectre v2 の緩和を外すことになる）。realmode の
         # __x86_return_thunk の問題は REALMODE_CFLAGS を上書きしないことで
         # 解決している（build_kernel のコメント参照）。
-        if [ "$ARCH" = "x86_64" ]; then
-            scripts/config --disable RETPOLINE
-            log_info "scripts/config --disable RETPOLINE: no-op on this kernel (the symbol is MITIGATION_RETPOLINE)"
-        fi
 
         log_info "Security hardening applied to kernel config"
         log_info "Netfilter/iptables disabled (QEMU/bare-metal test kernel; not shipped in the image)"
@@ -446,11 +439,27 @@ install_kernel() {
     cp System.map "$KERNEL_OUTPUT_DIR/System.map-${KERNEL_VERSION}-${ARCH}"
     cp .config "$KERNEL_OUTPUT_DIR/config-${KERNEL_VERSION}-${ARCH}"
 
-    # Install modules (if built)
-    if make modules_install INSTALL_MOD_PATH="$KERNEL_OUTPUT_DIR/modules" ARCH="$KERNEL_ARCH" 2>/dev/null; then
-        log_info "Kernel modules installed to $KERNEL_OUTPUT_DIR/modules"
+    # モジュールは「ビルドされたときだけ」入れる。
+    #
+    # build_kernel が作るのは bzImage / Image だけで、modules ターゲットは
+    # 回していない。以前は無条件に modules_install を叩き、失敗を
+    # 2>/dev/null で捨てて「No kernel modules to install」と出していたため、
+    # 本当にモジュールがあって install が壊れた場合も同じ表示になっていた。
+    # arm64 では LLVM=1 も渡しておらず、GCC 前提で走っていた。
+    # modules.order はモジュールをビルドしたときにだけ生成される。
+    if [ -f modules.order ]; then
+        local llvm=()
+        [ "$ARCH" = "arm64" ] && llvm=(LLVM=1)
+        if make ARCH="$KERNEL_ARCH" "${llvm[@]}" modules_install \
+                INSTALL_MOD_PATH="$KERNEL_OUTPUT_DIR/modules" >> "$BUILD_LOG" 2>&1; then
+            log_info "Kernel modules installed to $KERNEL_OUTPUT_DIR/modules"
+        else
+            log_error "modules_install failed (see $BUILD_LOG)"
+            tail -n 20 "$BUILD_LOG"
+            exit 1
+        fi
     else
-        log_warn "No kernel modules to install"
+        log_info "Modules were not built (only the kernel image is built); skipping modules_install"
     fi
 
     log_info "Kernel installation completed"
