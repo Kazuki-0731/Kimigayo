@@ -2,14 +2,13 @@
 
 Kimigayo OSのコアユーティリティ
 
-## 構造
+**このディレクトリには README しかありません。** コアユーティリティは
+BusyBox で、設定は `src/busybox/config/`（minimal / standard / extended）、
+パッチは `src/busybox/patches/` にあります。
 
-- `busybox/` - BusyBox設定とカスタマイズ
-- `tools/` - 追加ユーティリティ
-
-## BusyBoxコンポーネント
+## BusyBoxコンポーネント（バリアントにより異なる）
 
 - シェル (ash)
 - ファイル操作 (cp, mv, rm, tar, gzip, etc.)
-- ネットワーク (wget, nc, etc.)
+- ネットワーク (nc など。wget は standard / extended のみ)
 - システム (ps, top, kill, etc.)
