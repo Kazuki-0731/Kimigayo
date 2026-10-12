@@ -50,8 +50,7 @@ make test
 > Apple Silicon では QEMU 越しになり現実的ではありません）。
 > カーネルが要るのはベアメタル／QEMU を試すときだけなので、
 > 普段は `build-no-kernel` を使います。
-> **`IMAGE_TYPE` は常に明示してください。** 省くと BusyBox と rootfs の
-> 既定がずれ、minimal になることがあります。
+> `IMAGE_TYPE` の既定は `standard` です。何を作るかが分かるよう明示を勧めます。
 
 **簡単コマンド（ホストOSから）：**
 
@@ -87,6 +86,7 @@ make clean-all
 # ビルドログを確認（最新100行）
 make log-kernel
 make log-musl
+make log-openrc
 ```
 
 **コンテナ内で実行（リアルタイム出力）：**
@@ -240,7 +240,7 @@ make shell
 # コンテナ内でビルドログをリアルタイム確認
 tail -f /build/kimigayo/build/logs/kernel-build.log   # カーネルビルドログ
 tail -f /build/kimigayo/build/logs/musl-build.log     # musl libcビルドログ
-# OpenRC（build-openrc.sh）はログファイルを書かない。端末の出力を見る
+tail -f /build/kimigayo/build/logs/openrc-build.log   # OpenRCビルドログ
 
 # コンテナ内で過去のログを確認
 tail -n 100 /build/kimigayo/build/logs/kernel-build.log
@@ -356,7 +356,7 @@ CI でもカーネルは作りません。ベアメタル／QEMU を試すとき
 # ホスト側
 make help              # 全ターゲット
 make info              # ビルド設定
-make status            # どこまでできているか
+make status            # どこまでできているか（musl・カーネル・BusyBox・OpenRC・rootfs。カーネルは任意）
 make build             # コンテナ内で make build を実行（カーネルを含む）
 make test              # コンテナ内で pytest tests/ -v（unit・property・integration）
 make test-integration  # 統合テスト
@@ -387,9 +387,8 @@ make ci-build-all ARCH=x86_64          # 3 バリアントを順に
 ```
 
 - ホスト側の既定は `VARIANT=standard` / `ARCH=x86_64`。
-  **コンテナ側の `IMAGE_TYPE` には既定が無いので、常に明示します**
-  （省くと BusyBox は standard、rootfs は minimal を既定にしてずれ、
-  minimal になることがあります）
+  コンテナ側の `IMAGE_TYPE` の既定は `standard`（`build-system/Makefile` が
+  export し、BusyBox と rootfs に同じ値が届く）
 - **ホストの `make build ARCH=arm64` はアーキテクチャを変えません**
   （ホストの `build` はコンテナへ変数を渡さない）。上のようにコンテナ側で
   `TARGET_ARCH` を渡してください
@@ -436,8 +435,8 @@ docker compose run --rm -T kimigayo-build make busybox \
 
 **使われるのは `src/kernel/config/<arch>.config` だけです**
 （`scripts/build-kernel.sh` が選びます）。無いとき、または
-プレースホルダ行（`# This is a placeholder`）を含むときは上流の defconfig を使い、
-無ければプレースホルダの `<arch>.config` を書き出します。
+プレースホルダ行（`# This is a placeholder`）を含むときは上流の defconfig を使います
+（無いときに `src/kernel/config/` へ何かを書き出すことはありません）。
 **追跡中の `x86_64.config` はプレースホルダなので、今は使われていません。**
 自分の config を使うなら、その行を含まない完全な `.config` で置き換えます。
 
@@ -525,7 +524,7 @@ PATCHED_CVES=musl:CVE-2026-40200 musl:CVE-2026-6042 busybox:CVE-2026-38754 ...
 bash scripts/verify-image.sh <image> <variant> <arch>
 ```
 
-版の突合・全 ELF の PIE / RELRO / BIND_NOW / 非実行スタック・OpenRC の起動などを
+版の突合・全 ELF の PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護・OpenRC の起動などを
 検査します（34 項目、Minimal は 33）。**「イメージが起動した」は検証ではありません。**
 
 ## 再現可能ビルド
@@ -561,7 +560,7 @@ standard / x86_64 の tarball の SHA-256 が一致しました。
 ```bash
 make log-kernel        # build/logs/kernel-build.log の最新100行
 make log-musl
-# make log-openrc もあるが、build-openrc.sh がログを書かないため読むものが無い
+make log-openrc        # build/logs/openrc-build.log
 
 # パッチが黙ってスキップされていないか
 grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-patches.log
@@ -635,6 +634,7 @@ docker compose run --rm kimigayo-build make clean-busybox   # clean-musl / clean
 | `make clean` | ビルド成果物だけ |
 | `make clean-cache` | ダウンロードキャッシュ（volume） |
 | `make clean-all` | コンテナ・volume・ビルド環境のイメージ。**約 150MB の再ダウンロードになる**ので最後の手段（`build/` は残るので、版が同じならビルド済みの構成要素は飛ばされる） |
+| `make clean-all`（コンテナ内） | `build/`（`downloads/` を除く）と `output/`。ダウンロードキャッシュは volume なので残る |
 
 ## CI/CD との統合
 
@@ -642,8 +642,8 @@ GitHub Actions のワークフローは `.github/workflows/` にあります。
 
 | ワークフロー | いつ | 何をするか |
 |------------|------|-----------|
-| `ci.yml` | `main` / `develop` への push、`main` への PR | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
-| `release.yml` | `v*.*.*` タグ、手動 | Docker Hub への公開・Cosign 署名・GitHub Release（手動実行では署名と Release は飛ぶ） |
+| `ci.yml` | `main` への push・PR、手動 | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
+| `release.yml` | `v*.*.*` タグ、手動 | Docker Hub への公開・Cosign 署名・GitHub Release（**公開はタグのときだけ**。手動実行はビルド・検証・スキャンまでで push しない） |
 | `manual-build.yml` | 手動 | バリアント・アーキを選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
 詳しくは [CICD_GUIDE.md](CICD_GUIDE.md)。
