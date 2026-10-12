@@ -5,9 +5,21 @@
 # Claude
 .claude
 
+# Secrets (Docker Hub token). Never send to the daemon.
+.env
+
+# Test / benchmark caches
+.hypothesis/
+.pytest_cache/
+benchmark-results/
+
 # Build artifacts
 build/
-# output/ - needed for runtime Docker image build
+# output/ は rootfs の tarball だけ残す。Dockerfile.runtime が
+# COPY ${TARBALL_PATH}（既定 output/*.tar.gz）で使うため。
+# それ以外（ログや一時ファイル）は送らない。
+output/*
+!output/*.tar.gz
 *.o
 *.a
 *.so
