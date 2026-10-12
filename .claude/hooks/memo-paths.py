@@ -48,6 +48,13 @@ PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 接頭辞の規則は、文書・テキストの拡張子（または拡張子なし）のときだけ使う。
+# コード（.py / .sh など）は名前が memo- で始まってもメモではない。
+# このファイル自身（memo-paths.py）が PREFIX_RE に一致して
+# 「メモ扱い」になり、編集・コミットを guard-memo-files.sh に
+# 止められていた（2026-10-13）。
+PREFIX_EXTS = {"", ".md", ".markdown", ".txt", ".text", ".org", ".rst"}
+
 # basename がこれで終わるもの。
 # notes は入れない。RELEASE_NOTES.md は実ドキュメントであり、
 # project_notes.md と名前だけでは区別できない。notes 単独の場合は
@@ -62,6 +69,17 @@ SUFFIX_RE = re.compile(
 # Claude Code の作業ディレクトリで、共有するのは設定だけ
 # （settings.json / hooks / agents / skills / commands）。
 MEMO_DIRS_MD = (".claude",)
+
+
+def _doc_ext(base: str) -> str:
+    """basename の最後の拡張子（小文字）。'notes-2026' のように無ければ ''。
+
+    'todo.v2' のように数字だけの「拡張子」は版番号とみなして '' を返す。
+    """
+    ext = posixpath.splitext(base)[1].lower()
+    if ext and ext[1:].isdigit():
+        return ""
+    return ext
 
 
 def is_memo_path(path: str) -> bool:
@@ -79,7 +97,7 @@ def is_memo_path(path: str) -> bool:
 
     if base.lower() in EXACT:
         return True
-    if PREFIX_RE.match(base):
+    if PREFIX_RE.match(base) and _doc_ext(base) in PREFIX_EXTS:
         return True
     if SUFFIX_RE.search(base):
         return True
