@@ -8,14 +8,18 @@
 カーネルはイメージに入らず、コンテナはホストのカーネルで動きます。
 **このため、以下の章の多くはコンテナでは直接使えません。**
 
-| 章 | コンテナ | ベアメタル／VM |
+| 章 | コンテナ | ホスト（ベアメタル／VM）|
 | --- | --- | --- |
-| カーネルセキュリティ（sysctl・モジュール）| **効かない**（`/proc/sys` は読み取り専用。ホスト側で設定）| 効く |
-| ネットワークセキュリティ（`iptables`）| **使えない**（`iptables` は未収録。ホストかオーケストレータで）| 要ビルド追加 |
-| SSH 強化 | **使えない**（`sshd` は未収録。`docker exec` を使う）| 要ビルド追加 |
-| アクセス制御（`sudo`）| **使えない**（`sudo` も `wheel` も無い。`--user` を使う）| 要ビルド追加 |
-| ログとモニタリング | syslog は動いていない。`docker logs` を使う | 効く |
-| インシデント対応 | 読み替えが必要 | 効く |
+| カーネルセキュリティ（sysctl・モジュール）| **効かない**（`/proc/sys` は読み取り専用。ホスト側で設定）| ホストの OS で設定する |
+| ネットワークセキュリティ（`iptables`）| **使えない**（`iptables` は未収録。ホストかオーケストレータで）| ホストの OS で設定する |
+| SSH 強化 | **使えない**（`sshd` は未収録。`docker exec` を使う）| ホストの OS で設定する |
+| アクセス制御（`sudo`）| **使えない**（`sudo` も `wheel` も無い。`--user` を使う）| ホストの OS で設定する |
+| ログとモニタリング | syslog は動いていない。`docker logs` を使う | ホストの OS で設定する |
+| インシデント対応 | 下記の「コンテナの場合」を使う | ホストの OS の手順で |
+
+**ホスト側の作業は、Kimigayo ではなくホストの OS（Ubuntu など）で行います。**
+Kimigayo はパッケージマネージャーを持たず、`iptables`・`sshd`・`sudo`・
+`logrotate`・`auditd` を追加する仕組みもありません。
 
 **コンテナでの設定は[システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)に
 まとめてあります。** こちらを先に読んでください。
@@ -32,8 +36,10 @@
 
 > **「パッケージセキュリティ」の章はありません。**
 > Kimigayo はパッケージマネージャーを**意図的に持ちません**。
-> これがこの OS の最大の防御層で、侵入されても追加の道具を
-> 取得・インストールできません。
+> 侵入されてもパッケージ経由で道具を入れることはできません。
+> ただし `wget`（standard 以上）・`nc`（standard 以上）・`ftpget` などで
+> ファイルを取得することはでき、`/tmp` も既定では書き込み・実行が可能です。
+> 持ち込みを防ぐには `--read-only` と `--tmpfs /tmp:rw,noexec,nosuid` を併用します。
 
 ## セキュリティアーキテクチャ
 
@@ -42,18 +48,18 @@ Kimigayo OSは多層防御（Defense in Depth）の原則に基づいて設計�
 ```
 ┌─────────────────────────────────────────────┐
 │ パッケージマネージャー不在                   │★ Kimigayo
-│   - 追加インストール手段が無い               │
+│   - パッケージ経由の追加インストール手段が無い│
 ├─────────────────────────────────────────────┤
 │ コンパイル層                                 │★ Kimigayo
-│   - PIE, RELRO (-z relro -z now)            │
-│   - Stack protector, FORTIFY_SOURCE=2       │
+│   - PIE, RELRO (-z relro -z now), 非実行スタック│
+│   - Stack protector（arm64 の OpenRC を除く）│
 ├─────────────────────────────────────────────┤
-│ 最小の実行面                                 │★ Kimigayo
-│   - 第三者の共有ライブラリ無し               │
+│ 小さな実行面                                 │★ Kimigayo
+│   - 共有ライブラリは musl と OpenRC のものだけ│
 │   - sshd / sudo / iptables / curl 無し       │
 ├─────────────────────────────────────────────┤
 │ カーネル層                                   │ ホストが提供
-│   - Namespace / cgroup, ASLR                │
+│   - Namespace / cgroup, ASLR, seccomp        │
 ├─────────────────────────────────────────────┤
 │ コンテナランタイム層                         │ 利用者が設定
 │   - --cap-drop / --read-only / --user        │
@@ -62,12 +68,19 @@ Kimigayo OSは多層防御（Defense in Depth）の原則に基づいて設計�
 ```
 
 **★ の 3 層が Kimigayo 自身が担保する部分です。**
+強化フラグの詳細（どれを検査しているか、効果が確認できていないもの）は
+[セキュリティポリシー](SECURITY_POLICY.md#コンパイル時のセキュリティ強化)を見てください。
+
+> **実行面について正直に書くと**: `telnetd`・`ftpd`・`httpd`・`crond`・`nc` などの
+> BusyBox アプレットはイメージに入っています（`nc` は standard 以上、
+> ほかは全バリアント）。**既定では起動していません**（PID 1 は `/bin/sh`）。
+> 不要なら利用者のイメージで該当するリンクを消してください。
 
 > **Kimigayo は seccomp プロファイルを配布していません。**
-> カーネルは `CONFIG_SECCOMP=y`（`defconfig` の既定）ですが、
-> プロファイルはイメージに含めていないので、絞るなら
+> seccomp を効かせるのは**ホストのカーネルとコンテナランタイム**です
+> （Docker は既定のプロファイルを適用します）。さらに絞るなら
 > `docker run --security-opt seccomp=profile.json` のように
-> ランタイム側で指定してください。
+> ランタイム側で指定してください（→ [HARDENING_GUIDE.md](HARDENING_GUIDE.md#seccomp-bpfの使用)）。
 > SELinux / AppArmor のポリシーも配布していません。
 
 ## カーネルセキュリティ
@@ -78,18 +91,18 @@ Kimigayo OSは多層防御（Defense in Depth）の原則に基づいて設計�
 > `sysctl -w` は `Read-only file system` で失敗します。
 > 名前空間化されたものだけ `docker run --sysctl ...` で渡せます
 > （`kernel.kptr_restrict` などは whitelist 外で拒否されます）。
-> **ホスト側で設定してください。**
+> **以下はホスト側の作業です。**
 >
 > イメージが出荷している `/etc/sysctl.d/99-kimigayo-performance.conf` で
-> セキュリティに関わるのは `kernel.randomize_va_space=2` /
-> `fs.suid_dumpable=0` / `kernel.core_uses_pid=1` の 3 つだけです。
+> セキュリティに関わるのは `kernel.randomize_va_space = 2` /
+> `fs.suid_dumpable = 0` / `net.ipv4.tcp_syncookies = 1` の 3 つです
+> （コンテナでは適用されません）。
 
-
-セキュリティを強化するカーネルパラメータの設定：
+ホストで、セキュリティを強化するカーネルパラメータを設定します：
 
 ```bash
-# /etc/sysctl.conf を編集
-vi /etc/sysctl.conf
+# ホストで /etc/sysctl.d/99-security.conf を作成
+vi /etc/sysctl.d/99-security.conf
 ```
 
 以下の設定を追加：
@@ -132,21 +145,20 @@ fs.suid_dumpable = 0
 ```
 
 ```bash
-# 設定を反映
-sysctl -p
+# ホストで設定を反映
+sysctl -p /etc/sysctl.d/99-security.conf
 ```
 
 ### カーネルモジュールのブラックリスト
 
 > **コンテナからは操作できません**（`/lib/modules` が無く `modprobe` は
 > 失敗します。`lsmod` が見せるのは**ホストの**モジュールです）。
-> ホスト側で設定してください。
+> **以下はホスト側の作業です。**
 
-
-不要なカーネルモジュールを無効化：
+ホストで不要なカーネルモジュールを無効化：
 
 ```bash
-# /etc/modprobe.d/blacklist.conf を作成
+# ホストで /etc/modprobe.d/blacklist.conf を作成
 vi /etc/modprobe.d/blacklist.conf
 ```
 
@@ -171,289 +183,125 @@ blacklist tipc
 
 ## ネットワークセキュリティ
 
-### ファイアウォール設定（iptables）
+### 通信の制御
 
-> **`iptables` はイメージに入っていません。** コンテナでは使えません。
-> 通信制御はホスト側か、`docker run -p 127.0.0.1:8080:8080` /
-> `--network none`、Kubernetes の `NetworkPolicy` で行います。
-> 以下はこの rootfs をベアメタル／VM で使い、`iptables` を
-> ビルド時に追加した場合の設定例です。
-
-
-基本的なファイアウォールルールの設定：
+**コンテナの場合** — `iptables` はイメージに入っていません。
+通信制御は `docker run` のオプションか、ホスト／オーケストレータで行います。
 
 ```bash
-# デフォルトポリシー（すべて拒否）
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT
+# 公開するポートをループバックに限る
+docker run -d -p 127.0.0.1:8080:8080 <your-app-image>
 
-# ループバックを許可
-iptables -A INPUT -i lo -j ACCEPT
-iptables -A OUTPUT -o lo -j ACCEPT
-
-# 確立された接続を許可
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# SSH接続を許可（ポート22）
-iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --set
-iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 4 -j DROP
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-
-# HTTP/HTTPSを許可（Webサーバーの場合）
-iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-
-# ICMPを制限的に許可
-iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
-iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
-
-# 無効なパケットをドロップ
-iptables -A INPUT -m state --state INVALID -j DROP
-
-# ログ記録（オプション）
-iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "iptables denied: " --log-level 7
-
-# ルールを保存
-rc-service iptables save
-
-# 自動起動を有効化
-rc-update add iptables default
+# ネットワークを持たせない
+docker run --rm --network none ishinokazuki/kimigayo-os:3.0.2 <command>
 ```
 
-### SSH強化
+Kubernetes なら `NetworkPolicy` を使います。
+
+**ホスト側** — ホストのファイアウォール（`iptables` / `nftables` / `ufw` など）を
+ホストの OS の手順で設定します。Docker が公開したポートは
+ホストの `INPUT` チェインではなく `DOCKER-USER` チェインで制御する点に
+注意してください。
+
+### SSH
 
 > **`sshd` と `/etc/ssh` はイメージに入っていません。** コンテナへの
 > 接続は `docker exec -it <container> /bin/sh` を使います。
 > **`sshd` を入れることは推奨しません**（攻撃面が増え、不変インフラの
-> 前提も崩れます）。以下はベアメタル／VM 向けです。
+> 前提も崩れます）。
 
-
-SSHサーバーのセキュリティ強化：
-
-```bash
-# SSH設定ファイルを編集
-vi /etc/ssh/sshd_config
-```
-
-推奨設定：
+ホスト（VPS）の SSH は、ホストの OS で強化します。最低限の推奨設定
+（ホストの `/etc/ssh/sshd_config`）：
 
 ```ini
-# プロトコルバージョン
-Protocol 2
-
-# rootログインを無効化
 PermitRootLogin no
-
-# パスワード認証を無効化
 PasswordAuthentication no
 PermitEmptyPasswords no
-
-# 公開鍵認証のみ許可
 PubkeyAuthentication yes
-
-# ホストベース認証を無効化
-HostbasedAuthentication no
-IgnoreRhosts yes
-
-# X11フォワーディングを無効化（不要な場合）
 X11Forwarding no
-
-# 最大認証試行回数
 MaxAuthTries 3
-MaxSessions 2
-
-# ログイン時間制限
 LoginGraceTime 30
-
-# 特定のユーザーのみ許可
-AllowUsers user1 user2
-
-# または特定のグループのみ許可
-AllowGroups ssh-users
-
-# 強力な暗号化方式のみ使用
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
-KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
-
-# ポート番号の変更（オプション）
-Port 2222
 ```
 
-```bash
-# SSHサービスを再起動
-rc-service sshd restart
-```
-
-### 公開鍵認証の設定
-
-```bash
-# クライアント側でSSHキーペアを生成（Ed25519推奨）
-ssh-keygen -t ed25519 -C "user@kimigayo"
-
-# または RSA（4096ビット）
-ssh-keygen -t rsa -b 4096 -C "user@kimigayo"
-
-# 公開鍵をサーバーにコピー
-ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server-ip
-
-# サーバー側でパーミッションを確認
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-```
+公開鍵はクライアント側で `ssh-keygen -t ed25519` で作り、
+`ssh-copy-id` でホストに登録します。
 
 ## アクセス制御
 
-### ユーザー管理
+### ユーザーと権限
+
+> **`sudo` も `/etc/sudoers` も `wheel` グループも `/etc/login.defs` もありません**
+> （`su` のアプレットはあります）。イメージの既定ユーザーは root です。
+
+**コンテナの場合** — 権限は `docker run` で落とします。
 
 ```bash
-# 新しいユーザーの作成
-adduser newuser
-
-# sudoグループに追加（管理者権限）
-adduser newuser wheel
-
-# ユーザーのロック（無効化）
-passwd -l username
-
-# ユーザーのアンロック
-passwd -u username
-
-# パスワードポリシーの設定
-vi /etc/login.defs
+docker run --rm \
+  --user 65534:65534 \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  ishinokazuki/kimigayo-os:3.0.2 id
+# → uid=65534(nobody) gid=65534(nogroup)
 ```
 
-```ini
-# パスワードの最小長
-PASS_MIN_LEN 12
+自分のアプリのイメージでは `USER` を指定します
+（`examples/` の 3 つはすべて `USER 65534`）。
 
-# パスワードの有効期限
-PASS_MAX_DAYS 90
-PASS_MIN_DAYS 1
-PASS_WARN_AGE 7
-```
-
-### sudoの設定
-
-> **`sudo` も `/etc/sudoers` も `wheel` グループもありません**
-> （`su` のみ）。コンテナで権限を落とすなら
-> `docker run --user 1000:1000` を使います。以下はベアメタル／VM 向けです。
-
-
-```bash
-# sudoの設定を編集（visudoを使用）
-visudo
-```
-
-推奨設定：
-
-```ini
-# デフォルト設定
-Defaults env_reset
-Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Defaults timestamp_timeout=5
-Defaults use_pty
-
-# ログ記録
-Defaults logfile="/var/log/sudo.log"
-Defaults log_input,log_output
-
-# wheelグループにsudo権限を付与
-%wheel ALL=(ALL) ALL
-
-# パスワードなしsudoを許可（慎重に使用）
-# %wheel ALL=(ALL) NOPASSWD: ALL
-
-# 特定のコマンドのみ許可
-user1 ALL=(ALL) /usr/bin/systemctl, /usr/bin/journalctl
-```
+ユーザーを追加したい場合は、イメージのビルド時に BusyBox の `adduser` を使います
+（`adduser -D -H -s /sbin/nologin app` のように）。BusyBox の `adduser` /
+`passwd` は `/etc/login.defs` を読まないので、パスワードの有効期限などの
+ポリシーは設定できません。
 
 ### ファイルとディレクトリのパーミッション
 
-重要なファイルのパーミッション設定：
+イメージの既定値（3.0.2 実測）:
+
+| ファイル | 権限 |
+| --- | --- |
+| `/etc/passwd` | 644 |
+| `/etc/shadow` | 600（`verify-image.sh` が検査） |
+| `/etc/group` | 644 |
+| `/root` | 700 |
+| `/tmp`・`/var/tmp` | 1777 |
+
+`/etc/gshadow`・`/boot` はありません。setuid / setgid のファイルは 0 個です
+（`verify-image.sh` が検査）。確認するには：
 
 ```bash
-# システムファイルの保護
-chmod 644 /etc/passwd
-chmod 600 /etc/shadow
-chmod 644 /etc/group
-chmod 600 /etc/gshadow
-chmod 600 /boot/grub/grub.cfg
-
-# ログファイルの保護
-chmod 640 /var/log/messages
-chmod 640 /var/log/secure
-
-# 実行ファイルのSUID/SGIDビットを確認
-find / -perm -4000 -type f -exec ls -la {} \;  # SUID
-find / -perm -2000 -type f -exec ls -la {} \;  # SGID
-
-# 不要なSUID/SGIDビットを削除
-chmod u-s /path/to/file
+docker run --rm ishinokazuki/kimigayo-os:3.0.2 \
+  find / -xdev -perm /6000 -type f
+# 何も出なければ setuid / setgid は無い
 ```
 
 ## ログとモニタリング
 
-### システムログの設定
+### システムログ
 
 > **コンテナでは syslog は動いておらず、`/var/log` は空です。**
 > 標準出力・標準エラーに出したものを `docker logs` で読みます。
-> `dmesg` も `CAP_SYSLOG` が無いため使えません。以下はベアメタル／VM 向けです。
-
-
-```bash
-# ログローテーションの設定
-vi /etc/logrotate.conf
-```
-
-```ini
-# ログを週次でローテーション
-weekly
-
-# 4週間分保持
-rotate 4
-
-# 古いログを圧縮
-compress
-
-# ローテーション後に新しいログファイルを作成
-create
-```
-
-### ログの監視
+> `dmesg` も `CAP_SYSLOG` が無いため使えません。
+> `logrotate` もイメージに入っていません。
 
 ```bash
-# システムログのリアルタイム監視
-tail -f /var/log/messages
+# コンテナのログ
+docker logs -f <container>
 
-# 認証ログの監視
-tail -f /var/log/auth.log
-
-# カーネルログの確認
-dmesg | tail -50
-
-# 特定のパターンを検索
-grep "Failed password" /var/log/auth.log
-
-# SSH接続失敗を確認
-grep "Failed password" /var/log/auth.log | awk '{print $11}' | sort | uniq -c | sort -nr
+# ログの肥大化はランタイム側で抑える
+docker run --log-opt max-size=10m --log-opt max-file=3 ...
 ```
 
-### セキュリティイベントのモニタリング
+認証ログやカーネルログ（`/var/log/auth.log`・`dmesg`）を見るのは
+ホスト側の作業です。
+
+### プロセスとネットワークの確認（コンテナ内）
+
+BusyBox の `ps` は `aux` を受け付けません。`ps -o` は extended だけで使えます
+（minimal / standard の `ps` はオプションを持たない）。
 
 ```bash
-# 失敗したログイン試行を監視
-grep "Failed password" /var/log/auth.log
-
-# sudoの使用を監視
-tail -f /var/log/sudo.log
-
-# ファイアウォールログを確認
-grep "iptables denied" /var/log/messages
-
-# 不審なプロセスを確認
-ps aux | grep -v "^root" | grep -E "nc|ncat|netcat|/tmp"
+docker exec <container> ps
+docker exec <container> top -b -n1
+docker exec <container> netstat -tulanp
 ```
 
 ## インシデント対応
@@ -468,87 +316,77 @@ ps aux | grep -v "^root" | grep -E "nc|ncat|netcat|/tmp"
 - 異常なCPU/メモリ使用量
 - 不正なユーザーアカウント
 
-### 初動対応
+### 初動対応（コンテナの場合）
+
+コンテナは作り直せるので、**調べる前に証拠を残し、作り直す**のが基本です。
 
 ```bash
-# 1. ネットワークを遮断
-iptables -P INPUT DROP
-iptables -P OUTPUT DROP
-iptables -P FORWARD DROP
+# 1. ネットワークから切り離す（コンテナは止めない）
+docker network disconnect <network> <container>
 
-# 2. 実行中のプロセスを確認
-ps auxf
+# 2. 実行中のプロセスとネットワーク接続を確認
+docker exec <container> ps
+docker exec <container> netstat -tulanp
 
-# 3. ネットワーク接続を確認
-netstat -tulanp
+# 3. イメージからの変更点を確認（--read-only なら何も出ないはず）
+docker diff <container>
 
-# 4. 最近ログインしたユーザーを確認
-last -a
+# 4. ファイルシステムのスナップショットを取る
+docker export <container> > incident-$(date +%Y%m%d-%H%M%S).tar
+docker logs <container> > incident-$(date +%Y%m%d-%H%M%S).log 2>&1
 
-# 5. システムのスナップショットを作成
-tar -czf /backup/incident-$(date +%Y%m%d-%H%M%S).tar.gz \
-    /var/log \
-    /etc \
-    /home
-
-# 5. メモリダンプを取得（フォレンジック用）
-dd if=/dev/mem of=/backup/memory-dump-$(date +%Y%m%d-%H%M%S).img
+# 5. 停止して、信頼できるイメージから作り直す
+docker stop <container>
 ```
+
+ホストが侵害された疑いがある場合は、ホストの OS の手順で対応します。
 
 ### フォレンジック調査
 
 ```bash
-# ファイルのタイムスタンプを確認
-stat /path/to/suspicious/file
+# 取得したスナップショットを展開して調べる（ホスト側）
+mkdir snapshot && tar -xf incident-*.tar -C snapshot
 
-# 最近変更されたファイルを検索
-find /etc -mtime -1 -type f
+# 公開イメージと実行ファイルのハッシュを比べる
+docker run --rm ishinokazuki/kimigayo-os:3.0.2 sha256sum /bin/busybox
+sha256sum snapshot/bin/busybox
 
-# ハッシュ値の比較
-sha256sum /bin/bash
+# 最近変更されたファイル
+find snapshot/etc -mtime -1 -type f
 
-# 隠しファイルを検索
-find / -name ".*" -type f
+# 隠しファイル
+find snapshot -name ".*" -type f
 
-# SUID/SGIDビットが設定されたファイルを検索
-find / -perm -4000 -o -perm -2000
+# setuid / setgid（公開イメージには 0 個）
+find snapshot -perm -4000 -o -perm -2000
 ```
 
 ## セキュリティチェックリスト
 
 ### 初期セットアップ時
 
-- [ ] 最新のセキュリティアップデートを適用
-- [ ] ファイアウォールを設定
-- [ ] SSH強化（鍵認証、rootログイン無効化）
-- [ ] 不要なサービスを無効化
-- [ ] カーネルパラメータの強化
-- [ ] ユーザーアカウントの設定
-- [ ] sudoの設定
-- [ ] ログローテーションの設定
+- [ ] 使うタグを固定する（例: `3.0.2-standard`）。必要なら `cosign verify` で署名を確認（→ [セキュリティポリシー](SECURITY_POLICY.md#イメージの署名)）
+- [ ] `--read-only`・`--cap-drop ALL`・`--security-opt no-new-privileges`・`--user` を付ける
+- [ ] 公開するポートを絞る（`-p 127.0.0.1:...`、`--network none`）
+- [ ] ホストの OS 側でファイアウォール・SSH・カーネルパラメータを設定する
 
 ### 定期的なメンテナンス（週次）
 
-- [ ] セキュリティアップデートの確認と適用
-- [ ] ログの確認
-- [ ] パッケージ監査の実施
-- [ ] ディスク使用量の確認
-- [ ] バックアップの確認
+- [ ] 新しいリリース（[GitHub Releases](https://github.com/Kazuki-0731/Kimigayo/releases)）とセキュリティアドバイザリを確認する
+- [ ] 新しい版が出ていたら、イメージを pull してコンテナを作り直す（コンテナ内で更新する手段はありません）
+- [ ] `docker logs` を確認する
 
 ### 定期的なメンテナンス（月次）
 
-- [ ] パスワードポリシーの見直し
-- [ ] ユーザーアカウントの監査
-- [ ] ファイアウォールルールの見直し
-- [ ] 不要なパッケージの削除
-- [ ] カーネルアップデートの適用
+- [ ] 使っている `docker run` のオプションと公開ポートを見直す
+- [ ] ホストの OS とカーネルを更新する
 
-## 参考リソース
+## 参考資料
 
 - [セキュリティポリシー](SECURITY_POLICY.md)
 - [脆弱性報告手順](VULNERABILITY_REPORTING.md)
 - [セキュリティ強化設定](HARDENING_GUIDE.md)
-- [CIS Benchmarks](https://www.cisecurity.org/benchmark/alpine_linux)
+- [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker)
 
 ## 緊急連絡先
 
