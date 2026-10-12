@@ -173,9 +173,9 @@ make print-versions    # 構成要素の版（versions.mk）
 
 #### ビルド
 
-**バリアントはターゲットではなく変数で選びます。コンテナ側では
-`IMAGE_TYPE` を常に明示してください**（省くと BusyBox と rootfs の既定が
-ずれ、minimal になることがあります）。
+**バリアントはターゲットではなく変数で選びます。** コンテナ側の
+`IMAGE_TYPE` の既定は `standard` です（`build-system/Makefile` が export し、
+BusyBox と rootfs に同じ値が届く）。何を作るかが読み手に分かるよう、明示を勧めます。
 
 ```bash
 # コンテナ内（build-system/Makefile）。カーネル抜き（Docker イメージにはカーネルは入らない）
@@ -246,9 +246,9 @@ make trivy-fs-scan
 | 変数 | 置き場 | 既定 | 用途 |
 | --- | --- | --- | --- |
 | `TARGET_ARCH` | `build-system/Makefile` | `x86_64` | `x86_64` / `arm64` |
-| `IMAGE_TYPE` | `build-system/Makefile` | **無し（明示する）** | `minimal` / `standard` / `extended` |
+| `IMAGE_TYPE` | `build-system/Makefile` | `standard` | `minimal` / `standard` / `extended` |
 | `VARIANT` | `Makefile`（ホスト側） | `standard` | 同上。ホストのターゲットはこちらを使う |
-| `ARCH` | `Makefile`（ホスト側） | `x86_64` | ホスト側のアーキテクチャ。`build-system` では非推奨（`TARGET_ARCH` に読み替えられ警告が出る。compose が `ARCH=x86_64` を渡すので警告は毎回出る） |
+| `ARCH` | `Makefile`（ホスト側） | `x86_64` | ホスト側のアーキテクチャ。`build-system` では非推奨（コマンドラインで渡すと警告を出して `TARGET_ARCH` に読み替える。`ARCH=arm64` でも arm64 になる） |
 | `KIMIGAYO_VERSION` | `Makefile`（ホスト側） | `scripts/get-version.sh`（`git describe`）の結果。失敗時 `dev` | `/etc/os-release` などに入る版 |
 | `VERSION` | `Makefile`（ホスト側） | `latest` | tarball 名・ローカルのタグに入る文字列 |
 | `V` | `build-system/Makefile` | `0` | `1` で詳細出力 |
