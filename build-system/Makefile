@@ -61,13 +61,14 @@ SCRIPTS_DIR := $(PROJECT_ROOT)/scripts
 TESTS_DIR := $(PROJECT_ROOT)/tests
 
 KERNEL_SRC := $(SRC_DIR)/kernel
-INIT_SRC := $(SRC_DIR)/init
-PKG_SRC := $(SRC_DIR)/pkg
-UTILS_SRC := $(SRC_DIR)/utils
 
 # Cross-compilation settings (already defined above based on TARGET_ARCH)
 
 # Compiler and flags
+#
+# ここの CC / CFLAGS / LDFLAGS は export しておらず、ビルドでは使われない
+# （make info で表示するだけの参考値）。実際のフラグは
+# scripts/build-{musl,busybox,openrc}.sh がそれぞれ export CFLAGS で決める。
 CC := $(CROSS_COMPILE)gcc
 CXX := $(CROSS_COMPILE)g++
 LD := $(CROSS_COMPILE)ld
@@ -104,10 +105,11 @@ else
 endif
 
 # Phony targets
-.PHONY: all build build-no-kernel clean help test docker-build docker-test \
-        kernel musl init utils rootfs \
-        security-scan dependency-check qemu-test \
-        install uninstall test-unit test-property test-integration test-musl
+.PHONY: all build build-no-kernel clean help info status version \
+        kernel musl busybox init rootfs \
+        test test-unit test-property test-integration test-musl test-busybox test-openrc \
+        clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output clean-all \
+        docker-build docker-test
 
 # Default target
 all: build
@@ -117,7 +119,8 @@ help:
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  all              - Build everything (default)"
-	@echo "  build            - Build all OS components [1/4] to [4/4]"
+	@echo "  build            - Build all OS components [1/4] to [4/4] (includes kernel)"
+	@echo "  build-no-kernel  - Build musl, BusyBox, OpenRC and rootfs (no kernel)"
 	@echo "  musl             - Build musl libc [1/4]"
 	@echo "  kernel           - Build Linux kernel [2/4]"
 	@echo "  busybox          - Build BusyBox [3/4]"
@@ -132,40 +135,31 @@ help:
 	@echo "  clean-openrc     - Remove only OpenRC build artifacts"
 	@echo "  clean-rootfs     - Remove only rootfs build artifacts"
 	@echo "  clean-output     - Remove only output directory"
-	@echo "  clean-all        - Remove everything (including downloads & Docker)"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test             - Run all tests"
 	@echo "  test-unit        - Run unit tests only"
 	@echo "  test-property    - Run property-based tests only"
 	@echo "  test-integration - Run integration tests only"
-	@echo ""
-	@echo "Docker Targets:"
-	@echo "  docker-build     - Build Docker environment"
-	@echo "  docker-test      - Run tests in Docker"
-	@echo "  shell            - Enter Docker build environment"
+	@echo "  test-musl        - Run musl libc integration script"
+	@echo "  test-busybox     - Run BusyBox integration script"
+	@echo "  test-openrc      - Run OpenRC integration script"
 	@echo ""
 	@echo "Other Targets:"
-	@echo "  security-scan    - Run security analysis"
-	@echo "  qemu-test        - Test in QEMU"
 	@echo "  info             - Show build information"
 	@echo "  status           - Show build status for each component"
-	@echo ""
-	@echo "Log Targets:"
-	@echo "  log-kernel       - Show kernel build log (last 100 lines)"
-	@echo "  log-musl         - Show musl build log (last 100 lines)"
-	@echo "  log-openrc       - Show OpenRC build log (last 100 lines)"
+	@echo "  version          - Show project version (git describe)"
 	@echo ""
 	@echo "Variables:"
-	@echo "  ARCH             - Target architecture (x86_64, arm64)"
-	@echo "  IMAGE_TYPE       - Image type (minimal, standard, extended)"
-	@echo "  DEBUG            - Enable debug build (yes/no)"
+	@echo "  TARGET_ARCH      - Target architecture (x86_64, arm64)"
+	@echo "  IMAGE_TYPE       - Image type (minimal, standard, extended)."
+	@echo "                     Always set it: without it BusyBox defaults to"
+	@echo "                     standard but rootfs defaults to minimal."
 	@echo "  V                - Verbose output (0/1)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make build ARCH=x86_64"
-	@echo "  make clean-kernel && make kernel"
-	@echo "  make shell"
+	@echo "  make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard"
+	@echo "  make clean-kernel && make kernel TARGET_ARCH=x86_64"
 	@echo "  make test V=1"
 
 # Build target
@@ -180,8 +174,8 @@ build: musl kernel busybox init rootfs
 # Docker イメージにカーネルは入らない（コンテナはホストのカーネルで
 # 動く）。カーネルをビルドするのはベアメタル／QEMU 検証のためなので、
 # musl / BusyBox / OpenRC の変更を確かめたいだけならこれで足りる。
-# CI では src/kernel/ などを触ったときだけ build を使い、それ以外は
-# こちらを使う（1 run あたり数十分の差になる）。
+# CI（ci.yml・release.yml）は常にこちらを使う。カーネルを CI で作るのは
+# manual-build.yml を build_kernel=true で回したときだけ。
 build-no-kernel: musl busybox init rootfs
 	@echo ""
 	@echo "=========================================="
@@ -278,24 +272,6 @@ test-busybox:
 test-openrc:
 	@echo "[TEST] OpenRC integration tests"
 	$(Q)bash $(SCRIPTS_DIR)/test-openrc-integration.sh
-
-# Security
-security-scan:
-	@echo "[SECURITY] Running security scan"
-	@echo "  Security scanning will be implemented in Phase 10"
-
-dependency-check:
-	@echo "[SECURITY] Checking dependencies"
-	@echo "  Dependency check will be implemented in Phase 6"
-
-# QEMU testing
-qemu-test:
-	@echo "[QEMU] Starting QEMU test"
-	@echo "  QEMU testing will be implemented in Phase 4"
-
-qemu-debug:
-	@echo "[QEMU] Starting QEMU with debug options"
-	@echo "  QEMU debugging will be implemented in Phase 4"
 
 # Docker build
 docker-build:

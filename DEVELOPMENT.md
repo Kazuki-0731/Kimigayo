@@ -196,8 +196,8 @@ ARCH=x86_64 bash scripts/test-kernel-qemu.sh
 
 ### QEMUでのデバッグ
 
-ホストの `Makefile` に `make qemu-debug` は無い。ビルドコンテナ側の `qemu-debug` /
-`qemu-test` は「Phase 4 で実装」と表示するだけの空ターゲット。スクリプトを直接使う。
+`make qemu-debug` / `make qemu-test` というターゲットは無い（ビルドコンテナ側にあった
+「Phase 4 で実装」と表示するだけの空ターゲットは 2026-10-13 に消した）。スクリプトを直接使う。
 
 ```bash
 # QEMUでカーネルを起動
