@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**軽量・高速・セキュアなオペレーティングシステム**
+**軽量・セキュアなコンテナ向けオペレーティングシステム**
 
 [![Release](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml)
 [![License: GPL-2.0](https://img.shields.io/badge/License-GPL%202.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
@@ -19,7 +19,7 @@
 
 ### 概要
 
-Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思想をハイブリッド的に組み合わせた軽量・高速・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除し、不変インフラを徹底することで、最小限のリソースで動作し、コンテナ環境やマイクロサービスアーキテクチャで高いパフォーマンスとセキュリティを実現します。
+Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思想をハイブリッド的に組み合わせた、軽量・セキュアなコンテナ向けオペレーティングシステムです。パッケージマネージャーを意図的に排除して不変インフラを徹底し、攻撃面とイメージサイズを小さく保ちながら、シェルで中を確かめられる実用性を残しています。
 
 #### Docker Hub
 - https://hub.docker.com/r/ishinokazuki/kimigayo-os
@@ -755,7 +755,24 @@ Kimigayo OS は以下のプロジェクトにインスパイアされ、技術�
 
 ### Overview
 
-Kimigayo OS is a lightweight, fast, and secure container-focused operating system that combines the design philosophies of both Google's distroless and Alpine Linux in a hybrid approach. By intentionally excluding package managers and enforcing immutable infrastructure, it operates with minimal resources while delivering high performance and security in container environments and microservice architectures.
+Kimigayo OS is a lightweight, secure container-focused operating system that combines the design philosophies of Google's distroless and Alpine Linux in a hybrid approach. By intentionally excluding package managers and enforcing immutable infrastructure, it keeps the attack surface and image size small while still letting you inspect the container with a shell.
+
+### 🎯 Design Philosophy: a Distroless + Alpine Hybrid
+
+**From distroless: no package manager, by design**
+
+- ✅ **Minimal attack surface**: nothing can be installed at runtime, so an intruder cannot fetch extra tools with a package manager
+- ✅ **Immutable infrastructure**: everything is added at build time through multi-stage builds
+- ✅ **Predictability**: what runs is decided at build time
+
+**From Alpine Linux: practical enough to debug**
+
+- ✅ **musl libc**: a lightweight, simple C library
+- ✅ **BusyBox**: a shell and the basic Unix commands
+- ✅ **OpenRC**: a simple, lightweight init system
+- ✅ **Hardening**: every executable is built with PIE, Stack Protector, FORTIFY_SOURCE and full RELRO (ASLR itself is provided by the host kernel)
+
+A working multi-stage example is in [examples/python/Dockerfile](examples/python/Dockerfile) (nginx and Node.js examples are there too).
 
 ### ✨ Key Features
 
