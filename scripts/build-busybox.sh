@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # BusyBox Build Script for Kimigayo OS
-# Builds BusyBox against musl libc, statically (default) or dynamically
-# (BUSYBOX_LINK=dynamic)
+# Builds BusyBox against musl libc, dynamically (default) or statically
+# (BUSYBOX_LINK=static)
 #
 
 set -euo pipefail
@@ -43,8 +43,9 @@ fi
 # was the Makefile's `CFLAGS += -fdebug-prefix-map=...`, because the CFLAGS
 # assignments further down overwrite CFLAGS wholesale. Rebuild them here.
 #
-# This alone does not make the build bit-for-bit reproducible; that has never
-# been verified. See the header of config.mk for how to prove it.
+# The rootfs tarball was confirmed bit-identical on 2026-10-12 (one pair,
+# standard/x86_64, commit 46b05da built by CI and Manual Build). The Docker
+# image digest has not been checked.
 CFLAGS_REPRODUCIBLE=""
 if [ "${REPRODUCIBLE_BUILD:-yes}" = "yes" ]; then
     CFLAGS_REPRODUCIBLE="-fdebug-prefix-map=${PROJECT_ROOT:-$PWD}=. -fmacro-prefix-map=${PROJECT_ROOT:-$PWD}=."
@@ -110,7 +111,7 @@ BUSYBOX_BUILD_ID="$(kimigayo_busybox_build_id "$BUSYBOX_VERSION" "$IMAGE_TYPE")"
 
 if kimigayo_is_built "$BUSYBOX_INSTALL_DIR" "$BUSYBOX_BUILD_ID"; then
     log_info "BusyBox ${BUSYBOX_BUILD_ID} already built and installed: ${BUSYBOX_INSTALL_DIR}"
-    log_info "Skipping build (use 'make clean-busybox' to rebuild)"
+    log_info "Skipping build (use 'make clean-busybox' in the container to rebuild)"
     log_info "BusyBox build check completed!"
     exit 0
 fi
@@ -288,7 +289,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     fi
     # Set sysroot for musl (for cross-compilation)
     sed -i "s|CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"${MUSL_INSTALL_DIR}\"|" .config
-    # **static-PIE にする（ASLR のため）。**
+    # **PIE にする（ASLR のため）。BUSYBOX_LINK=static のときは static-PIE。**
     #
     # 2026-10-10 まで arm64 だけ ELF Type=EXEC で出ており、ASLR が
     # 効いていなかった。x86_64 は Alpine の gcc が default-PIE なので
@@ -315,11 +316,11 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     sed -i "s|CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"-Os -fstack-protector-strong -fPIE ${CFLAGS_REPRODUCIBLE}\"|" .config
     # Add EXTRA_LDFLAGS - use lld linker only (no -nodefaultlibs, let toolchain handle linking)
     sed -i "s|CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"-fuse-ld=lld\"|" .config
-    # Disable EXTRA_LDLIBS (-lm -lresolv) - musl includes these in libc.a
+    # Disable EXTRA_LDLIBS (-lm -lresolv) - musl's libc already provides these
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
-    log_info "Enabled static-PIE and stack protector for ARM64"
+    log_info "Enabled -fPIE and stack protector for ARM64 (final link: ${BUSYBOX_LINK})"
     log_info "Using -fuse-ld=lld with empty GCC crt placeholders"
-    log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are in musl libc.a)"
+    log_info "Disabled EXTRA_LDLIBS (-lm -lresolv are part of musl libc)"
 else
     # For x86_64, clear cross-compiler settings and use system musl
     sed -i "s|CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"\"|" .config
@@ -355,7 +356,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     # （上記参照。PIE 化は -fPIE / -static-pie を直接渡して行う）
     # Disable STATIC_LIBGCC for clang compatibility (avoid -lgcc, -lgcc_eh, crtbeginT.o)
     sed -i "s|CONFIG_STATIC_LIBGCC=.*|# CONFIG_STATIC_LIBGCC is not set|" .config
-    # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl includes these in libc.a)
+    # Re-apply EXTRA_LDLIBS="" to disable -lm -lresolv (musl's libc already provides these)
     sed -i "s|CONFIG_EXTRA_LDLIBS=.*|CONFIG_EXTRA_LDLIBS=\"\"|" .config
     log_info "Re-applied settings after oldconfig (link=${BUSYBOX_LINK}, STATIC_LIBGCC=n, EXTRA_LDLIBS=\"\" for ARM64)"
 else
@@ -395,9 +396,9 @@ fi
 # Alpine Linux's gcc is already configured to use musl
 # Note: Don't use -static in CFLAGS as it affects compilation, only in LDFLAGS
 if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    # For ARM64: Use static linking with explicit musl libc
-    # Disable stack protector to avoid libssp_nonshared dependency with clang
-    # Use -nodefaultlibs (set in CONFIG_EXTRA_LDFLAGS) and manually add libc
+    # For ARM64: build against our own musl (headers via -isystem, CRT files
+    # from its lib dir) with -fstack-protector-strong and -fPIE. The final
+    # link mode (PIE or static-PIE) is passed via CFLAGS_busybox below.
 
     # Determine musl include path
     if [ -d "${MUSL_INSTALL_DIR}/usr/include" ]; then
@@ -443,7 +444,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     log_info "Using musl libc.a: ${MUSL_LIBC_PATH}"
     log_info "Using musl lib dir: ${MUSL_LIB_DIR}"
     log_info "Using musl headers: ${MUSL_INCLUDE_DIR}"
-    log_info "Stack protector enabled (__stack_chk_fail is in musl libc.a)"
+    log_info "Stack protector enabled (__stack_chk_fail is provided by musl libc)"
     log_info "Using -rtlib=compiler-rt (clang uses compiler-rt builtins directly)"
 else
     # For x86_64: use stack protector (GCC has proper support)

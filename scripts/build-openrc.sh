@@ -73,8 +73,7 @@ log_error() {
 # Check if OpenRC is already built at the version we want
 if kimigayo_is_built "$OPENRC_INSTALL_DIR" "$OPENRC_VERSION"; then
     log_info "OpenRC ${OPENRC_VERSION} already built and installed: ${OPENRC_INSTALL_DIR}"
-    log_info "Skipping build (use 'make clean-openrc' to rebuild)"
-    log_success "All essential binaries verified"
+    log_info "Skipping build (use 'make clean-openrc' in the container to rebuild)"
     log_info "OpenRC build check completed!"
     exit 0
 fi
@@ -160,7 +159,7 @@ fi
 
 # -Wl,-z,noexecstack is stated explicitly rather than relying on the
 # linker default (the artifacts already have GNU_STACK=RW, but that is
-# lld's choice, not ours).
+# the linker's choice - lld on arm64, GNU ld on x86_64 - not ours).
 LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
 # Set compiler flags for musl
@@ -192,11 +191,11 @@ meson_options=(
     # start-stop-daemon と supervise-daemon が libcap.so.2 にリンクする。
     # 動的のままだと rootfs に Alpine の libcap.so.2 を同梱しない限り
     # 「Error loading shared library libcap.so.2」で両方起動しない（実測）。
-    # BusyBox が static-pie なのと揃え、ランタイムには musl 以外の
-    # 共有ライブラリを置かない方針で静的にする。
+    # ランタイムには musl 以外の共有ライブラリを置かない方針なので、
+    # libcap は静的にする。
     "--prefer-static"
     # 注: -Dos / -Dcapabilities / -Drootprefix / -Dsplit-usr / -Dtermcap は
-    # OpenRC 0.52.1 以降に上流から削除された。渡すと meson setup が
+    # OpenRC 0.52.1 → 0.63.2 の間に上流から削除された。渡すと meson setup が
     # "Unknown options" で失敗する（CLAUDE.md「版上げで実際に壊れた箇所」節）。
     "-Dpam=false"
     "-Dselinux=disabled"

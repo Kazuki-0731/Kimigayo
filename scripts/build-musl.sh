@@ -92,8 +92,8 @@ setup_arch() {
                 export STRIP="${STRIP:-aarch64-alpine-linux-musl-strip}"
             else
                 log_error "ARM64 cross-compiler not found"
-                log_error "Please install aarch64-linux-musl-gcc or set CC environment variable"
-                log_error "For now, skipping ARM64 build (only x86_64 is supported)"
+                log_error "Please install aarch64-linux-musl-gcc"
+                log_error "Build inside the build container (Dockerfile provides the aarch64 cross wrappers)"
                 exit 1
             fi
             ;;
@@ -194,8 +194,8 @@ configure_musl() {
     # Security hardening flags
     #
     # -Wl,-z,noexecstack is passed explicitly. The artifacts already have
-    # GNU_STACK=RW, but only because lld defaults to it - that is the
-    # linker's choice, not ours. State it so a toolchain change cannot
+    # GNU_STACK=RW, but only because the linker defaults to it (lld on
+    # arm64, GNU ld on x86_64) - that is the linker's choice, not ours. State it so a toolchain change cannot
     # silently turn the stack executable.
     local CFLAGS_SECURITY="-fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
     local LDFLAGS_SECURITY="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
@@ -213,8 +213,8 @@ configure_musl() {
     # it was the Makefile's `CFLAGS += -fdebug-prefix-map=...`, because the
     # line below overwrites CFLAGS wholesale. Rebuild the prefix maps here.
     #
-    # This does not by itself make the build bit-for-bit reproducible;
-    # that has never been verified (see config.mk).
+    # The rootfs tarball was confirmed bit-identical on 2026-10-12 (one pair,
+    # standard/x86_64); the Docker image digest has not been checked.
     local CFLAGS_REPRODUCIBLE=""
     if [ "${REPRODUCIBLE_BUILD:-yes}" = "yes" ]; then
         CFLAGS_REPRODUCIBLE="-fdebug-prefix-map=${PROJECT_ROOT:-$PWD}=. -fmacro-prefix-map=${PROJECT_ROOT:-$PWD}=."
