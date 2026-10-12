@@ -1,6 +1,6 @@
 # Maintenance Schedule
 
-**Last Updated:** 2026-10-12
+**Last Updated:** 2026-10-13
 
 ---
 
@@ -21,8 +21,6 @@ The schedule below is what that maintainer aims for, not a staffed rota.
 - **Workflow:** `.github/workflows/security.yml`
 - **Schedule:** Daily at 02:00 UTC
 - **Actions:**
-  - Count the entries in the Alpine Linux security database (secdb) for the
-    pinned Alpine version (a count only; it is not matched against Kimigayo)
   - Check musl libc version updates
   - Check BusyBox version updates
   - Run Trivy filesystem scan (the repository, not the image) and upload SARIF
@@ -44,21 +42,26 @@ the kernel is not built into the image).
 - **Actions:**
   - Check component versions (musl, BusyBox, OpenRC)
   - Bump `versions.mk` and open a pull request (labels `dependencies`, `automated`)
-    if updates are available. The PR includes an `UPDATES.md` summary and a
-    review checklist
-  - It does **not** build or test anything itself
+    if updates are available. The summary and a review checklist are in the PR
+    body (no `UPDATES.md` is committed). An empty, non-version or not-newer
+    version fails the run instead of opening a PR
+  - It does not build anything itself, but it starts `ci.yml` on the PR branch
+    via `workflow_dispatch` (a PR created with `GITHUB_TOKEN` does not trigger
+    workflows by itself)
+  - `force_rebuild=true` on a manual run opens an empty-commit PR even without
+    updates (to check the workflow itself)
 
-**Manual Review Required:** The PR is created with `GITHUB_TOKEN`, so **`ci.yml`
-does not run on it automatically** (GitHub does not trigger workflows from
-events created by `GITHUB_TOKEN`). Trigger CI yourself (for example push a
-commit to the branch, or close and reopen the PR), update the checksums in
-`scripts/download-*.sh`, and follow the `version-bump` skill before merging.
+**Manual Review Required:** Check the `ci.yml` run linked from the PR body,
+update the checksums in `scripts/download-*.sh`, and follow the `version-bump`
+skill before merging.
 
 #### Dependabot
 - **Config:** `.github/dependabot.yml`
-- **Schedule:** Weekly on Monday — GitHub Actions at 03:00 UTC, Dockerfile base
-  images at 04:00 UTC
-- **Actions:** Open PRs for outdated actions and Docker base images
+- **Schedule:** Weekly on Monday at 03:00 UTC (GitHub Actions only)
+- **Actions:** Open PRs for outdated actions (labels `dependencies`, `automated`;
+  subject `⬆️ Bump ...`). Docker base images are not watched by Dependabot:
+  `FROM alpine:${ALPINE_VERSION}` comes from `versions.mk`, which
+  `base-image-update.yml` handles
 
 **Manual Review Required:** Review and merge the PRs
 
@@ -67,8 +70,9 @@ commit to the branch, or close and reopen the PR), update the checksums in
 - **Schedule:** Weekly on Monday at 04:00 UTC
 - **Actions:**
   - Run filesystem vulnerability scan (`vulnerability-scan`)
-  - Grep build scripts for hardcoded secrets and `http://` downloads
-    (warnings only; these never fail the job)
+  - Check build scripts for `http://` URLs and `eval` outside comments; any hit
+    fails the job (only the `eval` in `scripts/lib/versions.sh` is allowed).
+    Secrets are covered by Trivy and `scripts/scan-image.sh`, not by a grep
   - Upload scan results to Security tab
   - Pull the published image (`ishinokazuki/kimigayo-os:latest`) and match
     its shipped component versions against CVEs, plus scan it for secrets
@@ -181,8 +185,8 @@ the scan fail again without any code change; that is a real signal.
   only writes a draft to `build/CHANGELOG.generated.md`), run the quality
   checks, and get explicit approval before pushing a `v*.*.*` tag — the tag
   push makes `release.yml` replace the public images on Docker Hub, including
-  `latest`. Running `release.yml` manually also pushes to Docker Hub and needs
-  the same approval.
+  `latest`. Running `release.yml` manually only builds, verifies and scans
+  (it does not push to Docker Hub); publishing happens only on a tag push.
 
 ---
 
