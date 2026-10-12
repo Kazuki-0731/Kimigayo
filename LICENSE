@@ -1,7 +1,7 @@
 # Kimigayo OS License Information
 
-Kimigayo OS is a Linux distribution composed of various software components,
-each with its own license. This file provides an overview of the licensing
+Kimigayo OS is a container-oriented root filesystem, published as a Docker image,
+composed of various software components, each with its own license. This file provides an overview of the licensing
 structure, following the approach of Alpine Linux.
 
 ## License Overview
@@ -15,7 +15,7 @@ maintains its original license, and we clearly document all licenses used.
 
 | Component | License | Location |
 |-----------|---------|----------|
-| Linux Kernel | GPL-2.0 | LICENSES/GPL-2.0.txt |
+| Linux Kernel (configuration and build scripts only; not included in the Docker image) | GPL-2.0 | LICENSES/GPL-2.0.txt |
 | musl libc | MIT | LICENSES/MIT.txt |
 | BusyBox | GPL-2.0 | LICENSES/GPL-2.0.txt |
 | OpenRC (Init System) | BSD-2-Clause | LICENSES/BSD-2-Clause.txt |
@@ -24,7 +24,6 @@ maintains its original license, and we clearly document all licenses used.
 
 | Component | License | Location |
 |-----------|---------|----------|
-| isn (Package Manager) | MIT | LICENSES/MIT.txt |
 | Build System | MIT | LICENSES/MIT.txt |
 | Documentation | MIT | LICENSES/MIT.txt |
 | Test Framework | MIT | LICENSES/MIT.txt |
@@ -35,7 +34,6 @@ maintains its original license, and we clearly document all licenses used.
 src/
 ├── kernel/        # GPL-2.0 (Linux Kernel configurations)
 ├── init/          # BSD-2-Clause (OpenRC-based)
-├── pkg/           # MIT (isn - original implementation)
 ├── utils/         # GPL-2.0 (BusyBox configurations)
 └── build/         # MIT (Build utilities)
 
@@ -46,12 +44,9 @@ docs/              # MIT
 
 ## Third-Party Components
 
-When you install packages using `isn`, each package maintains its own
-license. You can check package licenses using:
-
-```bash
-isn info <package-name>
-```
+Kimigayo OS has no package manager by design. Software you add to the image
+in your own Dockerfile (for example from an Alpine builder stage) keeps its
+own license; checking and complying with it is up to you.
 
 ## License Identification
 
@@ -77,7 +72,7 @@ Subject to the terms of the individual component licenses.
 ### Contributing to Kimigayo OS
 
 By contributing to Kimigayo OS, you agree that:
-- Your contributions to original components (build system, isn, etc.) will be licensed under MIT
+- Your contributions to original components (build system, documentation, tests, etc.) will be licensed under MIT
 - Your contributions to existing components will be licensed under their respective licenses
 - You have the right to submit the contributions under these licenses
 
@@ -99,8 +94,7 @@ For complete license texts and more information:
 
 If you have questions about licensing, please:
 - Open an issue: https://github.com/Kazuki-0731/Kimigayo/issues
-- Contact: (to be determined)
 
 ---
 
-Last Updated: 2025-12-14
+Last Updated: 2026-10-12
