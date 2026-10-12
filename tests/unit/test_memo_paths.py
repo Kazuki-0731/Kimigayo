@@ -54,7 +54,7 @@ def test_non_memo_names_pass(path):
 
 def test_no_tracked_file_is_classified_as_memo():
     """CLAUDE.md の手順: git ls-files | memo-paths.py が何も出さないこと"""
-    files = subprocess.run(["git", "-C", str(ROOT), "ls-files"],
+    files = subprocess.run(["git", "-c", "safe.directory=*", "-C", str(ROOT), "ls-files"],
                            capture_output=True, text=True, check=True).stdout
     hits = [p for p in files.splitlines() if p and memo_paths.is_memo_path(p)]
     assert hits == []
