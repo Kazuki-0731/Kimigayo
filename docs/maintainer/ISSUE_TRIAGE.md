@@ -1,7 +1,6 @@
 # Issue Triage Process
 
-**Last Updated:** 2025-12-22
-**Version:** 1.0.0
+**Last Updated:** 2026-10-12
 
 ---
 
@@ -9,25 +8,51 @@
 
 This document defines the issue triage process for Kimigayo OS to ensure efficient handling of bug reports, feature requests, and security issues.
 
+The project currently has one maintainer. There is no separate maintainer team,
+no project board and no priority labels; priority is decided case by case and
+written in a comment.
+
 ---
 
 ## Triage Schedule
 
-### Daily Tasks
-- **Review new issues** (unassigned, unlabeled)
-- **Respond to security issues** (within 24 hours)
-- **Update critical bug status**
-
 ### Weekly Tasks (Monday)
+- **Review new issues** opened in the past week
+- **Respond to security reports** (GitHub Security Advisories) within the
+  [SECURITY_POLICY.md](../security/SECURITY_POLICY.md) deadlines
 - **Review open issues** for stale items
-- **Update milestone assignments**
 - **Close resolved issues**
-- **Review automated security scan results**
+- **Review automated security scan results** (issues labelled `security` + `automated`)
 
 ### Monthly Tasks (First Monday)
 - **Review issue backlog** and prioritize
 - **Update issue templates** based on common patterns
-- **Analyze issue metrics** (time to response, time to resolution)
+
+---
+
+## Labels
+
+Only these 12 labels exist in the repository (2026-10-12). Use them; do not
+assume any other label exists.
+
+| Label | Used for |
+|-------|----------|
+| `bug` | Something is broken |
+| `enhancement` | New feature or improvement |
+| `documentation` | Documentation improvement or correction |
+| `security` | Security-related issue (vulnerabilities themselves go to Security Advisories) |
+| `question` | User question or support |
+| `good first issue` | Good for new contributors |
+| `help wanted` | Community help needed |
+| `duplicate` | Duplicate of another issue |
+| `invalid` | Not a valid issue |
+| `wontfix` | Won't be fixed (explain why) |
+| `automated` | Created by a workflow |
+| `dependencies` | Component / dependency updates |
+
+> The issue templates apply only `bug`, `documentation`, `enhancement` and
+> `security`. There is no "needs triage" label, so untriaged issues are found
+> by date, not by label (see "Tools and Resources").
 
 ---
 
@@ -37,47 +62,26 @@ This document defines the issue triage process for Kimigayo OS to ensure efficie
 
 **Definition:** Something is broken or not working as intended
 
-**Priority Levels:**
-- **P0 (Critical):** System crash, data loss, security vulnerability
-- **P1 (High):** Major functionality broken, affects many users
-- **P2 (Medium):** Minor functionality issue, workaround available
-- **P3 (Low):** Cosmetic issue, minimal impact
-
-**Labels:**
-- `bug`
-- `critical` (P0)
-- `high-priority` (P1)
-- `medium-priority` (P2)
-- `low-priority` (P3)
+**Labels:** `bug`
 
 **Triage Checklist:**
-- [ ] Severity assessed
+- [ ] Severity assessed (data loss / security impact / broken feature / cosmetic)
 - [ ] Reproducible steps verified
-- [ ] Affected versions identified
+- [ ] Affected versions identified (`cat /etc/os-release`, image tag)
 - [ ] Workaround documented (if available)
-- [ ] Assigned to milestone
 
 ### 🚀 Feature Requests
 
 **Definition:** New functionality or enhancement
 
-**Priority Levels:**
-- **P0 (Critical):** Blocking for next release
-- **P1 (High):** Important for user experience
-- **P2 (Medium):** Nice to have
-- **P3 (Low):** Future consideration
-
-**Labels:**
-- `enhancement`
-- `feature-request`
-- `needs-discussion` (for complex features)
+**Labels:** `enhancement`
 
 **Triage Checklist:**
 - [ ] Use case validated
-- [ ] Feasibility assessed
+- [ ] Checked against the requirements in README.md ("Distroless + Alpine"
+      design: no package manager, rootfs-only Docker image, VPS Docker use)
 - [ ] Breaking changes identified
 - [ ] Implementation complexity estimated
-- [ ] Community interest gauged
 
 ### 📚 Documentation
 
@@ -85,7 +89,7 @@ This document defines the issue triage process for Kimigayo OS to ensure efficie
 
 **Labels:**
 - `documentation`
-- `good-first-issue` (simple doc fixes)
+- `good first issue` (simple doc fixes)
 
 **Triage Checklist:**
 - [ ] Documentation gap identified
@@ -96,17 +100,17 @@ This document defines the issue triage process for Kimigayo OS to ensure efficie
 
 **Definition:** Security vulnerability or security-related issue
 
-**Priority:** Always P0 (Critical)
-
-**Labels:**
-- `security`
-- `vulnerability`
+**Labels:** `security`
 
 **Special Handling:**
-- **Response time:** Within 24 hours
-- **Private discussion:** Use GitHub Security Advisories for vulnerabilities
-- **Disclosure:** Follow responsible disclosure process
-- **Tracking:** Create private security advisory before public issue
+- **Vulnerabilities:** must be reported privately via GitHub Security
+  Advisories (the only channel; there is no email address). If one is posted as
+  a public issue, ask the reporter to use an advisory and hide the details
+- **Deadlines:** as in [SECURITY_POLICY.md](../security/SECURITY_POLICY.md):
+  acknowledge within 24 hours, initial assessment within 72 hours, fix by
+  severity — Critical within 7 days, High within 30 days, Medium within
+  90 days, Low in the next release
+- **Disclosure:** advisory published together with the fixed release
 
 **Triage Checklist:**
 - [ ] Severity assessed (CVSS score)
@@ -119,14 +123,12 @@ This document defines the issue triage process for Kimigayo OS to ensure efficie
 
 **Definition:** User needs help or clarification
 
-**Labels:**
-- `question`
-- `support`
+**Labels:** `question`
 
 **Triage Checklist:**
 - [ ] Check if documentation exists
 - [ ] Link to relevant docs
-- [ ] Consider if FAQ entry needed
+- [ ] Consider moving to GitHub Discussions
 - [ ] Close after resolution
 
 ---
@@ -136,91 +138,25 @@ This document defines the issue triage process for Kimigayo OS to ensure efficie
 ```
 New Issue Created
     ↓
-┌───────────────────────────────────┐
-│ 1. Initial Assessment (1 hour)    │
-│    - Read issue description       │
-│    - Check for duplicates         │
-│    - Assess completeness          │
-└───────────────────────────────────┘
+1. Initial Assessment
+   - Read issue description
+   - Check for duplicates
+   - Assess completeness (ask for info if needed)
     ↓
-┌───────────────────────────────────┐
-│ 2. Categorization (15 minutes)    │
-│    - Assign type label            │
-│    - Add relevant labels          │
-│    - Set priority                 │
-└───────────────────────────────────┘
+2. Categorization
+   - Apply one of the existing labels
+   - Decide priority and say it in a comment
     ↓
-┌───────────────────────────────────┐
-│ 3. Validation (varies)            │
-│    - Reproduce bugs               │
-│    - Validate use cases           │
-│    - Assess security impact       │
-└───────────────────────────────────┘
+3. Validation
+   - Reproduce bugs
+   - Validate use cases against the requirements
+   - Assess security impact
     ↓
-┌───────────────────────────────────┐
-│ 4. Assignment (30 minutes)        │
-│    - Assign to milestone          │
-│    - Assign to maintainer (if P0) │
-│    - Add to project board         │
-└───────────────────────────────────┘
-    ↓
-┌───────────────────────────────────┐
-│ 5. Response (24 hours)            │
-│    - Thank reporter               │
-│    - Provide initial feedback     │
-│    - Set expectations             │
-└───────────────────────────────────┘
+4. Response
+   - Thank reporter
+   - Provide initial feedback
+   - Set expectations
 ```
-
----
-
-## Labeling Guide
-
-### Priority Labels
-
-| Label | Description | SLA Response | SLA Resolution |
-|-------|-------------|--------------|----------------|
-| `critical` | System broken, security issue | 1 hour | 24 hours |
-| `high-priority` | Major functionality affected | 24 hours | 1 week |
-| `medium-priority` | Minor issue, workaround exists | 3 days | 1 month |
-| `low-priority` | Cosmetic or future consideration | 1 week | Next major version |
-
-### Type Labels
-
-- `bug` - Something is broken
-- `enhancement` - Improve existing functionality
-- `feature-request` - New functionality
-- `documentation` - Documentation improvement
-- `security` - Security-related issue
-- `question` - User question or support
-- `performance` - Performance-related issue
-
-### Status Labels
-
-- `needs-triage` - Awaiting initial triage
-- `needs-info` - More information needed from reporter
-- `needs-discussion` - Requires team discussion
-- `in-progress` - Actively being worked on
-- `blocked` - Blocked by external dependency
-- `ready-for-review` - PR ready for review
-
-### Component Labels
-
-- `core` - Core OS functionality
-- `init-system` - OpenRC/init system
-- `networking` - Network-related
-- `security-hardening` - Security features
-- `build-system` - Build scripts/process
-- `ci-cd` - CI/CD pipeline
-
-### Special Labels
-
-- `good-first-issue` - Good for new contributors
-- `help-wanted` - Community help needed
-- `wontfix` - Won't be fixed (explain why)
-- `duplicate` - Duplicate of another issue
-- `invalid` - Not a valid issue
-- `automated` - Created by automation
 
 ---
 
@@ -231,7 +167,7 @@ New Issue Created
 ```markdown
 Thank you for reporting this issue!
 
-I've triaged this as a **[priority]** bug affecting **[component]**.
+I've triaged this as a **[severity]** bug affecting **[component]**.
 
 **Next Steps:**
 - [ ] Reproduce the issue
@@ -239,8 +175,6 @@ I've triaged this as a **[priority]** bug affecting **[component]**.
 - [ ] Develop fix
 - [ ] Test fix
 - [ ] Release patch
-
-**Timeline:** Expected resolution by [date]
 
 **Workaround:** [if available]
 
@@ -252,15 +186,11 @@ If you have additional information, please add it to this issue.
 ```markdown
 Thank you for the feature request!
 
-This is an interesting idea. Let me break down the considerations:
-
 **Use Case:** [summarize]
+**Fits the design (no package manager, minimal rootfs image):** [yes/no, why]
 **Complexity:** [low/medium/high]
 **Breaking Changes:** [yes/no]
 
-I've added this to our **[milestone]** for further discussion.
-
-**Community Feedback:**
 If others are interested in this feature, please 👍 the original post to help us prioritize.
 ```
 
@@ -269,20 +199,14 @@ If others are interested in this feature, please 👍 the original post to help 
 ```markdown
 Thank you for reporting this security issue.
 
-I've created a **private security advisory** to discuss this further.
+Please continue in a **private security advisory**:
+https://github.com/Kazuki-0731/Kimigayo/security/advisories/new
 
-**Immediate Actions:**
-- [ ] Assess severity and impact
-- [ ] Develop patch
-- [ ] Test fix
-- [ ] Coordinate disclosure
-
-**Timeline:**
-- Initial assessment: Within 24 hours
-- Fix development: Within 1 week
-- Public disclosure: After fix release
-
-I'll keep you updated through the security advisory.
+**Timeline (docs/security/SECURITY_POLICY.md):**
+- Acknowledgement: within 24 hours
+- Initial assessment: within 72 hours
+- Fix: Critical within 7 days / High within 30 days / Medium within 90 days
+- Public disclosure: together with the fixed release
 ```
 
 ### Needs Info Response
@@ -292,7 +216,7 @@ Thank you for opening this issue!
 
 To help us investigate, could you please provide:
 
-- [ ] Kimigayo OS version (`cat /etc/os-release`)
+- [ ] Kimigayo OS version (`cat /etc/os-release`) and image tag
 - [ ] Architecture (`uname -m`)
 - [ ] Steps to reproduce
 - [ ] Expected behavior
@@ -306,18 +230,12 @@ This will help us identify the root cause faster.
 
 ## Stale Issue Management
 
-### Stale Issue Definition
+There is no `stale` label and no automatic closing. An issue with no activity
+for 90 days is reviewed by hand:
 
-An issue is considered stale if:
-- No activity for **90 days** (low priority)
-- No activity for **60 days** (medium priority)
-- No activity for **30 days** (high priority, needs-info)
-
-### Stale Issue Process
-
-1. **Add `stale` label** and comment:
+1. Comment:
    ```
-   This issue has been inactive for [X] days.
+   This issue has been inactive for 90 days.
    If there's no activity within 14 days, it will be closed.
    Please comment if this is still relevant.
    ```
@@ -331,35 +249,46 @@ An issue is considered stale if:
    ```
 
 **Exceptions:**
-- Security issues (never auto-close)
-- Feature requests with significant community interest (>10 👍)
-- Issues in active milestones
+- Security issues (never closed for inactivity)
+- Feature requests with significant community interest
 
 ---
 
 ## Automated Issue Management
 
-### Automated Security Scans
+### Component Update Check
 
-**Source:** `.github/workflows/security-updates.yml`
+**Source:** `.github/workflows/security.yml`
 
 **Triggers:**
 - Daily at 02:00 UTC
 - On-demand via workflow_dispatch
 
-**Creates Issues:**
-- Security updates available
-- Dependency vulnerabilities found
-- Component version updates needed
+**Creates Issues:** only when a newer musl or BusyBox release is found
+(one issue, updated with a comment on later runs)
 
 **Labels:** `security`, `automated`, `dependencies`
 
-**Handling:**
+### Weekly Security Scan
+
+**Source:** `.github/workflows/dependency-review.yml`
+
+**Triggers:**
+- Weekly on Monday at 04:00 UTC
+- Pull requests (the scheduled-only jobs do not open issues for PRs)
+
+**Creates Issues:** when a **scheduled** run fails, for example because the
+published `latest` image matches a CVE (`published-image-scan` →
+`scripts/scan-image.sh`)
+
+**Labels:** `security`, `automated`, and `vulnerability`
+(the last one does not exist as a repository label)
+
+**Handling (both):**
 1. Review automated issue
-2. Assess impact and priority
-3. Create tracking milestone if needed
-4. Assign to maintainer
-5. Update issue with action plan
+2. Assess impact against [SECURITY_POLICY.md](../security/SECURITY_POLICY.md)
+3. Fix or update the component (`version-bump` / `security-review` skills)
+4. Update issue with the action taken
 
 ### Automated Base Image Updates
 
@@ -370,71 +299,18 @@ An issue is considered stale if:
 - On-demand via workflow_dispatch
 
 **Creates Pull Requests:**
-- Component version updates (musl, BusyBox, etc.)
-- Includes changelog and testing checklist
+- Component version updates (musl, BusyBox, OpenRC) in `versions.mk`
+- Includes an `UPDATES.md` summary and a testing checklist
 
-**Labels:** `dependencies`, `automated`, `base-image`
+**Labels:** `dependencies`, `automated`
 
 **Handling:**
 1. Review automated PR
-2. Run full test suite
-3. Verify security scans pass
+2. **Start CI yourself** — the PR is created with `GITHUB_TOKEN`, so `ci.yml`
+   does not run on it automatically
+3. Update checksums and verify patches (`version-bump` skill)
 4. Merge if all checks pass
-5. Update release notes
-
----
-
-## Metrics and Monitoring
-
-### Key Metrics
-
-| Metric | Target | Current |
-|--------|--------|---------|
-| Time to first response | < 24 hours | - |
-| Time to triage | < 3 days | - |
-| Open issue count | < 50 | - |
-| Stale issue rate | < 20% | - |
-| Security issue resolution | < 7 days | - |
-
-### Monthly Review
-
-**First Monday of each month:**
-
-1. **Generate report:**
-   ```bash
-   gh issue list --json number,title,labels,createdAt,closedAt \
-     --state all --search "created:>$(date -d '1 month ago' +%Y-%m-%d)" \
-     > issues-report.json
-   ```
-
-2. **Analyze:**
-   - Total issues opened vs closed
-   - Average time to response
-   - Average time to resolution
-   - Issue type distribution
-   - Top contributors
-
-3. **Improve:**
-   - Update issue templates based on patterns
-   - Adjust triage process if needed
-   - Recognize top contributors
-
----
-
-## Escalation Process
-
-### When to Escalate
-
-- Security vulnerability (CVSS > 7.0)
-- Critical bug affecting production users
-- Legal/compliance concerns
-- Community conflict
-
-### Escalation Path
-
-1. **Level 1:** Maintainer team discussion (GitHub Discussions)
-2. **Level 2:** Project lead decision (email)
-3. **Level 3:** Security advisory for vulnerabilities
+5. Update CHANGELOG.md / RELEASE_NOTES.md at the next release
 
 ---
 
@@ -443,41 +319,40 @@ An issue is considered stale if:
 ### GitHub CLI Commands
 
 ```bash
-# List new issues
-gh issue list --label "needs-triage" --state open
+# Issues opened in the past week (GNU date; macOS: date -v-7d +%Y-%m-%d)
+gh issue list --search "created:>$(date -d '7 days ago' +%Y-%m-%d)" --state open
 
 # List security issues
 gh issue list --label "security" --state open
 
-# List stale issues
+# List stale issues (macOS: date -v-90d +%Y-%m-%d)
 gh issue list --search "updated:<$(date -d '90 days ago' +%Y-%m-%d)" --state open
 
 # Close stale issue
 gh issue close <number> --comment "Closing due to inactivity"
-
-# Create security advisory
-gh api repos/:owner/:repo/security-advisories \
-  -X POST -f summary="..." -f description="..."
 ```
+
+Security advisories are created from the web UI
+(Security → Advisories → New draft security advisory).
 
 ### Issue Templates
 
 See `.github/ISSUE_TEMPLATE/` for:
 - Bug report template
 - Feature request template
-- Security vulnerability template
+- Security vulnerability template (points to private advisories)
 - Documentation improvement template
 
 ---
 
 ## References
 
-- [GitHub Issue Triage Best Practices](https://docs.github.com/en/issues)
-- [Alpine Linux Security Process](https://security.alpinelinux.org/)
+- [GitHub Issues documentation](https://docs.github.com/en/issues)
+- [Alpine Linux Security Tracker](https://security.alpinelinux.org/)
 - [Common Vulnerability Scoring System (CVSS)](https://www.first.org/cvss/)
 
 ---
 
-**Maintainer:** Kimigayo OS Team
-**Contact:** GitHub Issues or Discussions
-**Last Review:** 2025-12-22
+**Maintainer:** Kimigayo OS maintainer
+**Contact:** GitHub Issues or Discussions (security: GitHub Security Advisories)
+**Last Review:** 2026-10-12
