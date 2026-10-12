@@ -18,8 +18,8 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 
 | ワークフロー | トリガー | 役割 |
 |------------|---------|------|
-| `ci.yml` | `main` / `develop` への push、`main` への PR | 日常の検証 |
-| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub への公開** |
+| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が PR ブランチで起動する） | 日常の検証 |
+| `release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
 | `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャンと Issue 起票 |
@@ -28,11 +28,15 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 
 ### 1. CI (`.github/workflows/ci.yml`)
 
-**トリガー:** `main` / `develop` への push、`main` への PR
+**トリガー:** `main` への push、`main` への PR、手動（workflow_dispatch）。
+手動は `base-image-update.yml` が更新 PR のブランチで CI を回すためにある
+（`GITHUB_TOKEN` で作った PR ではワークフローが起動しないが、workflow_dispatch だけは例外）。
+`develop` ブランチは 2026-10-13 にトリガーから外した（ブランチが存在しない）。
 
 **処理内容:**
-1. ShellCheck（`scripts/` と `.claude/hooks`）
-2. リンク検査（`scripts/check-links.py`）
+1. ShellCheck（`scripts/*.sh`・`scripts/lib/*.sh`・`.claude/hooks/*.sh`）
+2. リンク検査（`scripts/check-links.py`。`#見出し` へのリンクも見る）と
+   古い記述の検査（`scripts/check-stale-docs.py`）
 3. pytest（単体 + プロパティ）
 4. variant × arch の matrix でビルドとイメージ検証
 
@@ -62,18 +66,20 @@ strategy:
 ### 2. Release (`.github/workflows/release.yml`)
 
 **トリガー:**
-- タグ push (`v*.*.*`)
-- 手動実行 (workflow_dispatch、`tag` を入力)
+- タグ push (`v*.*.*`) — **公開するのはこれだけ**
+- 手動実行 (workflow_dispatch、`tag` を入力。空なら版は `edge`) —
+  ビルド・検証・スキャン・SBOM の保存まで。**Docker Hub には push しない**
+  （→ [手動実行](#手動実行workflow_dispatch)）
 
 **処理内容:**
-1. 版の解決（`meta` ジョブ。タグ名から `v` を外す。手動実行では入力 `tag`）
+1. 版の解決（`meta` ジョブ。タグ名から `v` を外す。手動実行では入力 `tag`、空なら `edge`）
 2. ShellCheck
 3. マルチアーキテクチャ・マルチバリアントビルド（6 ジョブ）
-4. イメージ検証と Docker Hub への push
-5. マルチアーキテクチャマニフェスト作成
-6. **Cosign のキーレス署名**（`sign` ジョブ）
-7. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`）
-8. 通知
+4. イメージ検証・スキャン・SBOM の保存と、Docker Hub への push（push はタグのときだけ）
+5. マルチアーキテクチャマニフェスト作成（タグのときだけ）
+6. **Cosign のキーレス署名**（`sign` ジョブ。タグのときだけ）
+7. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`。タグのときだけ）
+8. 通知（Cosign の署名結果も載せる）
 
 > **`CHANGELOG.md` は自動生成されません。手で書きます。**
 > `make changelog` は `build/CHANGELOG.generated.md` に下書きを出すだけで、
@@ -124,8 +130,9 @@ gh workflow run manual-build.yml \
 - 手動実行
 
 **処理内容:**
-1. 構成要素の版の確認（`version-check`。musl と BusyBox の新版、
-   Alpine の secdb に載っているパッケージ数）
+1. 構成要素の版の確認（`version-check`。musl と BusyBox の新版）。
+   以前は Alpine の secdb に載っているパッケージ数も数えていたが、
+   Kimigayo の出荷物と関係が無い数字なので 2026-10-13 に外した
 2. リポジトリのファイルシステムスキャン（Trivy、`trivy-filesystem-scan`）
 3. musl か BusyBox の新版を検知したときに Issue を自動作成（脆弱性の検出では起票しない）
 
@@ -148,13 +155,25 @@ gh workflow run manual-build.yml \
 上流（musl / BusyBox / OpenRC）の更新を検知して、`versions.mk` を
 書き換える PR を作成します（カーネルと Alpine は見ていません。
 チェックサム表は更新しないので、マージ前に手で足します）。
-PR は `GITHUB_TOKEN` で作るため、その PR では CI が自動では走りません。**この PR は「上流が動いた」という一次情報**なので、
+
+- 取得した版が空・版の形でない・現在より新しくないときは、PR を作らずに失敗します
+  （2026-10-12 までは後段に値が渡っておらず、`versions.mk` の版を空にした PR を作っていた）
+- 変更内容は PR の本文にだけ書きます（以前のように `UPDATES.md` をコミットしない）
+- PR は `GITHUB_TOKEN` で作るため、そのままでは CI が起動しません。
+  **ワークフローが PR ブランチで `ci.yml` を workflow_dispatch で起動します**
+- `force_rebuild=true` で手動実行すると、更新が無くても空コミットの PR を作ります
+  （ワークフロー自体の動作確認用）
+
+**この PR は「上流が動いた」という一次情報**なので、
 バージョン更新の起点として先に見てください。
 
 ### Dependabot（`.github/dependabot.yml`）
 
-ワークフローではありませんが、毎週月曜に GitHub Actions（03:00 UTC）と
-Dockerfile のベースイメージ（04:00 UTC）の更新 PR を作ります。
+ワークフローではありませんが、毎週月曜 03:00 UTC に GitHub Actions の
+更新 PR を作ります（ラベルは `dependencies`・`automated`、件名は `⬆️ Bump ...`）。
+Dockerfile のベースイメージは見ません。`FROM alpine:${ALPINE_VERSION}` は
+Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` と
+`base-image-update.yml` が扱うためです（2026-10-13 に docker のブロックを外した）。
 
 ### 7. Dependency Review (`.github/workflows/dependency-review.yml`)
 
@@ -163,7 +182,7 @@ Dockerfile のベースイメージ（04:00 UTC）の更新 PR を作ります�
 | ジョブ | いつ | 何をするか |
 | --- | --- | --- |
 | `dependency-review` | PR のみ | 依存のレビュー（`fail-on-severity: high`） |
-| `vulnerability-scan` | PR・定期・手動 | リポジトリの Trivy FS スキャンとビルドスクリプトの検査 |
+| `vulnerability-scan` | PR・定期・手動 | リポジトリの Trivy FS スキャンと、ビルドスクリプトの検査（コメント以外の `http://` と `eval` があれば落ちる。`scripts/lib/versions.sh` の `eval` だけ許可）。秘密情報の grep は外した（Trivy と `scan-image.sh` が見る） |
 | `published-image-scan` | 定期・手動（PR では走らない） | Docker Hub の `ishinokazuki/kimigayo-os:latest`（standard / amd64）を pull し、`scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。SBOM を `sbom-published-latest` として保存 |
 | `create-security-issue` | 定期実行で上の2つのどちらかが失敗したとき | Issue を起票 |
 
@@ -331,8 +350,12 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
 
 #### 9. 検証済みイメージを push
 
+**タグ push のときだけ**走ります（`PUBLISH` は `github.event_name == 'push'` かつ
+タグのときだけ `true`。Docker Hub へのログインも同じ条件）。
+
 ```yaml
 - name: Push verified image
+  if: env.PUBLISH == 'true'
   run: |
     docker push "${{ steps.tags.outputs.primary }}"
     docker push "${{ steps.tags.outputs.moving }}"
@@ -479,18 +502,25 @@ make shellcheck-scan
 **外部 Action は必ずコミット SHA で固定します。** `@master` 参照は
 供給網のリスクであり、再現性もありません（2026-10-09 に固定しました）。
 
+ShellCheck は Action を使わず、版をダイジェストで固定した
+`koalaman/shellcheck` のイメージを直接 `docker run` します
+（`ci.yml` と `release.yml`。ローカルの `make shellcheck-scan` と同じ対象・重大度）。
+
 ```yaml
 - name: Run ShellCheck
-  uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
-  with:
-    additional_files: '.claude/hooks'
-    scandir: './scripts'
-    severity: warning
-    ignore_paths: build output
+  run: |
+    set -euo pipefail
+    docker run --rm -v "${PWD}:/mnt" -w /mnt \
+      koalaman/shellcheck:v0.11.0@sha256:61862eba... \
+      --severity=warning \
+      scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 ```
 
 `.claude/hooks` も検査対象です（Hook はこのプロジェクトの作業ルール
 そのものなので、`scripts/` と同じ基準で静的解析します）。
+**2026-10-12 までは検査されていませんでした。**
+以前使っていた `ludeeus/action-shellcheck` は、`additional_files: '.claude/hooks'` を
+`./scripts` の中での `find -name` のパターンとして扱っていたためです。
 
 ### Trivy（リポジトリのファイルシステムスキャン）
 
@@ -592,19 +622,23 @@ GitHub Releasesページで以下を確認:
 ### 手動実行（workflow_dispatch）
 
 ```bash
-# GitHub CLI を使用（**ユーザーの明示的な承認が必要**）
-gh workflow run release.yml -f tag=v3.0.2
+# ビルド・検証・スキャンだけ（Docker Hub には push しない）
+gh workflow run release.yml -f tag=v3.0.3
 ```
 
 または、GitHubのActionsタブから手動実行。
 
-> **手動実行でも Docker Hub に push します。** `verify-and-push` には
-> タグ push に限る条件が無いため、`<ver>-<variant>-<arch>` と
-> `latest-<variant>-<arch>` が差し替わります。一方で `create-manifest`・
-> `sign`・`create-github-release` はタグ push のときだけなので**飛ばされ**、
-> マルチアーキのマニフェストも署名も Release もできません。
-> `tag` を省くと既定値の `latest` が版になります。
-> 完全なリリースはタグの push で行ってください。
+> **手動実行は Docker Hub に push しません。** タグ push と同じ経路で
+> 6 本をビルドし、`verify-image.sh` と `scan-image.sh` を通して SBOM を
+> 成果物に残すところまでです。`create-manifest`・`sign`・
+> `create-github-release` も走りません。`tag` を省くと版は `edge` になります。
+> **公開は `v*.*.*` タグの push だけ**です。公開をやり直したいときは、
+> タグを打ち直すか、タグの run を Actions の Re-run で回します。
+>
+> 2026-10-12 までは手動実行でも `verify-and-push` が push しており、
+> 既定の `tag` のままだと `latest-<variant>-<arch>` を上書きしていました
+> （マニフェスト・署名・Release はタグのときしか作られないので、
+> 「push されたが署名もマニフェストも無い」状態を作れた）。
 
 ## ローカルでのCI実行
 
