@@ -1,13 +1,13 @@
 # Kimigayo OS + Nginx
 
-Nginx web server running on Kimigayo OS - ultra-lightweight container OS.
+Nginx web server running on Kimigayo OS - a small container OS without a package manager.
 
 ## Features
 
-- **Lightweight**: Based on Kimigayo OS (1-3MB base)
-- **Fast**: Optimized nginx configuration
-- **Secure**: Security headers and hardened configuration
-- **Production-ready**: Health checks and logging configured
+- **Small**: 10.6MB including nginx (arm64, measured 2026-10-12; `nginx:alpine` is 62.4MB)
+- **Runs as non-root**: `USER 65534` (nobody), listening on port 8080
+- **Hardened configuration**: security headers, directory listing disabled, hidden files denied
+- **Health check and logging**: `HEALTHCHECK` built in, access/error logs go to stdout/stderr (`docker logs`)
 
 ## Quick Start
 
@@ -19,8 +19,11 @@ docker build -t kimigayo-nginx:latest examples/nginx/
 
 ### Run the container
 
+nginx listens on **8080** inside the container (a non-root process cannot bind
+to ports below 1024).
+
 ```bash
-docker run -d -p 8080:80 --name my-nginx kimigayo-nginx:latest
+docker run -d -p 8080:8080 --name my-nginx kimigayo-nginx:latest
 ```
 
 ### Test
@@ -38,20 +41,22 @@ You should see:
 
 ### Add your own content
 
-Mount your content directory:
+Mount your content directory (files must be readable by uid 65534):
 
 ```bash
-docker run -d -p 8080:80 \
+docker run -d -p 8080:8080 \
   -v $(pwd)/my-website:/var/www/html:ro \
   kimigayo-nginx:latest
 ```
 
 ### Custom nginx configuration
 
-Mount your nginx config:
+Mount your nginx config. Keep `listen 8080` (or another port >= 1024),
+`pid /tmp/nginx.pid` and do not use the `user` directive, because nginx runs
+as uid 65534 (see [nginx.conf](nginx.conf) and [default.conf](default.conf)).
 
 ```bash
-docker run -d -p 8080:80 \
+docker run -d -p 8080:8080 \
   -v $(pwd)/my-nginx.conf:/etc/nginx/nginx.conf:ro \
   -v $(pwd)/my-site.conf:/etc/nginx/conf.d/default.conf:ro \
   kimigayo-nginx:latest
@@ -64,19 +69,18 @@ docker run -d -p 8080:80 \
 Create `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   nginx:
     image: kimigayo-nginx:latest
     ports:
-      - "80:80"
+      - "80:8080"
     volumes:
       - ./html:/var/www/html:ro
-      - ./logs:/var/log/nginx
     restart: unless-stopped
+    # The image already has a HEALTHCHECK. BusyBox wget does not accept
+    # --tries, so do not add it if you override this.
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -84,7 +88,7 @@ services:
 
 Run:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Kubernetes Deployment
@@ -108,7 +112,7 @@ spec:
       - name: nginx
         image: kimigayo-nginx:latest
         ports:
-        - containerPort: 80
+        - containerPort: 8080
         resources:
           requests:
             memory: "64Mi"
@@ -119,7 +123,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /
-            port: 80
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
 ---
@@ -133,31 +137,38 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 80
+    targetPort: 8080
   type: LoadBalancer
 ```
 
-## Performance
+## Image Size
 
-Based on Kimigayo OS benchmarks:
+| Image | Size |
+|-------|------|
+| `kimigayo-nginx` (this example) | 10.6MB |
+| `nginx:alpine` | 62.4MB |
 
-- **Image Size**: ~10-15MB (vs 140MB for nginx:alpine)
-- **Memory Usage**: ~30-50MB under load
-- **Startup Time**: <2 seconds
+Measured 2026-10-12 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's nginx 1.30.4.
+Memory usage and startup time have not been measured.
 
 ## Security
 
 Built-in security features:
 
-- No root user execution
+- Runs as non-root (uid 65534)
 - Security headers enabled
 - Directory listing disabled
 - Hidden files access denied
-- Regular security updates via Kimigayo OS
+
+**nginx itself comes from Alpine's package at build time.** Updates to
+Kimigayo OS do not update it; rebuild the image to pick up a newer nginx.
 
 ## Monitoring
 
-### Access logs
+### Logs
+
+Access and error logs are written to stdout/stderr:
 
 ```bash
 docker logs my-nginx
@@ -181,7 +192,7 @@ docker logs my-nginx
 
 ### Permission issues
 
-Ensure your content directory has correct permissions:
+Ensure your content directory is readable by uid 65534:
 ```bash
 chmod -R 755 ./html
 ```
