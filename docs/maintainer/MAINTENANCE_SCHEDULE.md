@@ -1,13 +1,15 @@
 # Maintenance Schedule
 
-**Last Updated:** 2025-12-22
-**Version:** 1.0.0
+**Last Updated:** 2026-10-12
 
 ---
 
 ## Overview
 
 This document defines the regular maintenance schedule for Kimigayo OS to ensure security, stability, and continuous improvement.
+
+The project currently has one maintainer and a single branch (`main`).
+The schedule below is what that maintainer aims for, not a staffed rota.
 
 ---
 
@@ -19,11 +21,16 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 - **Workflow:** `.github/workflows/security.yml`
 - **Schedule:** Daily at 02:00 UTC
 - **Actions:**
-  - Check Alpine Linux security advisories
+  - Count the entries in the Alpine Linux security database (secdb) for the
+    pinned Alpine version (a count only; it is not matched against Kimigayo)
   - Check musl libc version updates
   - Check BusyBox version updates
   - Run Trivy filesystem scan (the repository, not the image) and upload SARIF
-  - Create a GitHub issue if a musl / BusyBox update is available
+  - Create a GitHub issue (labels `security`, `automated`, `dependencies`) if a
+    musl / BusyBox update is available
+
+OpenRC and the kernel are not checked daily (OpenRC is checked weekly below;
+the kernel is not built into the image).
 
 **Manual Review Required:** If security issue is created
 
@@ -36,19 +43,32 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 - **Schedule:** Weekly on Monday at 03:00 UTC
 - **Actions:**
   - Check component versions (musl, BusyBox, OpenRC)
-  - Create pull request if updates available
-  - Run build and test for updated components
-  - Generate changelog
+  - Bump `versions.mk` and open a pull request (labels `dependencies`, `automated`)
+    if updates are available. The PR includes an `UPDATES.md` summary and a
+    review checklist
+  - It does **not** build or test anything itself
 
-**Manual Review Required:** Review and merge PR if tests pass
+**Manual Review Required:** The PR is created with `GITHUB_TOKEN`, so **`ci.yml`
+does not run on it automatically** (GitHub does not trigger workflows from
+events created by `GITHUB_TOKEN`). Trigger CI yourself (for example push a
+commit to the branch, or close and reopen the PR), update the checksums in
+`scripts/download-*.sh`, and follow the `version-bump` skill before merging.
+
+#### Dependabot
+- **Config:** `.github/dependabot.yml`
+- **Schedule:** Weekly on Monday — GitHub Actions at 03:00 UTC, Dockerfile base
+  images at 04:00 UTC
+- **Actions:** Open PRs for outdated actions and Docker base images
+
+**Manual Review Required:** Review and merge the PRs
 
 #### Dependency Vulnerability Scan
 - **Workflow:** `.github/workflows/dependency-review.yml`
 - **Schedule:** Weekly on Monday at 04:00 UTC
 - **Actions:**
   - Run filesystem vulnerability scan (`vulnerability-scan`)
-  - Check for hardcoded secrets
-  - Check for insecure downloads
+  - Grep build scripts for hardcoded secrets and `http://` downloads
+    (warnings only; these never fail the job)
   - Upload scan results to Security tab
   - Pull the published image (`ishinokazuki/kimigayo-os:latest`) and match
     its shipped component versions against CVEs, plus scan it for secrets
@@ -58,20 +78,18 @@ This document defines the regular maintenance schedule for Kimigayo OS to ensure
 **Manual Review Required:** Review Security tab for findings, and the
 issue / SBOM artifact (`sbom-published-latest`) if `published-image-scan` failed.
 It failed on v3.0.1 (5 known CVEs in BusyBox 1.38.0 / musl 1.2.6). All 5 were
-patched in v3.0.2, and since that release replaced `latest` (2026-10-12) the
-scan passes with 0 findings — see
-[SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md).
+patched in v3.0.2, which replaced `latest` on 2026-10-12 — see
+[SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md). A new NVD entry can make
+the scan fail again without any code change; that is a real signal.
 
 #### Issue Triage
-- **Schedule:** Every Monday morning
+- **Schedule:** Every Monday
 - **Actions:**
-  - Review new issues (needs-triage label)
-  - Categorize and label issues
+  - Review issues opened in the past week (see [ISSUE_TRIAGE.md](ISSUE_TRIAGE.md))
+  - Label them with the existing labels
   - Respond to all issues opened in past week
-  - Update stale issues (90 days old)
+  - Follow up on stale issues (90 days old)
   - Close resolved issues
-
-**Responsible:** Maintainer team
 
 ---
 
@@ -81,36 +99,24 @@ scan passes with 0 findings — see
 
 ##### Issue Backlog Review
 - **Actions:**
-  - Generate issue metrics report
-  - Analyze time to response/resolution
-  - Review issue type distribution
+  - Review open issues and their age
   - Identify patterns for template improvements
   - Update issue templates if needed
-  - Recognize top contributors
-
-##### Milestone Planning
-- **Actions:**
-  - Review current milestone progress
-  - Create next milestone
-  - Assign issues to milestones
-  - Update release timeline
 
 ##### Documentation Review
 - **Actions:**
-  - Review all documentation for accuracy
-  - Update version numbers
-  - Check for broken links
-  - Update screenshots if needed
-  - Review FAQ based on recent issues
+  - Review documentation for accuracy against the repository
+  - Check version numbers against `versions.mk` and `git describe --tags`
+  - Check for broken links: `make check-links`
 
 ##### Security Audit
 - **Actions:**
   - Review all security findings from past month
-  - Verify all patches applied
+  - Verify all patches applied (`build/busybox-patches.log` and the musl patch step)
   - Match shipped components against CVEs: `make scan-image`
     (SBOM from the versions read out of the image + Grype)
-  - Update SECURITY.md if needed
-  - Review access controls and permissions
+  - Update `.github/SECURITY.md` / `docs/security/SECURITY_POLICY.md` if needed
+  - Review access controls and permissions (repository, Docker Hub token)
 
 ---
 
@@ -120,34 +126,20 @@ scan passes with 0 findings — see
 
 ##### Performance Benchmarking
 - **Actions:**
-  - Run full benchmark suite
-  - Compare with previous quarter
-  - Analyze trends
-  - Identify performance regressions
-  - Update performance documentation
+  - Run the benchmark suite (`make benchmark`)
+  - Compare with the previous values, recording host / arch / variant / version
+  - Update README.md and `docs/benchmarks/` in the same change
 
 ##### Dependency Audit
 - **Actions:**
-  - Review all dependencies
-  - Check for deprecated packages
-  - Evaluate alternatives
-  - Plan upgrade path for major versions
-  - Update dependency documentation
+  - Check upstream versions and EOL of the kernel, musl, BusyBox, OpenRC and Alpine
+  - Plan upgrade path for major versions (`version-bump` skill)
 
 ##### Architecture Review
 - **Actions:**
-  - Review system architecture
+  - Review system architecture against SPECIFICATION.md
   - Identify technical debt
-  - Propose refactoring if needed
   - Update architecture documentation
-
-##### Community Health Check
-- **Actions:**
-  - Review community metrics (stars, forks, contributors)
-  - Analyze user feedback
-  - Identify pain points
-  - Plan community engagement activities
-  - Update CONTRIBUTING.md if needed
 
 ---
 
@@ -157,10 +149,11 @@ scan passes with 0 findings — see
 
 #### Security Patches
 - **Trigger:** CVE announcement affecting Kimigayo OS
-- **Timeline:** start the assessment within 24-48 hours. The release
-  deadlines are the ones in
-  [SECURITY_POLICY.md](../security/SECURITY_POLICY.md): Critical within
-  7 days, High within 30 days, Medium within 90 days
+- **Timeline:** the deadlines in
+  [SECURITY_POLICY.md](../security/SECURITY_POLICY.md): acknowledge within
+  24 hours, initial assessment within 72 hours, fix by severity —
+  Critical within 7 days, High within 30 days, Medium within 90 days,
+  Low in the next release
 - **Process:**
   1. Assess impact and severity
   2. Create security advisory (private)
@@ -170,31 +163,26 @@ scan passes with 0 findings — see
   6. Announce to users
 
 #### Bug Fixes
-- **Trigger:** Critical or high-priority bug reported
-- **Timeline:**
-  - Critical (P0): 24 hours
-  - High (P1): 1 week
-  - Medium (P2): 1 month
-  - Low (P3): Next major version
+- **Trigger:** Bug reported (label `bug`)
+- **Timeline:** no fixed SLA; security-relevant bugs follow the security
+  deadlines above
 - **Process:**
   1. Triage and reproduce
-  2. Create fix
+  2. Create fix (with a regression test where possible)
   3. Test fix
-  4. Create PR
-  5. Review and merge
-  6. Release if critical/high
+  4. Commit to `main`
+  5. Release if needed
 
 #### Release Preparation
-- **Trigger:** Milestone completion or scheduled release
-- **Timeline:** 1 week before release
-- **Process:**
-  1. Update version numbers
-  2. Generate CHANGELOG
-  3. Update documentation
-  4. Run full test suite
-  5. Create release candidate
-  6. Community testing
-  7. Final release
+- **Trigger:** Fixes or updates worth shipping
+- **Process:** follow
+  [.claude/skills/release/SKILL.md](../../.claude/skills/release/SKILL.md).
+  In short: write CHANGELOG.md and RELEASE_NOTES.md by hand (`make changelog`
+  only writes a draft to `build/CHANGELOG.generated.md`), run the quality
+  checks, and get explicit approval before pushing a `v*.*.*` tag — the tag
+  push makes `release.yml` replace the public images on Docker Hub, including
+  `latest`. Running `release.yml` manually also pushes to Docker Hub and needs
+  the same approval.
 
 ---
 
@@ -205,28 +193,12 @@ scan passes with 0 findings — see
 ```markdown
 ## Week of [DATE]
 
-### Monday
-- [ ] Review automated security scan results
-- [ ] Review automated base image update PR
+- [ ] Review automated security scan results (Security tab, open `security` issues)
+- [ ] Review automated update PRs (base image update, Dependabot) and run CI on them
 - [ ] Triage new issues from past week
-- [ ] Update stale issues
+- [ ] Follow up on stale issues
 - [ ] Close resolved issues
-
-### Tuesday
-- [ ] Review pull requests
-- [ ] Respond to community discussions
-
-### Wednesday
-- [ ] Check Docker Hub statistics
-- [ ] Review GitHub Insights
-
-### Thursday
-- [ ] Review Security tab findings
-- [ ] Update documentation if needed
-
-### Friday
-- [ ] Weekly team sync (if applicable)
-- [ ] Plan next week's priorities
+- [ ] Review pull requests and Discussions
 ```
 
 ### Monthly Maintenance Checklist
@@ -234,24 +206,9 @@ scan passes with 0 findings — see
 ```markdown
 ## Month of [MONTH YEAR]
 
-### First Week
-- [ ] Generate issue metrics report
-- [ ] Review milestone progress
-- [ ] Update issue templates if needed
-- [ ] Documentation review
-- [ ] Security audit
-
-### Second Week
-- [ ] Review community feedback
-- [ ] Plan feature improvements
-
-### Third Week
-- [ ] Technical debt assessment
-- [ ] Performance monitoring
-
-### Fourth Week
-- [ ] Prepare for next month
-- [ ] Update roadmap
+- [ ] Issue backlog review
+- [ ] Documentation review (`make check-links`)
+- [ ] Security audit (`make scan-image`)
 ```
 
 ### Quarterly Maintenance Checklist
@@ -259,12 +216,9 @@ scan passes with 0 findings — see
 ```markdown
 ## Quarter [Q# YEAR]
 
-- [ ] Run full benchmark suite
+- [ ] Run benchmark suite and update the docs
 - [ ] Dependency audit
 - [ ] Architecture review
-- [ ] Community health check
-- [ ] Update quarterly metrics
-- [ ] Plan next quarter priorities
 ```
 
 ---
@@ -275,25 +229,10 @@ scan passes with 0 findings — see
 
 | Metric | Target | Check Frequency |
 |--------|--------|-----------------|
-| Security scan pass rate | 100% | Weekly |
-| Time to security patch | < 48 hours | As needed |
-| Issue response time | < 24 hours | Weekly |
-| Issue resolution time (P0) | < 24 hours | Weekly |
-| Issue resolution time (P1) | < 1 week | Weekly |
-| Open issue count | < 50 | Monthly |
-| Stale issue rate | < 20% | Monthly |
-| Docker Hub pull rate | Growing | Monthly |
-| Community contributors | Growing | Quarterly |
-
-### Monitoring Dashboard
-
-Use GitHub Insights and custom scripts to track:
-- Issue velocity (opened vs closed)
-- PR merge rate
-- Community engagement (stars, forks, watchers)
-- Docker Hub pulls
-- Security findings trend
-- Build success rate
+| Weekly published-image scan | Passing | Weekly |
+| Security fix time | Within the SECURITY_POLICY.md deadlines (Critical 7 days / High 30 days / Medium 90 days) | As needed |
+| Issue first response | < 1 week | Weekly |
+| Open issue count | Tracked | Monthly |
 
 ---
 
@@ -301,42 +240,16 @@ Use GitHub Insights and custom scripts to track:
 
 ### Security Emergency
 1. **Immediate:** Create private security advisory
-2. **Within 4 hours:** Assess impact and severity
-3. **Within 24 hours:** Develop patch
-4. **Within 48 hours:** Release patch and public advisory
+2. **Within 24 hours:** Acknowledge the reporter
+3. **Within 72 hours:** Assess impact and severity
+4. **By severity:** Release the fix and the public advisory within the
+   SECURITY_POLICY.md deadline (Critical 7 days)
 
-### Critical System Failure
-1. **Immediate:** Add incident label to issue
-2. **Within 1 hour:** Assess impact
-3. **Within 4 hours:** Deploy workaround if available
-4. **Within 24 hours:** Deploy permanent fix
-
-### Community Crisis
-1. **Immediate:** Acknowledge issue publicly
-2. **Within 4 hours:** Consult with maintainer team
-3. **Within 24 hours:** Provide transparent communication
-4. **Follow up:** Update policies if needed
-
----
-
-## Maintenance Calendar
-
-### 2025 Schedule
-
-| Month | Focus Areas | Special Events |
-|-------|-------------|----------------|
-| January | Q1 planning, Security audit | - |
-| February | Performance optimization | - |
-| March | Documentation sprint | Q1 review |
-| April | Q2 planning, Dependency audit | - |
-| May | Feature development | - |
-| June | Community engagement | Q2 review |
-| July | Q3 planning, Architecture review | - |
-| August | Security hardening | - |
-| September | Stability improvements | Q3 review |
-| October | Q4 planning, Performance review | - |
-| November | Release preparation | - |
-| December | Year-end review, 2026 planning | Q4 review |
+### Broken Release
+1. **Immediate:** Open an issue labelled `bug` describing the affected tags
+2. **As soon as possible:** Tell users to pin the previous version
+   (for example `3.0.1-standard`) until a fix is released
+3. **Then:** Release a fixed patch version
 
 ---
 
@@ -345,12 +258,13 @@ Use GitHub Insights and custom scripts to track:
 ### Automated Maintenance Scripts
 
 ```bash
-# Generate issue metrics report
+# Issues created in the past month
+# (GNU date; on macOS use: date -v-1m +%Y-%m-%d)
 gh issue list --json number,title,labels,createdAt,closedAt \
   --state all --search "created:>$(date -d '1 month ago' +%Y-%m-%d)" \
   > issues-report.json
 
-# Check stale issues
+# Check stale issues (macOS: date -v-90d +%Y-%m-%d)
 gh issue list --search "updated:<$(date -d '90 days ago' +%Y-%m-%d)" --state open
 
 # List security issues
@@ -359,7 +273,7 @@ gh issue list --label "security" --state open
 # Check workflow runs
 gh run list --limit 10
 
-# View security alerts
+# View code scanning alerts
 gh api repos/:owner/:repo/code-scanning/alerts
 ```
 
@@ -369,15 +283,15 @@ gh api repos/:owner/:repo/code-scanning/alerts
 # Update local repository
 git pull origin main
 
-# Check for outdated actions
-gh api repos/:owner/:repo/actions/workflows | jq '.workflows[] | {name, path}'
+# Outdated actions are reported by Dependabot (see above)
 
-# View Docker Hub stats (requires docker hub token)
+# View Docker Hub stats
 # Use Docker Hub web interface
 
 # Run local security scan
-trivy fs .
-make scan-image    # CVE + secrets on kimigayo-os:$(VARIANT)-$(ARCH)
+make trivy-fs-scan  # the repository
+make scan-image     # CVE + secrets on kimigayo-os:$(VARIANT)-$(ARCH)
+make security-scan  # scan-image + Trivy FS + ShellCheck
 
 # Check build status
 make status
@@ -387,13 +301,13 @@ make status
 
 ## Contact and Escalation
 
-### Maintainer Team
-- **Primary:** Check CODEOWNERS file
+### Maintainer
+- There is no CODEOWNERS file; the single maintainer reviews everything
 - **Backup:** GitHub Discussions or Issues
 
 ### Emergency Contact
-- **Security:** Use GitHub Security Advisories
-- **Critical Issues:** Create issue with `critical` label
+- **Security:** Use GitHub Security Advisories (the only channel; there is no email address)
+- **Critical Issues:** Create an issue with the `bug` label and say so in the title
 
 ### Community Support
 - **Questions:** GitHub Discussions
@@ -407,10 +321,10 @@ make status
 - [Issue Triage Process](ISSUE_TRIAGE.md)
 - [Security Policy](../security/SECURITY_POLICY.md)
 - [Contributing Guide](../../CONTRIBUTING.md)
-- [Release Process](../../RELEASE_NOTES.md)
+- [Release Process](../../.claude/skills/release/SKILL.md)
+- [Release Notes](../../RELEASE_NOTES.md)
 
 ---
 
-**Maintainer:** Kimigayo OS Team
-**Last Review:** 2025-12-22
-**Next Review:** 2026-01-22
+**Maintainer:** Kimigayo OS maintainer
+**Last Review:** 2026-10-12
