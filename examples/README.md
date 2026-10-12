@@ -6,88 +6,90 @@ This directory contains sample derivative images built on top of Kimigayo OS.
 
 ### 1. **Nginx** - Web Server
 - **Directory**: `nginx/`
-- **Base Size**: ~10-15MB
+- **Image Size**: 10.6MB
 - **Use Case**: Static websites, reverse proxy, load balancer
 - **Documentation**: [nginx/README.md](nginx/README.md)
 
-**Quick Start:**
+**Quick Start** (nginx listens on 8080 because it runs as non-root):
 ```bash
 docker build -t kimigayo-nginx examples/nginx/
-docker run -d -p 8080:80 kimigayo-nginx
+docker run -d -p 8080:8080 kimigayo-nginx
 ```
 
 ### 2. **Python** - Python Runtime
 - **Directory**: `python/`
-- **Base Size**: ~50-80MB
+- **Image Size**: 49.5MB
 - **Use Case**: Web APIs, data processing, automation scripts
 - **Documentation**: [python/README.md](python/README.md)
 
-**Quick Start:**
+**Quick Start** (starts the sample `app.py`; the command is `python3`):
 ```bash
 docker build -t kimigayo-python examples/python/
-docker run -d -p 8000:8000 \
-  -v $(pwd)/examples/python/app.py:/app/app.py \
-  kimigayo-python python /app/app.py
+docker run -d -p 8000:8000 kimigayo-python
 ```
 
 ### 3. **Node.js** - JavaScript Runtime
 - **Directory**: `nodejs/`
-- **Base Size**: ~50-90MB
+- **Image Size**: 72.9MB
 - **Use Case**: Web applications, APIs, real-time services
 - **Documentation**: [nodejs/README.md](nodejs/README.md)
 
-**Quick Start:**
+**Quick Start** (starts the sample `app.js`):
 ```bash
 docker build -t kimigayo-nodejs examples/nodejs/
-docker run -d -p 3000:3000 \
-  -v $(pwd)/examples/nodejs:/app \
-  kimigayo-nodejs node /app/app.js
+docker run -d -p 3000:3000 kimigayo-nodejs
 ```
 
 ## Size Comparison
 
-| Image | Kimigayo OS | Traditional Alpine | Traditional Debian |
-|-------|-------------|--------------------|--------------------|
-| **Base OS** | 1-3MB | 7-8MB | 95MB |
-| **+ Nginx** | ~10-15MB | ~40MB | ~140MB |
-| **+ Python** | ~50-80MB | ~150MB | ~350MB |
-| **+ Node.js** | ~50-90MB | ~150MB | ~400MB |
+| Image | Kimigayo OS example | Official Alpine-based image |
+|-------|---------------------|-----------------------------|
+| **Base OS** | 2.98MB (`3.0.2`, Standard) | 8.66MB (`alpine:3.24`) |
+| **+ Nginx** | 10.6MB | 62.4MB (`nginx:alpine`) |
+| **+ Python** | 49.5MB | 57.4MB (`python:alpine`) |
+| **+ Node.js** | 72.9MB | 181MB (`node:alpine`) |
 
-**Savings**: 60-70% smaller than Alpine-based images
+Measured 2026-10-12 on arm64 with `docker images`. The reduction depends on
+the runtime: about 83% for nginx, 60% for Node.js, but only about 14% for
+Python, whose size is mostly the interpreter and standard library. The
+official images also include pip / npm, which these examples leave out.
 
 ## Common Patterns
 
 ### Multi-stage Builds
 
-Reduce final image size by building in one stage and copying to runtime stage:
+Install dependencies in a stage that has a package manager, then copy only
+the result. Use the same Alpine version as the runtime you copy from, so
+compiled extensions match:
 
 ```dockerfile
 # Builder stage
-FROM python:3.11-alpine AS builder
-WORKDIR /build
+FROM alpine:3.24 AS builder
+RUN apk add --no-cache python3 py3-pip
 COPY requirements.txt .
-RUN pip install --user -r requirements.txt
+RUN pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
 
-# Runtime stage
-FROM ishinokazuki/kimigayo-os:latest
-COPY --from=builder /root/.local /usr/local
+# Runtime stage (the Python example image; Kimigayo itself has no Python)
+FROM kimigayo-python:latest
+COPY --from=builder /stage/app/lib /app/lib
+ENV PYTHONPATH=/app/lib
 WORKDIR /app
 COPY . .
-CMD ["python", "app.py"]
+CMD ["python3", "app.py"]
 ```
 
 ### Development vs Production
 
-**Development** (with shell access):
+**Development** (with shell access and more BusyBox applets):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:standard
-# ... install tools ...
+FROM ishinokazuki/kimigayo-os:3.0.2-standard
+# ... COPY your tools from a builder stage ...
 CMD ["/bin/sh"]
 ```
 
 **Production** (minimal):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:minimal
+FROM ishinokazuki/kimigayo-os:3.0.2-minimal
 # ... only runtime deps ...
 CMD ["./app"]
 ```
@@ -115,7 +117,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | grep -v 'ld-musl' | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-FROM ishinokazuki/kimigayo-os:latest
+FROM ishinokazuki/kimigayo-os:3.0.2
 COPY --from=builder /stage/ /
 COPY . /app
 WORKDIR /app
@@ -154,15 +156,15 @@ docker run -it --rm -p 8080:8080 your-image:latest
    FROM builder AS build
    # ... build steps ...
 
-   FROM ishinokazuki/kimigayo-os:latest
+   FROM ishinokazuki/kimigayo-os:3.0.2
    COPY --from=build /app /app
    ```
 
-3. **Layer caching**
+3. **Layer caching** (in the *builder* stage - Kimigayo has no pip)
    ```dockerfile
    # Copy dependencies first
    COPY requirements.txt .
-   RUN pip install -r requirements.txt
+   RUN pip install --no-cache-dir --target=/stage/app/lib -r requirements.txt
 
    # Then copy code
    COPY . .
@@ -180,14 +182,18 @@ docker run -it --rm -p 8080:8080 your-image:latest
 
 2. **Use specific tags**
    ```dockerfile
-   FROM ishinokazuki/kimigayo-os:0.1.0
+   FROM ishinokazuki/kimigayo-os:3.0.2-standard
    # not :latest in production
    ```
 
 3. **Scan for vulnerabilities**
-   ```bash
-   trivy image your-image:latest
-   ```
+
+   Image scanners that read a package database (such as `trivy image`)
+   find nothing to scan in Kimigayo-based images, because there is no
+   package database - the result is "not scanned", not "0 vulnerabilities".
+   Generate an SBOM from the binaries and match it instead; Kimigayo does
+   this for its own image in
+   [scripts/scan-image.sh](../scripts/scan-image.sh) (versions read from the binaries → CycloneDX SBOM → Grype).
 
 ### Performance
 
@@ -234,11 +240,11 @@ docker stop test && docker rm test
 ### Automated Testing
 
 ```bash
-# Health check
-docker run --rm test-image wget --spider localhost:8080
+# Health check (inside the running container; Minimal has no wget)
+docker exec test wget -q --spider http://localhost:8080/
 
-# Integration tests
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+# Integration tests (with your own docker-compose.test.yml)
+docker compose -f docker-compose.test.yml up --abort-on-container-exit
 ```
 
 ## CI/CD Integration
@@ -262,12 +268,13 @@ jobs:
         run: docker build -t my-image .
 
       - name: Test image
-        run: docker run --rm my-image test
+        run: docker run --rm my-image ./your-app --version
 
       - name: Push to registry
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-          docker push my-image
+          docker tag my-image "${{ secrets.DOCKER_USERNAME }}/my-image:latest"
+          docker push "${{ secrets.DOCKER_USERNAME }}/my-image:latest"
 ```
 
 ## Production Deployment
@@ -341,4 +348,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ## License
 
-GPL-2.0 - See [LICENSE](../LICENSE) for details
+Kimigayo OS components are licensed individually - see [LICENSE](../LICENSE) for details
