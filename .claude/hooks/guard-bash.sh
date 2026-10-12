@@ -126,8 +126,10 @@ ${tag_report:-  （タグ名を特定できませんでした。手動で確認�
 **gh workflow disable では古いコミットにしか無いワークフローを
 止められません**（ワークフロー ID が存在しないため）。
 上に ★ が出ているなら、公開を避けるには次のいずれかが必要です:
-  - リポジトリ全体の Actions を一時停止する
-    gh api -X PUT repos/{owner}/{repo}/actions/permissions -f enabled=false
+  - リポジトリ全体の Actions を一時停止する（enabled は真偽値なので
+    -F を使う。-f だと文字列 \"false\" が送られる）
+    gh api -X PUT repos/{owner}/{repo}/actions/permissions -F enabled=false
+    戻すとき: gh api -X PUT repos/{owner}/{repo}/actions/permissions -F enabled=true
   - 公開されてしまう前提で進め、あとで正しいイメージを出し直す"
 fi
 
