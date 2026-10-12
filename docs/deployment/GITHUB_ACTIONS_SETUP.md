@@ -2,41 +2,24 @@
 
 ## 概要
 
-このドキュメントでは、Kimigayo OSのDocker Hubへの自動ビルド・プッシュを行うGitHub Actionsワークフローの設定方法を説明します。
+このドキュメントでは、Kimigayo OS のイメージを Docker Hub に公開する
+GitHub Actions を動かすために、**リポジトリ側で用意するもの**と
+**リリースの起動のしかた**を説明します。
 
-## ワークフロー構成
-
-### ファイル構成
-
-```
-.github/
-└── workflows/
-    └── docker-publish.yml    # Docker ビルド・プッシュワークフロー
-```
-
-### トリガー条件
-
-ワークフローは以下のタイミングで実行されます:
-
-1. **タグプッシュ時** (`v*.*.*` 形式)
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-2. **手動実行** (workflow_dispatch)
-   - GitHub UIから手動でトリガー可能
-   - カスタムタグを指定可能
+ワークフローの中身（ジョブの構成・検証・作るタグ・署名）は
+[CICD_GUIDE.md](../developer/CICD_GUIDE.md) にまとめてあり、ここでは繰り返しません。
 
 ## GitHub Secrets設定
 
-### 必須シークレット
+| シークレット名 | 必須 | 用途 |
+|--------------|------|------|
+| `DOCKER_HUB_ACCESS_TOKEN` | 必須 | `release.yml` が Docker Hub にログインして push する |
+| `DISCORD_WEBHOOK` | 任意 | `ci.yml` と `release.yml` の結果通知。未設定なら通知ステップを飛ばす |
 
-ワークフローを実行するには、以下のシークレットをGitHubリポジトリに設定する必要があります:
-
-| シークレット名 | 説明 | 取得方法 |
-|--------------|------|---------|
-| `DOCKER_HUB_ACCESS_TOKEN` | Docker Hubアクセストークン | Docker Hub → Account Settings → Security → New Access Token |
+- Docker Hub のユーザー名（`ishinokazuki`）はシークレットではなく、
+  ワークフローの `env` に直書きしています。`DOCKER_HUB_TOKEN` という
+  シークレットはありません
+- `GITHUB_TOKEN` は Actions が自動で用意するので設定は要りません
 
 ### シークレットの設定手順
 
@@ -52,120 +35,48 @@
 
 1. [Docker Hub](https://hub.docker.com/)にログイン
 2. 右上のアカウントアイコン → **Account Settings**
-3. **Security** タブを選択
-4. **New Access Token** をクリック
+3. **Personal access tokens** を開く
+4. **Generate new token** をクリック
 5. トークンの説明を入力（例: "GitHub Actions CI/CD"）
-6. アクセス権限を選択（**Read, Write, Delete** 推奨）
+6. アクセス権限は **Read & Write** にする（push に必要な最小限。Delete は要らない）
 7. **Generate** をクリック
 8. 表示されたトークンをコピー（⚠️ 一度しか表示されません）
 
-## ワークフロー詳細
+> このトークンでは Docker Hub の Overview（説明文）は更新できません
+> （API が 403 を返します）。Overview の扱いは
+> [DOCKERHUB_SETUP.md](DOCKERHUB_SETUP.md#ステップ4-docker-hub-readme) を参照。
 
-### ビルドマトリックス
+## リリースの起動
 
-以下の組み合わせで並列ビルドを実行します:
+### タグの push（通常のリリース）
 
-| バリアント | アーキテクチャ | 合計 |
-|----------|-------------|-----|
-| minimal  | x86_64, arm64 | 2 |
-| standard | x86_64, arm64 | 2 |
-| extended | x86_64, arm64 | 2 |
-| **合計** | | **6ビルド** |
+```bash
+git tag -a v3.0.3 -m "Release v3.0.3"   # 例。2026-10-12 時点の最新は v3.0.2
+git push origin v3.0.3
+```
 
-### 生成されるDockerタグ
+**タグを push した瞬間に `release.yml` が走り、`latest` を含む公開イメージが
+差し替わります。取り消せないので、タグの作成と push は毎回ユーザーの明示的な
+承認を取ります**（`.claude/hooks/guard-bash.sh` も機械的に止めます）。
+タグを打つ前に `CHANGELOG.md` を手で更新しておきます。
 
-#### バージョンタグ (例: v0.1.0の場合)
+ビルド完了後に確認するもの:
+- Docker Hub: https://hub.docker.com/r/ishinokazuki/kimigayo-os
+- GitHub Releases: tarball 6 本・`SHA256SUMS`・`SHA512SUMS`・SBOM 6 本
 
-**Standardバリアント:**
-- `ishinokazuki/kimigayo-os:0.1.0-amd64`
-- `ishinokazuki/kimigayo-os:0.1.0-arm64`
-- `ishinokazuki/kimigayo-os:0.1.0` (マルチアーキマニフェスト)
-- `ishinokazuki/kimigayo-os:latest-amd64`
-- `ishinokazuki/kimigayo-os:latest-arm64`
-- `ishinokazuki/kimigayo-os:latest` (マルチアーキマニフェスト)
+### 手動実行（workflow_dispatch）
 
-**Minimalバリアント:**
-- `ishinokazuki/kimigayo-os:0.1.0-minimal-amd64`
-- `ishinokazuki/kimigayo-os:0.1.0-minimal-arm64`
-- `ishinokazuki/kimigayo-os:0.1.0-minimal` (マルチアーキマニフェスト)
-- `ishinokazuki/kimigayo-os:latest-minimal-amd64`
-- `ishinokazuki/kimigayo-os:latest-minimal-arm64`
-- `ishinokazuki/kimigayo-os:latest-minimal` (マルチアーキマニフェスト)
+Actions タブの **Release** ワークフロー、または:
 
-**Extendedバリアント:**
-- `ishinokazuki/kimigayo-os:0.1.0-extended-amd64`
-- `ishinokazuki/kimigayo-os:0.1.0-extended-arm64`
-- `ishinokazuki/kimigayo-os:0.1.0-extended` (マルチアーキマニフェスト)
-- `ishinokazuki/kimigayo-os:latest-extended-amd64`
-- `ishinokazuki/kimigayo-os:latest-extended-arm64`
-- `ishinokazuki/kimigayo-os:latest-extended` (マルチアーキマニフェスト)
+```bash
+gh workflow run release.yml -f tag=v3.0.2
+```
 
-### ワークフロージョブ
-
-#### 1. build-and-push
-
-各バリアント・アーキテクチャの組み合わせでOSイメージをビルドし、Docker Hubにプッシュします。
-
-**ステップ:**
-1. リポジトリをチェックアウト
-2. Docker Buildxをセットアップ
-3. Docker Hubにログイン
-4. メタデータを抽出（バージョン、タグ等）
-5. Kimigayo OS rootfsをビルド
-6. **統合テストを実行**
-   - Python環境のセットアップ
-   - Phase 1統合テストの実行
-   - rootfs構造の検証
-7. **Dockerイメージのスモークテスト**
-   - コンテナ起動テスト
-   - 基本コマンド動作確認
-   - BusyBox動作確認
-8. テスト成功後、Dockerイメージをビルド・プッシュ
-9. ビルド成果物をアップロード
-
-#### 2. create-manifest
-
-マルチアーキテクチャマニフェストを作成し、単一のタグで複数のアーキテクチャをサポートします。
-
-**ステップ:**
-1. Docker Hubにログイン
-2. 各バリアントのマルチアーキマニフェストを作成・プッシュ
-
-#### 3. create-github-release
-
-GitHub Releasesを作成し、ビルド成果物を添付します。
-
-**ステップ:**
-1. リポジトリをチェックアウト
-2. すべてのビルド成果物をダウンロード
-3. リリース用アセットを準備
-4. リリースノートを生成
-5. GitHub Releaseを作成し、成果物を添付
-
-## 使用方法
-
-### リリースの作成
-
-1. **バージョンタグを作成**
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-2. **GitHub Actionsで自動ビルドが開始**
-   - リポジトリの **Actions** タブで進行状況を確認
-
-3. **ビルド完了後、以下を確認**
-   - Docker Hub: https://hub.docker.com/r/ishinokazuki/kimigayo-os
-   - GitHub Releases: リポジトリの **Releases** タブでビルド成果物を確認
-
-### 手動実行
-
-1. GitHubリポジトリページを開く
-2. **Actions** タブに移動
-3. **Docker Build and Push** ワークフローを選択
-4. **Run workflow** をクリック
-5. タグを指定（任意）して **Run workflow** を実行
+**手動実行でも Docker Hub に push します**（`verify-and-push` ジョブ）。
+一方でマルチアーキのマニフェスト作成・Cosign 署名・GitHub Release は
+タグ push のときだけなので飛ばされます。`tag` を省くと版は `latest` に
+なります。**公開物を変える操作なので、タグの push と同じく承認が要ります。**
+詳細は [CICD_GUIDE.md](../developer/CICD_GUIDE.md#手動実行workflow_dispatch)。
 
 ## トラブルシューティング
 
@@ -173,19 +84,11 @@ GitHub Releasesを作成し、ビルド成果物を添付します。
 
 1. **Secretsが正しく設定されているか**
    - Settings → Secrets and variables → Actions で確認
-
 2. **Docker Hubアクセストークンが有効か**
-   - トークンの有効期限を確認
-   - 必要な権限（Read, Write, Delete）が付与されているか
-
-3. **ビルドスクリプトの実行権限**
-   ```bash
-   chmod +x scripts/build-rootfs.sh
-   ```
-
-4. **ログの確認**
+   - トークンの有効期限と、権限が Read & Write あるか
+3. **ログの確認**
    - Actions タブで失敗したジョブのログを確認
-   - エラーメッセージを確認して対処
+   - ビルドが落ちたときは `build-logs-<variant>-<arch>` の成果物にログが残る
 
 ### よくあるエラー
 
@@ -193,43 +96,28 @@ GitHub Releasesを作成し、ビルド成果物を添付します。
 ```
 Error: Cannot perform an interactive login from a non TTY device
 ```
-**解決方法:** `DOCKER_HUB_ACCESS_TOKEN` シークレットが正しく設定されているか確認
+**解決方法:** `DOCKER_HUB_ACCESS_TOKEN` シークレットが設定されているか確認
+（未設定だとパスワードが空になりこのエラーになる）
 
-#### ビルドスクリプトが見つからない
-```
-bash: scripts/build-rootfs.sh: No such file or directory
-```
-**解決方法:** スクリプトのパスと実行権限を確認
-
-#### マルチアーキテクチャビルド失敗
-```
-ERROR: failed to solve: failed to push
-```
-**解決方法:** Docker Buildxが正しくセットアップされているか確認
+#### 検証や CVE 照合で落ちる
+`scripts/verify-image.sh` か `scripts/scan-image.sh` が落ちると push しません。
+NVD に新しい CVE が載ると、コードを変えていなくても落ちます
+（→ [CICD_GUIDE.md](../developer/CICD_GUIDE.md#出荷物のスキャンscriptsscan-imagesh)）。
 
 ## セキュリティのベストプラクティス
 
 1. **アクセストークンの管理**
-   - トークンは絶対にコードにハードコーディングしない
-   - GitHub Secretsを使用して安全に管理
+   - トークンは絶対にコードにハードコーディングしない（ローカルでは `.env` に置き、コミットしない）
+   - GitHub Secretsを使用して管理
    - 定期的にトークンをローテーション
-
 2. **最小権限の原則**
-   - 必要最小限の権限のみをトークンに付与
+   - トークンの権限は Read & Write に留める
    - 使用しないトークンは削除
-
 3. **監査とモニタリング**
    - Docker Hubのアクティビティログを定期的に確認
-   - 不審なアクセスがないか監視
-
-## 次のステップ
-
-1. セキュリティスキャンの統合（タスク27）
-2. 自動テストの追加（タスク26.2）
-3. GitHub Releasesとの連携
 
 ## 関連ドキュメント
 
+- [CI/CD パイプラインガイド](../developer/CICD_GUIDE.md)
 - [Docker Hub セットアップガイド](./DOCKERHUB_SETUP.md)
 - [GitHub Actions公式ドキュメント](https://docs.github.com/en/actions)
-- [Docker Buildx公式ドキュメント](https://docs.docker.com/buildx/working-with-buildx/)
