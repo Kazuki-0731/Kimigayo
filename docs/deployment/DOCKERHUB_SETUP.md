@@ -91,9 +91,10 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 
 ### タグ付けワークフロー
 
-**Docker Hub へ push するのは `release.yml` だけ**（`v*.*.*` タグの push か、
-手動実行）。`main` へのコミットでは `ci.yml` が走るが、イメージは公開されない。
-どちらも公開物を変えるので、ユーザーの明示的な承認を取る。
+**Docker Hub へ push するのは `release.yml` の `v*.*.*` タグの push だけ**。
+`release.yml` の手動実行はビルドと検証だけで push しない。`main` へのコミットでは
+`ci.yml` が走るが、イメージは公開されない。タグの push は公開物を変えるので、
+ユーザーの明示的な承認を取る。
 
 1. **安定版リリース**
    - `git tag -a v3.0.3` → push で `release.yml` が走る（版は例）
@@ -102,9 +103,10 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 
 2. **手動実行**
    - Actions から `release.yml` を `workflow_dispatch` で実行する
-   - **これも Docker Hub に push する**（`<ver>-<variant>-<arch>` と
-     `latest-<variant>-<arch>`）。マニフェスト作成・署名・GitHub Release は飛ぶ
-   - `tag` を指定しなければ入力の既定値 `latest` が版になる（通常は使わない）
+   - **Docker Hub には push しない**。ビルド・検証・スキャン・SBOM の保存まで
+     （2026-10-12 までは `<ver>-<variant>-<arch>` と `latest-<variant>-<arch>` を
+     push していた）。マニフェスト作成・署名・GitHub Release も走らない
+   - `tag` を指定しなければ版は `edge` になる
 
 **プレリリース（beta / rc）は運用していない。**
 
