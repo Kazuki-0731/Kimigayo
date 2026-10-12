@@ -49,9 +49,9 @@ docker ps   # ビルドコンテナは kimigayo-build-env という固定名
 | `benchmark-size.sh` | イメージサイズ（Kimigayo と比較対象をまとめて） | `IMAGES` 配列（スクリプト内） | `benchmark-size.json` |
 | `benchmark-startup.sh` | 起動時間。`MODE=exec` は `/bin/true`、`MODE=init` は `openrc default` の完走まで | `IMAGE` `ITERATIONS` `MODE` `PLATFORM` | `benchmark-startup.json` |
 | `benchmark-memory.sh` | 常駐メモリ（**KB**） | `IMAGE` `DURATION` `PLATFORM` | `benchmark-memory.json` |
-| `benchmark-busybox.sh` | 8 コマンド（`ls` `grep` `find` `awk` `sort` `cat` `wc` `head`）を Alpine と比較 | `IMAGE_NAME` `ALPINE_IMAGE` `BENCHMARK_ITERATIONS` | `benchmark-results/busybox.json` |
-| `benchmark-lifecycle.sh` | コンテナの作成・起動・停止・削除 | `IMAGE_NAME` `BENCHMARK_ITERATIONS` | `benchmark-results/lifecycle.json` |
-| `benchmark-comparison.sh` | Kimigayo vs Alpine / distroless / Ubuntu | `ITERATIONS` | `benchmark-results/comparison_<時刻>.{txt,json,md}` |
+| `benchmark-busybox.sh` | 8 コマンド（`ls` `grep` `find` `awk` `sort` `cat` `wc` `head`）を Alpine と比較。**比は中央値どうし**（`ratio_median`。`ratio_avg` は平均の比、`speedup` は `ratio_median` の別名。2026-10-13 までの `speedup` は平均の比） | `IMAGE_NAME` `ALPINE_IMAGE` `BENCHMARK_ITERATIONS` | `benchmark-results/busybox.json` |
+| `benchmark-lifecycle.sh` | コンテナの作成・起動・停止・削除・warm pull。**pull が失敗した回は記録せず、全部失敗なら N/A**（ローカル専用のイメージは必ず N/A。2026-10-13 までは失敗までの時間を記録していた） | `IMAGE_NAME` `BENCHMARK_ITERATIONS` | `benchmark-results/lifecycle.json` |
+| `benchmark-comparison.sh` | Kimigayo vs Alpine / distroless / Ubuntu。対象のアーキは `uname -m` から選ぶ。**消すのは自分で pull したイメージだけ**（2026-10-13 までは利用者が元から持っていたものまで `docker rmi` していた） | `ITERATIONS` `KIMIGAYO_IMAGE`（公開前の版は手元のイメージを渡す） | `benchmark-results/comparison_<時刻>.{txt,json,md}` |
 | `benchmark-report.sh` | **測らない。** 上の JSON を読んで Markdown にまとめる | `$1`（既定 `benchmark-results`） | `benchmark-results/BENCHMARK_REPORT.md` |
 | `benchmark-all.sh` | 上をまとめて回す | `OUTPUT_DIR` | `benchmark-results/` 一式 |
 
