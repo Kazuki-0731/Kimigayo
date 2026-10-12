@@ -2,6 +2,25 @@
 
 This directory contains custom OpenRC init scripts and service definitions for Kimigayo OS.
 
+> **These files are NOT installed into the image (reference only).**
+> As of 2026-10-12, `scripts/build-rootfs.sh` does not read `src/openrc/`
+> (only `scripts/test-openrc-integration.sh` checks that the files exist).
+> The same applies to `configs/openrc/` (`rc.conf`, `services-*.list`,
+> `inittab.optimized`).
+>
+> What the image actually contains:
+>
+> - **Init scripts and runlevels**: upstream OpenRC's own, as installed by
+>   `scripts/build-openrc.sh` and copied by `build-rootfs.sh`
+>   (`copy_over "$OPENRC_INSTALL_DIR/etc" ...`). `build-rootfs.sh` then removes
+>   scripts that can never run in a container (`remove_unusable_init_scripts`)
+>   and adapts `sysctl` / `bootmisc` to BusyBox (`patch_openrc_for_busybox`)
+> - **`/etc/rc.conf`, `/etc/inittab`, `/etc/network/interfaces`,
+>   `/etc/sysctl.d/99-kimigayo-performance.conf`**: written by heredocs in
+>   `scripts/build-rootfs.sh`
+>
+> The descriptions below describe the files in this directory, not the image.
+
 ## Directory Structure
 
 ```
@@ -43,14 +62,14 @@ BusyBox syslogd system logging service.
 
 **Configuration**: `/etc/conf.d/syslog`
 **Runlevel**: boot
-**Dependencies**: localmount, clock
+**Dependencies**: need localmount, use clock
 
 ### klogd
 BusyBox klogd kernel logging service.
 
 **Configuration**: `/etc/conf.d/klogd`
 **Runlevel**: boot
-**Dependencies**: syslog, clock
+**Dependencies**: need syslog, use clock
 
 ### networking
 Configures network interfaces:
@@ -58,18 +77,20 @@ Configures network interfaces:
 - Configures interfaces from `/etc/network/interfaces`
 
 **Runlevel**: default
-**Dependencies**: localmount, bootmisc
+**Dependencies**: need localmount, after bootmisc
 
 ### crond
 BusyBox crond scheduling service.
 
 **Configuration**: `/etc/conf.d/crond`
 **Runlevel**: default
-**Dependencies**: localmount, logger
+**Dependencies**: need localmount, use logger, after bootmisc
 
 ## Runlevels
 
-Kimigayo OS uses the following OpenRC runlevels:
+`runlevels/setup-runlevels.sh` would set up the following runlevels.
+**The image does not use this layout**; it uses upstream OpenRC's runlevels
+(check with `docker run --rm <image> rc-update show`).
 
 | Runlevel | Description | Services |
 |----------|-------------|----------|
@@ -80,7 +101,7 @@ Kimigayo OS uses the following OpenRC runlevels:
 
 ## Installation
 
-The init scripts and runlevels are automatically installed during the rootfs build process. To manually set up runlevels:
+These scripts are **not** installed by the rootfs build. To try them on a rootfs manually:
 
 ```bash
 cd src/openrc/runlevels
@@ -131,9 +152,7 @@ All services are designed to work with BusyBox implementations:
 
 ## Dependencies
 
-- OpenRC (>= 0.52.1)
-- BusyBox (>= 1.36.1)
-- musl libc (>= 1.2.4)
+- OpenRC / BusyBox / musl libc (versions are defined only in `versions.mk`)
 
 ## See Also
 
