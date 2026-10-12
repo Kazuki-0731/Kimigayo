@@ -3,6 +3,13 @@ Kernel build system for Kimigayo OS
 
 Handles kernel configuration, compilation, and module management
 with security hardening and reproducible builds.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+カーネルはイメージに入らない。実際のカーネルビルドは scripts/build-kernel.sh で、
+src/kernel/config/<arch>.config（プレースホルダなら上流 defconfig）を使う。
+ここが既定にしている kimigayo_<arch>_defconfig はビルドでは使われておらず、
+build_kernel() はモックのイメージを書くだけ。
 """
 
 import os

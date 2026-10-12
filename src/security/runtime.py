@@ -4,7 +4,12 @@ Runtime Security Enforcement
 Enforces runtime security features including ASLR and DEP/NX.
 
 Requirements:
-- 2.2: Runtime security enforcement - ASLR and DEP must be enforced at runtime
+- Runtime security enforcement - ASLR and DEP must be enforced at runtime
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+ASLR を有効にするのはホストのカーネル。イメージ側は全実行ファイルを PIE にして
+ASLR が効く形にしている（scripts/verify-image.sh が検査）。
 """
 
 import os
@@ -50,7 +55,7 @@ class RuntimeSecurityEnforcer:
     """
     Enforces runtime security features.
 
-    Requirement: 2.2 (Runtime security enforcement)
+    Runtime security enforcement
     """
 
     def __init__(self):
@@ -62,7 +67,7 @@ class RuntimeSecurityEnforcer:
         """
         Check if ASLR is enabled and get randomization level.
 
-        Requirement: 2.2 - ASLR must be enforced at runtime
+        ASLR must be enforced at runtime
 
         Returns:
             Tuple of (enabled, level)
@@ -83,7 +88,7 @@ class RuntimeSecurityEnforcer:
         """
         Enable ASLR at specified level.
 
-        Requirement: 2.2 - ASLR must be enforced
+        ASLR must be enforced
 
         Args:
             level: ASLR randomization level
@@ -107,7 +112,7 @@ class RuntimeSecurityEnforcer:
         """
         Check if DEP/NX is enabled.
 
-        Requirement: 2.2 - DEP must be enforced at runtime
+        DEP must be enforced at runtime
 
         Returns:
             True if DEP is enabled
@@ -194,7 +199,7 @@ class RuntimeSecurityEnforcer:
         """
         Enforce runtime security policy.
 
-        Requirement: 2.2 - Enforce ASLR and DEP
+        Enforce ASLR and DEP
 
         Returns:
             Dictionary of enforcement results
@@ -256,7 +261,7 @@ class RuntimeSecurityEnforcer:
         """
         Verify that runtime security is properly enforced.
 
-        Requirement: 2.2 - ASLR and DEP must be enforced
+        ASLR and DEP must be enforced
 
         Returns:
             Tuple of (all_checks_passed, list_of_failures)
@@ -297,7 +302,7 @@ class ProcessSecurityChecker:
     """
     Checks security features of running processes.
 
-    Requirement: 2.2 (Runtime security monitoring)
+    Runtime security monitoring
     """
 
     def __init__(self):
@@ -394,7 +399,7 @@ class SecurityPolicyManager:
     """
     Manages security policy enforcement.
 
-    Requirement: 2.2 (Security policy application)
+    Security policy application
     """
 
     def __init__(self, enforcer: Optional[RuntimeSecurityEnforcer] = None):
@@ -410,7 +415,7 @@ class SecurityPolicyManager:
         """
         Apply runtime security policy.
 
-        Requirement: 2.2 - Apply runtime security policy
+        Apply runtime security policy
 
         Returns:
             True if policy applied successfully

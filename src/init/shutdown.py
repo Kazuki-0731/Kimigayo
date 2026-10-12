@@ -3,6 +3,9 @@ System Shutdown Management for Kimigayo OS
 
 Provides graceful shutdown with service stopping, filesystem unmounting,
 and resource cleanup.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
 """
 
 import os

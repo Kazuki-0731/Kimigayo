@@ -4,7 +4,13 @@ Compile-time Security Hardening
 Manages compile-time security flags and build-time verification.
 
 Requirements:
-- 2.1: Compile-time security hardening - PIE, stack protection, FORTIFY_SOURCE
+- Compile-time security hardening - PIE, stack protection, FORTIFY_SOURCE
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+musl は FORTIFY_SOURCE を実装していないので、-D_FORTIFY_SOURCE=2 の効果は
+確認できていない。arm64 の OpenRC には Stack Protector が付いていない。
+成果物の実際の検査（PIE・Full RELRO・非実行スタック）は scripts/verify-image.sh。
 """
 
 import re
@@ -36,7 +42,7 @@ class SecurityFlags:
     """
     Security compilation flags.
 
-    Requirement: 2.1 (Compile-time security hardening)
+    Compile-time security hardening
     """
     # PIE - Position Independent Executable
     pie_cflags: List[str] = field(default_factory=lambda: ["-fPIE"])
@@ -160,7 +166,7 @@ class SecurityHardeningManager:
     """
     Manages compile-time security hardening.
 
-    Requirement: 2.1 (Compile-time security hardening)
+    Compile-time security hardening
     """
 
     def __init__(self, security_level: SecurityLevel = SecurityLevel.STANDARD):
@@ -177,7 +183,7 @@ class SecurityHardeningManager:
         """
         Get required security flags.
 
-        Requirement: 2.1 - PIE, stack protection, FORTIFY_SOURCE must be enabled
+        PIE, stack protection, FORTIFY_SOURCE must be enabled
 
         Returns:
             Dictionary of flag categories
@@ -193,7 +199,7 @@ class SecurityHardeningManager:
         """
         Verify that required security flags are enabled.
 
-        Requirement: 2.1 - Verify security flags are applied
+        Verify security flags are applied
 
         Args:
             cflags: Compiler flags string
@@ -272,14 +278,14 @@ class BinarySecurityVerifier:
     """
     Verifies security features in compiled binaries.
 
-    Requirement: 2.1 (Build-time verification)
+    Build-time verification
     """
 
     def verify_binary(self, binary_path: Path) -> Dict[str, bool]:
         """
         Verify security features in a binary.
 
-        Requirement: 2.1 - Verify PIE, stack protection, FORTIFY_SOURCE
+        Verify PIE, stack protection, FORTIFY_SOURCE
 
         Args:
             binary_path: Path to binary file
@@ -348,7 +354,7 @@ class BinarySecurityVerifier:
         """
         Verify that required security features are present.
 
-        Requirement: 2.1 - All required features must be present
+        All required features must be present
 
         Args:
             binary_path: Path to binary file
@@ -374,7 +380,7 @@ class CompilerSecurityChecker:
     """
     Checks compiler support for security features.
 
-    Requirement: 2.1 (Security configuration management)
+    Security configuration management
     """
 
     def __init__(self, compiler: str = "gcc"):
@@ -435,7 +441,7 @@ class SecurityConfigManager:
     """
     Manages security configuration for build system.
 
-    Requirement: 2.1 (Security configuration management)
+    Security configuration management
     """
 
     def __init__(self, config_dir: Optional[Path] = None):
@@ -480,7 +486,7 @@ LDFLAGS={config.get_ldflags()}
         """
         Verify that a build meets security requirements.
 
-        Requirement: 2.1 - Build-time verification
+        Build-time verification
 
         Args:
             binary_path: Path to compiled binary

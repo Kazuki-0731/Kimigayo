@@ -8,6 +8,11 @@ Target Environments:
 - ARM64 devices
 - Embedded devices
 - IoT devices
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+ホスト環境を調べるもので、Kimigayo のイメージは検証しない。
+ベアメタル・組み込み・IoT は対象外（2026-10-10 決定。成果物は Docker イメージのみ）。
 """
 
 import os
@@ -69,7 +74,7 @@ class HardwareDetector:
     """
     Detects hardware information.
 
-    Requirement 5.1: Support x86_64 and ARM64
+    Support x86_64 and ARM64
     """
 
     def __init__(self):
@@ -178,7 +183,7 @@ class ArchitectureTester:
     """
     Tests architecture-specific functionality.
 
-    Requirement 5.1: Support x86_64 and ARM64
+    Support x86_64 and ARM64
     """
 
     def __init__(self):
@@ -189,7 +194,7 @@ class ArchitectureTester:
         """
         Test x86_64 architecture support.
 
-        Requirement 5.1: x86_64 support
+        x86_64 support
 
         Returns:
             Test result
@@ -223,7 +228,7 @@ class ArchitectureTester:
         """
         Test ARM64 architecture support.
 
-        Requirement 5.1: ARM64 support
+        ARM64 support
 
         Returns:
             Test result
@@ -408,7 +413,7 @@ class BaremetalEnvironmentBenchmark:
     Benchmarks bare metal environment functionality.
 
     Target Environment: Bare metal servers, embedded devices, IoT
-    Requirement 5.1: x86_64 and ARM64 support
+    x86_64 and ARM64 support
     """
 
     def __init__(self):

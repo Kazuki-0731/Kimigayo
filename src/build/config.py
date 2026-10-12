@@ -1,5 +1,10 @@
 """
 Build configuration for Kimigayo OS
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+SystemRequirements の値（RAM 128MB 等）は旧設計目標（現在の仕様には無い）。
+必要な RAM・ストレージは載せるアプリケーションで決まる（SPECIFICATION.md 8.1）。
 """
 
 from dataclasses import dataclass
@@ -88,7 +93,7 @@ class BuildConfig:
 
 @dataclass
 class SystemRequirements:
-    """System requirements for Kimigayo OS"""
+    """System requirements for Kimigayo OS（旧設計目標（現在の仕様には無い））"""
     min_ram_mb: int = 128
     recommended_ram_mb: int = 512
     min_storage_mb: int = 512

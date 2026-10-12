@@ -7,6 +7,11 @@ Target Environments:
 - Docker
 - Kubernetes
 - Podman
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+検証に使うイメージは alpine:latest / nginx:alpine で、Kimigayo のイメージではない。
+Podman は enum に名前があるだけで、実装は無い。
 """
 
 import os

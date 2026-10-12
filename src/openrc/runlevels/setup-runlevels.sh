@@ -3,6 +3,9 @@
 # OpenRC Runlevel Setup Script for Kimigayo OS
 # Configures default runlevels for the init system
 #
+# ビルドでは使われていない。イメージの /etc/runlevels は OpenRC のインストールと
+# scripts/build-rootfs.sh で決まり、このスクリプトは
+# scripts/test-openrc-integration.sh が存在を確かめるだけ。
 
 set -e
 

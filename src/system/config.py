@@ -5,8 +5,13 @@ Manages modular system configuration including kernel modules
 and component selection.
 
 Requirements:
-- 3.1: Kernel module selection flexibility
-- 3.2: Dynamic component management
+- Kernel module selection flexibility
+- Dynamic component management
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+カーネルはイメージに入らないので、カーネルモジュールの選択は実際のイメージに
+影響しない。
 """
 
 import json
@@ -39,7 +44,7 @@ class KernelModule:
     """
     Kernel module configuration.
 
-    Requirement: 3.1 (Kernel module selection flexibility)
+    Kernel module selection flexibility
     """
     name: str
     category: str
@@ -63,7 +68,7 @@ class SystemComponent:
     """
     System component configuration.
 
-    Requirement: 3.2 (Dynamic component management)
+    Dynamic component management
     """
     name: str
     category: ComponentCategory
@@ -146,7 +151,7 @@ class KernelModuleManager:
     """
     Manages kernel module selection.
 
-    Requirement: 3.1 (Kernel module selection flexibility)
+    Kernel module selection flexibility
     """
 
     def __init__(self):
@@ -231,7 +236,7 @@ class ComponentManager:
     """
     Manages system components dynamically.
 
-    Requirement: 3.2 (Dynamic component management)
+    Dynamic component management
     """
 
     def __init__(self):

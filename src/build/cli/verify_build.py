@@ -11,8 +11,13 @@ Usage:
     verify_build.py reproducible <output-dir> --builds N
 
 Requirements:
-- 6.4: Cryptographic verification of build reproducibility
-- 6.5: Build metadata inclusion
+- Cryptographic verification of build reproducibility
+- Build metadata inclusion
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（どこからも呼ばれていない）。
+reproducible サブコマンドは BuildConfig に文字列を渡しており、現在は
+'str' object has no attribute 'value' で失敗する。
 """
 
 import sys

@@ -3,7 +3,11 @@ Memory Usage Measurement and Optimization
 
 Measures and optimizes system memory usage.
 
-Design Goal: RAM consumption under 128MB
+旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+実測は scripts/benchmark-memory.sh。
 """
 
 import os
@@ -87,12 +91,12 @@ class MemoryProfiler:
     """
     Profiles memory usage.
 
-    Design Goal: RAM consumption under 128MB
+    旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
     """
 
     def __init__(self):
         """Initialize memory profiler"""
-        self.target_mb = 128.0  # Design goal: requirement 1.2
+        self.target_mb = 128.0  # 旧設計目標（現在の仕様には無い）
         self.snapshots: List[SystemMemorySnapshot] = []
 
     def read_meminfo(self) -> Dict[str, int]:
@@ -212,7 +216,7 @@ class MemoryProfiler:
         """
         Check if memory usage meets target.
 
-        Design Goal: RAM consumption under 128MB
+        旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
 
         Args:
             snapshot: Memory snapshot to check
@@ -251,7 +255,7 @@ class MemoryAnalyzer:
 
     def __init__(self):
         """Initialize memory analyzer"""
-        self.target_mb = 128.0
+        self.target_mb = 128.0  # 旧設計目標（現在の仕様には無い）
 
     def analyze_profile(self, profile: MemoryProfile) -> Dict:
         """
@@ -358,7 +362,7 @@ class MemoryOptimizer:
     """
     Optimizes memory usage.
 
-    Design Goal: Achieve memory usage under 128MB
+    旧設計目標（現在の仕様には無い）: Achieve memory usage under 128MB
     """
 
     def __init__(self, analyzer: Optional[MemoryAnalyzer] = None):
@@ -447,7 +451,7 @@ class MemoryBenchmark:
     """
     Benchmarks memory usage.
 
-    Design Goal: Verify RAM consumption under 128MB
+    旧設計目標（現在の仕様には無い）: Verify RAM consumption under 128MB
     """
 
     def __init__(self):
@@ -494,7 +498,7 @@ class MemoryBenchmark:
         """
         Verify memory usage meets target.
 
-        Design Goal: RAM consumption under 128MB
+        旧設計目標（現在の仕様には無い）: RAM consumption under 128MB
 
         Args:
             profile: Memory profile to verify

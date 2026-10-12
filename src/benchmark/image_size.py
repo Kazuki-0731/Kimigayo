@@ -7,6 +7,10 @@ Design Goal:
 - Minimal: 5MB or less
 - Standard: 15MB or less
 - Extended: 50MB or less
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+目標値は SPECIFICATION.md 8.3 と同じ。実測は scripts/ のベンチマークで取る。
 """
 
 import os
@@ -289,6 +293,7 @@ class ImageOptimizer:
                 )
 
                 # Specific suggestions based on component type
+                # （注: 現在のイメージにカーネルは入らない。汎用の提案として残している）
                 if 'kernel' in component.name.lower():
                     suggestions.append("Consider minimal kernel configuration")
                     suggestions.append("Remove unnecessary kernel modules")

@@ -3,7 +3,12 @@ Boot Time Measurement and Optimization
 
 Measures and optimizes system boot time.
 
-Design Goal: Boot time under 10 seconds
+旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+BootBenchmark.measure_boot() は time.sleep で起動段階を模擬するだけで、
+イメージの起動は測らない（実測は scripts/benchmark-startup.sh）。
 """
 
 import time
@@ -57,12 +62,12 @@ class BootTimer:
     """
     Measures boot time.
 
-    Design Goal: Boot time under 10 seconds
+    旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
     """
 
     def __init__(self):
         """Initialize boot timer"""
-        self.boot_target_seconds = 10.0  # Design goal
+        self.boot_target_seconds = 10.0  # 旧設計目標（現在の仕様には無い）
         self.measurements: List[BootMeasurement] = []
         self.phase_start_times: Dict[str, float] = {}
 
@@ -121,7 +126,7 @@ class BootTimer:
         """
         Check if boot time meets target.
 
-        Design Goal: Boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
 
         Returns:
             Tuple of (meets_target, total_time)
@@ -159,7 +164,7 @@ class BootAnalyzer:
     """
     Analyzes boot performance.
 
-    Design Goal: Identify bottlenecks to achieve <10s boot
+    旧設計目標（現在の仕様には無い）: Identify bottlenecks to achieve <10s boot
     """
 
     def __init__(self):
@@ -255,7 +260,7 @@ class BootOptimizer:
     """
     Optimizes boot time.
 
-    Design Goal: Achieve boot time under 10 seconds
+    旧設計目標（現在の仕様には無い）: Achieve boot time under 10 seconds
     """
 
     def __init__(self, analyzer: Optional[BootAnalyzer] = None):
@@ -318,7 +323,7 @@ class BootBenchmark:
     """
     Benchmarks boot performance.
 
-    Design Goal: Verify boot time under 10 seconds
+    旧設計目標（現在の仕様には無い）: Verify boot time under 10 seconds
     """
 
     def __init__(self):
@@ -353,7 +358,7 @@ class BootBenchmark:
         """
         Run complete boot benchmark.
 
-        Design Goal: Verify boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Verify boot time under 10 seconds
 
         Returns:
             Benchmark results
@@ -371,7 +376,7 @@ class BootBenchmark:
         """
         Verify boot time meets target.
 
-        Design Goal: Boot time under 10 seconds
+        旧設計目標（現在の仕様には無い）: Boot time under 10 seconds
 
         Args:
             profile: Boot profile to verify

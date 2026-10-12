@@ -7,6 +7,11 @@ Target Environments:
 - QEMU/KVM
 - VirtualBox
 - VMware
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+ホスト環境を調べるもので、Kimigayo のイメージは検証しない。
+VM での起動は対象外（成果物は Docker イメージのみ）。
 """
 
 import os

@@ -1,4 +1,7 @@
 # crond configuration for Kimigayo OS
+# ビルドでは使われていない。イメージに入る init スクリプトと conf.d は
+# OpenRC 上流のもの（scripts/build-openrc.sh）で、このファイルは
+# scripts/test-openrc-integration.sh が存在を確かめるだけ。
 # Options for BusyBox crond
 
 # Default options:

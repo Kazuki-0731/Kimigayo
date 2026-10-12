@@ -4,8 +4,11 @@ Service Control System
 Manages system services with explicit enablement control.
 
 Requirements:
-- 3.4: Service startup control - only explicitly enabled services start
-- 7.5: Service management commands - start, stop, restart, status
+- Service startup control - only explicitly enabled services start
+- Service management commands - start, stop, restart, status
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
 """
 
 import os
@@ -38,7 +41,7 @@ class ServiceConfig:
     """
     Service configuration.
 
-    Requirement: 3.4 (Service startup control)
+    Service startup control
     """
     name: str
     description: str = ""
@@ -81,8 +84,8 @@ class ServiceManager:
     """
     Manages system services.
 
-    Requirement: 3.4 (Service startup control)
-    Requirement: 7.5 (Service management commands)
+    Service startup control
+    Service management commands
     """
 
     def __init__(self, config_dir: Optional[Path] = None):
@@ -110,7 +113,7 @@ class ServiceManager:
         """
         Enable a service for automatic startup.
 
-        Requirement: 3.4 - Only explicitly enabled services start
+        Only explicitly enabled services start
 
         Args:
             name: Service name
@@ -147,7 +150,7 @@ class ServiceManager:
         """
         Start a service.
 
-        Requirement: 7.5 - Service management commands (start)
+        Service management commands (start)
 
         Args:
             name: Service name
@@ -192,7 +195,7 @@ class ServiceManager:
         """
         Stop a service.
 
-        Requirement: 7.5 - Service management commands (stop)
+        Service management commands (stop)
 
         Args:
             name: Service name
@@ -233,7 +236,7 @@ class ServiceManager:
         """
         Restart a service.
 
-        Requirement: 7.5 - Service management commands (restart)
+        Service management commands (restart)
 
         Args:
             name: Service name
@@ -263,7 +266,7 @@ class ServiceManager:
         """
         Get service status.
 
-        Requirement: 7.5 - Service management commands (status)
+        Service management commands (status)
 
         Args:
             name: Service name
@@ -290,7 +293,7 @@ class ServiceManager:
         """
         Get all enabled services.
 
-        Requirement: 3.4 - Only explicitly enabled services
+        Only explicitly enabled services
 
         Args:
             run_level: Optional run level filter
@@ -309,7 +312,7 @@ class ServiceManager:
         """
         Start all enabled services for a run level.
 
-        Requirement: 3.4 - Only explicitly enabled services start
+        Only explicitly enabled services start
 
         Args:
             run_level: Run level to start services for
@@ -366,7 +369,7 @@ class ServiceController:
     """
     CLI interface for service management.
 
-    Requirement: 7.5 (Service management commands)
+    Service management commands
     """
 
     def __init__(self, manager: ServiceManager):

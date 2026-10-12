@@ -1,5 +1,9 @@
 """
 Image building utilities for Kimigayo OS
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+build_base_image() は中身がゼロ埋めのモックファイルを書くだけ。
 """
 
 import hashlib

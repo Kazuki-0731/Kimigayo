@@ -1,7 +1,14 @@
 # Kimigayo OS Kernel Configuration for ARM64
-# Based on Alpine Linux kernel config with additional security hardening
+# Security hardening options（Alpine Linux の config を基にしたという記述が
+# あったが、確認できていない）
 # Architecture: ARM64 (AArch64)
-# Version: 6.6 (recommended LTS kernel)
+# ビルドでは使われていない。scripts/build-kernel.sh が読むのは
+# src/kernel/config/<arch>.config だけで、それがプレースホルダなら上流の
+# defconfig と apply_security_hardening（scripts/config）を使う。
+# カーネルは Docker イメージに入らない（コンテナはホストのカーネルで動く）。
+# 6.6 系の頃に書いた項目で、現在の版（versions.mk の KERNEL_VERSION）とは
+# 突合していない。
+# src/kernel/build.py（モック）とそのテストだけがこのファイルを読む。
 
 #
 # General setup

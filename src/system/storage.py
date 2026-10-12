@@ -4,7 +4,12 @@ Storage Optimization
 Manages storage usage monitoring, optimization, and efficiency.
 
 Requirements:
-- 1.5: Storage optimization - Minimum storage requirement 512MB
+- Storage optimization - Minimum storage requirement 512MB
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+512MB は旧設計目標（現在の仕様には無い）。イメージのサイズ目標（5/15/50MB）は
+SPECIFICATION.md 8.3 と同じ。
 """
 
 import os
@@ -94,19 +99,19 @@ class StorageMonitor:
     """
     Monitors system storage usage.
 
-    Requirement: 1.5 (Storage usage monitoring)
+    Storage usage monitoring
     """
 
     def __init__(self):
         """Initialize storage monitor"""
-        self.minimum_storage_mb = 512  # Requirement: 1.5
+        self.minimum_storage_mb = 512  # 旧設計目標（現在の仕様には無い）
         self.recommended_storage_mb = 2048  # 2GB
 
     def get_storage_usage(self, path: str = "/") -> StorageUsage:
         """
         Get storage usage for a mount point.
 
-        Requirement: 1.5 - Monitor storage usage
+        Monitor storage usage
 
         Args:
             path: Mount point path
@@ -143,7 +148,7 @@ class StorageMonitor:
         """
         Check if available storage meets minimum requirement.
 
-        Requirement: 1.5 - Minimum storage 512MB
+        Minimum storage 512MB
 
         Args:
             path: Mount point path
@@ -225,7 +230,7 @@ class ImageSizeVerifier:
     """
     Verifies image sizes meet requirements.
 
-    Requirement: 1.5 (Image size verification)
+    Image size verification
     """
 
     def verify_image_size(self, image_path: Path, image_type: ImageType) -> Tuple[bool, float]:
@@ -276,7 +281,7 @@ class StorageOptimizer:
     """
     Optimizes storage usage.
 
-    Requirement: 1.5 (Storage optimization)
+    Storage optimization
     """
 
     def __init__(self, monitor: Optional[StorageMonitor] = None):
@@ -394,7 +399,7 @@ class StorageManager:
     """
     Manages overall storage monitoring and optimization.
 
-    Requirement: 1.5 (Storage management)
+    Storage management
     """
 
     def __init__(self):
@@ -428,7 +433,7 @@ class StorageManager:
         """
         Verify storage requirements are met.
 
-        Requirement: 1.5 - Verify minimum storage requirement
+        Verify minimum storage requirement
 
         Args:
             path: Mount point path

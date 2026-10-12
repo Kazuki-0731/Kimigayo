@@ -1,6 +1,6 @@
 """
-Kimigayo OS - A lightweight, secure, and fast operating system
-"""
+Kimigayo OS - コンテナ向けの軽量 OS
 
-__version__ = "0.1.0"
-__author__ = "Kimigayo OS Development Team"
+src/ 配下の Python パッケージはモック／参考実装。実際のビルドは
+scripts/build-*.sh が行い、これらはイメージには入らない（tests/ からのみ使われる）。
+"""

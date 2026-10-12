@@ -2,6 +2,11 @@
 musl libc integration and optimization for Kimigayo OS
 
 Provides lightweight, secure C library with static and dynamic linking support.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+既定の LinkMode.STATIC はモックの既定値。実際の BusyBox は
+BUSYBOX_LINK（既定 dynamic）で libc.so に動的リンクする。
 """
 
 import hashlib

@@ -4,7 +4,12 @@ Memory Usage Optimization
 Manages memory monitoring, optimization, and resource limits.
 
 Requirements:
-- 1.2: Memory usage constraint - RAM consumption under 128MB during normal operation
+- Memory usage constraint - RAM consumption under 128MB during normal operation
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+128MB は旧設計目標（現在の仕様には無い）。必要な RAM は載せるアプリケーションで決まる
+（SPECIFICATION.md 8.1）。
 """
 
 import os
@@ -83,19 +88,19 @@ class MemoryMonitor:
     """
     Monitors system memory usage.
 
-    Requirement: 1.2 (Memory usage monitoring)
+    Memory usage monitoring
     """
 
     def __init__(self):
         """Initialize memory monitor"""
         self.proc_path = Path("/proc")
-        self.memory_limit_mb = 128  # Requirement: 1.2
+        self.memory_limit_mb = 128  # 旧設計目標（現在の仕様には無い）
 
     def get_system_memory(self) -> MemoryUsage:
         """
         Get system memory usage.
 
-        Requirement: 1.2 - Monitor RAM consumption
+        Monitor RAM consumption
 
         Returns:
             Memory usage information
@@ -191,7 +196,7 @@ class MemoryMonitor:
         """
         Check if memory usage is within limit.
 
-        Requirement: 1.2 - RAM consumption must be under 128MB
+        RAM consumption must be under 128MB
 
         Returns:
             Tuple of (within_limit, current_usage_mb)
@@ -234,7 +239,7 @@ class MemoryOptimizer:
     """
     Optimizes system memory usage.
 
-    Requirement: 1.2 (Memory optimization)
+    Memory optimization
     """
 
     def __init__(self, monitor: Optional[MemoryMonitor] = None):
@@ -322,7 +327,7 @@ class ResourceLimiter:
     """
     Manages resource limits for processes.
 
-    Requirement: 1.2 (Resource limit functionality)
+    Resource limit functionality
     """
 
     def __init__(self):
@@ -397,7 +402,7 @@ class MemoryManager:
     """
     Manages overall memory optimization and monitoring.
 
-    Requirement: 1.2 (Memory usage optimization)
+    Memory usage optimization
     """
 
     def __init__(self):
@@ -428,7 +433,7 @@ class MemoryManager:
         """
         Verify memory constraint is met.
 
-        Requirement: 1.2 - Verify RAM consumption under 128MB
+        Verify RAM consumption under 128MB
 
         Returns:
             Tuple of (constraint_met, status_message)

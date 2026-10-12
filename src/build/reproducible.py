@@ -1,5 +1,10 @@
 """
 Reproducible build utilities for Kimigayo OS
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+ここで比べているのはモックのイメージ。実際の rootfs tarball の再現性は
+CI と Manual Build の成果物の SHA-256 を比べて確かめる。
 """
 
 import os
@@ -239,9 +244,9 @@ class ReproducibleBuilder:
     Manages reproducible builds with full metadata tracking.
 
     Requirements:
-    - 6.1: Bit-identical output guarantee
-    - 6.2: Environment-independent builds
-    - 6.3: Build dependency recording
+    - Bit-identical output guarantee
+    - Environment-independent builds
+    - Build dependency recording
     """
 
     def __init__(self, config: BuildConfig):
@@ -398,8 +403,8 @@ class BuildVerifier:
     Verifies build reproducibility and metadata.
 
     Requirements:
-    - 6.4: Cryptographic verification of build reproducibility
-    - 6.5: Build metadata inclusion
+    - Cryptographic verification of build reproducibility
+    - Build metadata inclusion
     """
 
     @staticmethod

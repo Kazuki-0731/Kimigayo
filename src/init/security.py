@@ -2,6 +2,11 @@
 Security features for Kimigayo OS Init System
 
 Provides namespace isolation and seccomp-BPF filtering for services.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+namespace と seccomp-BPF は、実際にはホストのコンテナランタイム（docker run 側）
+が与えるもので、イメージや init が適用するものではない（SPECIFICATION.md 5.2）。
 """
 
 import os

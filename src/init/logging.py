@@ -2,6 +2,9 @@
 Logging and Error Handling for Kimigayo OS Init System
 
 Provides structured logging, error tracking, and service failure recovery.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
 """
 
 import os

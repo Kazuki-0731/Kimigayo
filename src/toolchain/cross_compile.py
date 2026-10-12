@@ -2,6 +2,9 @@
 Cross-compilation environment for Kimigayo OS
 
 Supports x86_64 and ARM64 targets with musl libc integration.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
 """
 
 import os

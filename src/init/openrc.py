@@ -3,6 +3,11 @@ OpenRC-based Init System for Kimigayo OS
 
 Provides system initialization, service management, and dependency resolution.
 Based on OpenRC design principles with security hardening.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+実際の init はイメージに入っている OpenRC 本体（scripts/build-openrc.sh）で、
+このモジュールは使われない。
 """
 
 import os

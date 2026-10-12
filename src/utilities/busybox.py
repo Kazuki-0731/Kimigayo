@@ -2,6 +2,11 @@
 BusyBox configuration and build system for Kimigayo OS
 
 Provides modular configuration of essential Unix utilities with size optimization.
+
+モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
+モジュールはイメージには入らない（tests/ からのみ使われる）。
+enable_static=True / CONFIG_STATIC=y はモックの既定値。実際の config は
+src/busybox/config/*.config で、リンク方法は BUSYBOX_LINK（既定 dynamic）が決める。
 """
 
 import hashlib
