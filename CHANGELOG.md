@@ -8,18 +8,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **arm64 の OpenRC を `-fstack-protector-strong` 付きでビルドするようにした。**
+  v3.0.2 の arm64 では `openrc`・`librc`・`libeinfo` など 20 本以上が
+  スタック保護なしだった（`build-openrc.sh` が arm64 だけフラグを外していた）。
+  `verify-image.sh`（`check-elf-hardening.py`）がスタック保護も検査する
+  （libc から 20 個以上の関数を取り込む動的 ELF は `__stack_chk_fail` を参照すること）
+- **`release.yml` の手動実行は Docker Hub に push しない。** 公開は `v*.*.*` タグの
+  push だけ。以前は手動実行でも `latest-<variant>-<arch>` を上書きでき、署名も
+  マニフェストも無い状態を作れた。手動実行の版の既定は `edge`
+- Docker のビルドコンテキストから `.env`・`.hypothesis/`・`benchmark-results/`・
+  `output/` の tarball 以外を外した（`.dockerignore`）
+
 ### Fixed
 
 - **`examples/python` で `import ssl` が `libssl.so.3` 不足で落ちていたのを直した。**
   共有ライブラリを `python3` 本体の `ldd` からしか集めておらず、拡張モジュール
   （`lib-dynload/*.so`）が使う libssl / libcrypto を拾っていなかった
   （v3.0.1 を土台にしても落ちる、以前からの欠落）
+- ビルドコンテナで `ARCH=arm64` を渡しても x86_64 向けにビルドしていたのを直した。
+  `IMAGE_TYPE` の既定を `standard` に揃え、BusyBox と rootfs で既定がずれて
+  standard の BusyBox を minimal として包む食い違いを無くした
+- `make status`・`make log-openrc`（`build-openrc.sh` がログを書くようにした）・
+  コンテナ内の `make clean-all` / `clean-kernel` が動いていなかったのを直した。
+  動かないコンテナ側の `docker-build` / `docker-test` を外した
+- 結合テスト（`test-busybox` / `test-openrc` / `test-musl`、`make test-docker` /
+  `test-func`）が必ず落ちる、または実在しないイメージ名を既定にして何も検査せずに
+  通っていたのを直した。`verify_build.py reproducible` が必ず落ちていたのを直した
+- 版上げのワークフロー（`base-image-update.yml`）が `versions.mk` の版を空にした
+  PR を作っていたのを直した。空・版でない・新しくない値では失敗する。
+  PR ブランチで `ci.yml` を起動し、`UPDATES.md` はコミットしない
+- CI の ShellCheck が `.claude/hooks` を検査していなかったのを直した
+  （ダイジェスト固定の `koalaman/shellcheck` を直接動かす）
+- ビルドスクリプトの検査（`dependency-review.yml`）が警告を出すだけで落ちなかったのを直した
+- ベンチマークが利用者の持っていたイメージを消していた・失敗した pull の時間を
+  記録していた・平均の比を「Speedup」と呼んでいたのを直した（比は中央値どうし）。
+  `docs/benchmarks/lifecycle.md` の warm pull 2,282ms は失敗した pull の時間だったので N/A にした
+- Hook（`memo-paths.py` が自分自身をメモと判定・ビルド中の編集の停止が計測用の
+  コンテナにも反応）と、`check-links.py` が `#見出し` へのリンク切れを見ていなかったのを直した
 
 ### Changed
 
 - `examples/` の土台を `kimigayo-os:3.0.2` に上げた
 - ドキュメント（README・Docker Hub の Overview・設計書・利用者向け文書・
   性能の文書・リリースの手順）の実測値・タグ・署名の記述を v3.0.2 の実態に合わせた
+- カーネルのビルドから何もしていなかった `--disable RETPOLINE` を外し、
+  `src/kernel/config/` にプレースホルダを書き出すのをやめた。`modules_install` は
+  モジュールをビルドしたときだけ実行する。`manual-build.yml` でカーネルを作ると
+  実際の `.config` の強化項目をサマリーと artifact に残す
+- `build-busybox.sh` のサイズ警告を、根拠の無い目標値から実測ベースの退行の上限に変えた
+- `ci.yml` のトリガーから存在しない `develop` を外し、手動実行を足した。
+  毎日の検査から意味の無い Alpine の secdb の件数を外した。Dependabot は
+  GitHub Actions だけを見て、件名を `⬆️ Bump ...` にした
 
 ## [3.0.2] "Himawari" (向日葵) - 2026-10-12
 
