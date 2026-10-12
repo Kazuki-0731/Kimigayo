@@ -275,7 +275,6 @@ set_permissions() {
     log "✅ Permissions set successfully"
 }
 
-# Optimize rootfs size
 # ---------------------------------------------------------------------------
 # プロジェクトの版とコードネームを決める
 #
@@ -285,7 +284,9 @@ set_permissions() {
 #
 # 供給元は Makefile が export する KIMIGAYO_VERSION（= get-version.sh の
 # git describe）。コンテナには docker-compose.yml の environment で入る。
-# 単体で叩かれたときは自分で get-version.sh を呼ぶ。
+# 単体で叩かれて KIMIGAYO_VERSION が空のときは自分で get-version.sh を呼ぶ。
+# make を通さずに docker compose run で叩くと、compose の既定値 "dev" が
+# 入るので get-version.sh は呼ばれず、版は dev になる。
 # ---------------------------------------------------------------------------
 OS_VERSION=""
 OS_CODENAME=""
@@ -304,6 +305,7 @@ resolve_project_version() {
     fi
 }
 
+# Optimize rootfs size
 optimize_rootfs() {
     log ""
     log "=========================================="
@@ -659,8 +661,8 @@ copy_components() {
         # 9 個）は usr/sbin に入る。prefix が /usr なので sbin/ には何も無く、
         # ここを漏らしていたため OpenRC のバイナリが 1 つもイメージに入らないまま
         # 「✓ OpenRC copied」と報告していた。
-        # create_config_files が作る inittab と configs/openrc/ は /sbin/openrc を
-        # 参照しているので、Alpine と同じく /sbin に置く。
+        # create_config_files が作る inittab が /sbin/openrc を参照して
+        # いるので、Alpine と同じく /sbin に置く。
         copy_over "$OPENRC_INSTALL_DIR/usr/sbin" "$ROOTFS_DIR/sbin"
 
         # **/usr/sbin にも同じ名前で引けるようにする。**
@@ -718,7 +720,6 @@ copy_components() {
     log "✅ Components copied successfully"
 }
 
-# Create essential configuration files
 # ---------------------------------------------------------------------------
 # OpenRC の init スクリプトを BusyBox の userland に合わせる
 #
@@ -788,7 +789,7 @@ replace_line_in_file() {
 # Kimigayo では絶対に動かない init スクリプトを落とす。
 #
 # OpenRC は上流で、どのディストリでも使えるように init スクリプトを
-# 一式同梱している。Kimigayo の想定（AWS/GCP のコンテナ）では、その
+# 一式同梱している。Kimigayo の想定（VPS 上の Docker コンテナ）では、その
 # うち次の9本は**1度も実行されない**:
 #
 #   - 呼ぶバイナリがイメージに無い（パッケージマネージャーが無いので
@@ -928,6 +929,7 @@ SYSCTL_EOF
     fi
 }
 
+# Create essential configuration files
 create_config_files() {
     log "Creating essential configuration files..."
 
@@ -1111,12 +1113,12 @@ EOF
 
     # /etc/rc.conf (OpenRC configuration) - Performance optimized
     cat > "$ROOTFS_DIR/etc/rc.conf" << 'EOF'
-# Kimigayo OS - OpenRC Configuration (Performance Optimized)
+# Kimigayo OS - OpenRC Configuration
 
-# Enable parallel startup (faster boot)
+# Start services in parallel
 rc_parallel="YES"
 
-# Logging configuration (reduce overhead)
+# Logging configuration
 rc_logger="YES"
 rc_log_level="warn"
 
@@ -1127,10 +1129,10 @@ rc_timeout_stopsec=30
 rc_cgroup_mode="hybrid"
 rc_controller_cgroups="YES"
 
-# Disable hotplug (not needed in containers)
+# Services that hotplug events are allowed to start (OpenRC rc_hotplug)
 rc_hotplug="hwclock net.lo"
 
-# Relax dependency checking (faster startup)
+# Dependency resolution (OpenRC rc_depend_strict)
 rc_depend_strict="NO"
 
 # Crash handling
@@ -1141,7 +1143,7 @@ rc_crashed_start="YES"
 unicode="YES"
 EOF
     chmod 644 "$ROOTFS_DIR/etc/rc.conf"
-    log_info "  Created: /etc/rc.conf (performance optimized)"
+    log_info "  Created: /etc/rc.conf"
 
     # /etc/sysctl.d/ directory for kernel parameters
     mkdir -p "$ROOTFS_DIR/etc/sysctl.d"
@@ -1354,7 +1356,7 @@ verify_rootfs() {
             log_error "  ✗ built before the current musl:${stale}"
             log_error "      musl を作り直したあと、これらを作り直していない。"
             log_error "      別の musl に対してリンクされているので実行時に落ちる。"
-            log_error "      make clean-busybox clean-openrc してからやり直す。"
+            log_error "      （コンテナ内で）make clean-busybox clean-openrc してからやり直す。"
             errors=$((errors + 1))
         else
             log_info "  ✓ components were built after the current musl"
@@ -1642,8 +1644,8 @@ main() {
     # Display next steps
     log_info "Next steps:"
     log_info "  1. Review the rootfs: ls -la $ROOTFS_DIR"
-    log_info "  2. Package and build the image: make package-rootfs build-image"
-    log_info "  3. Smoke test the image: make test-smoke"
+    log_info "  2. Package and build the image (on a Linux host): make package-rootfs build-image"
+    log_info "  3. Smoke test the image (on a Linux host): make test-smoke"
 
     # Record build success
     "${PROJECT_ROOT}/scripts/build-status.sh" record rootfs 2>/dev/null || true
