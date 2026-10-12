@@ -179,9 +179,9 @@ SECURITY_LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 > rootfs の tarball のビット同一は 2026-10-12 に 1 組（standard / x86_64）
 > 確認済み。Docker イメージの digest は未確認（→ CLAUDE.md「セキュリティ」節）。
 
-**PIE / RELRO / BIND_NOW / 非実行スタックは `verify-image.sh` が
+**PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護は `verify-image.sh` が
 イメージ内の全 ELF で自動検査しています**（`scripts/check-elf-hardening.py`、
-2026-10-11 から。v3.0.1 では 29 個すべて合格）。CI・release で毎回走るので、
+2026-10-11 から。スタック保護は 2026-10-13 から。v3.0.1 では最初の 4 項目が 29 個すべて合格）。CI・release で毎回走るので、
 手で見るのは `NEEDED`（不要な動的依存）と、検査が落ちたときの原因調査です。
 
 ```bash
@@ -204,8 +204,12 @@ done
 | PIE | `readelf -h` の `Type` | `DYN`（`EXEC` ではない） |
 | 不要な動的依存が無い | `NEEDED` | musl と OpenRC 自身の lib だけ。**`libcap.so.2` が出たら不合格**（静的リンクしているはず） |
 
-**スタックカナリアは `readelf` では直接見えません。** strip 済みなので
-`__stack_chk_fail` シンボルも消えています。ビルドログで
+**スタックカナリアは動的シンボル表（`.dynsym`）で見ます。** strip しても
+動的リンクの ELF は `__stack_chk_fail` を `.dynsym` で参照するので、
+`check-elf-hardening.py` は libc から 20 個以上の関数を取り込む動的 ELF に
+その参照があるかを見ています（小さなヘルパはカナリアが入らないのが正常なので
+見ない）。**v3.0.2 の arm64 の OpenRC はこれで落ちます**（main で修正済み、
+次のリリースから付く）。静的リンクの ELF は判定できないので、ビルドログで
 `-fstack-protector-strong` が渡っていることを確認します。
 
 **両アーキテクチャで見ます。** 片方だけ通ることが実際にあります
@@ -290,7 +294,9 @@ grep -rn 'uses:' .github/workflows/ | grep -v '@v\|@[0-9a-f]\{40\}' | grep -v '\
 
 **`@master` 参照は供給網のリスクかつ再現性がありません。**
 tag か SHA で固定します（2026-10-09 に `trivy-action@v0.36.0`・
-`action-shellcheck@2.0.0` を固定しました）。
+`action-shellcheck@2.0.0` を固定しました。ShellCheck は 2026-10-13 に Action をやめ、
+ダイジェストで固定した `koalaman/shellcheck` のイメージを直接 `docker run` しています）。
+**Action 以外のイメージ（`docker run` するもの）もダイジェストで固定します。**
 
 ### 機密
 
