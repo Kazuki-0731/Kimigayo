@@ -3,10 +3,10 @@
 # musl Patch Application Script for Kimigayo OS
 # Applies src/libc/patches/*.patch to the musl source tree.
 #
-# Unlike apply-kernel-patches.sh / apply-busybox-patches.sh, this script
-# FAILS when a patch does not apply. Those two log a warning and return 0,
-# so a patch that stopped applying after a version bump is skipped silently
-# and the build still reports success (CLAUDE.md "パッチはなぜ存在するか").
+# This script FAILS when a patch does not apply (apply-busybox-patches.sh
+# does too). apply-kernel-patches.sh instead logs a warning and returns 0,
+# so a kernel patch that stopped applying after a version bump is skipped
+# silently and the build still reports success (CLAUDE.md "パッチはなぜ存在するか").
 # The musl patches are security fixes; silently shipping without them is
 # worse than a failed build.
 #

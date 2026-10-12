@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # BusyBox Patch Application Script for Kimigayo OS
-# Applies musl libc compatibility patches to BusyBox source
+# Applies src/busybox/patches/*.patch (musl compatibility and CVE fixes)
+# to the BusyBox source. Fails if any patch does not apply.
 #
 
 set -euo pipefail
@@ -90,7 +91,7 @@ for patch_file in "$PATCHES_DIR"/*.patch; do
     patch_name=$(basename "$patch_file")
     log_info "Applying patch: $patch_name"
 
-    # Check if patch was already applied
+    # Check whether the patch can be applied
     if patch -p1 --dry-run --silent < "$patch_file" > /dev/null 2>&1; then
         # Patch can be applied
         if patch -p1 < "$patch_file" >> "$PATCH_LOG" 2>&1; then

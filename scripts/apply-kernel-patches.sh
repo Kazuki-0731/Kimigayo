@@ -1,6 +1,7 @@
 #!/bin/bash
 # Kimigayo OS - Kernel Patch Application Script
-# Applies security and optimization patches to Linux kernel
+# Applies src/kernel/patches/*.patch to the Linux kernel source, if any
+# (there are none at the moment)
 
 set -e
 
