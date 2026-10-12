@@ -107,6 +107,7 @@ help:
 	@echo "📋 ログ確認:"
 	@echo "  make log-kernel   - カーネルビルドログ（最新100行）"
 	@echo "  make log-musl     - musl libcビルドログ（最新100行）"
+	@echo "  make log-openrc   - OpenRCビルドログ（最新100行）"
 	@echo ""
 	@echo "💡 推奨ワークフロー（リアルタイム出力）:"
 	@echo "  1. make shell               # コンテナに入る"
@@ -164,13 +165,16 @@ test:
 	@echo "テストを実行..."
 	docker compose run --rm kimigayo-build make test
 
+# テストスクリプトの既定イメージ名（kimigayo-os:minimal-latest）は
+# どのターゲットも作らない名前なので、build-image が付けるタグを明示して渡す。
+# VARIANT / ARCH は下の「CI/CDローカル実行」節で定義（.env で上書き可）。
 test-docker:
 	@echo "Dockerイメージ起動テストを実行..."
-	bash tests/integration/test_docker_startup.sh
+	IMAGE_NAME=kimigayo-os:$(VARIANT)-$(ARCH) bash tests/integration/test_docker_startup.sh
 
 test-func:
 	@echo "機能テストを実行..."
-	bash tests/integration/test_functionality.sh
+	IMAGE_NAME=kimigayo-os:$(VARIANT)-$(ARCH) bash tests/integration/test_functionality.sh
 
 info:
 	@echo "ビルド情報を表示..."
