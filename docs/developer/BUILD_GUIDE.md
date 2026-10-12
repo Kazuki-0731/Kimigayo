@@ -6,10 +6,14 @@
 
 - [ソースからビルドする](#ソースからビルドする)
 - [ビルド環境のセットアップ](#ビルド環境のセットアップ)
-- [ビルドプロセス](#ビルドプロセス)
-- [カスタムビルド](#カスタムビルド)
+- [ビルドの流れ](#ビルドの流れ)
+- [カスタマイズ](#カスタマイズ)
 - [クロスコンパイル](#クロスコンパイル)
+- [ビルド出力](#ビルド出力)
+- [再現可能ビルド](#再現可能ビルド)
+- [ビルドのデバッグ](#ビルドのデバッグ)
 - [トラブルシューティング](#トラブルシューティング)
+- [CI/CD との統合](#cicd-との統合)
 
 ## ソースからビルドする
 
@@ -68,7 +72,7 @@ make build
 # クリーンアップ
 make clean
 
-# すべてクリーンアップ（コンテナ+volume）
+# すべてクリーンアップ（コンテナ+volume。約150MBの再ダウンロードになる）
 make clean-all
 
 # ビルドログを確認（最新100行）
@@ -192,7 +196,7 @@ Dockerビルド環境内で実行することで、リアルタイムなビル�
 make shell
 
 # コンテナ内で特定のアーキテクチャでビルド
-make build ARCH=x86_64
+make build TARGET_ARCH=arm64
 
 # コンテナ内で詳細ログ付きでビルド
 make build V=1
@@ -261,23 +265,20 @@ tmux kill-session -t build
 
 ### ビルドが失敗する・止まるとき
 
-ビルドが失敗する場合や、途中で止まる場合は以下を試してください：
+ビルドが失敗する場合や、途中で止まる場合は、**軽いものから**試してください：
 
 ```bash
-# Dockerビルド環境に入る
-make shell
+# 1) 構成要素ごとに作り直す（コンテナ側のターゲット）
+docker compose run --rm kimigayo-build make clean-busybox   # clean-musl / clean-kernel / clean-openrc も
 
-# コンテナ内でカーネルソースツリーのクリーニング
-# ビルドスクリプトが自動で実行しますが、手動でも可能
-cd /build/kimigayo/build/kernel-src/linux-$(make -s -C /build/kimigayo print-kernel)
-make mrproper
+# 2) ビルド成果物をすべて消す（ダウンロード済みのソースは残る）
+make clean
+make build
 
-# コンテナから出て完全クリーンビルド（すべてリセット）
-exit
+# 3) 最後の手段: ビルド環境ごと作り直す（約150MBの再ダウンロードとフルビルドになる）
 make clean-all
 make docker-build
-make shell  # 再度コンテナに入る
-make build  # コンテナ内でビルド
+make build
 ```
 
 **注意:** カーネルビルド中に "The source tree is not clean" エラーが出る場合、ビルドスクリプトが自動的に`make mrproper`を実行してクリーニングします。
@@ -286,577 +287,351 @@ make build  # コンテナ内でビルド
 
 ### 必要なソフトウェア
 
-| ソフトウェア | バージョン | 目的 |
-|------------|-----------|------|
-| Docker | 20.10+ | ビルド環境の提供 |
-| Docker Compose | 1.29+ | マルチコンテナ管理 |
-| Git | 2.30+ | ソースコード管理 |
-| Make | 4.3+ | ビルド自動化 |
+| ソフトウェア | 目的 |
+|------------|------|
+| Docker（Compose v2 の `docker compose`） | ビルド環境の提供。ビルドはすべてコンテナ内で走る |
+| Git | ソースの取得。ビルドが版（`git describe`）とコミット時刻を読む |
+| Make | 入口（`Makefile`） |
 
 ### システム要件
 
-- **CPU**: x86_64（クロスコンパイル用にARM64も推奨）
-- **RAM**: 最低2GB、推奨4GB以上
-- **ディスク**: 10GB以上の空き容量
-- **OS**: Linux, macOS, Windows（WSL2）
+- **RAM**: 最低 2GB、推奨 4GB 以上（`docker-compose.yml` の `memory: 2G`）
+- **ディスク**: 10GB 以上の空き
+- **ホスト OS**: Linux / macOS / Windows（WSL2）
+
+> **`docker-compose.yml` は `platform: linux/amd64` を固定しています。**
+> Apple Silicon の Mac では x86_64 が QEMU のエミュレーションになり、
+> musl・BusyBox・OpenRC は通りますが、**カーネルのフルビルドは現実的ではありません**。
+> フルビルドは GitHub Actions に任せる方針です
+> （→ [CLAUDE.md](../../CLAUDE.md)「フルビルドは x86_64 / arm64 とも GitHub Actions で回す」）。
 
 ### 初期セットアップ
 
 ```bash
-# 1. リポジトリをクローン
 git clone https://github.com/Kazuki-0731/Kimigayo.git
 cd Kimigayo
 
-# 2. サブモジュールの初期化（将来使用する可能性）
-git submodule update --init --recursive
-
-# 3. Docker環境を構築
-docker-compose build
-
-# 4. ビルド環境の確認
-docker-compose run --rm kimigayo-build make info
+make docker-build      # ビルド環境のイメージ（Alpine ベース）
+make info              # ビルド設定の確認
+make print-versions    # 構成要素の版（versions.mk）
 ```
 
-## ビルドプロセス
+## ビルドの流れ
 
-### フェーズ別ビルド
+構成要素の版は [versions.mk](../../versions.mk) だけに書かれています。
+`make build`（コンテナ内）は次の順に作ります。
 
-Kimigayo OSは段階的なビルドプロセスを採用しています。
-
-#### Phase 0: 開発環境のセットアップ（完了）
-
-```bash
-# Docker環境の構築
-docker-compose build
+```
+versions.mk ─┬→ download-musl    → build-musl     [1/4]
+             ├→ download-kernel  → apply-kernel-patches → build-kernel  [2/4]
+             ├→ download-busybox → apply-busybox-patches → build-busybox [3/4]
+             └→ download-openrc  → build-openrc   [4/4]
+                                        ↓
+                              build-rootfs.sh（build/rootfs/）
+                                        ↓
+                        package-rootfs（output/*.tar.gz）
+                                        ↓
+                    Dockerfile.runtime → Docker イメージ → smoke test
 ```
 
-#### Phase 1: プロジェクト構造とコアインターフェース（完了）
-
-```bash
-# テストの実行
-docker-compose run --rm kimigayo-build pytest tests/ -v
-```
-
-#### Phase 2: カーネル設定とビルドシステム（実装中）
-
-```bash
-# カーネルのビルド（成果物の Docker イメージには入りません）
-docker compose run --rm kimigayo-build make kernel
-```
-
-> `make kernel-config` は存在しません。カーネル設定の選び方は
-> `scripts/build-kernel.sh` が決めます（`src/kernel/config/<arch>.config`
-> があればそれを、無ければ上流の defconfig を使う）。
-
-#### Phase 3以降: コアユーティリティとライブラリ
-
-```bash
-# 完全なOSイメージのビルド
-docker-compose run --rm kimigayo-build make build
-```
+**カーネルは Docker イメージに入りません**（コンテナはホストのカーネルで動きます）。
+CI でもカーネルは作りません。ベアメタル／QEMU を試すときだけ作ります
+（→ [CLAUDE.md](../../CLAUDE.md)「カーネルは CI で作らない」）。
 
 ### ビルドコマンド
 
-Makefileを使用したビルドコマンド：
-
 ```bash
-# すべてのターゲットを表示
-make help
-
-# ビルド情報の表示
-make info
-
-# クリーンビルド
-make clean
-make build
-
-# テストの実行
-make test              # すべてのテスト
-make test-unit         # 単体テスト
-make test-property     # プロパティテスト
+# ホスト側
+make help              # 全ターゲット
+make info              # ビルド設定
+make status            # どこまでできているか
+make build             # コンテナ内で make build を実行
+make test              # コンテナ内で pytest（unit + property）
 make test-integration  # 統合テスト
-
-# 静的解析（ホスト側）
-make shellcheck-scan   # scripts/ と .claude/hooks/
+make shellcheck-scan   # scripts/ と .claude/hooks/ の静的解析
 make security-scan     # scan-image（成果物の CVE・秘密情報）+ Trivy FS + ShellCheck
+
+# コンテナ内（make shell で入ってから）
+make test-unit
+make test-property
 ```
 
-> `make lint` / `make static-analysis` / `make docs` は存在しません。
-> 静的解析は上の2つ、カバレッジは `python3 -m pytest --cov`
-> （設定は `.coveragerc`）です。
+> `make test-unit` / `make test-property` はコンテナ側（`build-system/Makefile`）
+> にしかありません。ホストからは `python3 -m pytest tests/unit -q` でも走ります。
 
-### ビルドターゲット
+### バリアントとアーキテクチャ
 
-#### イメージバリエーション
-
-Kimigayo OSは3つのイメージバリエーションを提供します：
-
-**バリアントはターゲットではなく変数で選びます。**
+**バリアントもアーキテクチャも、ターゲットではなく変数で選びます。**
+コンテナ側とホスト側で変数名が違うので注意してください。
 
 ```bash
-# コンテナ内（build-system/Makefile）
-docker compose run --rm kimigayo-build make build IMAGE_TYPE=minimal
-docker compose run --rm kimigayo-build make build IMAGE_TYPE=standard
-docker compose run --rm kimigayo-build make build IMAGE_TYPE=extended
+# コンテナ内（build-system/Makefile）: IMAGE_TYPE と TARGET_ARCH
+docker compose run --rm -T kimigayo-build make build IMAGE_TYPE=minimal TARGET_ARCH=x86_64
+docker compose run --rm -T kimigayo-build make build IMAGE_TYPE=extended TARGET_ARCH=arm64
 
-# ホスト側（rootfs → イメージ → smoke まで通す）
+# ホスト側（rootfs → イメージ → smoke まで。Linux ホストのみ）: VARIANT と ARCH
 make ci-build-local VARIANT=minimal ARCH=x86_64
-make ci-build-all ARCH=x86_64          # 3バリアントを順に
+make ci-build-all ARCH=x86_64          # 3 バリアントを順に
 ```
 
-既定は `VARIANT=standard` / `ARCH=x86_64`（`Makefile:211-212`）。
+- 既定は `standard` / `x86_64`
+- **ホストの `make build ARCH=arm64` はアーキテクチャを変えません**
+  （ホストの `build` はコンテナへ変数を渡さない）。上のようにコンテナ側で
+  `TARGET_ARCH` を渡してください
+- `docker compose run` の出力をパイプやファイルに繋ぐときは **`-T` を付けます**。
+  付けないと出力が消え、スクリプトが走らないまま成功扱いになることがあります
+- **ホストの `make ci-build-local` は macOS では通りません**
+  （musl の `configure` が `unsupported long double type` で落ちる）
 
-> `make build-minimal` / `build-standard` / `build-extended` という
-> ターゲットは存在しません。
+| バリアント | 目標（SPECIFICATION.md §8.3） | 実測（v3.0.2、x86_64 / arm64） | BusyBox アプレット |
+|-----------|------|------|------|
+| **Minimal** | < 5MB | 2.46MB / 2.83MB | 367（`vi`・`wget`・`du`・`less` が無い） |
+| **Standard** | < 15MB | 2.60MB / 2.98MB | 400 |
+| **Extended** | < 50MB | 2.62MB / 3.01MB | 411 |
 
-各イメージの内容：
+**3 バリアントの違いは BusyBox の config（`src/busybox/config/<variant>.config`）だけ**です。
+musl・OpenRC はどのバリアントにも同じものが入り、カーネルはどれにも入りません。
 
-| イメージ | サイズ | 含まれるコンポーネント |
-|---------|--------|---------------------|
-| **Minimal** | < 5MB | カーネル、BusyBox、musl libc、OpenRC（最小構成） |
-| **Standard** | < 15MB | Minimal + 基本的なネットワークツール、SSH |
-| **Extended** | < 50MB | Standard + 開発ツール、追加ユーティリティ |
+## カスタマイズ
 
-#### アーキテクチャ別ビルド
+### アプリを載せたイメージを作る
+
+**Kimigayo のビルドに手を入れる必要はありません。** 公開イメージを
+ベースにして、マルチステージビルドで持ち込みます
+（→ [CUSTOM_BUILD.md](CUSTOM_BUILD.md)、動く例は [examples/](../../examples/)）。
+
+### BusyBox のアプレットを変える
+
+`src/busybox/config/{minimal,standard,extended}.config` を編集します。
+
+- **書いていない項目は Kconfig の既定値になります。** 外したいものは
+  `# CONFIG_XXX is not set` と明示してください。書かなかったために
+  `dpkg`・`rpm` が入っていた、`wget` の HTTPS が落ちていた、という前例があります
+  （`tests/unit/test_busybox_config_explicit.py` が主要な項目を見ています）
+- **config を変えただけでは再ビルドされません。** ビルド済みかどうかは
+  版・バリアント・リンク方法で判定するので、成果物を消してから作ります
 
 ```bash
-# x86_64アーキテクチャ（デフォルト）
-make build ARCH=x86_64
-
-# ARM64アーキテクチャ
-make build ARCH=arm64
-
+rm -rf build/busybox-build-x86_64 build/busybox-install-x86_64
+docker compose run --rm -T kimigayo-build make busybox \
+  TARGET_ARCH=x86_64 IMAGE_TYPE=extended
 ```
 
-> `make build-all-arch` は存在しません。両アーキテクチャを作るなら
-> `ARCH` を変えて2回回すか、GitHub Actions に任せます
-> （→ [CLAUDE.md](../../CLAUDE.md)「フルビルドは GitHub Actions で回す」）。
+### カーネル設定
 
-## カスタムビルド
-
-### カーネル設定のカスタマイズ
-
-**設定ファイルを直接編集します。**
+**使われるのは `src/kernel/config/<arch>.config` だけです**
+（`scripts/build-kernel.sh` が選びます）。無ければ上流の defconfig を使い、
+プレースホルダの `<arch>.config` を書き出します。
 
 ```bash
-# アーキテクチャごとの設定
 vi src/kernel/config/x86_64.config
-vi src/kernel/config/arm64.config     # 無ければ上流の defconfig が使われる
-
-docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64
+docker compose run --rm -T kimigayo-build make kernel TARGET_ARCH=x86_64
 ```
 
 > `make kernel-menuconfig` は存在せず、`make kernel KERNEL_CONFIG=...` も
-> 効きません（`KERNEL_CONFIG` は `scripts/build-kernel.sh` の内部変数で、
-> Makefile から渡されません）。
-> `menuconfig` を使いたいときはカーネルのソースツリーで直接叩きます
-> （`build/kernel/linux-<version>/` で `make ARCH=... menuconfig`）。
+> 効きません。`menuconfig` を使いたいときはカーネルのソースツリー
+> （`build/kernel-src/linux-<version>/`）で直接叩きます。
 
-カーネル設定ファイルの場所：
-- デフォルト設定: `src/kernel/config/default.config`
-- アーキテクチャ別: `src/kernel/config/x86_64.config`
+### コンパイルフラグ
 
-### パッケージリストのカスタマイズ
+**強化フラグは `scripts/build-{musl,busybox,openrc}.sh` に直書きされています**
+（`-fPIE`・`-fstack-protector-strong`・`-D_FORTIFY_SOURCE=2`・
+`-Wl,-z,relro -Wl,-z,now`・`-Wl,-z,noexecstack`）。
+`make build CFLAGS=...` で渡しても、スクリプトが `CFLAGS` を上書きするので効きません。
 
-```bash
-# パッケージリストを編集
-vi build/packages/minimal.list
-vi build/packages/standard.list
-vi build/packages/extended.list
-```
-
-パッケージリストの例：
-```
-# build/packages/custom.list
-busybox
-musl
-openrc
-isn
-vim
-curl
-python3
-```
-
-```bash
-# カスタムパッケージリストでビルド
-make build PACKAGE_LIST=custom.list
-```
-
-### ビルドオプションの設定
-
-環境変数でビルドをカスタマイズ：
-
-```bash
-# デバッグビルド
-make build BUILD_TYPE=debug
-
-# 最適化レベルの設定
-make build OPTIMIZATION=-O3
-
-# セキュリティフラグの追加
-make build CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
-
-# 並列ビルド
-make build JOBS=4
-```
-
-### カスタムイメージの作成
-
-```bash
-# ビルド設定ファイルを作成
-vi build/config/custom-image.yaml
-```
-
-```yaml
-# custom-image.yaml
-name: custom-kimigayo
-version: 1.0.0
-architecture: x86_64
-base: minimal
-
-packages:
-  - busybox
-  - musl
-  - openrc
-  - nginx
-  - postgresql
-
-kernel:
-  config: src/kernel/config/custom.config
-  modules:
-    - ext4
-    - overlay
-    - veth
-
-security:
-  enable_aslr: true
-  enable_dep: true
-  enable_pie: true
-  fortify_source: 2
-
-size_target: 20MB
-```
-
-```bash
-# カスタム設定でビルド
-make build CONFIG=build/config/custom-image.yaml
-```
+> `config.mk` にもフラグが書かれていますが、**どこからも読まれていません。**
+> パッケージリスト（`build/packages/*.list`）やビルド設定ファイル
+> （`custom-image.yaml`）による構成の変更も、**仕組みとして存在しません**。
 
 ## クロスコンパイル
 
-### ARM64向けクロスコンパイル
-
 **クロスツールチェーンのセットアップは不要です。** ビルド環境の
-イメージ（`make docker-build`）に入っています。
+イメージ（`make docker-build`）に入っています。arm64 は clang / lld で
+クロスコンパイルします。
 
 ```bash
-docker compose run --rm kimigayo-build make build TARGET_ARCH=arm64
+docker compose run --rm -T kimigayo-build make build TARGET_ARCH=arm64
 ```
-
-> `make setup-cross-arm64` / `setup-cross-riscv` は存在しません。
-> **RISC-V は未対応**です（`SPECIFICATION.md` 8.2 の「将来的に」）。
-
-### マルチアーキテクチャビルド
 
 **両アーキテクチャを一度に作るターゲットはありません。**
-`TARGET_ARCH` を変えて2回回します。
+`TARGET_ARCH` を変えて 2 回回すか、GitHub Actions に任せます。
+**RISC-V は未対応**です（`SPECIFICATION.md` 8.2 の「将来的に」）。
 
-```bash
-for a in x86_64 arm64; do
-  docker compose run --rm kimigayo-build make build TARGET_ARCH=$a
-done
-
-# 出力の確認
-ls output/
-# kimigayo-minimal-latest-x86_64.tar.gz
-# kimigayo-minimal-latest-arm64.tar.gz
-```
+> arm64 を手元でクロスビルドするなら、compose ではなく
+> `docker run --memory 8g` で直接叩きます（compose の `memory: 2G` では
+> `meson setup` が OOM で落ちる）。
 
 ## ビルド出力
 
 ### 生成されるファイル
 
-ビルド成功後、`output/`ディレクトリに以下のファイルが生成されます：
-
 ```
-output/
-├── kimigayo-minimal-latest-x86_64.tar.gz      # Minimalイメージ
-├── kimigayo-standard-latest-x86_64.tar.gz     # Standardイメージ
-└── kimigayo-extended-latest-x86_64.tar.gz     # Extendedイメージ
+build/rootfs/                                  # rootfs（イメージの中身）
+output/kimigayo-<variant>-<version>-<arch>.tar.gz
 ```
 
-ファイル名の `latest` の位置にはプロジェクトの版が入ります
+`<version>` には `git describe` から取ったプロジェクトの版が入ります
 （`KIMIGAYO_VERSION` 未指定なら `latest`）。
 
 - **ISO イメージは生成されません。** ベアメタル起動は対象外です
   （→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2・9.2）
-- **署名ファイルは生成されません。** リリース時に `SHA256SUMS` と
-  `SHA512SUMS` が GitHub Release に添付されます
-  （→ [SPECIFICATION.md](../../SPECIFICATION.md) 5.3）
+- リリースでは、tarball に加えて `SHA256SUMS`・`SHA512SUMS`・
+  SBOM（CycloneDX）が GitHub Release に添付され、Docker イメージは Cosign で署名されます
 
-### ビルドレポート
+### ビルド情報
 
-ビルドレポート（`build-report.json`）には以下の情報が含まれます：
+イメージの `/.kimigayo-build-info` に記録されます（値は例）。
 
-```json
-{
-  "version": "1.0.0",
-  "architecture": "x86_64",
-  "build_date": "2025-12-15T12:34:56Z",
-  "build_duration": "180.5s",
-  "image_sizes": {
-    "minimal": "4.8MB",
-    "standard": "14.2MB",
-    "extended": "48.9MB"
-  },
-  "boot_time": "8.3s",
-  "memory_usage": "112MB",
-  "packages": {
-    "count": 127,
-    "list": ["busybox", "musl", "openrc", "..."]
-  },
-  "tests": {
-    "unit": "passed",
-    "property": "passed",
-    "integration": "passed"
-  },
-  "security": {
-    "aslr": "enabled",
-    "dep": "enabled",
-    "pie": "enabled",
-    "fortify_source": "level 2"
-  }
-}
+```
+# Kimigayo OS Build Information
+BUILD_DATE=<コミット時刻>   # ビルドした時刻ではない
+BUILD_ARCH=x86_64
+IMAGE_TYPE=standard
+VERSION=3.0.2
+CODENAME=Himawari
+BUILDER=root
+PATCHED_CVES=CVE-2026-38753 CVE-2026-38754 ...
 ```
 
-## 再現可能ビルド（未達）
+`PATCHED_CVES` は `src/*/patches/` のファイル名から作られ、
+`scripts/scan-image.sh` がパッチ済みの CVE を照合結果から除外するのに使います。
 
-**Kimigayo は再現可能ビルドを達成していません**（2026-10-11 に確認）。
+### 成果物の検査
 
-- `config.mk` に `SOURCE_DATE_EPOCH := 0` と
-  `-fdebug-prefix-map` / `-fmacro-prefix-map` を入れる仕組みはある
-- しかし `REPRODUCIBLE_BUILD=yes` のときだけ有効で、
-  **この変数を `Makefile`・`.env.example`・compose のどこも設定していない**
-- そもそも **`config.mk` はどの Makefile からも include されていない**
-  （`grep -rn 'include.*config.mk' Makefile build-system/Makefile` が空）。
-  実際のコンパイルフラグは `scripts/build-{musl,busybox,openrc}.sh` に
-  直書きされており、そちらに再現性のための指定は無い
-- **ビット同一性を検証した記録もない**
+```bash
+bash scripts/verify-image.sh <image> <variant> <arch>
+```
+
+版の突合・全 ELF の PIE / RELRO / BIND_NOW / 非実行スタック・OpenRC の起動などを
+検査します（34 項目、Minimal は 33）。**「イメージが起動した」は検証ではありません。**
+
+## 再現可能ビルド
+
+**rootfs の tarball はビット同一になりました**（2026-10-12）。
+同じコミット（46b05da）を CI と Manual Build で別々にビルドし、
+standard / x86_64 の tarball の SHA-256 が一致しました。
+
+そのためにしていること:
+
+- `build-system/Makefile` が `SOURCE_DATE_EPOCH=0` を export し、
+  `scripts/build-{musl,busybox,openrc}.sh` がビルドディレクトリのパスを
+  `-fdebug-prefix-map` などで消す
+- `/.kimigayo-build-info` の `BUILD_DATE` をコミット時刻にし、ホスト名を入れない
+- tarball を `--sort=name --mtime=@<コミット時刻> --owner=0 --group=0 --numeric-owner`
+  で作り、`gzip -n` で圧縮する（CI と release で同じ）
+
+**確かめたのは 1 組・1 バリアントだけで、Docker イメージの digest は見ていません。**
+名乗る範囲は「rootfs の tarball」までです。
 
 ### 自分で確かめるには
 
-```bash
-docker compose run --rm kimigayo-build make build IMAGE_TYPE=minimal
-cd build/rootfs && COPYFILE_DISABLE=1 tar czf /tmp/h1.tar.gz . && cd -
-sha256sum /tmp/h1.tar.gz
-
-docker compose run --rm kimigayo-build make clean build IMAGE_TYPE=minimal
-cd build/rootfs && COPYFILE_DISABLE=1 tar czf /tmp/h2.tar.gz . && cd -
-sha256sum /tmp/h2.tar.gz
-```
-
-**tar の時刻とファイル順でまず一致しません。**
-`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner` を
-付けない限り、rootfs の中身が同じでも tarball のハッシュは変わります。
-
-### ビルド環境の固定（これは効いている）
-
-```bash
-# ビルド環境イメージのダイジェストを確認
-docker compose build --pull
-docker images --digests | grep kimigayo-build
-```
-
-構成要素の版は [versions.mk](../../versions.mk) に固定し、
-`scripts/download-*.sh` がチェックサムを検証します。
-**「決定的な構成」までは担保していますが、「ビット同一の出力」は別の話です。**
+同じコミットで `manual-build.yml` を回し、CI の `rootfs-<variant>-<arch>`
+成果物と `shasum -a 256` を比べます。手元で作った tarball は、
+上の tar のオプションを付けない限り一致しません。
 
 ## ビルドのデバッグ
 
-### 詳細ログの有効化
+### ログ
+
+各構成要素のログは `build/logs/` と `build/*.log` に出ます。
 
 ```bash
-# Verbose モード
-make build VERBOSE=1
+make log-kernel        # build/logs/kernel-build.log の最新100行
+make log-musl
+make log-openrc
 
-# デバッグモード
-make build DEBUG=1
-
-# ビルドログの保存
-make build 2>&1 | tee build.log
+# パッチが黙ってスキップされていないか
+grep -iE 'skipped: [1-9]|not applicable' build/kernel-patches.log build/busybox-patches.log
 ```
 
-### ビルド中間ファイルの確認
+`build-system/Makefile` には `V=1`（詳細出力）があります。
+
+### 実際にビルドされた版を確かめる
+
+ビルド済みかどうかは `.kimigayo-build-version` と `versions.mk` を突合して決めます。
+**版を上げたのに古いものが残っていないか**はこう見ます。
 
 ```bash
-# 中間ファイルを削除しない
-make build KEEP_TEMP=1
-
-# 中間ファイルの確認
-ls build/tmp/
+make print-versions
+find build -maxdepth 2 -name '.kimigayo-build-version' -exec sh -c 'echo "$1: $(cat "$1")"' _ {} \;
 ```
 
-### ビルドのステップ実行
+### ステップ実行
 
 個別ターゲットは**ビルドコンテナ内**の `build-system/Makefile` にあります。
 ホストの `Makefile` には無いので、ホストで叩くと
 `No rule to make target` になります。
 
 ```bash
-# ステップごとにビルド（コンテナ内）
-docker compose run --rm kimigayo-build make musl      # [1/4]
-docker compose run --rm kimigayo-build make kernel    # [2/4] 成果物には入らない
-docker compose run --rm kimigayo-build make busybox   # [3/4]
-docker compose run --rm kimigayo-build make init      # [4/4]
-docker compose run --rm kimigayo-build make rootfs
+docker compose run --rm -T kimigayo-build make musl      # [1/4]
+docker compose run --rm -T kimigayo-build make kernel    # [2/4] 成果物には入らない
+docker compose run --rm -T kimigayo-build make busybox   # [3/4]
+docker compose run --rm -T kimigayo-build make init      # [4/4]
+docker compose run --rm -T kimigayo-build make rootfs
 ```
 
-`make bootloader` と `make create-image` は存在しません
-（ベアメタル起動は対象外。→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2）。
 イメージ化はホスト側の `make package-rootfs` → `make build-image` です。
-
-## パフォーマンス最適化
-
-### ビルド時間の短縮
-
-```bash
-# 並列ビルド（CPUコア数に応じて調整）
-make build -j$(nproc)
-
-# ccacheの使用
-export USE_CCACHE=1
-make build
-
-# ビルドキャッシュの活用
-docker-compose build --build-arg BUILDKIT_INLINE_CACHE=1
-```
-
-### ディスクI/Oの最適化
-
-```bash
-# tmpfsを使用してビルド速度を向上
-docker-compose run --rm \
-  --tmpfs /tmp:rw,size=2G \
-  kimigayo-build make build
-```
 
 ## トラブルシューティング
 
 ### よくあるビルドエラー
 
-#### エラー: "Docker daemon is not running"
+#### エラー: "Cannot connect to the Docker daemon"
 
-```bash
-# Dockerデーモンを起動
-sudo systemctl start docker
-
-# または macOS/Windows
-# Docker Desktopを起動
-```
+Docker Desktop（macOS / Windows）か Docker デーモン（Linux）を起動します。
 
 #### エラー: "No space left on device"
 
 ```bash
-# Dockerイメージとコンテナのクリーンアップ
-docker system prune -a
-
-# ビルドキャッシュのクリーンアップ
-make clean-all
+docker system prune        # 停止中のコンテナ・宙に浮いたイメージ・ビルドキャッシュ
+make clean                 # ビルド成果物だけ
 ```
 
-#### エラー: "Permission denied"
+#### ビルドは通ったのに、実行すると落ちる（Segmentation fault など）
+
+**musl を作り直したのに、BusyBox と OpenRC が古い musl にリンクされたまま**
+のことがあります。成果物の日時を比べ、古ければ消して作り直します
+（→ [CLAUDE.md](../../CLAUDE.md)「musl を作り直したら、それにリンクしているものも作り直す」）。
 
 ```bash
-# Dockerグループにユーザーを追加
-sudo usermod -aG docker $USER
-
-# ログアウト/ログインして変更を反映
+ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 ```
 
-#### エラー: "Kernel config not found"
+#### 版を上げたあと、ビルドが妙な挙動をする
 
-`src/kernel/config/<arch>.config` を置くか、置かずに上流の defconfig に
-任せます（`scripts/build-kernel.sh` が自動で判断します）。
+前の版の残骸を疑い、構成要素ごとに消します（コンテナ側のターゲット）。
 
 ```bash
-# 既存の設定を持ち込む場合（ファイル名は <arch>.config）
-cp /boot/config-$(uname -r) src/kernel/config/x86_64.config
+docker compose run --rm kimigayo-build make clean-busybox   # clean-musl / clean-kernel / clean-openrc も
 ```
 
-> `make kernel-defconfig` は存在しません。
+### クリーンの使い分け
 
-### ビルドログの解析
+| コマンド | 消えるもの |
+|---------|-----------|
+| `make clean` | ビルド成果物だけ |
+| `make clean-cache` | ダウンロードキャッシュ（volume） |
+| `make clean-all` | コンテナ・volume・ビルド環境のイメージ。**約 150MB の再ダウンロードとフルビルドになる**ので最後の手段 |
 
-```bash
-# エラーのみ表示
-make build 2>&1 | grep -i error
+## CI/CD との統合
 
-# 警告のみ表示
-make build 2>&1 | grep -i warning
+GitHub Actions のワークフローは `.github/workflows/` にあります。
 
-# 特定のコンポーネントのログ
-make build 2>&1 | grep -i kernel
-```
+| ワークフロー | いつ | 何をするか |
+|------------|------|-----------|
+| `ci.yml` | `main` への push・PR | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
+| `release.yml` | `v*.*.*` タグ | Docker Hub への公開・Cosign 署名・GitHub Release |
+| `manual-build.yml` | 手動 | バリアント・アーキを選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
-### ビルド環境のリセット
-
-```bash
-# すべてのビルド成果物を削除
-make clean-all
-
-# Docker環境を再構築
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-## CI/CDとの統合
-
-### GitHub Actions
-
-`.github/workflows/build.yml`:
-
-```yaml
-name: Build Kimigayo OS
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Build Docker image
-      run: docker-compose build
-
-    - name: Build Kimigayo OS
-      run: docker-compose run --rm kimigayo-build make build
-
-    - name: Run tests
-      run: docker-compose run --rm kimigayo-build make test
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: kimigayo-images
-        path: output/*.tar.gz
-```
+詳しくは [CICD_GUIDE.md](CICD_GUIDE.md)。
 
 ## 参考リソース
 
 - [DEVELOPMENT.md](../../DEVELOPMENT.md) - 開発環境の詳細
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) - コントリビューションガイドライン
-- [Makefile](../../Makefile) - ビルドシステムの実装
-- [Dockerfile](../../Dockerfile) - ビルド環境の定義
+- [CUSTOM_BUILD.md](CUSTOM_BUILD.md) - 公開イメージをベースにしたカスタマイズ
+- [docs/troubleshooting/](../troubleshooting/) - 実際に踏んだ罠の記録
+- [Makefile](../../Makefile) / [build-system/Makefile](../../build-system/Makefile)
 
 ---
 
