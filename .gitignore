@@ -55,15 +55,6 @@ IDEAS.md
 *.img
 *.iso
 
-# Rust
-/target/
-Cargo.lock
-src/pkg/isn/target/
-
-# Repository packages (actual binaries)
-repository/packages/**/*.tar.gz
-repository/packages/**/*.sig
-
 # Editor files
 *.swp
 *.swo
