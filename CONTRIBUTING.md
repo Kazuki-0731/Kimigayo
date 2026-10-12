@@ -146,7 +146,7 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 ### セキュリティ
 
 - コンパイル時の強化フラグ（`scripts/build-{musl,busybox,openrc}.sh`）を緩めない
-- 成果物の強化は `scripts/verify-image.sh` が全 ELF で検査する（PIE・RELRO・BIND_NOW・非実行スタック）
+- 成果物の強化は `scripts/verify-image.sh` が全 ELF で検査する（PIE・RELRO・BIND_NOW・非実行スタック・スタック保護）
 
 ## テスト
 
