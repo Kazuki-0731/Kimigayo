@@ -26,9 +26,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
-      # ローカルの make shellcheck-scan と同じ対象にする。
-      # 以前は ./scripts だけで .claude/hooks/ が入らず、
-      # ローカルで通るものが CI では見られていなかった。
       # 追跡ファイル基準でリンクを検査する。手元では .gitignore された
       # ファイルがあるせいで気づけない種類の壊れ方なので CI で止める。
       - name: Check markdown links
@@ -39,6 +36,11 @@ jobs:
       - name: Check for stale statements in docs
         run: python3 scripts/check-stale-docs.py
 
+      # ローカルの make shellcheck-scan と同じ対象（.claude/hooks/ を含む）に
+      # するつもりで additional_files を渡しているが、このアクションは
+      # additional_files を ./scripts の中での find -name のパターンとして
+      # 扱うため、**.claude/hooks/ は実際には検査されていない**
+      # （CI ログで `-o -name *.claude/hooks` を確認、2026-10-12）。
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
@@ -79,7 +81,8 @@ jobs:
   # 47 分 → カーネル抜きで大幅短縮）。
   #
   # カーネルをビルドしたいときは次のどちらかで行う:
-  #   - ローカル: `make kernel TARGET_ARCH=<arch>`
+  #   - ローカル: `docker compose run --rm kimigayo-build make kernel TARGET_ARCH=<arch>`
+  #     （kernel ターゲットはコンテナ側の build-system/Makefile にしかない）
   #   - CI: Actions から manual-build.yml を build_kernel=true で実行
   build-and-verify:
     name: Build and Verify

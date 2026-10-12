@@ -46,7 +46,8 @@ jobs:
   build:
     name: Build ${{ inputs.variant }} ${{ inputs.arch }}${{ inputs.build_kernel && ' (+kernel)' || '' }}
     runs-on: ubuntu-latest
-    # 実測の最長は arm64 standard の 47 分（カーネル込み、run 37880882653）。
+    # 実測の最長は arm64 の 59 分（manual-build.yml を build_kernel=true で
+    # 回したとき、c851a25、2026-10-12）。カーネル抜きの CI はこれより大幅に短い。
     # 既定の 360 分だとハングしたときに 6 時間占有する。
     # timeout-minutes に式を書くのは対応が怪しいので定数にしてある。
     timeout-minutes: 120
@@ -99,7 +100,8 @@ jobs:
             kimigayo-build \
             make "${target}" TARGET_ARCH=${{ inputs.arch }} IMAGE_TYPE=${{ inputs.variant }}
 
-      # パッチが当たらなくても apply-*-patches.sh は log_warn して return 0 する。
+      # カーネルのパッチは当たらなくても apply-kernel-patches.sh が log_warn して
+      # return 0 する（BusyBox・musl の適用スクリプトは当たらなければ exit 1 で止まる）。
       # 黙ってスキップされたまま成功扱いになるのを止める。
       - name: Fail if patches were silently skipped
         run: |
@@ -211,7 +213,7 @@ jobs:
             "${{ inputs.variant }}" \
             "${{ inputs.arch }}"
 
-      # 出荷物そのものの秘密情報スキャン（scripts/scan-image.sh）。
+      # 出荷物そのものの秘密情報スキャンと CVE 照合（scripts/scan-image.sh）。
       # 秘密情報と CVE の両方を見る。CVE は出荷物の版で SBOM を作って
       # Grype で照合し、イメージに記録したパッチ済みの CVE は除外する。
       # NVD に新しい CVE が載ると、コードを変えていない push でも落ちる。
