@@ -26,6 +26,13 @@ Google の **distroless** と **Alpine Linux** の考え方を組み合わせて
 - **BusyBox** — シェルと基本的な Unix コマンド（デバッグできる）
 - **OpenRC** — シンプルな Init システム
 
+| | distroless | Alpine | **Kimigayo OS** |
+|---|---|---|---|
+| パッケージマネージャー | なし | `apk` | **なし** |
+| シェル・ユーティリティ | なし | あり | **あり（BusyBox）** |
+| 実行時のソフトウェア追加 | できない | できる | **できない** |
+| 中に入ってのデバッグ | 難しい | 容易 | **容易** |
+
 distroless のように攻撃面を絞りつつ、Alpine のようにシェルで中を確かめられる、
 その両立を狙っています。
 
@@ -64,6 +71,9 @@ docker run ishinokazuki/kimigayo-os:latest uname -a
 ```
 
 ### ベースイメージとして使用
+
+**ビルド時にすべてを用意し、実行時には変更しない**のが前提の使い方です。
+開発の柔軟さは Alpine 側（`apk`）で、本番の堅さは Kimigayo 側で受け持ちます。
 
 ```dockerfile
 # マルチステージビルドで必要なものを準備
@@ -180,6 +190,11 @@ GPL-2.0 - 詳細は[LICENSE](https://github.com/Kazuki-0731/Kimigayo/blob/main/L
 
 - **GitHub Issues**: https://github.com/Kazuki-0731/Kimigayo/issues
 - **セキュリティ問題**: [VULNERABILITY_REPORTING.md](https://github.com/Kazuki-0731/Kimigayo/blob/main/docs/security/VULNERABILITY_REPORTING.md)を参照
+
+## 謝辞
+
+- [Google Distroless](https://github.com/GoogleContainerTools/distroless) — 不変インフラとセキュリティ優先の設計思想
+- [Alpine Linux](https://alpinelinux.org/) — 軽量性とセキュリティの実践
 
 ## プロジェクトリンク
 
