@@ -116,7 +116,7 @@ Docker Hub の `latest` 系のタグを差し替えます。
 | **RELRO** | Relocation Read-Only | ✅ Full RELRO（BIND_NOW）。全 ELF（検査あり） |
 | **非実行スタック** | `PT_GNU_STACK` に実行権限なし | ✅ 全 ELF（検査あり） |
 | **Stack Protector** | スタックバッファオーバーフロー保護 | ⚠️ x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません**（`build-openrc.sh` が arm64 だけ外していた。main で修正済み、次のリリースから付きます）。`verify-image.sh` が検査 |
-| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ⚠️ `-D_FORTIFY_SOURCE=2` を指定していますが、**musl は FORTIFY を実装しておらず、効果は確認できていません**。検査なし |
+| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ⚠️ `-D_FORTIFY_SOURCE=2` を指定しています。**効いているのは x86_64 だけ**です（Alpine の `fortify-headers` 経由）。**arm64 は効いていません**（自前の musl のヘッダだけを見ており、musl は FORTIFY を実装しないため）。検査なし |
 
 確認方法（イメージ内の**全 ELF** の PIE / RELRO / BIND_NOW / 非実行スタック・
 スタック保護（libc から 20 個以上の関数を取り込む動的 ELF が `__stack_chk_fail` を
