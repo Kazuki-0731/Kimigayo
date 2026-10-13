@@ -5,7 +5,7 @@
 **軽量・セキュアなコンテナ向けオペレーティングシステム**
 
 [![Release](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml)
-[![License: GPL-2.0 / MIT / BSD-2-Clause](https://img.shields.io/badge/License-GPL--2.0%20%7C%20MIT%20%7C%20BSD--2--Clause-blue.svg)](LICENSE)
+[![License: GPL-2.0 / MIT / BSD](https://img.shields.io/badge/License-GPL--2.0%20%7C%20MIT%20%7C%20BSD-blue.svg)](LICENSE)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-ishinokazuki%2Fkimigayo--os-blue?logo=docker)](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -355,12 +355,16 @@ Kimigayo OS は Alpine Linux と同様、各コンポーネントが個別のラ
 
 | コンポーネント             | ライセンス   |
 | -------------------------- | ------------ |
-| Linux カーネル             | GPL-2.0      |
+| BusyBox                    | GPL-2.0-only |
 | musl libc                  | MIT          |
-| BusyBox                    | GPL-2.0      |
 | OpenRC                     | BSD-2-Clause |
+| libcap（OpenRC に静的リンク） | BSD-3-Clause |
+| Linux カーネル（イメージに入らない） | GPL-2.0-only |
 | ビルドシステム             | MIT          |
 
+条文はイメージの `/usr/share/licenses/` にあります。対応するソース
+（上流の tarball と、パッチ・config・ビルドスクリプトを含むリポジトリの
+archive）は各 GitHub Release に添付しています。
 詳細は [LICENSE](LICENSE) を参照してください。
 
 ### 🌟 競合OS比較
@@ -448,7 +452,7 @@ distroless は 2026-10-11 の値。
 | ワークフロー | トリガー | 目的 | 処理内容 |
 |------------|---------|------|---------|
 | **ci.yml** | PR、main push、手動 | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、build-workflow.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
-| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
+| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・対応するソース・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
 | **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
 | **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
 | **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら Issue）<br>• Trivy ファイルシステムスキャン |
@@ -649,12 +653,16 @@ Like Alpine Linux, Kimigayo OS components have individual licenses:
 
 | Component             | License      |
 | --------------------- | ------------ |
-| Linux Kernel          | GPL-2.0      |
+| BusyBox               | GPL-2.0-only |
 | musl libc             | MIT          |
-| BusyBox               | GPL-2.0      |
 | OpenRC                | BSD-2-Clause |
+| libcap (statically linked into OpenRC) | BSD-3-Clause |
+| Linux Kernel (not in the image) | GPL-2.0-only |
 | Build System          | MIT          |
 
+The license texts are in `/usr/share/licenses/` in the image. The
+corresponding source (upstream archives plus a repository archive with
+the patches, configs and build scripts) is attached to each GitHub Release.
 See [LICENSE](LICENSE) for details.
 
 ### 📚 Documentation
