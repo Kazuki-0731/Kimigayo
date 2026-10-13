@@ -263,8 +263,12 @@ gh release view v<X.Y.Z> --json tagName,isDraft,assets
 ```
 
 tarball 6本（3バリアント × 2アーキ）と `SHA256SUMS` / `SHA512SUMS`、
-SBOM（`kimigayo-<variant>-<ver>-<arch>.cdx.json`）6本の**計14ファイル**が
-付いていること（v3.0.1 までは SBOM が無く 8 ファイル）。draft のままになっていないこと。
+SBOM（`kimigayo-<variant>-<ver>-<arch>.cdx.json`）6本、
+対応するソース 4 本（BusyBox・musl・OpenRC の上流 tarball と
+`kimigayo-<ver>-src.tar.gz`）の**計18ファイル**が付いていること
+（v3.0.2 は 14、v3.0.1 までは SBOM が無く 8 ファイル）。draft のままになっていないこと。
+**ソースは BusyBox（GPL-2.0）の配布条件なので、欠けたら出してはいけない**
+（`release.yml` は sources ジョブが失敗すると push しない）。
 
 ---
 
