@@ -13,7 +13,7 @@ description: イメージサイズ・起動時間・メモリなどを計測し�
 | 着地先 | 何をするか |
 | --- | --- |
 | ドキュメント | `README.md` のパフォーマンス表、`docs/benchmarks/`、`docs/developer/PERFORMANCE_*` |
-| config | カーネル / BusyBox config、`configs/sysctl/`、`configs/openrc/` の項目を実際に変える（または**外す**） |
+| config | カーネル / BusyBox config、`build-rootfs.sh` が作る sysctl / OpenRC の設定を実際に変える（または**外す**） |
 | CI | 退行を検知したいならワークフローか回帰テストにする |
 | 仕組み | ルール化・Hook 化・回帰テスト化 |
 
