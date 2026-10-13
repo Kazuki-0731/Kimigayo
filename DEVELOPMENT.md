@@ -8,23 +8,15 @@ Kimigayo/
 │   └── workflows/          # CI/CD設定
 ├── build/                  # ビルド作業ディレクトリ（Git 管理外）
 ├── build-system/           # ビルドコンテナ内で使う Makefile（kernel / musl / busybox などのターゲット）
-├── configs/                # OpenRC・sysctl などの設定
 ├── docs/                   # ドキュメント
 ├── examples/               # ベースイメージとしての使用例（python / nginx / nodejs）
 ├── src/                    # ソースコード
-│   ├── kernel/             # カーネル設定・パッチ
-│   ├── libc/               # musl のパッチと補助モジュール
-│   ├── busybox/            # BusyBox設定・パッチ
-│   ├── init/, openrc/      # Initシステム（OpenRC）
-│   ├── build/              # ビルド設定・イメージの Python モジュール（テストが使う）
-│   ├── security/           # 強化設定
-│   ├── benchmark/          # 計測
-│   ├── system/, integration/, utilities/, utils/  # 補助の Python モジュール
-│   └── toolchain/          # クロスコンパイル
+│   ├── kernel/             # カーネル設定（config/README.md のみ）・パッチ
+│   ├── libc/patches/       # musl の CVE パッチ
+│   └── busybox/            # BusyBox設定・パッチ
 ├── tests/                  # テストコード
-│   ├── unit/               # 単体テスト
-│   ├── property/           # プロパティテスト
-│   └── integration/        # 統合テスト
+│   ├── unit/               # 単体テスト（pytest）
+│   └── integration/        # 統合テスト（シェル）
 ├── scripts/                # ビルドスクリプト
 ├── output/                 # ビルド出力
 ├── Dockerfile              # ビルド環境
@@ -134,45 +126,23 @@ Kimigayo OS はコンテナ向けで、成果物は rootfs の tarball と Docke
 
 ## テスト戦略
 
-### プロパティベーステスト
-
-要件ごとにプロパティテストを書く方針です（既存のプロパティテストの
-すべてが下の見出しコメントの形式に揃っているわけではありません）:
-
-```python
-# tests/property/test_build_constraints.py（抜粋）
-
-import pytest
-from hypothesis import given
-from src.build.config import BuildConfig
-from src.build.image import build_base_image
-
-# **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
-@pytest.mark.property
-@given(build_config=build_configurations())  # 同じファイルで定義した strategy
-def test_build_size_constraint(build_config, tmp_path):
-    """任意のビルド設定に対して、イメージはバリアントの上限未満
-    （MINIMAL 5MB / STANDARD 15MB / EXTENDED 50MB。SPECIFICATION.md §8.3）"""
-    image = build_base_image(build_config, output_dir=tmp_path)
-    assert image.size_bytes < build_config.max_image_size
-```
-
 ### 単体テスト
 
-個別のコンポーネントをテスト:
+`tests/unit/` の pytest。BusyBox の config・リンク検査・Hook の判定規則を見ます
+（3 ファイル 65 件、2026-10-14 時点。→ [tests/README.md](tests/README.md)）。
 
 ```bash
 # 依存をインストール
 pip install -r requirements-dev.txt
 
+# 全部
+python3 -m pytest tests -q
+
 # 特定のテストを実行
-pytest tests/unit/test_build_config.py -v
+pytest tests/unit/test_check_links.py -v
 
-# マーカーで絞る（unit / property / integration / slow / security）
+# マーカーで絞る（unit / integration / slow / security）
 pytest -m "not slow" -q
-
-# カバレッジ測定
-pytest --cov=src tests/
 ```
 
 ### 統合テスト
@@ -180,7 +150,7 @@ pytest --cov=src tests/
 システム全体をテスト:
 
 ```bash
-# rootfs tarball に対する統合テスト
+# rootfs tarball ができたかの確認（ホスト）
 make test-integration
 
 # Dockerイメージの起動テスト
