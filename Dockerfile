@@ -50,6 +50,9 @@ RUN apk update && apk add --no-cache \
     pkgconfig \
     # musl開発ツール
     musl-dev \
+    # _FORTIFY_SOURCE の実装（build-base の依存でも入るが、arm64 のビルドが
+    # 明示的に /usr/include/fortify を使うので名指しで入れる）
+    fortify-headers \
     musl-utils \
     # OpenRC 0.63.2 は libcap が必須（0.52.1 の -Dcapabilities で
     # 無効化できたが、そのオプションは上流から削除された）。
