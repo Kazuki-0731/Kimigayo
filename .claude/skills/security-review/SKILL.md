@@ -150,6 +150,27 @@ standard 400 / extended 411 アプレット。1つの答えで済ませないこ
 
 ---
 
+### 修正がまだ無い CVE は「待つ」を登録する
+
+**影響を受けるのに上流にも Alpine にも修正が無い CVE は、待つと決めたら
+`scripts/watch-upstream-fixes.py` の `WATCH` に足す。** 文章で「上流を待つ」と
+書くだけでは、誰も見に行かず忘れられる。
+
+1. `WATCH` に `(CVE ID, Debian / Alpine のパッケージ名, パッチの置き場)` を足す
+2. 追跡用の Issue を立てる（影響・発動条件・回避策・修正が出たらやること。
+   例: #121 CVE-2026-108119）
+3. 既知の問題として `HARDENING_GUIDE.md`・`CHANGELOG.md` に書く
+
+`security.yml` の `upstream-fix-watch` が毎日、Debian の security-tracker
+（unstable の Fixed Version）と Alpine aports の APKBUILD（master と
+`<ALPINE_VERSION>-stable`）を見て、修正が出たら Issue を立てて **Discord に
+通知する**。監視が判定できなかったときも Discord に失敗を送る。
+手元では `/status` に同じ結果が出る。
+
+**取り込んだら:** パッチを `src/<component>/patches/` に CVE ID 入りの名前で
+置き（`PATCHED_CVES` に載る）、再現手順を `verify-image.sh` の回帰テストにし、
+`WATCH` から消す（消し忘れても、パッチがあれば「取り込み済み。消す」と出る）。
+
 ## 3. 強化フラグが成果物に効いているかを検証する
 
 **`config.mk` に書いてあることは宣言で、検証ではありません。**
@@ -181,7 +202,8 @@ SECURITY_LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 
 **PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護は `verify-image.sh` が
 イメージ内の全 ELF で自動検査しています**（`scripts/check-elf-hardening.py`、
-2026-10-11 から。スタック保護は 2026-10-13 から。v3.0.1 では最初の 4 項目が 29 個すべて合格）。CI・release で毎回走るので、
+2026-10-11 から。スタック保護は 2026-10-13 から。FORTIFY は 2026-10-14 から
+`/bin/busybox` のトラップの数で見る。v3.0.1 では最初の 4 項目が 29 個すべて合格）。CI・release で毎回走るので、
 手で見るのは `NEEDED`（不要な動的依存）と、検査が落ちたときの原因調査です。
 
 ```bash
@@ -314,7 +336,7 @@ git log --all --diff-filter=A --name-only | grep -x '.env' && echo "過去にコ
 
 | ワークフロー | いつ | 何をするか |
 | --- | --- | --- |
-| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流の修正待ちの CVE の監視**（修正が出たら Issue と Discord 通知）・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC | 上流の更新を検知して PR |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | `fail-on-severity: high` |
 
