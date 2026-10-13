@@ -95,6 +95,8 @@ RULES = [
     (r"tests/property|test-property|configs/(openrc|sysctl)|(minimal|standard|extended)-x86_64\.config|kimigayo_(x86_64|arm64)_defconfig|/sbin/create-devices",
      r"削除|消した|以前|当時|まで|deleted|removed|実施した最適化|inittab\.optimized|^`configs/sysctl/99-kimigayo-performance\.conf`。$",
      "2026-10-14 に削除したもの（プロパティテスト・configs/・未使用のカーネル config・create-devices・Python モック）"),
+    (r"image\.licenses=\"GPL-2\.0\"|LICENSES/BSD-2-Clause\.txt|musl libc \| MIT \| LICENSES/MIT\.txt", None,
+     "イメージのライセンスは GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause。musl・OpenRC・libcap の条文は LICENSES/ の上流の原文"),
     (r"Linux ?カーネル 6\.6|linux-6\.6\.|BusyBox 1\.36\.1|musl 1\.2\.4|OpenRC 0\.52", r"当時|かつて|以前|まで|→|のつもり|で既知|の頃|古い版|が 1\.38|libcap は|historical|v[0-2]\.",
      "古い構成要素の版。現在の版は versions.mk"),
 ]
