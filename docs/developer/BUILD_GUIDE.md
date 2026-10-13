@@ -101,7 +101,7 @@ make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard
 # クリーンアップ
 make clean
 
-# テスト実行（pytest tests/ -v。unit・property・integration すべて）
+# テスト実行（pytest tests/ -v）
 make test
 ```
 
@@ -211,9 +211,6 @@ make build-no-kernel TARGET_ARCH=arm64 IMAGE_TYPE=standard
 
 # コンテナ内で詳細ログ付きでビルド
 make build-no-kernel TARGET_ARCH=x86_64 IMAGE_TYPE=standard V=1
-
-# コンテナ内でプロパティテストのみ実行
-pytest tests/property/ -v
 
 # コンテナ内で単体テストのみ実行
 pytest tests/unit/ -v
@@ -358,18 +355,21 @@ make help              # 全ターゲット
 make info              # ビルド設定
 make status            # どこまでできているか（musl・カーネル・BusyBox・OpenRC・rootfs。カーネルは任意）
 make build             # コンテナ内で make build を実行（カーネルを含む）
-make test              # コンテナ内で pytest tests/ -v（unit・property・integration）
-make test-integration  # 統合テスト
+make test              # コンテナ内で pytest tests/ -v（tests/unit の 3 ファイル）
+make test-integration  # rootfs の tarball ができたかの確認だけ
+make test-docker       # イメージの起動テスト（tests/integration/test_docker_startup.sh。要イメージ）
+make test-func         # イメージの機能テスト（tests/integration/test_functionality.sh。要イメージ）
 make shellcheck-scan   # scripts/ と .claude/hooks/ の静的解析
 make security-scan     # scan-image（成果物の CVE・秘密情報）+ Trivy FS + ShellCheck
 
 # コンテナ内（make shell で入ってから）
 make test-unit
-make test-property
+make test-musl         # scripts/test-musl-integration.sh（test-busybox / test-openrc も）
 ```
 
-> `make test-unit` / `make test-property` はコンテナ側（`build-system/Makefile`）
-> にしかありません。ホストからは `python3 -m pytest tests/unit -q` でも走ります。
+> `make test-unit` と `make test-musl` / `test-busybox` / `test-openrc` はコンテナ側
+> （`build-system/Makefile`）にしかありません。ホストからは
+> `python3 -m pytest tests -q` でも走ります（65 件、2026-10-14）。
 
 ### バリアントとアーキテクチャ
 
@@ -437,13 +437,13 @@ docker compose run --rm -T kimigayo-build make busybox \
 （`scripts/build-kernel.sh` が選びます）。無いとき、または
 プレースホルダ行（`# This is a placeholder`）を含むときは上流の defconfig を使います
 （無いときに `src/kernel/config/` へ何かを書き出すことはありません）。
-**追跡中の `x86_64.config` はプレースホルダなので、今は使われていません。**
-自分の config を使うなら、その行を含まない完全な `.config` で置き換えます。
+**追跡している `<arch>.config` は今は無いので、両アーキとも上流の defconfig です。**
+自分の config を使うなら、その行を含まない完全な `.config` を置きます。
 
 どちらの場合も、そのあと `apply_security_hardening` が `scripts/config` で
 項目を上書きします（→ [ARCHITECTURE.md](ARCHITECTURE.md#カーネル設定)）。
-`minimal-x86_64.config` などのバリアント別のファイルと `kimigayo_*_defconfig` は
-ビルドで使われていません。
+バリアント別の config と `kimigayo_*_defconfig` は 2026-10-14 に削除しました
+（ビルドで使われていませんでした）。
 
 ```bash
 cp my-kernel.config src/kernel/config/x86_64.config   # プレースホルダ行を含まないもの
