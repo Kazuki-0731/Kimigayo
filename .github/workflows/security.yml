@@ -156,6 +156,83 @@ jobs:
           path: reports/
           retention-days: 90
 
+  # 上流の修正待ちにした CVE（scripts/watch-upstream-fixes.py の WATCH）に
+  # 修正が出たかを毎日見る。出たら Issue を 1 つ立てる（開いている同じ Issue が
+  # あれば立てない）。Debian の表が読めないなどで判定できないときは失敗させる
+  # （黙って「未修正」と読むと、修正が出ても気づけない）。
+  upstream-fix-watch:
+    name: Watch upstream fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Check upstream fixes
+        id: watch
+        run: |
+          set -euo pipefail
+          python3 -I scripts/watch-upstream-fixes.py | tee watch-report.md
+          cat watch-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open an issue when a fix is available
+        id: issue
+        if: steps.watch.outputs.fix_available == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('watch-report.md', 'utf8');
+            const title = '🔒 上流に修正が出た（修正待ちの CVE）';
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'security,automated',
+              state: 'open'
+            });
+            if (open.data.some(i => i.title === title)) {
+              core.info('already open');
+              return;
+            }
+            const created = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body: `${report}\n\n取り込み手順: CLAUDE.md「パッチはなぜ存在するか」、\`security-review\` skill。\n取り込んだら \`scripts/watch-upstream-fixes.py\` の WATCH から消す。`,
+              labels: ['security', 'automated']
+            });
+            core.setOutput('url', created.data.html_url);
+
+      # Discord には「新しく Issue を立てたとき」だけ送る。修正が出たまま
+      # 取り込んでいない間も毎日送ると、通知が読まれなくなる。
+      - name: Notify Discord (fix available)
+        if: steps.issue.outputs.url != '' && env.DISCORD_WEBHOOK != ''
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
+        with:
+          webhook: ${{ env.DISCORD_WEBHOOK }}
+          status: success
+          title: '🔒 上流に修正が出た（修正待ちの CVE）'
+          description: |
+            取り込み待ちの修正が見つかりました。
+            ${{ steps.issue.outputs.url }}
+          username: 'Kimigayo Security Bot'
+
+      # 監視そのものが壊れたら（Debian の表が読めない・取得に失敗）知らせる。
+      # 黙って止まると、修正が出ても誰も気づけない。
+      - name: Notify Discord (watch failed)
+        if: failure() && env.DISCORD_WEBHOOK != ''
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
+        with:
+          webhook: ${{ env.DISCORD_WEBHOOK }}
+          status: failure
+          title: '❌ 上流の修正の監視が失敗した'
+          description: |
+            scripts/watch-upstream-fixes.py が判定できませんでした。
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          username: 'Kimigayo Security Bot'
+
   trivy-filesystem-scan:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
