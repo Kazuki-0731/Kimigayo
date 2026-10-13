@@ -498,7 +498,7 @@ output/kimigayo-<variant>-<version>-<arch>.tar.gz
 - **ISO イメージは生成されません。** ベアメタル起動は対象外です
   （→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2・9.2）
 - リリースでは、tarball に加えて `SHA256SUMS`・`SHA512SUMS`・
-  SBOM（CycloneDX）が GitHub Release に添付され、Docker イメージは Cosign で署名されます
+  SBOM（CycloneDX）・対応するソース（上流の tarball とリポジトリの archive）が GitHub Release に添付され、Docker イメージは Cosign で署名されます
 
 ### ビルド情報
 
