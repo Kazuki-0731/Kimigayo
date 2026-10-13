@@ -379,7 +379,7 @@ gh pr list --limit 10
 | 着地先 | 何をするか |
 | --- | --- |
 | `docs/security/` | `SECURITY_AUDIT.md`・`HARDENING_GUIDE.md` に結果を追記 |
-| config | カーネル / BusyBox config、`configs/sysctl/` を実際に変える（または外す） |
+| config | カーネル / BusyBox config、`build-rootfs.sh` が作る sysctl を実際に変える（または外す） |
 | CI | 退行を検知したいならワークフローか回帰テストに落とす |
 | Hook | 機械的に止められるものは `.claude/hooks/` へ |
 | `CHANGELOG.md` | 修正した脆弱性と、取り消した誤った安全性の主張 |
