@@ -3,9 +3,8 @@
 このドキュメントは、Kimigayo OS を使う・作るときに参照する
 **OpenRC のサービス定義・ビルド変数とターゲット・運用コマンド**の一覧です。
 
-> **Python の API はここに載っていません。** `src/` 配下の Python
-> モジュールはビルドとテストの補助で、利用者向けの公開 API ではありません。
-> 詳細は各モジュールのソースを参照してください。
+> **Python の API はありません。** 以前あった `src/` 配下の Python
+> モジュールは、どこからも使われていなかったため 2026-10-14 に削除しました。
 
 ## 目次
 
@@ -198,21 +197,19 @@ docker compose run --rm -T kimigayo-build make clean
 #### テスト
 
 ```bash
-# ホスト: コンテナ内で pytest tests/ -v（unit・property・integration すべて）
+# ホスト: コンテナ内で pytest tests/ -v
 make test
 
-# ホスト: 統合テスト（test_phase1_integration.py と tarball の存在確認）
+# ホスト: rootfs の tarball ができたかの確認だけ
 make test-integration
+
+# ホスト: イメージが要るシェルのテスト
+make test-docker
+make test-func
 
 # コンテナ内（build-system/Makefile）にだけあるターゲット
 docker compose run --rm -T kimigayo-build make test-unit
-docker compose run --rm -T kimigayo-build make test-property
-```
-
-カバレッジは make ターゲットではありません（設定は `.coveragerc`）。
-
-```bash
-python3 -m pytest tests/unit tests/property --cov --cov-report=term-missing
+docker compose run --rm -T kimigayo-build make test-musl   # test-busybox / test-openrc も
 ```
 
 #### 静的解析・スキャン（ホスト）
