@@ -127,8 +127,8 @@ fs.suid_dumpable = 0                 # setuid プロセスのコアダンプ禁�
 - **overlay**: コンテナのルートファイルシステム（通常はこれ）
 - **tmpfs**: 一時ファイル用メモリファイルシステム
 - **ext4**: ベアメタル／VM でルートに使う場合
-- **squashfs**: 読み取り専用圧縮ファイルシステム（ビルドで有効になるかは
-  未確認。→ [カーネル設定](#カーネル設定)）
+- **squashfs**: 読み取り専用圧縮ファイルシステム（自前のカーネルでは arm64 だけ
+  有効。x86_64 の defconfig には入っていない。→ [カーネル設定](#カーネル設定)）
 
 ### 3. Cライブラリ層 (musl libc)
 
@@ -341,13 +341,40 @@ CONFIG_PANIC_ON_OOPS=y         # PANIC_TIMEOUT=10
 モジュールの `modules_install` は、モジュールがビルドされたとき
 （`modules.order` があるとき）だけ実行し、失敗したらビルドを止めます。
 
-> **実際にビルドされた `.config` でこれらが効いているかは未確認です。**
-> 手元に残っている 6.18.55 の `.config` は上の意図と食い違っており
-> （`CONFIG_NETFILTER=y`・`# CONFIG_SECURITY_DMESG_RESTRICT is not set`）、
-> 上書きが効いていないのか、途中で止まった実行の残骸なのかを確かめていません。
-> 確かめるには `manual-build.yml` を `build_kernel=true` で回します。
-> 主な強化項目がジョブのサマリーに出て、`.config` が artifact
-> `kernel-config-<arch>` に残ります（手元なら `build/kernel/output/config-<version>-<arch>`）。
+**実際にビルドされた `.config` で、上の意図はすべて効いています**
+（2026-10-13、6.18.55、`manual-build.yml` を `build_kernel=true` で両アーキに
+回した run 38287999391 / 38288004527 の artifact `kernel-config-<arch>`）。
+以前ここで「手元の `.config` は `CONFIG_NETFILTER=y`」と書いていたのは、
+途中で止まった実行の残骸でした。
+
+| 項目 | x86_64 | arm64 | 出どころ |
+| --- | --- | --- | --- |
+| `RANDOMIZE_BASE`（KASLR） | y | y | 上書き |
+| `RANDOMIZE_MEMORY` | y | （x86 専用） | 上書き |
+| `SECURITY`・`SECURITY_DMESG_RESTRICT` | y | y | 上書き |
+| `HARDENED_USERCOPY`・`FORTIFY_SOURCE` | y | y | 上書き |
+| `STACKPROTECTOR_STRONG` | y | y | 上書き |
+| `PANIC_ON_OOPS`（`PANIC_TIMEOUT=10`） | y | y | 上書き |
+| `NETFILTER` | 無効 | 無効 | 上書き |
+| `STRICT_KERNEL_RWX`・`SECCOMP_FILTER` | y | y | defconfig |
+| `MITIGATION_RETPOLINE`・`MITIGATION_PAGE_TABLE_ISOLATION` | y | （x86 専用） | defconfig |
+| `UNMAP_KERNEL_AT_EL0`・`ARM64_PTR_AUTH` | （arm64 専用） | y | defconfig |
+| `MODULES` | y | y | defconfig |
+| `SECURITY_YAMA` | 無効 | 無効 | defconfig |
+| `INIT_ON_ALLOC_DEFAULT_ON` | 無効 | 無効 | defconfig |
+| `USER_NS` | 無効 | y | defconfig |
+| `OVERLAY_FS` | 無効 | m | defconfig |
+| `SQUASHFS` | 無効 | y | defconfig |
+
+**アーキで差があるのは上流の defconfig の違いです**（arm64 の `defconfig` は
+x86_64 の `x86_64_defconfig` よりずっと多くを有効にしている）。
+NETFILTER を無効にしているので、このカーネルでは iptables も、iptables に
+頼る Docker の既定のブリッジネットワークも使えません。x86_64 は `OVERLAY_FS` も無いので、
+このカーネルの上で Docker を動かす用途には向きません。
+
+確かめ直すには `manual-build.yml` を `build_kernel=true` で回します。
+主な強化項目がジョブのサマリーに出て、`.config` が artifact
+`kernel-config-<arch>` に残ります（手元なら `build/kernel/output/config-<version>-<arch>`）。
 
 > **`src/kernel/config/` のほかのファイルはビルドで使われていません。**
 > `minimal-x86_64.config` / `standard-x86_64.config` /
@@ -432,7 +459,7 @@ CONFIG_UNLZOP=y
 │  - PIE / Full RELRO / 非実行スタック    │
 │    （verify-image.sh が全 ELF を検査）  │
 │  - Stack canaries（arm64 の OpenRC 除く）│
-│  - FORTIFY_SOURCE（指定のみ。下記）      │
+│  - FORTIFY_SOURCE（x86_64 のみ。下記）   │
 ├─────────────────────────────────────────┤
 │  Layer 3: 最小の実行面                  │★ Kimigayo が担保
 │  - 第三者の共有ライブラリ無し            │
@@ -454,8 +481,10 @@ CONFIG_UNLZOP=y
 （`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません
 （`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、
 次のリリースから付きます。`scripts/verify-image.sh` が検査します）。
-`-D_FORTIFY_SOURCE=2` は指定していますが、musl は FORTIFY を実装して
-いないため、効果は確認できていません。
+`-D_FORTIFY_SOURCE=2` が効いているのは x86_64 だけです。x86_64 はビルド環境の
+Alpine のヘッダを使い、`fortify-headers` が前に入ります。arm64 は自前の musl の
+ヘッダだけを `-isystem` で見ており、musl は FORTIFY を実装しないので効いて
+いません（2026-10-13 にテストプログラムで実測）。
 Layer 1 と 2 はホストと利用者の設定によります
 （→ [システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)）。
 
