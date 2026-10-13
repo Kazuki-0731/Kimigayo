@@ -1431,6 +1431,77 @@ verify_rootfs() {
     log "✅ rootfs verification passed"
 }
 
+# 第三者のライセンス文書とソースの入手先をイメージに入れる。
+#
+# イメージは BusyBox（GPL-2.0-only）・musl（MIT）・OpenRC（BSD-2-Clause）と、
+# OpenRC に静的リンクした libcap（BSD-3-Clause OR GPL-2.0-only）を配布している。
+# どのライセンスもバイナリの配布時に条文と著作権表示を添えることを求め、
+# GPL はさらにソースの入手先を示すことを求める。v3.0.2 以前の公開イメージには
+# どこにも入っていなかった（2026-10-14 に追加）。
+#
+# 条文はリポジトリに写しを置かず、ビルドに使ったその版の tarball から取る
+# （版を上げたときに古い条文が残らないように）。libcap は Alpine の
+# libcap-static をリンクしていてソースを取らないので、LICENSES/ の写しを使う。
+# optimize_rootfs の後に置く（/usr/share の 1KB 超のテキストを gzip するため、
+# その前だと条文が圧縮されて cat で読めなくなる）。
+install_licenses() {
+    log "Installing third-party license texts..."
+
+    local dl="${DOWNLOAD_DIR:-${BUILD_DIR}/downloads}"
+    local dest="$ROOTFS_DIR/usr/share/licenses"
+    mkdir -p "$dest/busybox" "$dest/musl" "$dest/openrc" "$dest/libcap"
+
+    tar -xOjf "$dl/busybox-${BUSYBOX_VERSION}.tar.bz2" "busybox-${BUSYBOX_VERSION}/LICENSE" > "$dest/busybox/LICENSE"
+    tar -xOzf "$dl/musl-${MUSL_VERSION}.tar.gz" "musl-${MUSL_VERSION}/COPYRIGHT" > "$dest/musl/COPYRIGHT"
+    tar -xOzf "$dl/openrc-${OPENRC_VERSION}.tar.gz" "openrc-${OPENRC_VERSION}/LICENSE" > "$dest/openrc/LICENSE"
+    cp "${PROJECT_ROOT}/LICENSES/libcap-License.txt" "$dest/libcap/License"
+
+    local commit
+    commit="$(git -C "$PROJECT_ROOT" -c safe.directory='*' rev-parse HEAD 2>/dev/null || echo unknown)"
+
+    cat > "$dest/README" << EOF
+Kimigayo OS ${OS_VERSION} - third-party software in this image
+
+BusyBox ${BUSYBOX_VERSION}
+    License: GPL-2.0-only                 Text: busybox/LICENSE
+musl libc ${MUSL_VERSION}
+    License: MIT                          Text: musl/COPYRIGHT
+OpenRC ${OPENRC_VERSION}
+    License: BSD-2-Clause                 Text: openrc/LICENSE
+libcap (Alpine ${ALPINE_VERSION} libcap-static, statically linked into
+        start-stop-daemon and supervise-daemon)
+    License: BSD-3-Clause OR GPL-2.0-only, used under BSD-3-Clause
+                                          Text: libcap/License
+
+Compiler runtime code linked into the binaries (libgcc on x86_64,
+compiler-rt builtins on arm64) is covered by the GCC Runtime Library
+Exception and the LLVM Exception, which do not require a notice.
+The Linux kernel is not included in this image.
+
+Source code
+-----------
+The complete corresponding source for this image is:
+  - The upstream source archives of BusyBox ${BUSYBOX_VERSION}, musl ${MUSL_VERSION}
+    and OpenRC ${OPENRC_VERSION}. They are attached to each GitHub Release of
+    Kimigayo OS (https://github.com/Kazuki-0731/Kimigayo/releases) and are
+    also available from busybox.net, musl.libc.org and
+    github.com/OpenRC/openrc.
+  - The patches, BusyBox configurations and build scripts in
+    https://github.com/Kazuki-0731/Kimigayo/tree/${commit}
+    (src/busybox/, src/libc/patches/, scripts/).
+EOF
+
+    find "$dest" -type f -exec chmod 644 {} +
+    local f
+    for f in busybox/LICENSE musl/COPYRIGHT openrc/LICENSE libcap/License README; do
+        if [ ! -s "$dest/$f" ]; then
+            log_error "  License file is missing or empty: /usr/share/licenses/$f"
+            return 1
+        fi
+    done
+    log "✅ License texts installed in /usr/share/licenses"
+}
+
 # Generate rootfs metadata
 generate_metadata() {
     log "Generating rootfs metadata..."
@@ -1597,6 +1668,7 @@ main() {
     create_config_files
     set_permissions
     optimize_rootfs
+    install_licenses || exit 1
     verify_rootfs || exit 1
     generate_metadata
     calculate_size
