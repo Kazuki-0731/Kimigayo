@@ -204,9 +204,7 @@ else
     test_fail "OpenRC init.d directory not found: $init_dir"
 fi
 
-# src/openrc/ の init.d・conf.d・runlevels は検査しない。
-# scripts/build-rootfs.sh はそれらを rootfs に入れておらず、
-# イメージに含まれないファイルを検査しても成果物の保証にならない。
+# イメージの init.d は scripts/build-rootfs.sh の heredoc と上流 OpenRC が作る。
 
 # Summary
 echo ""
