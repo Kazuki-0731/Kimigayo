@@ -456,7 +456,7 @@ CONFIG_UNLZOP=y
 │  - PIE / Full RELRO / 非実行スタック    │
 │    （verify-image.sh が全 ELF を検査）  │
 │  - Stack canaries（arm64 の OpenRC 除く）│
-│  - FORTIFY_SOURCE（x86_64 のみ。下記）   │
+│  - FORTIFY_SOURCE（下記）                │
 ├─────────────────────────────────────────┤
 │  Layer 3: 最小の実行面                  │★ Kimigayo が担保
 │  - 第三者の共有ライブラリ無し            │
@@ -478,10 +478,11 @@ CONFIG_UNLZOP=y
 （`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません
 （`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、
 次のリリースから付きます。`scripts/verify-image.sh` が検査します）。
-`-D_FORTIFY_SOURCE=2` が効いているのは x86_64 だけです。x86_64 はビルド環境の
-Alpine のヘッダを使い、`fortify-headers` が前に入ります。arm64 は自前の musl の
-ヘッダだけを `-isystem` で見ており、musl は FORTIFY を実装しないので効いて
-いません（2026-10-13 にテストプログラムで実測）。
+`-D_FORTIFY_SOURCE=2` は musl ではなく Alpine の `fortify-headers` が実装します。
+x86_64 はビルド環境のヘッダを使うので自動で入りますが、arm64 は自前の musl の
+ヘッダだけを見るため、**v3.0.2 の arm64 には効いていません**。2026-10-14 から
+arm64 のビルドも `fortify-headers` を musl より前に置き、`scripts/verify-image.sh` が
+BusyBox のトラップの数で効いているかを検査します（次のリリースから）。
 Layer 1 と 2 はホストと利用者の設定によります
 （→ [システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)）。
 
