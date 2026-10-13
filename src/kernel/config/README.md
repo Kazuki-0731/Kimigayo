@@ -1,10 +1,12 @@
 # Kimigayo OS Kernel Configurations
 
-> **このディレクトリの config は、ビルドでほとんど使われていない（参考資料）。**
-> 2026-10-12 時点で、`scripts/build-kernel.sh` が読むのは
-> `src/kernel/config/<arch>.config`（`x86_64.config` / `arm64.config`）だけ。
-> バリアント別の `minimal-` / `standard-` / `extended-x86_64.config` と
-> `kimigayo_{x86_64,arm64}_defconfig` を読むビルド経路は無い。
+> **このディレクトリに追跡中の config は無い（2026-10-14 に削除）。**
+> `scripts/build-kernel.sh` が読むのは `src/kernel/config/<arch>.config`
+> （`x86_64.config` / `arm64.config`）だけで、今はどちらも無いので、
+> 両アーキとも上流の defconfig + `apply_security_hardening()` で作られる。
+> 削除したのはバリアント別の `minimal-` / `standard-` / `extended-x86_64.config`、
+> `kimigayo_{x86_64,arm64}_defconfig`、プレースホルダの `x86_64.config`
+> （どれもビルドの経路から読まれていなかった）。
 >
 > **カーネルは Docker イメージに入らない**（コンテナはホストのカーネルで動く）。
 > カーネルを作るのはベアメタル／QEMU で試すときだけで、CI では作らない
@@ -32,8 +34,7 @@
      6.18 ではシンボル名が `MITIGATION_RETPOLINE` に変わっていて
      何もしていなかったので外した（Spectre v2 の緩和は無効にしない）
 
-**追跡中の `x86_64.config` はプレースホルダ**なので、x86_64 は手順 2 の
-上流 defconfig で作られる。arm64 は `arm64.config` が無いので、同じく手順 2。
+**追跡中の `<arch>.config` は無い**ので、両アーキとも手順 2 の上流 defconfig で作られる。
 
 **上書きはすべて効いている**（2026-10-13、6.18.55 を両アーキでビルドした
 `.config` で確認。項目ごとの値は
@@ -44,20 +45,6 @@
 
 **バリアント（minimal / standard / extended）でカーネル config は変わらない。**
 バリアントの違いは BusyBox の config（`src/busybox/config/`）だけ。
-
-## ファイル一覧
-
-| ファイル | ビルドで使われるか |
-| --- | --- |
-| `x86_64.config` | 読まれるが、プレースホルダなので無視される |
-| `minimal-x86_64.config` | 使われていない |
-| `standard-x86_64.config` | 使われていない |
-| `extended-x86_64.config` | 使われていない |
-| `kimigayo_x86_64_defconfig` | 使われていない（参照は読まれていない `config.mk` と `src/kernel/build.py`・そのテストだけ） |
-| `kimigayo_arm64_defconfig` | 同上 |
-
-使われていない config の中身（モジュールの有無・IPv6・AppArmor など）は、
-当時の検討を残したもので、ビルドされるカーネルの性質ではない。
 
 ## 手元でカーネルを作る
 
@@ -71,8 +58,8 @@ CI で作るなら Actions から `manual-build.yml` を `build_kernel=true` で
 
 ### 自分の config を使いたいとき
 
-`src/kernel/config/<arch>.config` を、プレースホルダ行を含まない実物の
-config で置き換える。それでも手順 3 の `scripts/config` による上書きは
+`src/kernel/config/<arch>.config` として実物の config を置く
+（`# This is a placeholder` の行を含めないこと）。それでも手順 3 の `scripts/config` による上書きは
 かかる（netfilter は無効になる）。
 
 ```bash
