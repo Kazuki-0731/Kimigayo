@@ -26,7 +26,9 @@ LABEL org.opencontainers.image.url="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.documentation="https://github.com/Kazuki-0731/Kimigayo/tree/main/docs"
 LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.version="${KIMIGAYO_VERSION}"
-LABEL org.opencontainers.image.licenses="GPL-2.0"
+# ライセンスのラベルは付けない。このイメージは手元と CI でビルドに使うだけで
+# 配布せず、中身は Alpine の多数のパッケージ（それぞれのライセンス）。
+# 以前の "GPL-2.0" はどの意味でも正しくなかった。
 LABEL org.opencontainers.image.base.name="alpine:${ALPINE_VERSION}"
 
 # 環境変数の設定
