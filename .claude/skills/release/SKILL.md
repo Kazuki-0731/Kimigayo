@@ -33,7 +33,7 @@ v0.1.0 から v2.0.1 までの**公開済み4タグすべて**で次が同時に
 ## 1. 品質ゲート
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 599 件（2026-10-13 時点）
+python3 -m pytest tests -q                         # 65 件（2026-10-14 時点）
 make shellcheck-scan                               # scripts/ と .claude/hooks/
 make security-scan                                 # scan-image（CVE + 秘密情報）+ Trivy FS + ShellCheck
 make ci-build-local                                # Linux ホストのみ
@@ -97,7 +97,7 @@ CI は中身を検証しないので、実装していない機能が宣伝さ�
 
 ```bash
 # 宣伝している仕組みの「受け取り側」があるか
-grep -rn 'seccomp' scripts/ configs/ Dockerfile*          # プロファイルは rootfs に入るか
+grep -rn 'seccomp' scripts/ Dockerfile*                   # プロファイルは rootfs に入るか
 grep -rn -i 'cosign\|content trust' .github/workflows/release.yml
 grep -rn 'REPRODUCIBLE_BUILD' Makefile build-system/Makefile scripts/
 # 案内しているタグが実在するか
