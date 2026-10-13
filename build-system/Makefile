@@ -128,7 +128,7 @@ endif
 # Phony targets
 .PHONY: all build build-no-kernel clean help info status version \
         kernel musl busybox init rootfs \
-        test test-unit test-property test-integration test-musl test-busybox test-openrc \
+        test test-unit test-musl test-busybox test-openrc \
         clean-musl clean-kernel clean-busybox clean-openrc clean-rootfs clean-output clean-all
 
 # Default target
@@ -161,8 +161,6 @@ help:
 	@echo "Test Targets:"
 	@echo "  test             - Run all tests"
 	@echo "  test-unit        - Run unit tests only"
-	@echo "  test-property    - Run property-based tests only"
-	@echo "  test-integration - Run integration tests only"
 	@echo "  test-musl        - Run musl libc integration script"
 	@echo "  test-busybox     - Run BusyBox integration script"
 	@echo "  test-openrc      - Run OpenRC integration script"
@@ -273,14 +271,6 @@ test:
 test-unit:
 	@echo "[TEST] Unit tests"
 	$(Q)pytest $(TESTS_DIR)/unit/ -v
-
-test-property:
-	@echo "[TEST] Property tests"
-	$(Q)pytest $(TESTS_DIR)/property/ -v --hypothesis-show-statistics
-
-test-integration:
-	@echo "[TEST] Integration tests"
-	$(Q)pytest $(TESTS_DIR)/integration/ -v
 
 # 統合スクリプトは ARCH でインストール先を決める（musl は aarch64、
 # BusyBox / OpenRC は arm64 という名前）。以前は docker-compose.yml の
