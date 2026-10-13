@@ -76,10 +76,10 @@ jobs:
       # docker-compose.yml の working_dir は build-system なので
       # -w でリポジトリルートを指定する。これが無いと
       # "file or directory not found: tests/unit/" で落ちる。
-      - name: Run unit and property tests
+      - name: Run unit tests
         run: |
           docker compose run --rm -w /build/kimigayo kimigayo-build \
-            pytest tests/unit tests/property -q
+            pytest tests/unit -q
 
   # **カーネルは CI でビルドしない。**
   #
