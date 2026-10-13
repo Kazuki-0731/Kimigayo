@@ -207,7 +207,7 @@ v3.0.2 は公開時点で **0 件**でした（NVD の CPE に載っている範
 
 ## ライセンス
 
-構成要素ごとに元のライセンスに従います（BusyBox: GPL-2.0 / musl libc: MIT / OpenRC: BSD-2-Clause / ビルドシステム: MIT）。詳細は[LICENSE](https://github.com/Kazuki-0731/Kimigayo/blob/main/LICENSE)ファイルを参照してください。
+構成要素ごとに元のライセンスに従います（BusyBox: GPL-2.0-only / musl libc: MIT / OpenRC: BSD-2-Clause / OpenRC に静的リンクした libcap: BSD-3-Clause / ビルドシステム: MIT）。条文はイメージの `/usr/share/licenses/` にあり、対応するソースは各 [GitHub Release](https://github.com/Kazuki-0731/Kimigayo/releases) に添付しています。詳細は[LICENSE](https://github.com/Kazuki-0731/Kimigayo/blob/main/LICENSE)ファイルを参照してください。
 
 ## サポート
 
