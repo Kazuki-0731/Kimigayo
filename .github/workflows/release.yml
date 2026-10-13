@@ -110,6 +110,32 @@ jobs:
             --severity=warning \
             scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 
+  # BusyBox（GPL-2.0-only）をバイナリで配るので、対応するソースを
+  # Release に添付する（v3.0.2 以前は付いていなかった）。上流の tarball と
+  # パッチ・config・ビルドスクリプトを含むリポジトリの archive。
+  # 手動実行でも走らせて、タグを打つ前に集められることを確かめる。
+  sources:
+    name: Collect corresponding source
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Collect source archives
+        env:
+          KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
+        run: bash scripts/collect-sources.sh sources
+
+      - name: Upload source archives
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sources
+          path: sources/
+          retention-days: 30
+          if-no-files-found: error
+
   build:
     name: Build ${{ matrix.variant }} ${{ matrix.arch }}
     needs: [meta, shellcheck]
@@ -204,7 +230,8 @@ jobs:
   # 検証は常に行い、push はタグの push のときだけ（env.PUBLISH）。
   verify-and-push:
     name: Verify and push ${{ matrix.variant }} ${{ matrix.arch }}
-    needs: [meta, build]
+    # ソースを集められないうちは公開しない（GPL のソース提供が欠ける）
+    needs: [meta, build, sources]
     # arm64 はネイティブランナーで検証する。QEMU を介さないので
     # 本物の aarch64 で動くことを確かめられる。
     # ここでやるのは tarball を scratch に包むだけなのでクロスコンパイルは不要。
@@ -480,7 +507,7 @@ jobs:
 
   create-github-release:
     name: Create GitHub Release
-    needs: [meta, verify-and-push, create-manifest, sign]
+    needs: [meta, sources, verify-and-push, create-manifest, sign]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -505,6 +532,12 @@ jobs:
           path: sboms/
           pattern: sbom-*
 
+      - name: Download source archives
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: sources
+          path: sources/
+
       - name: Prepare release assets
         run: |
           set -euo pipefail
@@ -514,9 +547,13 @@ jobs:
           find sboms/ -name "*.cdx.json" -exec cp {} release-assets/ \;
           n=$(find release-assets -name '*.cdx.json' | wc -l)
           [ "$n" -eq 6 ] || { echo "::error::expected 6 SBOMs, got $n"; exit 1; }
+          # 対応するソース（上流 3 本 + リポジトリの archive）。欠けたら出さない
+          cp sources/* release-assets/
+          n=$(find sources -type f | wc -l)
+          [ "$n" -eq 4 ] || { echo "::error::expected 4 source archives, got $n"; exit 1; }
           cd release-assets
-          sha256sum *.tar.gz > SHA256SUMS
-          sha512sum *.tar.gz > SHA512SUMS
+          sha256sum *.tar.gz *.tar.bz2 > SHA256SUMS
+          sha512sum *.tar.gz *.tar.bz2 > SHA512SUMS
           ls -lh
           cat SHA256SUMS
 
@@ -574,6 +611,14 @@ jobs:
 
           SBOM（CycloneDX、3 バリアント × 2 アーキの 6 本）をこの Release に添付しています。
 
+          ## 📜 ライセンスとソース
+
+          イメージには BusyBox（GPL-2.0-only）・musl（MIT）・OpenRC（BSD-2-Clause）・
+          libcap（BSD-3-Clause）が入っています。条文はイメージの
+          \`/usr/share/licenses/\` にあります。対応するソースとして、上流の
+          tarball 3 本と、パッチ・BusyBox の config・ビルドスクリプトを含む
+          \`kimigayo-${VERSION}-src.tar.gz\` をこの Release に添付しています。
+
           ## 🔄 Changes Since ${PREVIOUS_TAG}
 
           EOF
@@ -621,7 +666,7 @@ jobs:
   notify:
     name: Discord Notification
     runs-on: ubuntu-latest
-    needs: [meta, build, verify-and-push, create-manifest, sign, create-github-release]
+    needs: [meta, sources, build, verify-and-push, create-manifest, sign, create-github-release]
     if: always()
     timeout-minutes: 5
     permissions: {}
@@ -629,7 +674,7 @@ jobs:
     # 条件をここに直接書いている。
     env:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      OK: ${{ needs.build.result == 'success' && needs.verify-and-push.result == 'success' && (!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (needs.create-manifest.result == 'success' && needs.sign.result == 'success' && needs.create-github-release.result == 'success')) }}
+      OK: ${{ needs.sources.result == 'success' && needs.build.result == 'success' && needs.verify-and-push.result == 'success' && (!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (needs.create-manifest.result == 'success' && needs.sign.result == 'success' && needs.create-github-release.result == 'success')) }}
     steps:
       # 断言しない。各ジョブの結果をそのまま並べる。
       # 以前は「Docker Hub: ✅ Images pushed」と書いていたが、
@@ -644,6 +689,7 @@ jobs:
           description: |
             **Kimigayo OS v${{ needs.meta.outputs.version }}**${{ env.PUBLISH != 'true' && '（workflow_dispatch: ビルドと検証のみ。Docker Hub には push していない）' || '' }}
 
+            • Corresponding source: ${{ needs.sources.result }}
             • Build (3 variants x 2 arch): ${{ needs.build.result }}
             • Verify and push: ${{ needs.verify-and-push.result }}
             • Multi-arch manifests: ${{ needs.create-manifest.result }}
