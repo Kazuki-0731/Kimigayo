@@ -8,8 +8,10 @@ Requirements:
 
 モック／参考実装。実際のビルドは scripts/build-*.sh が行い、この Python
 モジュールはイメージには入らない（tests/ からのみ使われる）。
-musl は FORTIFY_SOURCE を実装していないので、-D_FORTIFY_SOURCE=2 の効果は
-確認できていない。arm64 の OpenRC には Stack Protector が付いていない。
+-D_FORTIFY_SOURCE=2 が効くのは x86_64 だけ（Alpine の fortify-headers 経由）。
+arm64 は自前の musl のヘッダだけを見ており、musl は FORTIFY を実装しないので
+効かない。v3.0.2 の arm64 の OpenRC には Stack Protector が付いていない
+（main で修正済み）。
 成果物の実際の検査（PIE・Full RELRO・非実行スタック）は scripts/verify-image.sh。
 """
 
