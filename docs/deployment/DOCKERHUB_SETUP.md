@@ -214,7 +214,7 @@ LABEL org.opencontainers.image.source="https://github.com/Kazuki-0731/Kimigayo"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.revision="${VCS_REF}"
-LABEL org.opencontainers.image.licenses="GPL-2.0"
+LABEL org.opencontainers.image.licenses="GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause"
 LABEL org.opencontainers.image.vendor="Kimigayo OS Project"
 LABEL org.opencontainers.image.base.name="scratch"
 
