@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **arm64 でも `_FORTIFY_SOURCE` が効くようにした。** musl は FORTIFY を実装せず、
+  Alpine の `fortify-headers` が実装する。arm64 は自前の musl のヘッダだけを見ていたので、
+  v3.0.2 の arm64 の BusyBox には検査が 1 つも無かった（x86_64 は効いていた）。
+  `verify-image.sh`（`check-elf-hardening.py`）が BusyBox のトラップの数で検査する
+- **イメージに第三者のライセンス文書を入れた**（`/usr/share/licenses/`。BusyBox・musl・
+  OpenRC・OpenRC に静的リンクした libcap）。v3.0.2 以前のイメージには入っていなかった。
+  リリースは対応するソース（上流の tarball 3 本とリポジトリの archive）を GitHub Release に
+  添付し、集められなければ Docker Hub に push しない。イメージの
+  `org.opencontainers.image.licenses` を `GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause` にした
+- 既知の問題: BusyBox の `tar` が 2 本のアーカイブを同じ展開先に続けて展開すると
+  外にファイルを書ける（CVE-2026-108119。v3.0.2 も影響を受ける。上流に修正はまだ無い）
 - **arm64 の OpenRC を `-fstack-protector-strong` 付きでビルドするようにした。**
   v3.0.2 の arm64 では `openrc`・`librc`・`libeinfo` など 20 本以上が
   スタック保護なしだった（`build-openrc.sh` が arm64 だけフラグを外していた）。
@@ -20,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   マニフェストも無い状態を作れた。手動実行の版の既定は `edge`
 - Docker のビルドコンテキストから `.env`・`.hypothesis/`・`benchmark-results/`・
   `output/` の tarball 以外を外した（`.dockerignore`）
+
+### Removed
+
+- どこからも使われていない `src/` の Python モックと、それだけを検証していたテスト
+  （534 件。pytest は実物を検査する 65 件になった）、イメージに入らない
+  `configs/`・`src/openrc/`・未使用のカーネル config、呼ばれていないスクリプト 2 本、
+  rootfs の `/sbin/create-devices`
 
 ### Fixed
 
