@@ -194,7 +194,7 @@ done
 | 版上げで壊れた箇所 | `TODO.md`、`CHANGELOG.md` |
 | パッチの経緯 | `src/kernel/patches/README.md`、パッチ冒頭のコメント、CLAUDE.md「パッチはなぜ存在するか」節 |
 | 同じ罠の再発防止 | `docs/troubleshooting/` に追記 |
-| コードレベルのミス | `tests/unit/`・`tests/property/` に回帰テスト |
+| コードレベルのミス | `tests/unit/` に回帰テスト |
 | 機械的に止められるもの | `verify_rootfs`・`.claude/hooks/`・CI |
 
 **人の判断が絡まないミスは文章にしない。構造かチェックにします**
