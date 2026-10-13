@@ -275,6 +275,16 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         exit 1
     fi
 
+    # _FORTIFY_SOURCE は musl 自身は実装せず、Alpine の fortify-headers が
+    # #include_next で musl のヘッダを包んで実装する。musl より前に置かないと
+    # -D_FORTIFY_SOURCE=2 は何もしない（2026-10-13 まで arm64 はそうだった）。
+    FORTIFY_INC_DIR="/usr/include/fortify"
+    if [ ! -f "${FORTIFY_INC_DIR}/string.h" ]; then
+        log_error "fortify-headers not found: ${FORTIFY_INC_DIR}"
+        log_error "  ビルド環境のイメージに fortify-headers が要る（make docker-build）"
+        exit 1
+    fi
+
     # 取り違えの再発防止。aarch64 の値であることを確かめる。
     if ! grep -qE '^#define O_DIRECTORY[[:space:]]+040000' "${MUSL_INC_DIR}/bits/fcntl.h"; then
         log_error "Unexpected O_DIRECTORY in ${MUSL_INC_DIR}/bits/fcntl.h"
@@ -336,7 +346,7 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
 # 順序を崩すとセクションが壊れる。
 M="${MUSL_LIB_DIR}"
 RT="${RT_BUILTINS_DIR}"
-COMMON="--target=aarch64-linux-musl -fuse-ld=lld -B\$M -L\$M -nostdlibinc -isystem ${MUSL_INC_DIR} -isystem /usr/aarch64-linux-musl/include"
+COMMON="--target=aarch64-linux-musl -fuse-ld=lld -B\$M -L\$M -nostdlibinc -isystem ${FORTIFY_INC_DIR} -isystem ${MUSL_INC_DIR} -isystem /usr/aarch64-linux-musl/include"
 
 for arg in "\$@"; do
     case "\$arg" in
