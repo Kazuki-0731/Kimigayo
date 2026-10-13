@@ -846,6 +846,11 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   それぞれ直書きされている**（`-fPIE`・`-fstack-protector-strong`・
   `-D_FORTIFY_SOURCE=2`・`-Wl,-z,relro -Wl,-z,now`）。
   **緩めるのは提案に留める**（→「指示の範囲を超えない」節）
+- **`-D_FORTIFY_SOURCE=2` が効いているのは x86_64 だけ**（2026-10-13 に実測）。
+  x86_64 はビルド環境の Alpine のヘッダを使い、`fortify-headers` が前に入る。
+  arm64 は自前の musl のヘッダだけを `-isystem` で見ており、musl は FORTIFY を
+  実装しないので**フラグを渡しても何も起きない**。「フラグを渡した」と
+  「効いた」は別物なので、強化を名乗る前にバイナリで確かめる
 - **`config.mk` は読まれていない**（2026-10-11 に確認）。`Makefile` も
   `build-system/Makefile` も `include config.mk` を持たず、スクリプトも
   source していない。**強化フラグの正本として `config.mk` を引かないこと。**
