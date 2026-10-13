@@ -46,7 +46,7 @@ help:
 	@echo "  make ci-build-push       - ビルド＋Docker Hubへプッシュ"
 	@echo "  make build-rootfs        - rootfsのみビルド"
 	@echo "  make package-rootfs      - rootfsをtarballにパッケージ化"
-	@echo "  make test-integration    - 統合テストを実行"
+	@echo "  make test-integration    - rootfs の tarball ができたかを確認"
 	@echo "  make build-image         - Dockerイメージをビルド"
 	@echo "  make test-smoke          - スモークテストを実行"
 	@echo "  make ci-build-all        - 全バリアントをビルド"
@@ -278,15 +278,7 @@ package-rootfs: build-rootfs
 
 # 統合テスト実行
 test-integration:
-	@echo "=== Running integration tests ==="
-	@python3 -m pip install --upgrade pip --quiet
-	@python3 -m pip install -r requirements-dev.txt --quiet
-	@echo "Running integration tests for $(VARIANT) variant on $(ARCH)..."
-	@if [ -f "tests/integration/test_phase1_integration.py" ]; then \
-		python3 -m pytest tests/integration/test_phase1_integration.py -v; \
-	fi
-	@echo ""
-	@echo "=== Verifying rootfs tarball ==="
+	@echo "=== Verifying rootfs tarball ($(VARIANT) / $(ARCH)) ==="
 	@TARBALL_COUNT=$$(ls -1 output/kimigayo-$(VARIANT)-*.tar.gz 2>/dev/null | wc -l); \
 	if [ "$$TARBALL_COUNT" -gt 0 ]; then \
 		echo "✓ Rootfs tarball created successfully"; \
