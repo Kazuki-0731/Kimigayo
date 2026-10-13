@@ -275,7 +275,7 @@ Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）�
 - PIE (Position Independent Executables) — 全 ELF（`scripts/verify-image.sh` が検査）
 - Full RELRO (Relocation Read-Only + BIND_NOW) — 全 ELF（同上）
 - Stack-smashing protection — x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**（main で修正済み、次のリリースから付く。`scripts/verify-image.sh` が検査する）
-- FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2` を指定しているが、musl は FORTIFY を実装しておらず効果は確認できていない
+- FORTIFY_SOURCE — x86_64 だけ効いている（Alpine の `fortify-headers` がヘッダの前に入るため）。**arm64 は `-D_FORTIFY_SOURCE=2` を指定しているが効いていない**（自前の musl のヘッダだけを見ており、musl は FORTIFY を実装しないため）
 
 #### ランタイム（イメージ側）
 
