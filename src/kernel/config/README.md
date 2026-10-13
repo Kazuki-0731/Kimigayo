@@ -35,6 +35,13 @@
 **追跡中の `x86_64.config` はプレースホルダ**なので、x86_64 は手順 2 の
 上流 defconfig で作られる。arm64 は `arm64.config` が無いので、同じく手順 2。
 
+**上書きはすべて効いている**（2026-10-13、6.18.55 を両アーキでビルドした
+`.config` で確認。項目ごとの値は
+[ARCHITECTURE.md のカーネル設定](../../../docs/developer/ARCHITECTURE.md#カーネル設定)）。
+上書きしていない項目は上流の defconfig のままなので、アーキで差が出る
+（`USER_NS`・`SQUASHFS` は arm64 だけ有効、`OVERLAY_FS` は arm64 だけモジュール、
+`SECURITY_YAMA` はどちらも無効）。
+
 **バリアント（minimal / standard / extended）でカーネル config は変わらない。**
 バリアントの違いは BusyBox の config（`src/busybox/config/`）だけ。
 
