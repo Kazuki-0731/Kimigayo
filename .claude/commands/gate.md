@@ -7,7 +7,7 @@ allowed-tools: Bash(python3 -m pytest:*), Bash(make shellcheck-scan), Bash(pytho
 
 ## pytest（599 件、2026-10-13 時点）
 
-!`python3 -m pytest tests/unit tests/property -q 2>&1 | tail -15`
+!`python3 -m pytest tests -q 2>&1 | tail -15`
 
 ## ShellCheck（scripts/ と .claude/hooks/）
 
