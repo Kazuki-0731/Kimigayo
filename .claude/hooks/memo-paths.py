@@ -12,8 +12,8 @@
     .gitignore は「入れ忘れ」を防げないので、機械チェックで止める。
 
 判定の設計:
-  部分一致は使えない。このリポジトリには memory_benchmark.py・
-  memory.py・benchmark-memory.sh があり、'memo' を部分文字列として
+  部分一致は使えない。このリポジトリには benchmark-memory.sh があり
+  （以前は memory_benchmark.py・memory.py もあった）、'memo' を部分文字列として
   含む。RELEASE_NOTES.md も 'NOTES' を含むが実ドキュメントである。
   そのため basename に対する厳密な規則だけを使う。
 
