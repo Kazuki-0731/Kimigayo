@@ -839,11 +839,14 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
   それぞれ直書きされている**（`-fPIE`・`-fstack-protector-strong`・
   `-D_FORTIFY_SOURCE=2`・`-Wl,-z,relro -Wl,-z,now`）。
   **緩めるのは提案に留める**（→「指示の範囲を超えない」節）
-- **`-D_FORTIFY_SOURCE=2` が効いているのは x86_64 だけ**（2026-10-13 に実測）。
-  x86_64 はビルド環境の Alpine のヘッダを使い、`fortify-headers` が前に入る。
-  arm64 は自前の musl のヘッダだけを `-isystem` で見ており、musl は FORTIFY を
-  実装しないので**フラグを渡しても何も起きない**。「フラグを渡した」と
-  「効いた」は別物なので、強化を名乗る前にバイナリで確かめる
+- **`-D_FORTIFY_SOURCE=2` は、フラグを渡しただけでは効かない。** musl は
+  FORTIFY を実装せず、Alpine の `fortify-headers` が実装する。x86_64 は
+  ビルド環境のヘッダを使うので自動で入るが、arm64 は自前の musl のヘッダだけを
+  `-isystem` で見るため、**2026-10-13 まで arm64 では何も起きていなかった**
+  （公開済み v3.0.2 の arm64 の BusyBox はトラップ 0 個）。2026-10-14 に
+  `build-{busybox,openrc}.sh` が `/usr/include/fortify` を musl より前に置く
+  ようにし、`check-elf-hardening.py` が `/bin/busybox` のトラップの数を見る。
+  「フラグを渡した」と「効いた」は別物なので、強化を名乗る前にバイナリで確かめる
 - **`config.mk` は読まれていない**（2026-10-11 に確認）。`Makefile` も
   `build-system/Makefile` も `include config.mk` を持たず、スクリプトも
   source していない。**強化フラグの正本として `config.mk` を引かないこと。**
