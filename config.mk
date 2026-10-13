@@ -27,8 +27,10 @@
 #       OpenRC build (scripts/build-openrc.sh) did not pass
 #       -fstack-protector-strong, so openrc / librc / libeinfo in the published
 #       v3.0.2 arm64 image have no stack protector (fixed on main).
-#       musl does not implement FORTIFY, so the effect of
-#       -D_FORTIFY_SOURCE=2 is not confirmed.
+#       -D_FORTIFY_SOURCE=2 only works on x86_64, where the build uses the
+#       Alpine headers and fortify-headers comes first. arm64 sees only our
+#       own musl headers (-isystem), and musl does not implement FORTIFY, so
+#       it has no effect there (measured 2026-10-13).
 #       scripts/verify-image.sh checks PIE, RELRO, BIND_NOW, a non-exec
 #       stack and the stack protector on every ELF in the image.
 #   -Wl,-z,noexecstack
