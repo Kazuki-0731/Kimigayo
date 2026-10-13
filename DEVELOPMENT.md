@@ -238,8 +238,11 @@ ls build/logs/
 - **Stack Protection**: `-fstack-protector-strong` — 両アーキの全構成要素に渡す。
   **v3.0.2 の arm64 の OpenRC には付いていない**（`build-openrc.sh` が arm64 だけ
   外していた。main で修正済み、次のリリースから付く。`verify-image.sh` が検査する）
-- **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2` — musl は FORTIFY を実装しておらず、
-  効果は確認できていない
+- **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2` — **x86_64 だけ効いている。**
+  x86_64 はビルド環境の Alpine のヘッダを使い、`fortify-headers` が前に入る。
+  arm64 は自前の musl のヘッダだけを `-isystem` で見ており、musl は FORTIFY を
+  実装しないので効かない（2026-10-13 にテストプログラムで実測。公開中の
+  3.0.2 の arm64 の BusyBox にも検査コードが無い）
 
 成果物に効いているかは `scripts/verify-image.sh` が見る。イメージを
 `docker export` した tar を `scripts/check-elf-hardening.py` が読み、
