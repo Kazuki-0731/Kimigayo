@@ -15,10 +15,17 @@ maintains its original license, and we clearly document all licenses used.
 
 | Component | License | Location |
 |-----------|---------|----------|
-| Linux Kernel (configuration and build scripts only; not included in the Docker image) | GPL-2.0 | LICENSES/GPL-2.0.txt |
-| musl libc | MIT | LICENSES/MIT.txt |
-| BusyBox | GPL-2.0 | LICENSES/GPL-2.0.txt |
-| OpenRC (Init System) | BSD-2-Clause | LICENSES/BSD-2-Clause.txt |
+| BusyBox | GPL-2.0-only | LICENSES/GPL-2.0.txt |
+| musl libc | MIT | LICENSES/musl-COPYRIGHT.txt (upstream original) |
+| OpenRC (Init System) | BSD-2-Clause | LICENSES/OpenRC-LICENSE.txt (upstream original) |
+| libcap (statically linked into OpenRC's start-stop-daemon and supervise-daemon) | BSD-3-Clause OR GPL-2.0-only (used under BSD-3-Clause) | LICENSES/libcap-License.txt (upstream original) |
+| Linux Kernel (build scripts only; not included in the Docker image) | GPL-2.0-only | LICENSES/GPL-2.0.txt |
+
+The Docker image carries the license texts of the components it contains
+in `/usr/share/licenses/`, taken from the exact upstream source archives
+used for the build, together with a README that says where to get the
+corresponding source. Each GitHub Release also attaches the upstream
+source archives of BusyBox, musl and OpenRC.
 
 ### Kimigayo OS Original Components
 
@@ -32,10 +39,9 @@ maintains its original license, and we clearly document all licenses used.
 
 ```
 src/
-├── kernel/        # GPL-2.0 (Linux Kernel configurations)
-├── init/          # BSD-2-Clause (OpenRC-based)
-├── utils/         # GPL-2.0 (BusyBox configurations)
-└── build/         # MIT (Build utilities)
+├── kernel/        # GPL-2.0-only (kernel configuration and patches)
+├── busybox/       # GPL-2.0-only (BusyBox configurations and patches)
+└── libc/patches/  # MIT (musl patches)
 
 tests/             # MIT
 scripts/           # MIT
@@ -54,9 +60,13 @@ Kimigayo OS uses SPDX short identifiers for license identification,
 following Alpine Linux's convention.
 
 Common SPDX identifiers used:
-- GPL-2.0: GNU General Public License v2.0
+- GPL-2.0-only: GNU General Public License v2.0 only
 - MIT: MIT License
 - BSD-2-Clause: BSD 2-Clause "Simplified" License
+- BSD-3-Clause: BSD 3-Clause "New" or "Revised" License
+
+The image label `org.opencontainers.image.licenses` is
+`GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause`.
 
 ## Compliance
 
@@ -68,6 +78,9 @@ You are free to:
 - Create derivative works
 
 Subject to the terms of the individual component licenses.
+If you redistribute the image (for example an image built `FROM` it),
+keep `/usr/share/licenses/` and make the corresponding source available
+as GPL-2.0 requires for BusyBox.
 
 ### Contributing to Kimigayo OS
 
@@ -79,9 +92,11 @@ By contributing to Kimigayo OS, you agree that:
 ## Full License Texts
 
 Full license texts are available in the `LICENSES/` directory:
-- `LICENSES/GPL-2.0.txt` - GNU General Public License v2.0
-- `LICENSES/MIT.txt` - MIT License
-- `LICENSES/BSD-2-Clause.txt` - BSD 2-Clause License
+- `LICENSES/GPL-2.0.txt` - GNU General Public License v2.0 (BusyBox, Linux)
+- `LICENSES/musl-COPYRIGHT.txt` - musl's copyright and MIT license (upstream original)
+- `LICENSES/OpenRC-LICENSE.txt` - OpenRC's BSD 2-Clause license (upstream original)
+- `LICENSES/libcap-License.txt` - libcap's license (upstream original)
+- `LICENSES/MIT.txt` - MIT License for Kimigayo OS's own code
 
 ## Additional Information
 
@@ -89,6 +104,7 @@ For complete license texts and more information:
 - GPL-2.0: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 - MIT: https://opensource.org/licenses/MIT
 - BSD-2-Clause: https://opensource.org/licenses/BSD-2-Clause
+- BSD-3-Clause: https://opensource.org/licenses/BSD-3-Clause
 
 ## Questions
 
@@ -97,4 +113,4 @@ If you have questions about licensing, please:
 
 ---
 
-Last Updated: 2026-10-12
+Last Updated: 2026-10-14
