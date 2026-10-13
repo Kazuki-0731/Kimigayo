@@ -10,7 +10,4 @@
 # Alpine を上げたときにインストールできなくなる。
 
 pytest>=7.4
-hypothesis>=6.100
-pytest-cov>=4.1
-pytest-xdist>=3.5
 PyYAML>=6.0
