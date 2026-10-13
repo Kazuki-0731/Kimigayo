@@ -203,42 +203,6 @@ create_device_nodes() {
     # In a Docker build environment, these will be created at runtime
     # or by the container runtime
 
-    # Create device node creation script for later use
-    cat > "$ROOTFS_DIR/sbin/create-devices" << 'EOF'
-#!/bin/sh
-# Create essential device nodes
-# This script should be run with root privileges
-
-# Character devices
-mknod -m 666 /dev/null c 1 3 2>/dev/null || true
-mknod -m 666 /dev/zero c 1 5 2>/dev/null || true
-mknod -m 666 /dev/full c 1 7 2>/dev/null || true
-mknod -m 666 /dev/random c 1 8 2>/dev/null || true
-mknod -m 666 /dev/urandom c 1 9 2>/dev/null || true
-mknod -m 666 /dev/tty c 5 0 2>/dev/null || true
-mknod -m 600 /dev/console c 5 1 2>/dev/null || true
-
-# TTY devices
-for i in 0 1 2 3 4 5 6; do
-    mknod -m 660 /dev/tty$i c 4 $i 2>/dev/null || true
-done
-
-# PTY master
-mkdir -p /dev/pts
-mknod -m 666 /dev/ptmx c 5 2 2>/dev/null || true
-
-# Standard file descriptors
-ln -sf /proc/self/fd /dev/fd 2>/dev/null || true
-ln -sf /proc/self/fd/0 /dev/stdin 2>/dev/null || true
-ln -sf /proc/self/fd/1 /dev/stdout 2>/dev/null || true
-ln -sf /proc/self/fd/2 /dev/stderr 2>/dev/null || true
-
-echo "Device nodes created successfully"
-EOF
-
-    chmod +x "$ROOTFS_DIR/sbin/create-devices"
-    log_info "  Created device node creation script: /sbin/create-devices"
-
     # Create symbolic links that don't require root
     ln -sf /proc/self/fd "$dev_dir/fd" 2>/dev/null || true
     ln -sf /proc/self/fd/0 "$dev_dir/stdin" 2>/dev/null || true
