@@ -24,6 +24,19 @@
     SSP       動的リンクで libc から SSP_MIN_IMPORTS 個以上の関数を取り込む
               ELF は __stack_chk_fail を参照している
               （-fstack-protector-strong でコンパイルされた痕跡）
+    FORTIFY   /bin/busybox の実行可能セグメントに、_FORTIFY_SOURCE の
+              検査が失敗したときのトラップ命令が FORTIFY_MIN_TRAPS 個以上ある
+              （x86_64 は ud2、arm64 は brk）
+
+FORTIFY を足した経緯（2026-10-14）:
+    musl は _FORTIFY_SOURCE を実装せず、Alpine の fortify-headers が
+    __builtin_trap で実装する。arm64 は自前の musl のヘッダだけを見ていたので
+    -D_FORTIFY_SOURCE=2 を渡しても何も起きず、公開済み v3.0.2 の arm64 の
+    BusyBox にはトラップが 0 個だった（x86_64 は 255 個）。直したあとの
+    arm64 は 224 個（standard）・201 個（minimal）。フラグを渡しただけでは
+    効いたか分からないので、出荷物のトラップの数を見る。
+    BusyBox だけを見るのは、libc の関数を最も多く呼ぶ 1 本で、効いているかが
+    はっきり出るから（OpenRC は x86_64 でも 1 個しか出ない）。
 
 SSP を足した経緯（2026-10-13）:
     公開済み v3.0.2 の arm64 では、/sbin/openrc・librc・libeinfo を含む
@@ -66,6 +79,8 @@ SHT_DYNSYM = 11
 SHN_UNDEF = 0
 # これ未満しか関数を取り込まない ELF はスタック保護を見ない（→ 冒頭の SSP）
 SSP_MIN_IMPORTS = 20
+# /bin/busybox にこれ未満しかトラップが無ければ FORTIFY が効いていない（→ 冒頭）
+FORTIFY_MIN_TRAPS = 50
 EM_NAMES = {62: "x86_64", 183: "aarch64"}
 
 
@@ -184,6 +199,30 @@ def check_stack_protector(data):
     return []
 
 
+def fortify_traps(data):
+    """実行可能な PT_LOAD にあるトラップ命令の数（__builtin_trap の出力）。"""
+    e_machine, = struct.unpack_from("<H", data, 18)
+    e_phoff, = struct.unpack_from("<Q", data, 32)
+    e_phentsize, e_phnum = struct.unpack_from("<HH", data, 54)
+    n = 0
+    for i in range(e_phnum):
+        off = e_phoff + i * e_phentsize
+        p_type, p_flags, p_offset = struct.unpack_from("<IIQ", data, off)
+        p_filesz, = struct.unpack_from("<Q", data, off + 32)
+        if p_type != 1 or not p_flags & PF_X:
+            continue
+        seg = data[p_offset:p_offset + p_filesz]
+        if e_machine == 62:
+            n += seg.count(b"\x0f\x0b")  # ud2
+        else:
+            # brk #imm（clang は #0x1、GCC は #0x3e8）。命令は 4 バイト境界
+            for k in range(0, len(seg) - 3, 4):
+                w, = struct.unpack_from("<I", seg, k)
+                if w & 0xFFE0001F == 0xD4200000:
+                    n += 1
+    return n
+
+
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else "-"
     tf = (tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") if src == "-"
@@ -200,6 +239,10 @@ def main():
         data = head + f.read()
         checked += 1
         problems = inspect(data)
+        if m.name.lstrip("./") == "bin/busybox" and not m.issym():
+            traps = fortify_traps(data)
+            if traps < FORTIFY_MIN_TRAPS:
+                problems.append("_FORTIFY_SOURCE not effective (%d traps)" % traps)
         if problems:
             bad.append("/%s: %s" % (m.name.lstrip("./"), ", ".join(problems)))
 
