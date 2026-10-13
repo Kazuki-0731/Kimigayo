@@ -78,7 +78,8 @@ strategy:
 4. イメージ検証・スキャン・SBOM の保存と、Docker Hub への push（push はタグのときだけ）
 5. マルチアーキテクチャマニフェスト作成（タグのときだけ）
 6. **Cosign のキーレス署名**（`sign` ジョブ。タグのときだけ）
-7. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS`。タグのときだけ）
+7. GitHub Release の作成（tarball 6 本 + `SHA256SUMS` + `SHA512SUMS` + SBOM 6 本 + 対応するソース 4 本。タグのときだけ）。
+   ソースは `sources` ジョブ（`scripts/collect-sources.sh`）が集め、失敗したら Docker Hub に push しない
 8. 通知（Cosign の署名結果も載せる）
 
 > **`CHANGELOG.md` は自動生成されません。手で書きます。**
@@ -606,7 +607,7 @@ git push origin v3.0.3
 6. マルチアーキテクチャマニフェスト作成
 7. **Cosign のキーレス署名**（v3.0.2 から）
 8. GitHub Releases を作成
-9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS）を添付
+9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS + SBOM 6 本 + 対応するソース 4 本）を添付
 
 **Trivy の脆弱性スキャンと pytest は `release.yml` では走りません**
 （pytest は `ci.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
