@@ -15,10 +15,10 @@
 #   OpenRC   scripts/build-openrc.sh  exported CFLAGS / LDFLAGS
 #   kernel   scripts/build-kernel.sh  KCFLAGS + upstream defconfig hardened by
 #            apply_security_hardening (scripts/config). It only reads
-#            src/kernel/config/<arch>.config, and the tracked x86_64.config is
-#            ignored because it contains placeholder lines. The other files in
-#            src/kernel/config/ (minimal/standard/extended-*, kimigayo_*_defconfig)
-#            are not used by the build.
+#            src/kernel/config/<arch>.config if it exists. No <arch>.config is
+#            tracked now (the variant configs, kimigayo_*_defconfig and the
+#            placeholder x86_64.config were deleted 2026-10-14), so both
+#            architectures use the upstream defconfig.
 #
 # Consequences, measured rather than assumed:
 #
@@ -80,7 +80,8 @@
 # IMAGE_TYPE in scripts/build-busybox.sh.
 #
 # KERNEL_CONFIG below points at src/kernel/config/kimigayo_<arch>_defconfig.
-# The file exists but the build does not use it (see "kernel" above).
+# The file was deleted (2026-10-14) and the build does not use it (see
+# "kernel" above).
 #
 # Wiring the *rest* of this file in would change the flags every binary is
 # compiled with (note BASE_CFLAGS carries -Werror), so it needs its own change
@@ -174,6 +175,7 @@ LIBS := -L$(MUSL_LIB)
 include $(dir $(lastword $(MAKEFILE_LIST)))versions.mk
 
 # Kernel configuration
+# WRONG: the defconfig file no longer exists. See the header.
 KERNEL_CONFIG := $(KERNEL_SRC)/config/kimigayo_$(ARCH)_defconfig
 
 # BusyBox configuration
