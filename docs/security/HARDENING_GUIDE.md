@@ -480,7 +480,9 @@ NVD にまだ BusyBox の CPE が載っていないため、
 発動条件は「信頼できない tar を、同じ展開先に続けて特権で展開する」こと
 （CVSS は `AV:L/AC:H/UI:R`）。**それまでは、信頼できない tar を同じ
 ディレクトリに続けて展開しないこと。** 上流が修正を出したら
-`src/busybox/patches/` に CVE ID 入りの名前で取り込む。
+`src/busybox/patches/` に CVE ID 入りの名前で取り込む。修正が出たかは
+`security.yml` が毎日確かめ、出たら Issue と Discord で知らせる
+（追跡: [#121](https://github.com/Kazuki-0731/Kimigayo/issues/121)）。
 
 ---
 
