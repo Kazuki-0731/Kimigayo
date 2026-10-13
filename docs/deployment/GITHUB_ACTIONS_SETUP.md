@@ -62,7 +62,7 @@ git push origin v3.0.3
 
 ビルド完了後に確認するもの:
 - Docker Hub: https://hub.docker.com/r/ishinokazuki/kimigayo-os
-- GitHub Releases: tarball 6 本・`SHA256SUMS`・`SHA512SUMS`・SBOM 6 本
+- GitHub Releases: tarball 6 本・`SHA256SUMS`・`SHA512SUMS`・SBOM 6 本・対応するソース 4 本
 
 ### 手動実行（workflow_dispatch）
 
