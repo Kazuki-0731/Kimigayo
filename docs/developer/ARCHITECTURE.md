@@ -104,8 +104,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 **セキュリティ関連のカーネルパラメータ**:
 
 イメージが**実際に出荷している**のは `/etc/sysctl.d/99-kimigayo-performance.conf` で、
-中身は `scripts/build-rootfs.sh` が書き出します（リポジトリの
-`configs/sysctl/99-kimigayo-performance.conf` はイメージに入りません）。
+中身は `scripts/build-rootfs.sh` の heredoc が書き出します。
 セキュリティに関わるのは次の 2 つだけです。
 
 ```ini
@@ -310,8 +309,9 @@ sed, awk, cut, sort, uniq, head, tail
 1. `<arch>.config` があり、プレースホルダ行（`# This is a placeholder`）を
    含まなければ、それを `.config` にして `olddefconfig` する
 2. そうでなければ上流の defconfig（x86_64 は `x86_64_defconfig`、arm64 は
-   `defconfig`）を使う。追跡中の `x86_64.config` はプレースホルダなので、
-   **今は x86_64 も上流の defconfig です**（arm64 は `arm64.config` が無い）
+   `defconfig`）を使う。追跡している `<arch>.config` は今は無いので、
+   **両アーキとも上流の defconfig です**。自分の config を使いたければ
+   `src/kernel/config/<arch>.config` を置く
 3. そのあと `apply_security_hardening` が `scripts/config` で項目を上書きし、
    もう一度 `olddefconfig` する
 
@@ -376,13 +376,10 @@ NETFILTER を無効にしているので、このカーネルでは iptables も
 主な強化項目がジョブのサマリーに出て、`.config` が artifact
 `kernel-config-<arch>` に残ります（手元なら `build/kernel/output/config-<version>-<arch>`）。
 
-> **`src/kernel/config/` のほかのファイルはビルドで使われていません。**
-> `minimal-x86_64.config` / `standard-x86_64.config` /
-> `extended-x86_64.config` / `kimigayo_x86_64_defconfig` /
-> `kimigayo_arm64_defconfig` はどのスクリプトからも参照されていません。
-> そこに書かれた `CONFIG_SECURITY_YAMA=y`・`CONFIG_USER_NS=y`・
-> `CONFIG_OVERLAY_FS=y`・`CONFIG_SQUASHFS` などを、ビルド結果の
-> 設定として引かないでください。
+> **バリアント別の config と `kimigayo_*_defconfig` は 2026-10-14 に削除しました**
+> （どのスクリプトからも参照されていなかった）。過去の資料や古いコミットに出てくる
+> `CONFIG_SECURITY_YAMA=y`・`CONFIG_USER_NS=y`・`CONFIG_OVERLAY_FS=y`・
+> `CONFIG_SQUASHFS` などは、ビルド結果の設定ではありません。
 
 > **seccomp はカーネルが対応しているだけで、Kimigayo は
 > seccomp プロファイルを配布していません。**
