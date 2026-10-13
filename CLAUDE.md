@@ -78,8 +78,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **回帰テスト化**（テストコードに落とす） — コードのバグ・境界値の誤りは、
   直した箇所を壊すテストケースとして残す。ドキュメントや Memory より機械的な
   強制力がある（次に同じ間違いをすれば `pytest` が落ちて教えてくれる）。
-  このリポジトリは `tests/unit/`・`tests/property/` が整っているので、
-  **コードレベルのミスは第一候補がこれ**
+  このリポジトリは `tests/unit/` に置く。**コードレベルのミスは第一候補がこれ**
 - **CI に落とす**（`.github/workflows/`） — ローカルでは気づけず、PR の時点で
   止めたいもの向き（シェルスクリプトの構文、脆弱性、バージョンの乖離）
 
@@ -338,11 +337,11 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
     （→「パッチはなぜ存在するか」節）
   - **`src/busybox/config/`** — 項目ごとの取捨選択が実測の結果。
     `defconfig` から作り直せない
-  - **`src/kernel/config/`** — 2026-10-12 時点でビルドに使われているのは
-    `<arch>.config` だけで、それも追跡中の `x86_64.config` はプレースホルダ
-    （実際は上流 defconfig + `apply_security_hardening`）。バリアント別の
-    config と `kimigayo_*_defconfig` は使われていない参考資料だが、
-    当時の検討の記録なので消す前に聞く（→ `src/kernel/config/README.md`）
+  - **`src/kernel/config/`** — ビルドは `<arch>.config` があれば使う。
+    2026-10-14 に使われていなかった config（バリアント別・`kimigayo_*_defconfig`・
+    プレースホルダの `x86_64.config`）を消したので、今は README だけで、
+    両アーキとも上流 defconfig + `apply_security_hardening`。
+    消したものは `git log -- src/kernel/config` から戻せる
   - **`benchmark-results/`・`docs/benchmarks/`** — 過去の版の実測値。
     測り直すには同じホスト・同じ版が必要で、事実上再現できない
   - **`.env`** — Docker Hub のアクセストークンが入っている
@@ -773,8 +772,8 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
   カーネルなら `make olddefconfig` の出力
 - **`NEWS.md`・`Changelog` を読む。** OpenRC 0.62 では `ready` → `notify` の
   リネームとキャッシュ位置の変更（`libexec` → `/var/cache/rc`）があった
-  （このリポジトリの `src/openrc/init.d/`・`configs/openrc/rc.conf` は
-  どちらも使っていないので影響なしと確認済み）
+  （rootfs の init.d と `rc.conf` は `build-rootfs.sh` の heredoc が作る。
+  当時は影響なしと確認済み）
 - **オプションが消えると、任意だった依存が必須になることがある。**
   OpenRC 0.52.1 の libcap は
   `dependency('libcap', required: get_option('capabilities'))` で任意だったが、
@@ -797,13 +796,16 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 
 ```bash
 make test                      # コンテナ内で pytest
-python3 -m pytest tests/unit -q          # 単体（344 件、2026-10-13 時点）
-python3 -m pytest tests/property -q      # プロパティ（hypothesis、255 件、同）
-python3 -m pytest -m "not slow" -q       # 遅いものを除く
-pip install -r requirements-dev.txt      # pytest / hypothesis 等
+python3 -m pytest tests -q               # 65 件（2026-10-14 時点）
+pip install -r requirements-dev.txt      # pytest / PyYAML
 ```
 
-- **マーカーは `pytest.ini` に定義済み**（`unit`・`property`・`integration`・
+- **pytest のテストは実物を検査するものだけ**（BusyBox の config・
+  `check-links.py`・`memo-paths.py`）。2026-10-14 に、どこからも使われていない
+  `src/` の Python モック（約 24 モジュール）と、それだけを検証していた
+  テスト 534 件（プロパティテストを含む）を消した。**モックのテストが
+  通っても出荷物について何も言えない。** 成果物の検査は `verify-image.sh`
+- **マーカーは `pytest.ini` に定義済み**（`unit`・`integration`・
   `slow`・`security`）。`--strict-markers` なので**未定義のマーカーを使うと落ちる**。
   新しいマーカーを使うなら `pytest.ini` に足す
 - **設定の置き場所を間違えると「書いてあるのに効いていない」状態になる。**
@@ -816,18 +818,9 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   | 何の設定 | どこに書くか |
   | --- | --- |
   | pytest 本体（testpaths・addopts・markers） | `pytest.ini` の `[pytest]` |
-  | hypothesis（max_examples・verbosity・deadline） | `tests/conftest.py` の `settings.register_profile` |
-  | coverage（source・omit・report） | `.coveragerc` |
+  | hypothesis（使うなら） | `tests/conftest.py` の `settings.register_profile` |
+  | coverage（使うなら） | `.coveragerc` |
 
-- **hypothesis の `deadline` は無効にしてある**（`tests/conftest.py`）。
-  このリポジトリのプロパティテストは `tmp_path` への実ファイル書き込みや
-  サブプロセス起動を含み、1例あたり 300-400ms かかることがある。
-  既定の 200ms は純粋な関数の性能劣化を拾うための値で、ここには合わない。
-  **arm64 ホストでの linux/amd64 エミュレーションでは実際に 3 件が
-  `DeadlineExceeded` で落ちた**（ロジックの失敗ではなく実行速度の問題）
-- **プロパティテストは `hypothesis`。** 反例は `.hypothesis/examples/` に
-  キャッシュされるが**これは Git 管理下に置かない**
-  （2026-10-09 に 59 ファイルを追跡から外した）
 - `tests/integration/` の `.sh` は実際に Docker を叩く。
   `test_docker_startup.sh`・`test_functionality.sh` はイメージが必要で、
   既定で `kimigayo-os:<variant>-<arch>`（`make ci-build-local` が作る名前）を見る。
@@ -940,8 +933,8 @@ pip install -r requirements-dev.txt      # pytest / hypothesis 等
   `git commit` 時のステージを検査して止める。**`git add -f` も
   `git add .` 経由も捕まる**
 - 判定は **`.claude/hooks/memo-paths.py`**。
-  **部分一致は使えない**（このリポジトリには `memory.py`・
-  `memory_benchmark.py`・`benchmark-memory.sh` があり `memo` を含む。
+  **部分一致は使えない**（このリポジトリには `benchmark-memory.sh` があり
+  `memo` を含む。
   `RELEASE_NOTES.md` も `NOTES` を含むが実ドキュメント）。
   basename に対する厳密な規則だけを使う。`memo-` のような接頭辞の規則は
   文書系の拡張子（なし・`.md`・`.txt` など）のときだけ効かせる
@@ -1121,7 +1114,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | 着地先 | 何をするか |
 | --- | --- |
 | **ドキュメントに反映する** | `README.md` のパフォーマンス実績表、`docs/benchmarks/`、`docs/developer/PERFORMANCE_ANALYSIS.md`・`PERFORMANCE_TUNING.md` |
-| **config に活かす** | カーネル config・BusyBox config・`configs/sysctl/`・`configs/openrc/` の項目を実際に変える（または**外す**） |
+| **config に活かす** | カーネル config・BusyBox config・`build-rootfs.sh` が作る sysctl / OpenRC の設定を実際に変える（または**外す**） |
 | **CI に落とす** | 退行を検知したいならワークフローか回帰テストにする |
 | **仕組みにする** | ルール化・Hook 化・回帰テスト化（→「ミスを繰り返さない」節） |
 
@@ -1279,13 +1272,10 @@ Subagent の方が速くて安い。3〜5人から始める。
 | `config.mk` | **どこからも include されていない**（意図の記録のみ。実際のフラグは `scripts/build-*.sh`） |
 | `Makefile` | 入口。全量は `make help` |
 | `scripts/` | `download-*` / `apply-*-patches` / `build-*` / `test-*` / `verify-*` / `benchmark-*` |
-| `src/kernel/` | カーネル config（**ビルドで読むのは `<arch>.config` だけ**）・パッチ（0件）・`build.py` |
+| `src/kernel/` | カーネル config の置き場（`<arch>.config` を置けば使う。今は無い）・パッチ（0件） |
 | `src/busybox/` | BusyBox config（minimal/standard/extended）・パッチ（musl 互換と CVE） |
 | `src/libc/patches/` | musl の CVE パッチ（`apply-musl-patches.sh` が当てる） |
-| `src/openrc/`, `configs/openrc/`, `configs/sysctl/` | init.d / conf.d / runlevels / `rc.conf` / サービス一覧。**イメージには入らない**（実物は `build-rootfs.sh` の heredoc と上流 OpenRC） |
-| `src/libc/`, `src/toolchain/`, `src/security/`, `src/system/`, `src/init/`, `src/utilities/` | ビルド補助・テスト用の Python モジュール |
-| `src/benchmark/`, `src/integration/` | 計測・環境別の検証 |
-| `tests/unit/`, `tests/property/`, `tests/integration/` | pytest / hypothesis / シェルの統合テスト |
+| `tests/unit/`, `tests/integration/` | pytest / シェルの統合テスト |
 | `docs/developer/` | ARCHITECTURE・BUILD_GUIDE・CICD_GUIDE・CUSTOM_BUILD・PERFORMANCE_* |
 | `docs/security/` | ポリシー・監査・ハードニング・脆弱性報告 |
 | `docs/troubleshooting/`, `docs/development/` | **実際に踏んだ罠の記録。版上げの前に読む** |
@@ -1315,7 +1305,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 **ローカルで変更したら、外に出す前に最低これを通す:**
 
 ```bash
-python3 -m pytest tests/unit tests/property -q     # 599 件（2026-10-13 時点）
+python3 -m pytest tests -q                         # 65 件（2026-10-14 時点）
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
 make security-scan                                 # scan-image + Trivy FS + ShellCheck
