@@ -185,7 +185,7 @@ Web アプリケーションやバッチ処理を載せる用途です。
 - [x] カーネル設定とビルド（手元と手動 CI 専用。成果物には含まない → 3.1）
 - [x] 3 バリアント × 2 アーキテクチャのビルドと公開
 - [x] 成果物の検査（`scripts/verify-image.sh`）
-- [x] テスト（`tests/unit` / `tests/property` / `tests/integration`）
+- [x] テスト（`tests/unit` の pytest と `tests/integration` のシェル）
 - [x] ドキュメント整備
 
 ### 残っていること
