@@ -1288,7 +1288,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
 | `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
-| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM の保存までで push しない） |
+| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り、その PR ブランチで `ci.yml` を起動する |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
