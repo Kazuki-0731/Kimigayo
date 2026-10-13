@@ -37,7 +37,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 1. ShellCheck（`scripts/*.sh`・`scripts/lib/*.sh`・`.claude/hooks/*.sh`）
 2. リンク検査（`scripts/check-links.py`。`#見出し` へのリンクも見る）と
    古い記述の検査（`scripts/check-stale-docs.py`）
-3. pytest（単体 + プロパティ）
+3. pytest（`tests/unit`）
 4. variant × arch の matrix でビルドとイメージ検証
 
 **マトリックス戦略:**
@@ -441,26 +441,31 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 # ローカル実行
 docker compose run --rm kimigayo-build pytest tests/unit/ -v
 
-# CI（ci.yml の tests ジョブ）は unit と property をまとめて回す
+# CI（ci.yml の tests ジョブ）
 docker compose run --rm -w /build/kimigayo kimigayo-build \
-  pytest tests/unit tests/property -q
+  pytest tests/unit -q
 ```
 
-### 2. プロパティテスト
+`tests/unit` は 3 ファイル（`test_busybox_config_explicit.py`・
+`test_check_links.py`・`test_memo_paths.py`）で 65 件（2026-10-14）。
+プロパティテスト（hypothesis）と Python モジュールのテストは、検証対象の
+`src/` の Python モジュールごと 2026-10-14 に削除した
+（どのスクリプトからも使われていなかった）。
+
+### 2. 統合テスト
+
+イメージを起動して見るシェルのテストがあります（ホストで、先に
+`make ci-build-local` でイメージを作っておく）。
 
 ```bash
-# Hypothesisベースのプロパティテスト
-python3 -m pytest tests/property/ -v
+make test-docker       # tests/integration/test_docker_startup.sh
+make test-func         # tests/integration/test_functionality.sh
 ```
 
-### 3. 統合テスト
+構成要素ごとの統合テストはビルドコンテナ内の `make test-musl` /
+`test-busybox` / `test-openrc` です。
 
-```bash
-# Phase 1統合テスト
-python3 -m pytest tests/integration/test_phase1_integration.py -v
-```
-
-### 4. イメージの検証
+### 3. イメージの検証
 
 ```bash
 # イメージを実際に起動して検査する（CI・release と同じスクリプト）
@@ -471,7 +476,7 @@ bash scripts/verify-image.sh kimigayo-os:standard-x86_64 standard x86_64
 > OpenRC も `libc.so` も入っていないイメージでも通っていたため、
 > `verify-image.sh` に置き換えました。
 
-### 5. セキュリティテスト
+### 4. セキュリティテスト
 
 ```bash
 # 出荷物の CVE 照合（SBOM + Grype）と秘密情報スキャン
