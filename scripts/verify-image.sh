@@ -424,6 +424,26 @@ else
     pass "image labels match the contents (version=${label_ver} variant=${label_var})"
 fi
 
+# **第三者のライセンス文書が入っているか。**
+#
+# BusyBox（GPL-2.0）・musl・OpenRC・libcap はどれも、バイナリを配るときに
+# 条文を添えることを求める。v3.0.2 以前の公開イメージには入っていなかった。
+# build-rootfs.sh の install_licenses が入れるが、optimize_rootfs の gzip や
+# Dockerfile の変更で消えても docker build は成功するので、ここで中身を見る。
+out="$(in_image 'for f in busybox/LICENSE musl/COPYRIGHT openrc/LICENSE libcap/License README; do [ -s /usr/share/licenses/$f ] || echo "missing: $f"; done; grep -q "GNU GENERAL PUBLIC LICENSE" /usr/share/licenses/busybox/LICENSE || echo "busybox/LICENSE is not the GPL text"' 2>&1)"
+if [ -z "$out" ]; then
+    pass "third-party license texts are in /usr/share/licenses"
+else
+    fail "third-party license texts are incomplete"
+    show_output "$out"
+fi
+label_lic="$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}' 2>/dev/null || true)"
+if [ "$label_lic" = "GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause" ]; then
+    pass "license label lists every component (${label_lic})"
+else
+    fail "LABEL org.opencontainers.image.licenses=${label_lic:-（空）} does not match the components"
+fi
+
 # ---------------------------------------------------------------------------
 # 6. FHS の骨格
 # ---------------------------------------------------------------------------
