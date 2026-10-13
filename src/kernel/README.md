@@ -7,12 +7,11 @@
 
 ## 構造
 
-- `config/` - カーネル設定ファイル。**ビルドで実際に読まれるのは
-  `<arch>.config` だけで、追跡中の `x86_64.config` はプレースホルダ**
-  （→ [config/README.md](config/README.md)）
+- `config/` - カーネル設定の置き場。**追跡中の config は無く**（README だけ）、
+  `<arch>.config` を置けばビルドで使われる（→ [config/README.md](config/README.md)）
 - `patches/` - カーネルパッチ（現在0件）
-- `build.py` - Python のビルド補助（`tests/unit/test_kernel_build.py` から使われる。
-  実際のビルドは `scripts/build-kernel.sh`）
+
+実際のビルドは `scripts/build-kernel.sh`（ビルドコンテナ内の `make kernel`）です。
 
 ## セキュリティ強化設定
 
