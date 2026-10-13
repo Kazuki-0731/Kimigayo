@@ -86,6 +86,12 @@ RULES = [
     (r"軽量・高速|[Ll]ightweight, [Ff]ast", r"musl",
      "起動時間は Alpine・Ubuntu と差が出ていない。「高速」を名乗らない"),
     (r"glibcの1/10", None, "根拠を示せない比較"),
+    (r"FORTIFY[^\n]*(効果は確認|確認できていない)|effect of$|-D_FORTIFY_SOURCE=2 is not confirmed", None,
+     "FORTIFY は x86_64 だけ効き、arm64 は効かない（2026-10-13 に実測）。「確認できていない」とは書かない"),
+    (r"1\.38\.0[^\n]*(影響は未確認|対象かは)|影響は未確認[^\n]*108119|108119[^\n]*未確認", None,
+     "CVE-2026-108119 は 1.38.0 も影響を受ける（2026-10-13 に公開イメージで実測）"),
+    (r"`\.config` でこれらが効いているかは未確認|squashfs[^\n]*ビルドで有効になるかは", None,
+     "カーネルの .config は 2026-10-13 に両アーキで確認済み（ARCHITECTURE.md のカーネル設定）"),
     (r"Linux ?カーネル 6\.6|linux-6\.6\.|BusyBox 1\.36\.1|musl 1\.2\.4|OpenRC 0\.52", r"当時|かつて|以前|まで|→|のつもり|で既知|の頃|古い版|が 1\.38|libcap は|historical|v[0-2]\.",
      "古い構成要素の版。現在の版は versions.mk"),
 ]
