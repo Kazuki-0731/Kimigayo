@@ -153,7 +153,7 @@ grep -n 'ベアメタル\|組み込み\|VPS\|ISO' SPECIFICATION.md CLAUDE.md
 
 ```bash
 # 宣伝されている仕組みが本当にあるか、受け取る側を見る
-grep -rn 'seccomp' scripts/ configs/ Dockerfile* src/kernel/config/
+grep -rn 'seccomp' scripts/ Dockerfile* src/kernel/config/
 grep -rn -i 'sign\|cosign\|content trust' .github/workflows/release.yml
 grep -rn 'REPRODUCIBLE_BUILD' Makefile build-system/Makefile scripts/
 # 宣伝しているタグが実在するか
