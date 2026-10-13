@@ -322,8 +322,10 @@ Ubuntu が `Warty` から `Yakkety` まで一巡したあと `Artful` で A に�
 ## 11. コミュニティとライセンス
 
 ### 11.1 ライセンス
-- 各構成要素は元のライセンスに従う（BusyBox: GPL-2.0 / musl libc: MIT / OpenRC: BSD-2-Clause。
-  イメージに含まれない Linux カーネルは GPL-2.0）
+- 各構成要素は元のライセンスに従う（BusyBox: GPL-2.0-only / musl libc: MIT / OpenRC: BSD-2-Clause /
+  OpenRC に静的リンクした libcap: BSD-3-Clause。イメージに含まれない Linux カーネルは GPL-2.0-only）
+- イメージは条文を `/usr/share/licenses/` に持つ（`verify-image.sh` が検査）。
+  リリースは対応するソースを GitHub Release に添付し、集められなければ公開しない
 - Kimigayo 自身のビルドシステム・ドキュメント・テスト: MIT（→ [LICENSE](LICENSE)）
 
 ### 11.2 開発モデル
