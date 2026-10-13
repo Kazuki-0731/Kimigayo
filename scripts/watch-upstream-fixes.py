@@ -38,13 +38,14 @@ WATCH = [
 ]
 
 DEBIAN_URL = "https://security-tracker.debian.org/tracker/{cve}"
-ALPINE_URL = ("https://gitlab.alpinelinux.org/alpine/aports/-/raw/"
+# aports は GitHub の公式ミラーから取る。gitlab.alpinelinux.org は GitHub
+# Actions からのアクセスをボット扱いして 418 を返す（2026-10-14 に実測。
+# 手元からは通るので気づきにくい）。ミラーの中身は GitLab と同じ
+ALPINE_URL = ("https://raw.githubusercontent.com/alpinelinux/aports/"
               "{branch}/main/{pkg}/APKBUILD")
 
 
 def fetch(url):
-    # User-Agent は既定のまま。独自の名前にすると GitLab が 307 / 418 で
-    # ボット確認のページへ回し、APKBUILD が取れない（2026-10-14 に実測）
     with urllib.request.urlopen(url, timeout=30) as r:
         return r.read().decode("utf-8", "replace")
 
