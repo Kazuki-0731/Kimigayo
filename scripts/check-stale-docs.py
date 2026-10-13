@@ -92,6 +92,9 @@ RULES = [
      "CVE-2026-108119 は 1.38.0 も影響を受ける（2026-10-13 に公開イメージで実測）"),
     (r"`\.config` でこれらが効いているかは未確認|squashfs[^\n]*ビルドで有効になるかは", None,
      "カーネルの .config は 2026-10-13 に両アーキで確認済み（ARCHITECTURE.md のカーネル設定）"),
+    (r"tests/property|test-property|configs/(openrc|sysctl)|(minimal|standard|extended)-x86_64\.config|kimigayo_(x86_64|arm64)_defconfig|/sbin/create-devices",
+     r"削除|消した|以前|当時|まで|deleted|removed|実施した最適化|inittab\.optimized|^`configs/sysctl/99-kimigayo-performance\.conf`。$",
+     "2026-10-14 に削除したもの（プロパティテスト・configs/・未使用のカーネル config・create-devices・Python モック）"),
     (r"Linux ?カーネル 6\.6|linux-6\.6\.|BusyBox 1\.36\.1|musl 1\.2\.4|OpenRC 0\.52", r"当時|かつて|以前|まで|→|のつもり|で既知|の頃|古い版|が 1\.38|libcap は|historical|v[0-2]\.",
      "古い構成要素の版。現在の版は versions.mk"),
 ]
