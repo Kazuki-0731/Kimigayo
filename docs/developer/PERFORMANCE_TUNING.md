@@ -28,11 +28,10 @@
 > v3.0.1 は起動 0.61 秒 / 常駐 232KB、v3.0.2 は 0.60 秒 / 288KB → 下の比較の節）。
 > 下表の v2.0.1 列・v0.1.0 の節は当時の壊れた値なので **引用しない**。
 >
-> **4. 「実施した最適化」の節にある設定ファイルの一部は、ビルドに使われていない。**
-> `configs/openrc/`（`rc.conf`・`inittab.optimized`・`services-*.list`）と
-> `configs/sysctl/` はどのスクリプトからも読まれない。イメージの
-> `/etc/rc.conf`・`/etc/inittab`・`/etc/sysctl.d/99-kimigayo-performance.conf` は
-> `scripts/build-rootfs.sh` の heredoc が書き出している。
+> **4. 「実施した最適化」の節に出てくる設定ファイルのうち、`configs/openrc/` と
+> `configs/sysctl/` は 2026-10-14 に削除した**（どのスクリプトからも読まれていなかった）。
+> イメージの `/etc/rc.conf`・`/etc/inittab`・`/etc/sysctl.d/99-kimigayo-performance.conf` は
+> 当時から `scripts/build-rootfs.sh` の heredoc が書き出している。
 >
 > 現在の値は [README.md](../../README.md) の「パフォーマンス実績」節を見る。
 
@@ -155,8 +154,7 @@
 
 ### 1. OpenRC 並列起動の有効化
 
-**ファイル:** イメージの `/etc/rc.conf`（`scripts/build-rootfs.sh` の heredoc が書き出す。
-`configs/openrc/rc.conf` は使われていない）。主な項目:
+**ファイル:** イメージの `/etc/rc.conf`（`scripts/build-rootfs.sh` の heredoc が書き出す）。主な項目:
 
 ```bash
 rc_parallel="YES"
@@ -196,7 +194,7 @@ l6:6:wait:/sbin/reboot
 ### 3. カーネルパラメータのチューニング
 
 **ファイル:** `/etc/sysctl.d/99-kimigayo-performance.conf`（`scripts/build-rootfs.sh` の
-heredoc が書き出す。`configs/sysctl/` は使われていない）
+heredoc が書き出す）
 
 ```bash
 # Memory management
@@ -234,7 +232,7 @@ fs.suid_dumpable = 0
 ### 4. サービス構成の最適化
 
 当時はバリアントごとのサービス一覧を `configs/openrc/services-{minimal,standard,extended}.list`
-に書いたが、**このファイルはビルドで読まれていない**。udev・dbus・iptables・sshd は
+に書いたが、**このファイルはビルドで読まれておらず、2026-10-14 に削除した**。udev・dbus・iptables・sshd は
 どのバリアントのイメージにも入っていない。
 
 **3バリアントの違いは BusyBox のアプレットだけ**（→ [README.md](../../README.md) の
@@ -334,14 +332,10 @@ fs.suid_dumpable = 0
 
 ## 📋 変更されたファイル
 
-### 新規作成（いずれもビルドから読まれていない）
+### 新規作成（当時。いずれもビルドから読まれず、2026-10-14 に削除済み）
 
-1. `configs/openrc/rc.conf` - OpenRC設定テンプレート
-2. `configs/openrc/inittab.optimized` - 最適化済みinittab
-3. `configs/openrc/services-minimal.list` - 最小サービスリスト
-4. `configs/openrc/services-standard.list` - 標準サービスリスト
-5. `configs/openrc/services-extended.list` - 拡張サービスリスト
-6. `configs/sysctl/99-kimigayo-performance.conf` - カーネルパラメータ
+`configs/openrc/`（`rc.conf`・`inittab.optimized`・`services-*.list`）と
+`configs/sysctl/99-kimigayo-performance.conf`。
 
 イメージに入る中身は、下の `scripts/build-rootfs.sh` が書き出したもの。
 
@@ -377,7 +371,6 @@ cat benchmark-results/BENCHMARK_REPORT.md
 ```bash
 # 1. scripts/build-rootfs.sh の heredoc（/etc/rc.conf・/etc/inittab・
 #    /etc/sysctl.d/99-kimigayo-performance.conf を書き出す箇所）を編集
-#    （configs/openrc/rc.conf を編集しても成果物は変わらない）
 vi scripts/build-rootfs.sh
 
 # 2. 再ビルド
