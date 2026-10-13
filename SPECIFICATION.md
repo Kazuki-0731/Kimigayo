@@ -117,9 +117,9 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 - Stack-smashing protection — 全構成要素を `-fstack-protector-strong` でビルドする
   （`scripts/verify-image.sh` が検査）。**v3.0.2 の arm64 の OpenRC には付いていない**
   （`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、次のリリースから付く）
-- FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2` を指定している。**効いているのは x86_64 だけ**
-  （Alpine の `fortify-headers` 経由）。arm64 は自前の musl のヘッダだけを見ており、
-  musl は FORTIFY を実装しないので効いていない
+- FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2`（Alpine の `fortify-headers` 経由。musl 自身は
+  実装しない）。**v3.0.2 の arm64 には効いていない**（main で修正済み、次のリリースから。
+  `scripts/verify-image.sh` が BusyBox で検査する）
 
 ### 5.2 ランタイムセキュリティ
 
