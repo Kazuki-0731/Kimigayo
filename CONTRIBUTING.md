@@ -136,11 +136,11 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 - 構成要素のバージョンを直書きしない（`scripts/lib/versions.sh` 経由で `versions.mk` を読む）
 - 失敗を `|| true` や `-Wno-error` で黙らせない
 
-### Python（`src/`・`tests/`）
+### Python（`tests/`・`scripts/`）
 
 - PEP 8 に準拠（インデント 4 スペース、関数名 `snake_case`、クラス名 `PascalCase`）
-- テストは pytest。プロパティテストは hypothesis（設定は `tests/conftest.py` のプロファイル）
-- マーカーは `pytest.ini` に定義済みのもの（`unit`・`property`・`integration`・`slow`・`security`）
+- テストは pytest（`tests/unit/`）
+- マーカーは `pytest.ini` に定義済みのもの（`unit`・`integration`・`slow`・`security`）
   だけを使う（`--strict-markers`）
 
 ### セキュリティ
@@ -150,36 +150,25 @@ make changelog     # build/CHANGELOG.generated.md に下書きを出す
 
 ## テスト
 
-### プロパティベーステスト
+### テストの置き場
 
-新しい機能にはプロパティテストを足してください。実物の例
-（`tests/property/test_build_constraints.py` の抜粋）:
+- 単体テスト: `tests/unit/`（pytest。スクリプトや config の検査を足すときはここ）
+- 統合テスト: `tests/integration/`（シェル。Docker のイメージが要る）
 
-```python
-# **Feature: kimigayo-os-core, Property 1: ビルドサイズ制約**
-@pytest.mark.property
-@given(build_config=build_configurations())  # 同じファイルで定義した strategy
-def test_build_size_constraint(build_config, tmp_path):
-    """任意のビルド設定に対して、イメージはバリアントの上限未満
-    （MINIMAL 5MB / STANDARD 15MB / EXTENDED 50MB。SPECIFICATION.md §8.3）"""
-    image = build_base_image(build_config, output_dir=tmp_path)
-    assert image.size_bytes < build_config.max_image_size
-```
+詳細は [tests/README.md](tests/README.md)。
 
 ### テスト実行
 
 ```bash
-# 全テスト実行
+# 全テスト実行（ビルドコンテナ内で pytest）
 make test
 
-# プロパティテストのみ
-pytest tests/property/
+# 単体テスト（ホストで直接）
+python3 -m pytest tests/unit -q
 
-# 単体テストのみ
-pytest tests/unit/
-
-# 統合テスト（Docker が必要）
-make test-integration
+# イメージの起動・機能テスト（Docker が必要。先に make ci-build-local）
+make test-docker
+make test-func
 ```
 
 ## プルリクエスト
@@ -195,7 +184,7 @@ make test-integration
 ### プルリクエストのチェックリスト
 
 - [ ] すべてのテストが通る
-- [ ] 新機能にはプロパティテストを追加
+- [ ] 新機能・不具合修正にはテストを追加
 - [ ] ドキュメントを更新
 - [ ] コミットメッセージが規約に準拠
 - [ ] セキュリティ要件を満たす
