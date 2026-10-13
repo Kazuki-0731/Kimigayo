@@ -9,7 +9,6 @@
 .env
 
 # Test / benchmark caches
-.hypothesis/
 .pytest_cache/
 benchmark-results/
 
