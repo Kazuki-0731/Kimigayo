@@ -421,7 +421,20 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         MUSL_LIB_DIR="${MUSL_INSTALL_DIR}/lib"
     fi
 
-    export CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 -isystem ${MUSL_INCLUDE_DIR} ${CFLAGS_REPRODUCIBLE}"
+    # _FORTIFY_SOURCE は musl 自身は実装しない。Alpine の fortify-headers
+    # （ビルド環境に入っている。ヘッダだけでアーキ非依存）が #include_next で
+    # musl のヘッダを包んで実装する。x86_64 はホストのヘッダを使うので
+    # 自動で前に入るが、arm64 は自前の musl だけを見るので、ここで musl より
+    # 前に明示しないと -D_FORTIFY_SOURCE=2 は何もしない（2026-10-13 まで
+    # そうなっていた。公開済み v3.0.2 の arm64 の BusyBox には検査が無い）。
+    FORTIFY_INCLUDE_DIR="/usr/include/fortify"
+    if [ ! -f "${FORTIFY_INCLUDE_DIR}/string.h" ]; then
+        log_error "fortify-headers not found: ${FORTIFY_INCLUDE_DIR}"
+        log_error "  ビルド環境のイメージに fortify-headers が要る（make docker-build）"
+        exit 1
+    fi
+
+    export CFLAGS="-Os -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 -isystem ${FORTIFY_INCLUDE_DIR} -isystem ${MUSL_INCLUDE_DIR} ${CFLAGS_REPRODUCIBLE}"
 
     # Note: With -rtlib=compiler-rt in clang wrapper, libgcc is not requested
     # clang automatically uses compiler-rt builtins for 128-bit float operations
