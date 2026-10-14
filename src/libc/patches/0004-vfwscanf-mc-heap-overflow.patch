@@ -1,0 +1,43 @@
+Kimigayo OS: vfwscanf %mc heap overflow
+
+stdio: an allocating %c conversion in vfwscanf reserved 1 byte per wide
+character but wrote up to 4 bytes of UTF-8. Not in a musl release as of
+2026-10-14.
+
+Source: musl git https://git.musl-libc.org/cgit/musl/commit/?id=c2541fd53fa6
+  fetched from git.musl-libc.org on 2026-10-14.
+The original message follows unchanged.
+
+From c2541fd53fa6c972d6cc8974f3574b3fed5aa81e Mon Sep 17 00:00:00 2001
+From: Matthias Goergens <matthias.goergens@gmail.com>
+Date: Wed, 5 Aug 2026 22:09:54 +0800
+Subject: stdio: reserve multibyte space in allocated vfwscanf %c conversions
+
+Allocated narrow %c conversions initially reserve only width+1 bytes.
+For the default width this is two bytes, but in a UTF-8 locale wctomb
+can write up to MB_LEN_MAX bytes into the buffer before the
+post-conversion growth check, overflowing the two-byte allocation for
+a three- or four-byte input character.
+
+Ensure every allocated narrow buffer starts at no less than
+MB_LEN_MAX bytes.  The existing geometric growth then keeps at least
+MB_LEN_MAX spare bytes available after each conversion.
+---
+ src/stdio/vfwscanf.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/stdio/vfwscanf.c b/src/stdio/vfwscanf.c
+index 243fa3d4..38ea4539 100644
+--- a/src/stdio/vfwscanf.c
++++ b/src/stdio/vfwscanf.c
+@@ -250,6 +250,7 @@ int vfwscanf(FILE *restrict f, const wchar_t *restrict fmt, va_list ap)
+ 					wcs = malloc(k*sizeof(wchar_t));
+ 					if (!wcs) goto alloc_fail;
+ 				} else {
++					if (k < MB_LEN_MAX) k = MB_LEN_MAX;
+ 					s = malloc(k);
+ 					if (!s) goto alloc_fail;
+ 				}
+-- 
+cgit v1.2.1
+

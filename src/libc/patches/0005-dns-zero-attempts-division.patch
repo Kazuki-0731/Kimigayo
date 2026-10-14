@@ -1,0 +1,48 @@
+Kimigayo OS: resolv.conf attempts:0 division by zero
+
+dns: "options attempts:0" in resolv.conf made name resolution divide by
+zero (SIGFPE). Not in a musl release as of 2026-10-14.
+
+Source: musl git https://git.musl-libc.org/cgit/musl/commit/?id=897937236ddb
+  fetched from git.musl-libc.org on 2026-10-14.
+The original message follows unchanged.
+
+From 897937236ddbbf07ef41749a88812c594e5f69b4 Mon Sep 17 00:00:00 2001
+From: Yao Zi <me@ziyao.cc>
+Date: Mon, 27 Apr 2026 10:13:26 +0000
+Subject: dns: Avoid division-by-zero when zero attempts is specified in
+ resolv.conf
+
+DNS query retry interval is calculated through timeout / attempts in
+__res_msend_rc(), both are loaded from resolv.conf in
+__get_resolv_conf(), while value of attempts isn't checked. This would
+trigger an undefined behavior if attempts is set to zero in
+configuration, causing misfunction or termination with SIGFPE.
+
+Gracefully handle it by returning early.
+---
+ src/network/res_msend.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/network/res_msend.c b/src/network/res_msend.c
+index 51d42ecb..253ed0d1 100644
+--- a/src/network/res_msend.c
++++ b/src/network/res_msend.c
+@@ -99,10 +99,12 @@ int __res_msend_rc(int nqueries, const unsigned char *const *queries,
+ 	int r;
+ 	unsigned long t0, t1, t2;
+ 
+-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cs);
+-
+ 	timeout = 1000*conf->timeout;
+ 	attempts = conf->attempts;
++	if (!attempts)
++		return -1;
++
++	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cs);
+ 
+ 	for (nns=0; nns<conf->nns; nns++) {
+ 		const struct address *iplit = &conf->ns[nns];
+-- 
+cgit v1.2.1
+

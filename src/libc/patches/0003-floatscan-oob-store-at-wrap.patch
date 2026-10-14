@@ -1,0 +1,48 @@
+Kimigayo OS: floatscan out-of-bounds write
+
+floatscan: when the circular mantissa buffer wraps, 0 is stored at
+index -1. Reachable through strtold() and scanf %Lf with a crafted
+number on both x86_64 (80-bit long double) and aarch64 (IEEE quad). Not
+in a musl release as of 2026-10-14.
+
+Source: musl git https://git.musl-libc.org/cgit/musl/commit/?id=dd856098ad76
+  fetched from git.musl-libc.org on 2026-10-14.
+The original message follows unchanged.
+
+From dd856098ad76451718161f864158a38157d8b871 Mon Sep 17 00:00:00 2001
+From: Rich Felker <dalias@aerifal.cx>
+Date: Tue, 22 Sep 2026 15:36:08 -0400
+Subject: floatscan: fix oob store at -1 index in mantissa buffer at wrap
+
+the code to implement a modular postincrement was too clever, and
+essentially did it as a reducing version of (z+=1)-1, but only applied
+the redution after the addition not the subtraction. as a result, it
+evaluated to -1 when wrapping, causing a fixed value of zero to be
+stored out of bounds below the buffer.
+
+whether this condition is triggered depends on where the mantissa bits
+end up in the circular buffer after processing.
+
+for archs with 80-bit extended long double or IEEE quad long double,
+the input "710542735760100185871124267578125e-33" was reported to and
+has been confirmed to trigger it.
+---
+ src/internal/floatscan.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/internal/floatscan.c b/src/internal/floatscan.c
+index b15366b6..2bc6830f 100644
+--- a/src/internal/floatscan.c
++++ b/src/internal/floatscan.c
+@@ -256,7 +256,7 @@ static long double decfloat(FILE *f, int c, int bits, int emin, int sign, int po
+ 
+ 	/* Assemble desired bits into floating point variable */
+ 	for (y=i=0; i<LD_B1B_DIG; i++) {
+-		if ((a+i & MASK)==z) x[(z=(z+1 & MASK))-1] = 0;
++		if ((a+i & MASK)==z) x[z] = 0, z = z+1 & MASK;
+ 		y = 1000000000.0L * y + x[a+i & MASK];
+ 	}
+ 
+-- 
+cgit v1.2.1
+
