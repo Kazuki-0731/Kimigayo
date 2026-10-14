@@ -288,7 +288,8 @@ docker stats
 # ネットワークインターフェースの確認
 ip link show
 
-# DHCPクライアントの起動（BusyBox は udhcpc。dhclient は入っていません）
+# DHCPクライアントの起動（BusyBox は udhcpc。dhclient は入っていません。
+# udhcpc は Standard 以上。v3.0.2 の次の版から Minimal には入っていません）
 udhcpc -i eth0
 
 # Dockerネットワークの確認（ホスト側で実行）

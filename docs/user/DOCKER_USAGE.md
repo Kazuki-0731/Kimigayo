@@ -83,7 +83,8 @@ docker rm my-kimigayo
 
 ### 1. 軽量Webサーバー
 
-BusyBox httpdを使用した簡易Webサーバー:
+BusyBox httpdを使用した簡易Webサーバー（`httpd` は Standard 以上。
+v3.0.2 の次の版から Minimal には入っていません）:
 
 ```bash
 # ホスト側にコンテンツディレクトリを作成

@@ -169,7 +169,8 @@ networks:
 
 **通常は不要です。** `docker run` ではランタイムがアドレスを割り当てます。
 `--network host` や特殊な構成で自分で取得する必要がある場合は、
-BusyBox の `udhcpc` を使います（`dhclient` は入っていません）。
+BusyBox の `udhcpc` を使います（`dhclient` は入っていません。
+`udhcpc` は Standard 以上で、v3.0.2 の次の版から Minimal には入っていません）。
 
 ```bash
 udhcpc -i eth0

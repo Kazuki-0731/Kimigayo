@@ -72,8 +72,9 @@ Kimigayo OSは多層防御（Defense in Depth）の原則に基づいて設計�
 [セキュリティポリシー](SECURITY_POLICY.md#コンパイル時のセキュリティ強化)を見てください。
 
 > **実行面について正直に書くと**: `telnetd`・`ftpd`・`httpd`・`crond`・`nc` などの
-> BusyBox アプレットはイメージに入っています（`nc` は standard 以上、
-> ほかは全バリアント）。**既定では起動していません**（PID 1 は `/bin/sh`）。
+> BusyBox アプレットはイメージに入っています（`crond` は全バリアント、
+> ほかは standard 以上。v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd` が
+> 入っていました）。**既定では起動していません**（PID 1 は `/bin/sh`）。
 > 不要なら利用者のイメージで該当するリンクを消してください。
 
 > **Kimigayo は seccomp プロファイルを配布していません。**
