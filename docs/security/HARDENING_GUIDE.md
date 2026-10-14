@@ -474,13 +474,15 @@ config の行が消えると既定値（`n`）に黙って戻るため、config 
   `create_links_from_list` が、遅延して作るリンクの解決先が展開先の中に
   収まるかを確かめないこと
 
-**取り込めるパッチはまだ無い**（Alpine aports にも上流にも無い。2026-10-13 時点）。
+**上流 BusyBox に修正コミットがある**（`382008b3f07d` tar: protect against
+Symlink+Hardlink attack、2026-10-09。関連 `5da20102b5db`）。リリース・Alpine・
+Debian にはまだ入っていない（2026-10-14 時点）。
 NVD にまだ BusyBox の CPE が載っていないため、
 **`make scan-image`（Grype による CPE 照合）では検出されない。**
 発動条件は「信頼できない tar を、同じ展開先に続けて特権で展開する」こと
 （CVSS は `AV:L/AC:H/UI:R`）。**それまでは、信頼できない tar を同じ
-ディレクトリに続けて展開しないこと。** 上流が修正を出したら
-`src/busybox/patches/` に CVE ID 入りの名前で取り込む。修正が出たかは
+ディレクトリに続けて展開しないこと。** 取り込むときは
+`src/busybox/patches/` に CVE ID 入りの名前で置く。上流との差分は
 `security.yml` が毎日確かめ、出たら Issue と Discord で知らせる
 （追跡: [#121](https://github.com/Kazuki-0731/Kimigayo/issues/121)）。
 
