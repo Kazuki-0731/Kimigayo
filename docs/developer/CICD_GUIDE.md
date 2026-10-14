@@ -22,7 +22,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 | `release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
-| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流の修正待ちの CVE の監視、Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分、Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
 | `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
 
@@ -136,8 +136,9 @@ gh workflow run manual-build.yml \
    Kimigayo の出荷物と関係が無い数字なので 2026-10-13 に外した
 2. リポジトリのファイルシステムスキャン（Trivy、`trivy-filesystem-scan`）
 3. musl か BusyBox の新版を検知したときに Issue を自動作成（脆弱性の検出では起票しない）
-4. 上流の修正待ちの CVE の監視（`upstream-fix-watch`）。`scripts/watch-upstream-fixes.py` の
-   `WATCH` にある CVE について、Debian の security-tracker と Alpine aports の APKBUILD を見る。
+4. 上流のセキュリティ情報との差分（`upstream-fix-watch`）。`scripts/watch-upstream-fixes.py` が
+   Debian の security-tracker・Alpine aports・上流 git・CISA KEV を見て、
+   `docs/security/upstream-triage.tsv`（仕分け済みの一覧）に無いものを出す。
    修正が出たら Issue を立てて Discord に通知し、判定できなかったときも Discord に失敗を送る
 
 > **イメージの Trivy スキャン（`trivy-image-scan`）は 2026-10-09 に外しました。**
