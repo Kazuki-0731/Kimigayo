@@ -70,8 +70,10 @@ docker run -d \
 | `-p 127.0.0.1:...` | 外部への意図しない公開 |
 
 **`sshd`・`iptables`・`sudo` はイメージに入っていません。**
-一方で `telnetd`・`ftpd`・`httpd`・`crond` の BusyBox アプレットは
-全バリアントに、`nc`・`telnet`（クライアント）は standard 以上に入っています。
+一方で `telnetd`・`ftpd`・`httpd`・`nc`・`telnet`（クライアント）の BusyBox
+アプレットは standard 以上に、`crond` は全バリアントに入っています
+（v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd` などが入っていました。
+config に書いていない項目が既定値で有効になっていたためで、次の版から外します）。
 **既定ではどれも起動していません**（PID 1 は `/bin/sh`）。
 使わないなら、自分のイメージで該当するリンク（`/sbin/telnetd` など）を
 消しておくと確実です。
@@ -480,10 +482,12 @@ Debian にはまだ入っていない（2026-10-14 時点）。
 NVD にまだ BusyBox の CPE が載っていないため、
 **`make scan-image`（Grype による CPE 照合）では検出されない。**
 発動条件は「信頼できない tar を、同じ展開先に続けて特権で展開する」こと
-（CVSS は `AV:L/AC:H/UI:R`）。**それまでは、信頼できない tar を同じ
-ディレクトリに続けて展開しないこと。** 取り込むときは
-`src/busybox/patches/` に CVE ID 入りの名前で置く。上流との差分は
-`security.yml` が毎日確かめ、出たら Issue と Discord で知らせる
+（CVSS は `AV:L/AC:H/UI:R`）。実際に悪用された記録は無い（CISA KEV に無く、
+EPSS は 0.14%。2026-10-14 時点）。**Kimigayo は上流のコミットを先取りせず、
+リリースか Debian / Alpine に入るのを待つ**（2026-10-14 に決定）。
+**それまでは、信頼できない tar を同じディレクトリに続けて展開しないこと。**
+仕分けの一覧（`docs/security/upstream-triage.tsv`）では修正待ち（watching）で、
+Debian か Alpine で直ると `security.yml` が Issue と Discord で知らせる
 （追跡: [#121](https://github.com/Kazuki-0731/Kimigayo/issues/121)）。
 
 ---
