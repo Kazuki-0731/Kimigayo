@@ -70,7 +70,7 @@ cat /etc/os-release
 | Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.0.2-extended` |
 
 **Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
-（Standard との差は 33 アプレット）。次の版からは `httpd`・`ssl_client`・
+（Standard との差は 33 アプレット）。v3.1.0 からは `httpd`・`ssl_client`・
 `udhcpc`・`nslookup`・`netstat`・`telnetd` などのネットワークのサーバー・
 クライアントも Minimal から外れます（Standard 以上にはあります）。対話的に触る・シェルスクリプトを動かすなら
 Standard 以上を選んでください。
@@ -167,7 +167,7 @@ Podman の一部の設定では外れるので `--cap-add NET_RAW` を付けて�
 >
 > **`wget` は TLS 証明書を検証しません**（`TLS certificate validation
 > not implemented`。BusyBox の仕様）。v3.0.2 までは注意を出して取得を
-> 続けていましたが、**次の版からは `--no-check-certificate` を付けない限り
+> 続けていましたが、**v3.1.0 からは `--no-check-certificate` を付けない限り
 > `https://` の取得は失敗します**（検証しないまま繋がないため。Alpine と同じ）。
 > 信頼できない経路で HTTPS を使うなら、ビルド時に `curl` を持ち込んでください
 > （→[ソフトウェアの追加](#ソフトウェアの追加)）。

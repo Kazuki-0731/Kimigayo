@@ -207,12 +207,12 @@ ls build/logs/
 - **非実行スタック**: `-Wl,-z,noexecstack`
 - **Stack Protection**: `-fstack-protector-strong` — 両アーキの全構成要素に渡す。
   **v3.0.2 の arm64 の OpenRC には付いていない**（`build-openrc.sh` が arm64 だけ
-  外していた。main で修正済み、次のリリースから付く。`verify-image.sh` が検査する）
+  外していた。v3.1.0 で修正。`verify-image.sh` が検査する）
 - **FORTIFY_SOURCE**: `-D_FORTIFY_SOURCE=2` — musl は FORTIFY を実装しないので、
   Alpine の `fortify-headers` を musl のヘッダより前に置いて実装する。x86_64 は
   ビルド環境のヘッダを使うので自動で入り、arm64 は `build-busybox.sh`・
   `build-openrc.sh` が明示する。**v3.0.2 の arm64 には効いていない**（2026-10-14 に
-  修正、次のリリースから。`verify-image.sh` が BusyBox のトラップの数を検査する）
+  修正（v3.1.0）。`verify-image.sh` が BusyBox のトラップの数を検査する）
 
 成果物に効いているかは `scripts/verify-image.sh` が見る。イメージを
 `docker export` した tar を `scripts/check-elf-hardening.py` が読み、

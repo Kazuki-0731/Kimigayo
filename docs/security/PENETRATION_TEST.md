@@ -45,7 +45,7 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
 `crond`・`su`・`nsenter`・`unshare`（全バリアント）、
 `telnetd`・`ftpd`・`httpd`・`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
 v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd`・`ssl_server`・`udhcpc` などが
-入っていた（config に書いていない項目が既定値で有効になっていた。次の版から外す）。
+入っていた（config に書いていない項目が既定値で有効になっていた。v3.1.0 で外す）。
 サーバー系のアプレットは、利用者が起動しない限り待ち受けません。
 
 **既定の PID 1 は `/bin/sh`** で、OpenRC は起動していません。
@@ -65,7 +65,7 @@ v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd`・`ssl_server`・`u
 - **`wget` の HTTPS は v3.0.1 以前で、取得後に Segmentation fault で落ちる**
   （x86_64 / arm64 とも。v3.0.2 で修正）。可用性の問題であり、情報漏洩の
   経路ではない。**証明書は検証しない**（BusyBox の仕様。中間者攻撃に弱い）。
-  次の版からは `--no-check-certificate` なしの `https://` を失敗させる
+  v3.1.0 からは `--no-check-certificate` なしの `https://` を失敗させる
   （CVE-2018-1000500。Alpine の 0017 を取り込んだ）。
   → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 - **root で動く。** `Dockerfile.runtime` は `USER` を指定していません

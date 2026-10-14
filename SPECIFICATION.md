@@ -116,9 +116,9 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
 - Full RELRO (RELRO + BIND_NOW) — 全 ELF（同上）
 - Stack-smashing protection — 全構成要素を `-fstack-protector-strong` でビルドする
   （`scripts/verify-image.sh` が検査）。**v3.0.2 の arm64 の OpenRC には付いていない**
-  （`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、次のリリースから付く）
+  （`scripts/build-openrc.sh` が arm64 だけ外していた。v3.1.0 で修正）
 - FORTIFY_SOURCE — `-D_FORTIFY_SOURCE=2`（Alpine の `fortify-headers` 経由。musl 自身は
-  実装しない）。**v3.0.2 の arm64 には効いていない**（main で修正済み、次のリリースから。
+  実装しない）。**v3.0.2 の arm64 には効いていない**（v3.1.0 で修正。
   `scripts/verify-image.sh` が BusyBox で検査する）
 
 ### 5.2 ランタイムセキュリティ

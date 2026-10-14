@@ -73,7 +73,7 @@ docker run -d \
 一方で `telnetd`・`ftpd`・`httpd`・`nc`・`telnet`（クライアント）の BusyBox
 アプレットは standard 以上に、`crond` は全バリアントに入っています
 （v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd` などが入っていました。
-config に書いていない項目が既定値で有効になっていたためで、次の版から外します）。
+config に書いていない項目が既定値で有効になっていたためで、v3.1.0 で外します）。
 **既定ではどれも起動していません**（PID 1 は `/bin/sh`）。
 使わないなら、自分のイメージで該当するリンク（`/sbin/telnetd` など）を
 消しておくと確実です。

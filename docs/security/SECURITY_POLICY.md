@@ -115,8 +115,8 @@ Docker Hub の `latest` 系のタグを差し替えます。
 | **PIE** | Position Independent Executables | ✅ 全 ELF（`verify-image.sh` が検査） |
 | **RELRO** | Relocation Read-Only | ✅ Full RELRO（BIND_NOW）。全 ELF（検査あり） |
 | **非実行スタック** | `PT_GNU_STACK` に実行権限なし | ✅ 全 ELF（検査あり） |
-| **Stack Protector** | スタックバッファオーバーフロー保護 | ⚠️ x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません**（`build-openrc.sh` が arm64 だけ外していた。main で修正済み、次のリリースから付きます）。`verify-image.sh` が検査 |
-| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ✅ `-D_FORTIFY_SOURCE=2`（Alpine の `fortify-headers` 経由。musl 自身は実装しない）。**v3.0.2 の arm64 には効いていません**（main で修正済み、次のリリースから）。`verify-image.sh` が BusyBox のトラップの数で検査 |
+| **Stack Protector** | スタックバッファオーバーフロー保護 | ⚠️ x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません**（`build-openrc.sh` が arm64 だけ外していた。v3.1.0 で修正しました）。`verify-image.sh` が検査 |
+| **FORTIFY_SOURCE** | バッファオーバーフロー検出 | ✅ `-D_FORTIFY_SOURCE=2`（Alpine の `fortify-headers` 経由。musl 自身は実装しない）。**v3.0.2 の arm64 には効いていません**（v3.1.0 で修正）。`verify-image.sh` が BusyBox のトラップの数で検査 |
 
 確認方法（イメージ内の**全 ELF** の PIE / RELRO / BIND_NOW / 非実行スタック・
 スタック保護（libc から 20 個以上の関数を取り込む動的 ELF が `__stack_chk_fail` を
@@ -200,7 +200,7 @@ docker run --rm \
 ```bash
 # コンパイルオプションの概略（実体は scripts/build-{musl,busybox,openrc}.sh。
 # 構成要素とアーキテクチャで少しずつ違う。v3.0.2 の arm64 の OpenRC には
-# -fstack-protector-strong が無い。main で修正済み）
+# -fstack-protector-strong が無い。v3.1.0 で修正）
 CFLAGS="-Os -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 LDFLAGS="-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack"
 
@@ -215,7 +215,7 @@ make security-scan
 2. **`wget` の HTTPS**: v3.0.1 以前は取得後に Segmentation fault で落ちます（v3.0.2 で修正）。
    → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 3. **TLS 証明書の検証**: BusyBox の `wget` は証明書を検証しません。
-   v3.0.2 までは注意を出して取得を続けていました。次の版からは、
+   v3.0.2 までは注意を出して取得を続けていました。v3.1.0 からは、
    `--no-check-certificate` を付けない限り `https://` の取得を失敗させます
    （CVE-2018-1000500。Alpine と同じ）。
    信頼できない経路で HTTPS を使うなら `curl` などを持ち込んでください

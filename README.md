@@ -185,7 +185,7 @@ Kimigayo OS は、**Google の distroless** と **Alpine Linux** の両方の設
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
 - ✅ **BusyBox**: 基本的なUnixコマンドとシェルを提供（デバッグ可能）
 - ✅ **OpenRC**: シンプルで軽量なInitシステム
-- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO（BIND_NOW）・非実行スタックでビルド（`scripts/verify-image.sh` が検査。ASLR はホストのカーネルが効かせる）。Stack Protector は x86_64 では全 ELF に付くが、v3.0.2 の arm64 の OpenRC には付いていない（main で修正済み、次のリリースから付く。`verify-image.sh` が検査する）
+- ✅ **セキュリティ強化**: 全 ELF を PIE・Full RELRO（BIND_NOW）・非実行スタックでビルド（`scripts/verify-image.sh` が検査。ASLR はホストのカーネルが効かせる）。Stack Protector は x86_64 では全 ELF に付くが、v3.0.2 の arm64 の OpenRC には付いていない（v3.1.0 で修正。`verify-image.sh` が検査する）
 
 この組み合わせにより、**distroless のセキュリティ** と **Alpine の実用性** を両立し、コンテナ環境に最適化されたOSを実現しています。
 
@@ -274,8 +274,8 @@ Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）�
 
 - PIE (Position Independent Executables) — 全 ELF（`scripts/verify-image.sh` が検査）
 - Full RELRO (Relocation Read-Only + BIND_NOW) — 全 ELF（同上）
-- Stack-smashing protection — x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**（main で修正済み、次のリリースから付く。`scripts/verify-image.sh` が検査する）
-- FORTIFY_SOURCE — Alpine の `fortify-headers` で実装（musl 自身は実装しない）。**v3.0.2 の arm64 には効いていない**（main で修正済み、次のリリースから付く。`scripts/verify-image.sh` が検査する）
+- Stack-smashing protection — x86_64 は全 ELF。**v3.0.2 の arm64 の OpenRC（`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていない**（v3.1.0 で修正。`scripts/verify-image.sh` が検査する）
+- FORTIFY_SOURCE — Alpine の `fortify-headers` で実装（musl 自身は実装しない）。**v3.0.2 の arm64 には効いていない**（v3.1.0 で修正。`scripts/verify-image.sh` が検査する）
 
 #### ランタイム（イメージ側）
 

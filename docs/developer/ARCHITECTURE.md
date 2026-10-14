@@ -476,13 +476,12 @@ CONFIG_UNLZOP=y
 **★ の 3 層が Kimigayo 自身が担保している部分です。**
 ただし Layer 4 のうち、Stack Protector は v3.0.2 の arm64 の OpenRC
 （`openrc`・`openrc-run`・`librc`・`libeinfo` など）には付いていません
-（`scripts/build-openrc.sh` が arm64 だけ外していた。main で修正済み、
-次のリリースから付きます。`scripts/verify-image.sh` が検査します）。
+（`scripts/build-openrc.sh` が arm64 だけ外していた。v3.1.0 で修正しました。`scripts/verify-image.sh` が検査します）。
 `-D_FORTIFY_SOURCE=2` は musl ではなく Alpine の `fortify-headers` が実装します。
 x86_64 はビルド環境のヘッダを使うので自動で入りますが、arm64 は自前の musl の
 ヘッダだけを見るため、**v3.0.2 の arm64 には効いていません**。2026-10-14 から
 arm64 のビルドも `fortify-headers` を musl より前に置き、`scripts/verify-image.sh` が
-BusyBox のトラップの数で効いているかを検査します（次のリリースから）。
+BusyBox のトラップの数で効いているかを検査します（v3.1.0 から）。
 Layer 1 と 2 はホストと利用者の設定によります
 （→ [システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)）。
 
