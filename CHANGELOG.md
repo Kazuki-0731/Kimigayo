@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   添付し、集められなければ Docker Hub に push しない。イメージの
   `org.opencontainers.image.licenses` を `GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause` にした
 - 既知の問題: BusyBox の `tar` が 2 本のアーカイブを同じ展開先に続けて展開すると
-  外にファイルを書ける（CVE-2026-108119。v3.0.2 も影響を受ける。上流に修正はまだ無い）
+  外にファイルを書ける（CVE-2026-108119。v3.0.2 も影響を受ける。上流 git に修正コミットはあるがリリースされていない）
 - **arm64 の OpenRC を `-fstack-protector-strong` 付きでビルドするようにした。**
   v3.0.2 の arm64 では `openrc`・`librc`・`libeinfo` など 20 本以上が
   スタック保護なしだった（`build-openrc.sh` が arm64 だけフラグを外していた）。
