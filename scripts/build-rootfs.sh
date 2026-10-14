@@ -894,6 +894,23 @@ SYSCTL_EOF
             'mount -o bind / $dir' || return 1
         log_info "  ✓ bootmisc: mount --bind -> mount -o bind"
     fi
+
+    # --- bootmisc: 起動のたびに /tmp を丸ごと消さない ------------------------
+    #
+    # 上流の既定は wipe_tmp="YES" で、bootmisc（boot ランレベル）が /tmp を
+    # rm -rf する。コンテナで /tmp にボリュームをマウントしていると、その中身が
+    # 消える。Alpine は既定を NO にしている（aports main/openrc の
+    # 0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch）ので同じにする。
+    # OpenRC にはパッチの仕組みが無いので、Alpine のパッチと同じ 2 行をここで置き換える
+    if [ -f "$initd/bootmisc" ]; then
+        replace_line_in_file "$ROOTFS_DIR/etc/conf.d/bootmisc" \
+            'wipe_tmp="YES"' \
+            'wipe_tmp="NO"' || return 1
+        replace_line_in_file "$initd/bootmisc" \
+            '${WIPE_TMP:-yes}' \
+            '${WIPE_TMP:-no}' || return 1
+        log_info "  ✓ bootmisc: wipe_tmp の既定を NO にした"
+    fi
 }
 
 # Create essential configuration files
