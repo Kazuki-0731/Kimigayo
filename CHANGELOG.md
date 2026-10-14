@@ -19,8 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   リリースは対応するソース（上流の tarball 3 本とリポジトリの archive）を GitHub Release に
   添付し、集められなければ Docker Hub に push しない。イメージの
   `org.opencontainers.image.licenses` を `GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause` にした
+- **上流との突き合わせで見つかった、修正があるのに持っていなかった 30 件を取り込んだ。**
+  BusyBox に 19 本（CVE-2023-42366・CVE-2024-58251・CVE-2025-46394・CVE-2025-60876・
+  CVE-2026-38752・CVE-2026-88830・88831・88832・88834・88837・88839・88840・
+  CVE-2018-1000500 と、CVE ID の無い bunzip2 のメモリ破壊・tar・nslookup・
+  逆引き名の端末エスケープ・awk の読み過ぎ）、musl に 5 本（floatscan の範囲外書き込み・
+  vfwscanf の heap overflow・resolver のゼロ除算と範囲外読み取り・regex の無限ループ）。
+  出所は上流 git・Alpine aports（sha512 一致）・Debian。
+  `scripts/watch-upstream-fixes.py` が毎日上流と突き合わせ、新しい差分を Issue と Discord で知らせる
+- **wget の `https://` は、`--no-check-certificate` を付けない限り失敗するようにした**
+  （**挙動の変更**）。BusyBox の内部 TLS は証明書を検証しないのに、v3.0.2 までは注意を
+  出して取得を続けていた（CVE-2018-1000500。Alpine と同じ対応）
+- **minimal から httpd・ssl_server・ssl_client・udhcpc・telnetd・ftpd・nslookup・netstat など
+  38 個のネットワーク系アプレットを外した**（**挙動の変更**。standard / extended には
+  ある）。config に書いていない項目が既定値で有効になっていたため、v3.0.2 の minimal にも
+  入っていた
+- **OpenRC の bootmisc が起動のたびに `/tmp` を消さないようにした**（`wipe_tmp` の既定を
+  NO。Alpine と同じ）。`/tmp` にマウントしたボリュームが消えうる
 - 既知の問題: BusyBox の `tar` が 2 本のアーカイブを同じ展開先に続けて展開すると
-  外にファイルを書ける（CVE-2026-108119。v3.0.2 も影響を受ける。上流 git に修正コミットはあるがリリースされていない）
+  外にファイルを書ける（CVE-2026-108119。v3.0.2 も影響を受ける）。上流 git に修正
+  コミットはあるがリリースされていないので、リリースか Debian / Alpine に入るまで待つ
 - **arm64 の OpenRC を `-fstack-protector-strong` 付きでビルドするようにした。**
   v3.0.2 の arm64 では `openrc`・`librc`・`libeinfo` など 20 本以上が
   スタック保護なしだった（`build-openrc.sh` が arm64 だけフラグを外していた）。
