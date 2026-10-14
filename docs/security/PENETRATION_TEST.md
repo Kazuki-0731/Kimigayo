@@ -42,8 +42,10 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
 `auditd` / `capsh` / `bash` / `/etc/cron.*` / `/usr/share/zoneinfo` / `/boot`。
 
 **入っているが起動していないもの**（BusyBox のアプレット）:
-`telnetd`・`ftpd`・`httpd`・`crond`・`su`・`nsenter`・`unshare`（全バリアント）、
-`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
+`crond`・`su`・`nsenter`・`unshare`（全バリアント）、
+`telnetd`・`ftpd`・`httpd`・`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
+v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd`・`ssl_server`・`udhcpc` などが
+入っていた（config に書いていない項目が既定値で有効になっていた。次の版から外す）。
 サーバー系のアプレットは、利用者が起動しない限り待ち受けません。
 
 **既定の PID 1 は `/bin/sh`** で、OpenRC は起動していません。
@@ -56,12 +58,15 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
   剥がさなかった。`verify-image.sh` が回帰を見る）。
   `tar` のリンク経由の脱出（CVE-2026-108119）は **1.38.0 も影響を受ける**
   （2 本の tar を同じ展開先に続けて展開すると抜ける。2026-10-13 に実測）。
-  上流 BusyBox に修正コミット（`382008b3f07d`）はあるがリリースされておらず、Kimigayo は未取り込み。
+  上流 BusyBox に修正コミット（`382008b3f07d`）はあるがリリースされておらず、Kimigayo は
+  リリースか Debian / Alpine に入るまで待つ（2026-10-14 に決定）。
   NVD に CPE が無いので `make scan-image` でも検出できない。
   → [HARDENING_GUIDE.md](HARDENING_GUIDE.md#busybox-の-cpio-はディレクトリを脱出できたv301-まで修正済み)
 - **`wget` の HTTPS は v3.0.1 以前で、取得後に Segmentation fault で落ちる**
   （x86_64 / arm64 とも。v3.0.2 で修正）。可用性の問題であり、情報漏洩の
   経路ではない。**証明書は検証しない**（BusyBox の仕様。中間者攻撃に弱い）。
+  次の版からは `--no-check-certificate` なしの `https://` を失敗させる
+  （CVE-2018-1000500。Alpine の 0017 を取り込んだ）。
   → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 - **root で動く。** `Dockerfile.runtime` は `USER` を指定していません
   （OS ベースイメージなので利用側が決める方針）。
