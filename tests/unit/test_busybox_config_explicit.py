@@ -9,6 +9,9 @@ BusyBox の config は**書かないと Kconfig の既定値が入る**（`make 
 - FEATURE_WGET_OPENSSL（既定 y）— v3.0.1 まで wget の HTTPS が取得後に SIGSEGV で落ちた
   （→ docs/troubleshooting/busybox-wget-https-segfault.md）
 
+minimal にネットワークのサーバー・クライアント（httpd・ssl_server・udhcpc など）が
+既定値で入っていたのも同じ原因（v3.0.2 まで。2026-10-14 に明示的に外した）。
+
 成果物の挙動は scripts/verify-image.sh が見るが、それはイメージを作ってから
 しか分からない。ここでは config の行が消えた時点で落とす。
 """
@@ -34,6 +37,14 @@ WITH_WGET = {
     "FEATURE_WGET_HTTPS": "y",
     "FEATURE_WGET_OPENSSL": "n",
 }
+
+# minimal に入れないもの（standard / extended にはある）。書かないと既定値で入る
+MINIMAL_EXCLUDED = (
+    "HTTPD SSL_SERVER SSL_CLIENT FTPD FTPPUT TFTP TFTPD TELNETD INETD DNSD "
+    "FAKEIDENTD UDHCPC UDHCPC6 UDHCPD DHCPRELAY DUMPLEASES NTPD NSLOOKUP WHOIS "
+    "SENDMAIL POPMAILDIR LPD LPR LPQ TCPSVD UDPSVD PSCAN NETSTAT TRACEROUTE "
+    "TRACEROUTE6 ZCIP IFPLUGD NBDCLIENT SLATTACH ARPING ETHER_WAKE MICROCOM CHAT"
+).split()
 
 
 def explicit_values(text):
@@ -69,3 +80,12 @@ def test_risky_defaults_are_explicit(variant):
 def test_explicit_values_parser():
     text = "CONFIG_A=y\nCONFIG_B=n\n# CONFIG_C is not set\nCONFIG_D=\"x\"\n"
     assert explicit_values(text) == {"A": "y", "B": "n", "C": "n", "D": "y"}
+
+
+def test_minimal_has_no_network_servers():
+    values = explicit_values((CONFIG_DIR / "minimal.config").read_text())
+    missing = [n for n in MINIMAL_EXCLUDED if values.get(n) != "n"]
+    assert not missing, (
+        f"minimal.config で無効にしていない: {missing}"
+        "（書かないと BusyBox の既定値で有効になる）"
+    )
