@@ -1,0 +1,160 @@
+# 上流のセキュリティ情報の仕分け（scripts/watch-upstream-fixes.py が読む）
+#
+# 1 行 1 項目、タブ区切り: ID <TAB> component <TAB> status <TAB> 根拠
+#   ID         CVE ID / alpine:<pkg>:<パッチ名> / upstream:<component>:<コミット>
+#   component  busybox | musl | openrc | libcap
+#   status     patched        Kimigayo が持っている
+#              fixed-upstream 使っている上流の版に修正が入っている（ソースで確認）
+#              not-affected   該当機能が全バリアントで無効、またはセキュリティと無関係
+#              baseline       2026-10-14 の初回の突き合わせ時点で Debian で解決済みの過去分
+#              todo           影響あり・修正がある。取り込み待ち
+#              watching       影響あり・修正がどこにも無い。修正が出たら知らせる
+#              accepted       影響ありを承知で受け入れる（理由を書く）
+#              unknown        判断材料が足りない
+#
+# ここに無い CVE・パッチ・上流のコミットが現れると、security.yml が Issue と
+# Discord で知らせる。仕分けたらここに足す（手順は security-review skill）。
+# 2026-10-14 の初回の仕分け: BusyBox の実際の config（oldconfig 後）・上流 git・
+# Debian / Alpine のパッチの dry-run・公開イメージ 3.0.2 での実測に基づく。
+CVE-2026-108119	busybox	todo	tar の遅延リンクが展開先の外を検証しない（全バリアント、2 本の tar で実測）。上流 BusyBox に修正コミット 382008b3f07d（2026-10-09、tar: protect against Symlink+Hardlink attack）があるが、リリース・Debian・Alpine には未収録。#121
+CVE-2018-1000500	busybox	todo	緩和策は Alpine の 0017（alpine:busybox:0017 の行。https 取得が fail-closed になる挙動変更を伴う）。standard/extended の wget は内部 TLS で証明書を検証しない（実イメージで "TLS certificate validation not implemented" を出して続行）。上流は意図した設計で修正予定なし、Debian も unfixed/unimportant。minimal は wget なし
+CVE-2022-30065	busybox	fixed-upstream	修正 e63d7cdfdac78c6fd27e9e63150335767592b85e は 1_36_0 以降のタグに含まれ、1.38.0 にある
+CVE-2023-39810	busybox	fixed-upstream	9a8796436b9b0641e13480811902ea2ac57881d3 は 1.38.0 に入っている。ただし既定 n の CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION の下でしか効かない。Kimigayo は 3 バリアントとも y を明示しており verify-image.sh が回帰を見ている
+CVE-2023-42366	busybox	todo	awk の next_token が正規表現末尾の \ で範囲外を読む。修正は 1.38.0 にも上流 HEAD にも無い（Alpine 0033 が両方に当たる）。awk は全バリアント。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0033-awk.c-fix-CVE-2023-42366-bug-15874.patch（Debian も同じパッチ）
+CVE-2024-58251	busybox	todo	netstat -p が argv0 の端末エスケープを素通しする。1.38.0 にも HEAD にも修正なし。FEATURE_NETSTAT_PRG=y で全バリアント。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0036-Fix-CVE-2024-58251-sanitize-process-names-when-calli.patch
+CVE-2025-46394	busybox	todo	1.38.0 は f5e1bf966 で大半を直しているが、FEATURE_TAR_UNAME_GNAME=y の分岐（standard/extended）でファイル名が未サニタイズ。実イメージの tar tv で ESC がそのまま出た。minimal は修正済み経路。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/archival-libarchive-sanitize-filenames-on-output-CVE-2025-46394-2.patch（上流では 7473045ad3504db9b421427a452fd9b146346306 で修正）
+CVE-2025-60876	busybox	todo	wget の URL の CR/LF/制御文字によるヘッダ注入。1.38.0 にも HEAD にも修正なし。standard/extended。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/wget-disallow-control-chars-in-URLs-CVE-2025-60876.patch
+CVE-2026-26157	busybox	fixed-upstream	3fb6b31c716669e12f75a2accd31bb7685b1a1cb（ハードリンクの危険な成分を除去）は 1.38.0 に入っている（skip_unsafe_prefix / strip_unsafe_prefix(link_target) を確認）
+CVE-2026-26158	busybox	fixed-upstream	同じく 3fb6b31c で 1.38.0 修正済み。遅延リンクの別経路は対象外の CVE-2026-108119
+CVE-2026-29004	busybox	fixed-upstream	42202bfb1e6ac51fa995beda8be4d7b654aeee2a と d368f3f7836d1c2484c8f839316e5c93e76d4409 はどちらも 1.38.0 に含まれ、tarball に逆適用で当たる（Debian の unfixed 表示は追随遅れ）
+CVE-2026-38752	busybox	todo	awk の関数の無限再帰でスタックが溢れる。実イメージ（minimal）で segfault rc=139。全バリアント。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/awk-fix-stack-overflow-in-evaluate-CVE-2026-38752.patch（元は https://lists.busybox.net/pipermail/busybox/2026-June/092351.html）
+CVE-2026-38753	busybox	patched	Kimigayo 0003 と Debian の awk-fix-use-after-free-in-awk_sub-CVE-2026-38753.patch は変更行が完全に一致
+CVE-2026-38754	busybox	patched	Kimigayo 0002 は Debian・Alpine 0040 と変更行が完全に一致（上流でも a448b6d5b で修正済みだが 1.38.0 の後）
+CVE-2026-38755	busybox	patched	Kimigayo 0004 と Debian の ash-fix-stack-overflow-in-evalfun-CVE-2026-38755.patch は変更行が完全に一致（Debian の記述は evalcommand の heap overflow だが、パッチの中身は同じ）
+CVE-2026-76014	busybox	not-affected	-T の NULL 参照は FEATURE_WGET_TIMEOUT=n のときだけ起きる。standard/extended は y（busybox wget -T 1 でも落ちないことを確認）、minimal は wget なし
+CVE-2026-88830	busybox	todo	TLS の Montgomery reduction のバッファ計算誤り。ssl_server/ssl_client は全バリアントにある。上流は「現状の呼び出し元からは到達不能」と注記。https://git.busybox.net/busybox/commit/?id=89ac82774f90e270d04ed5299e5cf05dfbc314c1
+CVE-2026-88831	busybox	todo	httpd の不正な CIDR を含む D: ルールが fail-open になる（FEATURE_HTTPD_ACL_IP=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=339e3c62f5bcf252839c8abca5325f48a22f21aa
+CVE-2026-88832	busybox	todo	volume_id/romfs のラベルが heap overflow（FEATURE_VOLUMEID_ROMFS=y。blkid/findfs/mount は全バリアント、細工したブロックデバイスの読み取りが条件）。https://git.busybox.net/busybox/commit/?id=9073c1d15c9953c6f1e39145815fc5dccfa6081c
+CVE-2026-88833	busybox	watching	udhcpc の d4_recv_raw_packet で IP tot_len を 20〜27 にすると bytes-28 が負になり memcpy する（全バリアント）。上流の fd1972099 は recvmsg の長さしか見ておらず、HEAD でも tot_len 由来の経路は残る（ソースで確認）。修正はどこにも無い
+CVE-2026-88834	busybox	todo	httpd の "user:*" 認証で getspnam_r 失敗時に挙動が変わり、ユーザーの存在が分かる（FEATURE_SHADOWPASSWDS=y、全バリアント）。Red Hat の題名は「shadow 無効ビルド」だが、該当コードは shadow 有効側。https://git.busybox.net/busybox/commit/?id=b829bba95095b87834628adb38ea14b5885c0fbc
+CVE-2026-88835	busybox	not-affected	dpkg は全バリアントで CONFIG_DPKG=n（busybox --list にも無い）
+CVE-2026-88837	busybox	todo	httpd.conf の $y$ ハッシュを平文として比較するため、ハッシュ文字列そのもので認証が通る（FEATURE_HTTPD_AUTH_MD5=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=9f5cbdcaa5972d58503c59cd0da13da1e5bb272b
+CVE-2026-88838	busybox	not-affected	非 root の mount のオプション検査をすり抜ける問題。3 バリアントとも setuid ファイルが 0 件（/bin/busybox は 755）なので経路に届かない。上流もコメントの追加（556567f40）のみでコード修正なし
+CVE-2026-88839	busybox	todo	libpwdgrp の tokenize() が古い end ポインタを使い、heap に範囲外書き込みする（USE_BB_PWD_GRP=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=c2dec52d37380d27d89827cf01a770f6b3b04e3a
+CVE-2026-88840	busybox	todo	ssl_server の get_client_hello で 1 バイト範囲外読み取り（1.38.0 で入ったサーバ実装。ssl_server は全バリアント）。https://git.busybox.net/busybox/commit/?id=e97224f8fbad11a4d00feaec3391c27ed773f147
+CVE-2026-88841	busybox	not-affected	dpkg の write_status_file。dpkg は全バリアントで無効
+CVE-2025-26519	musl	fixed-upstream	musl 1.2.6 の src/locale/iconv.c に e5adcd97 と c47ad25e の修正行が両方ある（L505 / L551）
+alpine:busybox:0001-ash-exec-busybox.static.patch	busybox	not-affected	Alpine の busybox.static 用。セキュリティと無関係
+alpine:busybox:0002-awk-fix-handling-of-literal-backslashes-in-replaceme.patch	busybox	not-affected	sub() の置換文字列の POSIX 準拠の修正。セキュリティと無関係
+alpine:busybox:0003-blkdiscard-ship-link-to-sbin-instead-of-usr-bin.patch	busybox	not-affected	Alpine の配置の都合
+alpine:busybox:0004-hexdump-fix-regression-with-n4-e-u.patch	busybox	not-affected	テストの追加のみ
+alpine:busybox:0005-init-add-support-for-separate-reboot-action.patch	busybox	not-affected	機能追加
+alpine:busybox:0006-mount-fix-parsing-proc-mounts-with-long-lines.patch	busybox	not-affected	セキュリティと無関係。ただし Docker 内で長い /proc/mounts 行があると mount -o remount が失敗する機能バグで、コンテナ用途では効く
+alpine:busybox:0007-tar-fix-TOCTOU-symlink-race-condition.patch	busybox	todo	tar --overwrite（ARCHIVE_O_TRUNC）で通常ファイルを開くとき O_NOFOLLOW が無く、既存のシンボリックリンクを辿って書き込む（全バリアント）。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0007-tar-fix-TOCTOU-symlink-race-condition.patch
+alpine:busybox:0008-tunctl-fix-segfault-on-ioctl-failure.patch	busybox	not-affected	ioctl 失敗時の自滅的な segfault。セキュリティと無関係
+alpine:busybox:0009-wget-add-header-Accept.patch	busybox	not-affected	機能修正
+alpine:busybox:0010-adduser-default-to-sbin-nologin-as-shell-for-system-.patch	busybox	not-affected	既定シェルの /bin/false → /sbin/nologin。どちらもログイン不可なので Alpine の都合
+alpine:busybox:0011-ash-add-built-in-BB_ASH_VERSION-variable.patch	busybox	not-affected	機能追加
+alpine:busybox:0012-Avoid-redefined-warnings-when-buiding-with-utmps.patch	busybox	not-affected	Alpine の utmps の都合
+alpine:busybox:0013-libbb-sockaddr2str-ensure-only-printable-characters-.patch	busybox	todo	逆引きしたホスト名の端末エスケープを素通しする（netstat・traceroute 等、全バリアント）。1.38.0 には未修正。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0013-libbb-sockaddr2str-ensure-only-printable-characters-.patch
+alpine:busybox:0014-modinfo-add-k-option-for-kernel-version.patch	busybox	not-affected	機能追加
+alpine:busybox:0015-nologin-Install-applet-to-sbin-instead-of-usr-sbin.patch	busybox	not-affected	Alpine の配置の都合（Kimigayo は既に /sbin/nologin がある）
+alpine:busybox:0016-pgrep-add-support-for-matching-against-UID-and-RUID.patch	busybox	not-affected	機能追加
+alpine:busybox:0017-properly-fix-wget-https-support.patch	busybox	todo	CVE-2018-1000500 の緩和策。Kimigayo は SSL_CLIENT=y なので、当てると https 取得が --no-check-certificate なしで失敗（fail-closed）する挙動変更を伴う。採否は判断が要る。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0017-properly-fix-wget-https-support.patch
+alpine:busybox:0018-fsck-resolve-LABEL-.-UUID-.-spec-to-device.patch	busybox	not-affected	機能追加
+alpine:busybox:0019-nslookup-sanitize-all-printed-strings-with-printable.patch	busybox	todo	DNS 応答の文字列による端末エスケープ注入（nslookup は全バリアント）。1.38.0 には未修正。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0019-nslookup-sanitize-all-printed-strings-with-printable.patch
+alpine:busybox:0020-app-location-for-cpio-vi-and-lspci.patch	busybox	not-affected	Alpine の配置の都合
+alpine:busybox:0021-udhcpc-set-default-discover-retries-to-5.patch	busybox	not-affected	Alpine の調整値
+alpine:busybox:0022-ping-make-ping-work-without-root-privileges.patch	busybox	not-affected	機能追加（ICMP ソケット）。セキュリティ修正ではない
+alpine:busybox:0023-fbsplash-support-console-switching.patch	busybox	not-affected	機能追加
+alpine:busybox:0024-fbsplash-support-image-and-bar-alignment-and-positio.patch	busybox	not-affected	機能追加
+alpine:busybox:0025-depmod-support-generating-kmod-binary-index-files.patch	busybox	not-affected	機能追加
+alpine:busybox:0026-Add-flag-for-not-following-symlinks-when-recursing.patch	busybox	not-affected	diff の新しいフラグ
+alpine:busybox:0027-udhcpc-Don-t-background-if-n-is-given.patch	busybox	not-affected	Alpine の起動挙動の都合
+alpine:busybox:0028-tests-fix-tarball-creation.patch	busybox	not-affected	テストのみ
+alpine:busybox:0029-tests-musl-doesn-t-seem-to-recognize-UTC0-as-a-timez.patch	busybox	not-affected	テストのみ
+alpine:busybox:0030-Hackfix-to-disable-HW-acceleration-for-MD5-SHA1-on-x.patch	busybox	not-affected	i386 だけを対象とする変更。Kimigayo は x86_64/arm64
+alpine:busybox:0031-umount-Implement-O-option-to-unmount-by-mount-option.patch	busybox	not-affected	機能追加
+alpine:busybox:0032-find-fix-xdev-depth-and-delete.patch	busybox	not-affected	セキュリティと無関係。ただし find -xdev -delete が別のファイルシステムに入る、データ消失系の機能バグ（全バリアント）
+alpine:busybox:0033-awk.c-fix-CVE-2023-42366-bug-15874.patch	busybox	todo	CVE-2023-42366 の行を参照
+alpine:busybox:0034-awk-Mark-test-for-handling-of-start-of-word-pattern-.patch	busybox	not-affected	テストのみ
+alpine:busybox:0035-syslogd-fix-wrong-OPT_locallog-flag-detection.patch	busybox	not-affected	セキュリティと無関係。ただし -R 指定時にローカルへ記録されない機能バグ（FEATURE_REMOTE_LOG=y の standard/extended）
+alpine:busybox:0036-Fix-CVE-2024-58251-sanitize-process-names-when-calli.patch	busybox	todo	CVE-2024-58251 の行を参照
+alpine:busybox:0037-Skip-additional-hexdump-test-on-big-endian-systems.patch	busybox	not-affected	テストのみ
+alpine:busybox:0038-ash-clear-bb_got_signal-for-non-interactive-shell.patch	busybox	not-affected	非対話シェルで trap 後に無限ループする機能バグ。セキュリティと無関係
+alpine:busybox:0039-Install-lsblk-to-bin-instead-of-usr-bin.patch	busybox	not-affected	Alpine の配置の都合
+alpine:busybox:0040-ash-fix-out-of-bounds-read-in-ifsbreakup.patch	busybox	patched	Kimigayo 0002 と変更行が一致（逆適用で当たる）
+alpine:busybox:0041-less-Support-the-T-option.patch	busybox	not-affected	mandoc 互換の機能追加
+alpine:busybox:0042-modprobe-Check-for-ELF-header-to-determine-if-module.patch	busybox	not-affected	Alpine のカーネル設定の都合
+alpine:busybox:0001-tar-fix-16018-masking-of-potentially-malicious-tar-cpio-content.patch	busybox	todo	（3.24-stable）1.38.0 には当たらない。大半は上流 f5e1bf966 で入ったが、UNAME_GNAME 分岐が残っている。CVE-2025-46394 の行の Debian パッチで直る
+alpine:busybox:0001-netstat-sanitize-process-names.patch	busybox	todo	（3.24-stable）master の 0036 と変更行が同一。1.38.0 にも必要。CVE-2024-58251 の行を参照
+alpine:musl:handle-aux-at_base.patch	musl	not-affected	gcompat 用 ELF インタプリタの都合
+alpine:musl:0001-add-stub-for-pthread_mutexattr_setprioceiling.patch	musl	not-affected	API スタブの追加
+alpine:musl:0001-fix-toctou-race-in-popen-children-s-closing-of-other.patch	musl	not-affected	上流 f21a96538f78 の修正だが、マルチスレッドの popen/pclose 競合でしか起きない。Kimigayo の popen 利用者（OpenRC librc・BusyBox awk）は単一スレッドで、セキュリティ修正でもない
+alpine:musl:fix-loongarch64-zero-len-extcontext.patch	musl	not-affected	loongarch64 専用
+alpine:musl:fstatat-null.patch	musl	not-affected	path=NULL + AT_EMPTY_PATH の互換。OpenRC は NULL を渡さない
+alpine:musl:adjust-paths.patch	musl	not-affected	Alpine の utmps の都合
+alpine:openrc:0001-call-sbin-mkmntdirs-in-localmount-OpenRC-service.patch	openrc	not-affected	Alpine の mkmntdirs の都合
+alpine:openrc:0002-fsck-don-t-add-C0.patch	openrc	not-affected	機能互換
+alpine:openrc:0003-rc-pull-in-sysinit-and-boot-as-stacked-levels-when-n.patch	openrc	not-affected	ランレベル遷移の機能修正
+alpine:openrc:0004-make-consolefont-service-compatible-with-busyboxs-se.patch	openrc	not-affected	機能互換
+alpine:openrc:0005-Support-early-loading-of-keymap-if-kbd-is-installed.patch	openrc	not-affected	kbd 用
+alpine:openrc:0006-Add-support-for-starting-services-in-a-specified-VRF.patch	openrc	not-affected	機能追加
+alpine:openrc:0007-Clean-up-staticroute-config-remove-irrelevant-parts-.patch	openrc	not-affected	設定コメントの整理
+alpine:openrc:0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch	openrc	todo	CVE ではないがデータ消失の安全策。3 バリアントとも conf.d/bootmisc が wipe_tmp="YES" で、bootmisc は boot ランレベルに入っている。OpenRC を起動すると /tmp を rm -rf し、/tmp にマウントしたボリュームを消しうる。https://raw.githubusercontent.com/alpinelinux/aports/master/main/openrc/0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch
+alpine:openrc:0009-Based-on-the-vrf-patch-it-adds-support-to-run-servic.patch	openrc	not-affected	機能追加
+alpine:openrc:0010-init.d-user-add-a-respawn_delay-value.patch	openrc	not-affected	機能修正
+alpine:openrc:supervise-daemon-defaults.patch	openrc	not-affected	respawn の既定値の調整
+alpine:openrc:sysctl-readme.patch	openrc	not-affected	README のみ
+alpine:libcap:fortify.patch	libcap	not-affected	fortify の誤検知で cap_to_text() がトラップする問題。OpenRC 0.63.2 が使うのは cap_iab_from_text/cap_iab_set_proc/cap_setuid/cap_set_secbits/cap_free で、cap_to_text は呼ばない。なお Alpine 3.24-stable の libcap 2.78-r0 にはこのパッチが無い（master で 2026-10-12 に追加）
+CVE-2006-1058	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2006-5050	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2010-0001	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2011-2716	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2011-5325	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2013-1813	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2014-4607	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2014-9645	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2015-9261	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2016-2147	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2016-2148	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2016-6301	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2017-15873	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2017-15874	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2017-16544	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2018-1000517	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2018-20679	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2019-5747	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-28831	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42373	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42374	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42375	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42376	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42377	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42378	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42379	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42380	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42381	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42382	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42383	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42384	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42385	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42386	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2022-28391	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2022-48174	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2023-42363	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2023-42364	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2023-42365	busybox	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2011-4099	libcap	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2023-2602	libcap	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2023-2603	libcap	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2025-1390	libcap	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2026-4878	libcap	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2014-3484	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2015-1817	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2016-8859	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2017-15650	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2019-14697	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2020-28928	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2018-21269	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+CVE-2021-42341	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
