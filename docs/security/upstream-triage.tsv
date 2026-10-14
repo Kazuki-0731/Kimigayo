@@ -8,7 +8,8 @@
 #              not-affected   該当機能が全バリアントで無効、またはセキュリティと無関係
 #              baseline       2026-10-14 の初回の突き合わせ時点で Debian で解決済みの過去分
 #              todo           影響あり・修正がある。取り込み待ち
-#              watching       影響あり・修正がどこにも無い。修正が出たら知らせる
+#              watching       影響あり・リリースにも Debian / Alpine にも修正が無い。
+#                             出たら知らせる（CVE の行だけを見る）
 #              accepted       影響ありを承知で受け入れる（理由を書く）
 #              unknown        判断材料が足りない
 #
@@ -16,32 +17,32 @@
 # Discord で知らせる。仕分けたらここに足す（手順は security-review skill）。
 # 2026-10-14 の初回の仕分け: BusyBox の実際の config（oldconfig 後）・上流 git・
 # Debian / Alpine のパッチの dry-run・公開イメージ 3.0.2 での実測に基づく。
-CVE-2026-108119	busybox	todo	tar の遅延リンクが展開先の外を検証しない（全バリアント、2 本の tar で実測）。上流 BusyBox に修正コミット 382008b3f07d（2026-10-09、tar: protect against Symlink+Hardlink attack）があるが、リリース・Debian・Alpine には未収録。#121
-CVE-2018-1000500	busybox	todo	緩和策は Alpine の 0017（alpine:busybox:0017 の行。https 取得が fail-closed になる挙動変更を伴う）。standard/extended の wget は内部 TLS で証明書を検証しない（実イメージで "TLS certificate validation not implemented" を出して続行）。上流は意図した設計で修正予定なし、Debian も unfixed/unimportant。minimal は wget なし
+CVE-2026-108119	busybox	watching	tar の遅延リンクが展開先の外を検証しない（全バリアント、2 本の tar で実測）。上流 BusyBox に修正コミット 382008b3f07d（2026-10-09）と 5da20102b5db があるが、リリース・Debian・Alpine には未収録。**リリースか Debian / Alpine に入るまで待つ**（2026-10-14 に決定）。Debian か Alpine で直ると security.yml が知らせる。BusyBox の新版は base-image-update.yml が見る。#121
+CVE-2018-1000500	busybox	patched	src/busybox/patches/0017-CVE-2018-1000500-wget-https-fail-closed.patch（Alpine 0017）。https は --no-check-certificate なしでは失敗する（fail-closed。2026-10-14 に決定）。verify-image.sh が見る
 CVE-2022-30065	busybox	fixed-upstream	修正 e63d7cdfdac78c6fd27e9e63150335767592b85e は 1_36_0 以降のタグに含まれ、1.38.0 にある
 CVE-2023-39810	busybox	fixed-upstream	9a8796436b9b0641e13480811902ea2ac57881d3 は 1.38.0 に入っている。ただし既定 n の CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION の下でしか効かない。Kimigayo は 3 バリアントとも y を明示しており verify-image.sh が回帰を見ている
-CVE-2023-42366	busybox	todo	awk の next_token が正規表現末尾の \ で範囲外を読む。修正は 1.38.0 にも上流 HEAD にも無い（Alpine 0033 が両方に当たる）。awk は全バリアント。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0033-awk.c-fix-CVE-2023-42366-bug-15874.patch（Debian も同じパッチ）
-CVE-2024-58251	busybox	todo	netstat -p が argv0 の端末エスケープを素通しする。1.38.0 にも HEAD にも修正なし。FEATURE_NETSTAT_PRG=y で全バリアント。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0036-Fix-CVE-2024-58251-sanitize-process-names-when-calli.patch
-CVE-2025-46394	busybox	todo	1.38.0 は f5e1bf966 で大半を直しているが、FEATURE_TAR_UNAME_GNAME=y の分岐（standard/extended）でファイル名が未サニタイズ。実イメージの tar tv で ESC がそのまま出た。minimal は修正済み経路。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/archival-libarchive-sanitize-filenames-on-output-CVE-2025-46394-2.patch（上流では 7473045ad3504db9b421427a452fd9b146346306 で修正）
-CVE-2025-60876	busybox	todo	wget の URL の CR/LF/制御文字によるヘッダ注入。1.38.0 にも HEAD にも修正なし。standard/extended。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/wget-disallow-control-chars-in-URLs-CVE-2025-60876.patch
+CVE-2023-42366	busybox	patched	src/busybox/patches/0005-CVE-2023-42366-awk-next-token-backslash-oob.patch（Alpine 0033）
+CVE-2024-58251	busybox	patched	src/busybox/patches/0006-CVE-2024-58251-netstat-sanitize-process-names.patch（Alpine 0036）。minimal からは netstat 自体を外した
+CVE-2025-46394	busybox	patched	src/busybox/patches/0007-CVE-2025-46394-tar-sanitize-uname-gname-listing.patch（Debian 1:1.38.0-3）
+CVE-2025-60876	busybox	patched	src/busybox/patches/0008-CVE-2025-60876-wget-reject-control-chars-in-url.patch（Debian 1:1.38.0-3）
 CVE-2026-26157	busybox	fixed-upstream	3fb6b31c716669e12f75a2accd31bb7685b1a1cb（ハードリンクの危険な成分を除去）は 1.38.0 に入っている（skip_unsafe_prefix / strip_unsafe_prefix(link_target) を確認）
 CVE-2026-26158	busybox	fixed-upstream	同じく 3fb6b31c で 1.38.0 修正済み。遅延リンクの別経路は対象外の CVE-2026-108119
 CVE-2026-29004	busybox	fixed-upstream	42202bfb1e6ac51fa995beda8be4d7b654aeee2a と d368f3f7836d1c2484c8f839316e5c93e76d4409 はどちらも 1.38.0 に含まれ、tarball に逆適用で当たる（Debian の unfixed 表示は追随遅れ）
-CVE-2026-38752	busybox	todo	awk の関数の無限再帰でスタックが溢れる。実イメージ（minimal）で segfault rc=139。全バリアント。https://sources.debian.org/data/main/b/busybox/1:1.38.0-3/debian/patches/awk-fix-stack-overflow-in-evaluate-CVE-2026-38752.patch（元は https://lists.busybox.net/pipermail/busybox/2026-June/092351.html）
+CVE-2026-38752	busybox	patched	src/busybox/patches/0009-CVE-2026-38752-awk-evaluate-recursion-limit.patch（Debian 1:1.38.0-3）。verify-image.sh が見る
 CVE-2026-38753	busybox	patched	Kimigayo 0003 と Debian の awk-fix-use-after-free-in-awk_sub-CVE-2026-38753.patch は変更行が完全に一致
 CVE-2026-38754	busybox	patched	Kimigayo 0002 は Debian・Alpine 0040 と変更行が完全に一致（上流でも a448b6d5b で修正済みだが 1.38.0 の後）
 CVE-2026-38755	busybox	patched	Kimigayo 0004 と Debian の ash-fix-stack-overflow-in-evalfun-CVE-2026-38755.patch は変更行が完全に一致（Debian の記述は evalcommand の heap overflow だが、パッチの中身は同じ）
 CVE-2026-76014	busybox	not-affected	-T の NULL 参照は FEATURE_WGET_TIMEOUT=n のときだけ起きる。standard/extended は y（busybox wget -T 1 でも落ちないことを確認）、minimal は wget なし
-CVE-2026-88830	busybox	todo	TLS の Montgomery reduction のバッファ計算誤り。ssl_server/ssl_client は全バリアントにある。上流は「現状の呼び出し元からは到達不能」と注記。https://git.busybox.net/busybox/commit/?id=89ac82774f90e270d04ed5299e5cf05dfbc314c1
-CVE-2026-88831	busybox	todo	httpd の不正な CIDR を含む D: ルールが fail-open になる（FEATURE_HTTPD_ACL_IP=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=339e3c62f5bcf252839c8abca5325f48a22f21aa
-CVE-2026-88832	busybox	todo	volume_id/romfs のラベルが heap overflow（FEATURE_VOLUMEID_ROMFS=y。blkid/findfs/mount は全バリアント、細工したブロックデバイスの読み取りが条件）。https://git.busybox.net/busybox/commit/?id=9073c1d15c9953c6f1e39145815fc5dccfa6081c
+CVE-2026-88830	busybox	patched	src/busybox/patches/0010-CVE-2026-88830-tls-montgomery-buffer-size.patch（上流 89ac827）。minimal は TLS ごと外した
+CVE-2026-88831	busybox	patched	src/busybox/patches/0011-CVE-2026-88831-httpd-acl-bad-cidr-fail-open.patch（上流 339e3c6）。minimal は httpd を外した
+CVE-2026-88832	busybox	patched	src/busybox/patches/0012-CVE-2026-88832-volume-id-romfs-label-overflow.patch（上流 9073c1d）
 CVE-2026-88833	busybox	watching	udhcpc の d4_recv_raw_packet で IP tot_len を 20〜27 にすると bytes-28 が負になり memcpy する（全バリアント）。上流の fd1972099 は recvmsg の長さしか見ておらず、HEAD でも tot_len 由来の経路は残る（ソースで確認）。修正はどこにも無い
-CVE-2026-88834	busybox	todo	httpd の "user:*" 認証で getspnam_r 失敗時に挙動が変わり、ユーザーの存在が分かる（FEATURE_SHADOWPASSWDS=y、全バリアント）。Red Hat の題名は「shadow 無効ビルド」だが、該当コードは shadow 有効側。https://git.busybox.net/busybox/commit/?id=b829bba95095b87834628adb38ea14b5885c0fbc
+CVE-2026-88834	busybox	patched	src/busybox/patches/0014-CVE-2026-88834-httpd-bogus-passwd-entry.patch（上流 b829bba）。minimal は httpd を外した
 CVE-2026-88835	busybox	not-affected	dpkg は全バリアントで CONFIG_DPKG=n（busybox --list にも無い）
-CVE-2026-88837	busybox	todo	httpd.conf の $y$ ハッシュを平文として比較するため、ハッシュ文字列そのもので認証が通る（FEATURE_HTTPD_AUTH_MD5=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=9f5cbdcaa5972d58503c59cd0da13da1e5bb272b
+CVE-2026-88837	busybox	patched	src/busybox/patches/0013-CVE-2026-88837-httpd-yescrypt-hash-as-password.patch（上流 9f5cbdc）。minimal は httpd を外した
 CVE-2026-88838	busybox	not-affected	非 root の mount のオプション検査をすり抜ける問題。3 バリアントとも setuid ファイルが 0 件（/bin/busybox は 755）なので経路に届かない。上流もコメントの追加（556567f40）のみでコード修正なし
-CVE-2026-88839	busybox	todo	libpwdgrp の tokenize() が古い end ポインタを使い、heap に範囲外書き込みする（USE_BB_PWD_GRP=y、全バリアント）。https://git.busybox.net/busybox/commit/?id=c2dec52d37380d27d89827cf01a770f6b3b04e3a
-CVE-2026-88840	busybox	todo	ssl_server の get_client_hello で 1 バイト範囲外読み取り（1.38.0 で入ったサーバ実装。ssl_server は全バリアント）。https://git.busybox.net/busybox/commit/?id=e97224f8fbad11a4d00feaec3391c27ed773f147
+CVE-2026-88839	busybox	patched	src/busybox/patches/0015-CVE-2026-88839-libpwdgrp-tokenize-heap-overflow.patch（上流 c2dec52）
+CVE-2026-88840	busybox	patched	src/busybox/patches/0016-CVE-2026-88840-tls-client-hello-oob-read.patch（上流 e97224f）。minimal は ssl_server を外した
 CVE-2026-88841	busybox	not-affected	dpkg の write_status_file。dpkg は全バリアントで無効
 CVE-2025-26519	musl	fixed-upstream	musl 1.2.6 の src/locale/iconv.c に e5adcd97 と c47ad25e の修正行が両方ある（L505 / L551）
 alpine:busybox:0001-ash-exec-busybox.static.patch	busybox	not-affected	Alpine の busybox.static 用。セキュリティと無関係
@@ -50,19 +51,19 @@ alpine:busybox:0003-blkdiscard-ship-link-to-sbin-instead-of-usr-bin.patch	busybo
 alpine:busybox:0004-hexdump-fix-regression-with-n4-e-u.patch	busybox	not-affected	テストの追加のみ
 alpine:busybox:0005-init-add-support-for-separate-reboot-action.patch	busybox	not-affected	機能追加
 alpine:busybox:0006-mount-fix-parsing-proc-mounts-with-long-lines.patch	busybox	not-affected	セキュリティと無関係。ただし Docker 内で長い /proc/mounts 行があると mount -o remount が失敗する機能バグで、コンテナ用途では効く
-alpine:busybox:0007-tar-fix-TOCTOU-symlink-race-condition.patch	busybox	todo	tar --overwrite（ARCHIVE_O_TRUNC）で通常ファイルを開くとき O_NOFOLLOW が無く、既存のシンボリックリンクを辿って書き込む（全バリアント）。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0007-tar-fix-TOCTOU-symlink-race-condition.patch
+alpine:busybox:0007-tar-fix-TOCTOU-symlink-race-condition.patch	busybox	patched	src/busybox/patches/0018-tar-overwrite-o-nofollow.patch（sha512 一致）
 alpine:busybox:0008-tunctl-fix-segfault-on-ioctl-failure.patch	busybox	not-affected	ioctl 失敗時の自滅的な segfault。セキュリティと無関係
 alpine:busybox:0009-wget-add-header-Accept.patch	busybox	not-affected	機能修正
 alpine:busybox:0010-adduser-default-to-sbin-nologin-as-shell-for-system-.patch	busybox	not-affected	既定シェルの /bin/false → /sbin/nologin。どちらもログイン不可なので Alpine の都合
 alpine:busybox:0011-ash-add-built-in-BB_ASH_VERSION-variable.patch	busybox	not-affected	機能追加
 alpine:busybox:0012-Avoid-redefined-warnings-when-buiding-with-utmps.patch	busybox	not-affected	Alpine の utmps の都合
-alpine:busybox:0013-libbb-sockaddr2str-ensure-only-printable-characters-.patch	busybox	todo	逆引きしたホスト名の端末エスケープを素通しする（netstat・traceroute 等、全バリアント）。1.38.0 には未修正。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0013-libbb-sockaddr2str-ensure-only-printable-characters-.patch
+alpine:busybox:0013-libbb-sockaddr2str-ensure-only-printable-characters-.patch	busybox	patched	src/busybox/patches/0019-sockaddr2str-printable-hostnames.patch（sha512 一致）
 alpine:busybox:0014-modinfo-add-k-option-for-kernel-version.patch	busybox	not-affected	機能追加
 alpine:busybox:0015-nologin-Install-applet-to-sbin-instead-of-usr-sbin.patch	busybox	not-affected	Alpine の配置の都合（Kimigayo は既に /sbin/nologin がある）
 alpine:busybox:0016-pgrep-add-support-for-matching-against-UID-and-RUID.patch	busybox	not-affected	機能追加
-alpine:busybox:0017-properly-fix-wget-https-support.patch	busybox	todo	CVE-2018-1000500 の緩和策。Kimigayo は SSL_CLIENT=y なので、当てると https 取得が --no-check-certificate なしで失敗（fail-closed）する挙動変更を伴う。採否は判断が要る。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0017-properly-fix-wget-https-support.patch
+alpine:busybox:0017-properly-fix-wget-https-support.patch	busybox	patched	CVE-2018-1000500 の行を参照（0017-CVE-2018-1000500-wget-https-fail-closed.patch）
 alpine:busybox:0018-fsck-resolve-LABEL-.-UUID-.-spec-to-device.patch	busybox	not-affected	機能追加
-alpine:busybox:0019-nslookup-sanitize-all-printed-strings-with-printable.patch	busybox	todo	DNS 応答の文字列による端末エスケープ注入（nslookup は全バリアント）。1.38.0 には未修正。https://raw.githubusercontent.com/alpinelinux/aports/master/main/busybox/0019-nslookup-sanitize-all-printed-strings-with-printable.patch
+alpine:busybox:0019-nslookup-sanitize-all-printed-strings-with-printable.patch	busybox	patched	src/busybox/patches/0020-nslookup-printable-output.patch（sha512 一致）
 alpine:busybox:0020-app-location-for-cpio-vi-and-lspci.patch	busybox	not-affected	Alpine の配置の都合
 alpine:busybox:0021-udhcpc-set-default-discover-retries-to-5.patch	busybox	not-affected	Alpine の調整値
 alpine:busybox:0022-ping-make-ping-work-without-root-privileges.patch	busybox	not-affected	機能追加（ICMP ソケット）。セキュリティ修正ではない
@@ -76,18 +77,18 @@ alpine:busybox:0029-tests-musl-doesn-t-seem-to-recognize-UTC0-as-a-timez.patch	b
 alpine:busybox:0030-Hackfix-to-disable-HW-acceleration-for-MD5-SHA1-on-x.patch	busybox	not-affected	i386 だけを対象とする変更。Kimigayo は x86_64/arm64
 alpine:busybox:0031-umount-Implement-O-option-to-unmount-by-mount-option.patch	busybox	not-affected	機能追加
 alpine:busybox:0032-find-fix-xdev-depth-and-delete.patch	busybox	not-affected	セキュリティと無関係。ただし find -xdev -delete が別のファイルシステムに入る、データ消失系の機能バグ（全バリアント）
-alpine:busybox:0033-awk.c-fix-CVE-2023-42366-bug-15874.patch	busybox	todo	CVE-2023-42366 の行を参照
+alpine:busybox:0033-awk.c-fix-CVE-2023-42366-bug-15874.patch	busybox	patched	CVE-2023-42366 の行を参照
 alpine:busybox:0034-awk-Mark-test-for-handling-of-start-of-word-pattern-.patch	busybox	not-affected	テストのみ
 alpine:busybox:0035-syslogd-fix-wrong-OPT_locallog-flag-detection.patch	busybox	not-affected	セキュリティと無関係。ただし -R 指定時にローカルへ記録されない機能バグ（FEATURE_REMOTE_LOG=y の standard/extended）
-alpine:busybox:0036-Fix-CVE-2024-58251-sanitize-process-names-when-calli.patch	busybox	todo	CVE-2024-58251 の行を参照
+alpine:busybox:0036-Fix-CVE-2024-58251-sanitize-process-names-when-calli.patch	busybox	patched	CVE-2024-58251 の行を参照
 alpine:busybox:0037-Skip-additional-hexdump-test-on-big-endian-systems.patch	busybox	not-affected	テストのみ
 alpine:busybox:0038-ash-clear-bb_got_signal-for-non-interactive-shell.patch	busybox	not-affected	非対話シェルで trap 後に無限ループする機能バグ。セキュリティと無関係
 alpine:busybox:0039-Install-lsblk-to-bin-instead-of-usr-bin.patch	busybox	not-affected	Alpine の配置の都合
 alpine:busybox:0040-ash-fix-out-of-bounds-read-in-ifsbreakup.patch	busybox	patched	Kimigayo 0002 と変更行が一致（逆適用で当たる）
 alpine:busybox:0041-less-Support-the-T-option.patch	busybox	not-affected	mandoc 互換の機能追加
 alpine:busybox:0042-modprobe-Check-for-ELF-header-to-determine-if-module.patch	busybox	not-affected	Alpine のカーネル設定の都合
-alpine:busybox:0001-tar-fix-16018-masking-of-potentially-malicious-tar-cpio-content.patch	busybox	todo	（3.24-stable）1.38.0 には当たらない。大半は上流 f5e1bf966 で入ったが、UNAME_GNAME 分岐が残っている。CVE-2025-46394 の行の Debian パッチで直る
-alpine:busybox:0001-netstat-sanitize-process-names.patch	busybox	todo	（3.24-stable）master の 0036 と変更行が同一。1.38.0 にも必要。CVE-2024-58251 の行を参照
+alpine:busybox:0001-tar-fix-16018-masking-of-potentially-malicious-tar-cpio-content.patch	busybox	patched	（3.24-stable）1.38.0 には当たらない。残っていた UNAME_GNAME 分岐は CVE-2025-46394 の行のパッチで直した
+alpine:busybox:0001-netstat-sanitize-process-names.patch	busybox	patched	（3.24-stable）master の 0036 と同じ変更。CVE-2024-58251 の行を参照
 alpine:musl:handle-aux-at_base.patch	musl	not-affected	gcompat 用 ELF インタプリタの都合
 alpine:musl:0001-add-stub-for-pthread_mutexattr_setprioceiling.patch	musl	not-affected	API スタブの追加
 alpine:musl:0001-fix-toctou-race-in-popen-children-s-closing-of-other.patch	musl	not-affected	上流 f21a96538f78 の修正だが、マルチスレッドの popen/pclose 競合でしか起きない。Kimigayo の popen 利用者（OpenRC librc・BusyBox awk）は単一スレッドで、セキュリティ修正でもない
@@ -101,7 +102,7 @@ alpine:openrc:0004-make-consolefont-service-compatible-with-busyboxs-se.patch	op
 alpine:openrc:0005-Support-early-loading-of-keymap-if-kbd-is-installed.patch	openrc	not-affected	kbd 用
 alpine:openrc:0006-Add-support-for-starting-services-in-a-specified-VRF.patch	openrc	not-affected	機能追加
 alpine:openrc:0007-Clean-up-staticroute-config-remove-irrelevant-parts-.patch	openrc	not-affected	設定コメントの整理
-alpine:openrc:0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch	openrc	todo	CVE ではないがデータ消失の安全策。3 バリアントとも conf.d/bootmisc が wipe_tmp="YES" で、bootmisc は boot ランレベルに入っている。OpenRC を起動すると /tmp を rm -rf し、/tmp にマウントしたボリュームを消しうる。https://raw.githubusercontent.com/alpinelinux/aports/master/main/openrc/0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch
+alpine:openrc:0008-bootmisc-switch-wipe_tmp-setting-to-no-by-default.patch	openrc	patched	OpenRC にはパッチの仕組みが無いので、scripts/build-rootfs.sh が同じ 2 行（conf.d と init.d の bootmisc）を置き換える。verify-image.sh が見る
 alpine:openrc:0009-Based-on-the-vrf-patch-it-adds-support-to-run-servic.patch	openrc	not-affected	機能追加
 alpine:openrc:0010-init.d-user-add-a-respawn_delay-value.patch	openrc	not-affected	機能修正
 alpine:openrc:supervise-daemon-defaults.patch	openrc	not-affected	respawn の既定値の調整
@@ -158,33 +159,33 @@ CVE-2019-14697	musl	baseline	2026-10-14 の初回の突き合わせ時点で Deb
 CVE-2020-28928	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
 CVE-2018-21269	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
 CVE-2021-42341	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
-upstream:busybox:382008b3f07d	busybox	todo	CVE-2026-108119 の修正（create_links_from_list で遅延リンクの解決先が展開先の中に収まるかを確かめる）。1_38_0 より後で、tarball に当たる。tar は全バリアント。深刻度は中（CVSS 6.3）
-upstream:busybox:5da20102b5db	busybox	todo	CVE-2026-108119 の関連修正（unsafe_prefix が ".." 単体も危険な名前として扱う）。1_38_0 より後で、tarball に当たる。tar/cpio は全バリアント。深刻度は中。382008b と一緒に取り込むもの
+upstream:busybox:382008b3f07d	busybox	watching	CVE-2026-108119 の修正。CVE-2026-108119 の行のとおり、リリースか Debian / Alpine に入るまで待つ
+upstream:busybox:5da20102b5db	busybox	watching	CVE-2026-108119 の関連修正。CVE-2026-108119 の行のとおり、382008b と一緒に待つ
 upstream:busybox:f15a204bb28f	busybox	not-affected	xxd -p -c 0 の出力形式の修正。セキュリティと無関係
 upstream:busybox:e65b5600381f	busybox	not-affected	chrt の -R オプション追加（機能追加）
-upstream:busybox:14f6b6b580a4	busybox	todo	bunzip2 の runCnt が 32 ビットで溢れ、1.38.0 の dbufCount+runCnt の範囲検査をすり抜ける。上流の攻撃サンプル bz2_runcnt_overflow.bz2 で 3.0.2-minimal の bzcat が segfault（rc=139）するのを実測。bzcat と tar の bz2 自動判別は全バリアント、bunzip2 は standard/extended。深刻度は高（信頼できない .bz2 の展開でメモリ破壊）
+upstream:busybox:14f6b6b580a4	busybox	patched	src/busybox/patches/0021-bunzip2-runcnt-overflow.patch（testsuite の部分は除いた）。攻撃サンプルを tests/samples/ に置き、verify-image.sh が見る
 upstream:busybox:bfdf3560d64e	busybox	not-affected	fdisk の DOS 互換フラグの既定値変更。セキュリティと無関係
 upstream:busybox:659644d8d674	busybox	not-affected	fdisk のコメント追加のみ
 upstream:busybox:d3c8cfa6745f	busybox	not-affected	tr の "\-" の解釈修正（"escape" の誤検出）。セキュリティと無関係
 upstream:busybox:0e09d2f8577e	busybox	not-affected	tr のエスケープしたダッシュを範囲としない修正（誤検出）。セキュリティと無関係
 upstream:busybox:218f32862560	busybox	not-affected	wget の再試行回数（-t）の機能追加
 upstream:busybox:6885d4c3100b	busybox	not-affected	security_context_t の型の置き換え（誤検出）。SELINUX は全バリアントで n
-upstream:busybox:436223e2b77d	busybox	todo	tar cv（作成時の verbose）でファイル名の端末エスケープを素通しする。1.38.0 に未修正で、tarball に当たる。全バリアント。深刻度は低（ローカルのファイル名による端末エスケープ注入）
-upstream:busybox:15666f3e9a0b	busybox	todo	awk の next_token の文字列解析で 1 バイトの heap 範囲外読み取り（CVE-2023-42366 とは別のバグ）。tarball に当たる。awk は全バリアント。深刻度は低
+upstream:busybox:436223e2b77d	busybox	patched	src/busybox/patches/0022-tar-sanitize-verbose-create.patch
+upstream:busybox:15666f3e9a0b	busybox	patched	src/busybox/patches/0023-awk-next-token-string-oob.patch
 upstream:busybox:a448b6d5b21e	busybox	patched	CVE-2026-38754。Kimigayo の 0002 と同じ修正（前回 Debian・Alpine 0040 と変更行が完全一致を確認）
 upstream:busybox:0309c029800c	busybox	not-affected	hush のコンパイラ警告の抑止（誤検出）。HUSH は全バリアントで n
-upstream:musl:dd856098ad76	musl	todo	floatscan の循環バッファで、wrap 時に添字 -1 へ 0 を書く範囲外書き込み。80 ビット long double（x86_64）と IEEE quad（aarch64）が報告どおり該当し、Kimigayo の 2 アーキの両方。strtold や scanf %Lf などに細工した数値文字列を渡すと発動。深刻度は中
+upstream:musl:dd856098ad76	musl	patched	src/libc/patches/0003-floatscan-oob-store-at-wrap.patch
 upstream:musl:c4e1bb3994c1	musl	not-affected	fnmatch の FNM_PERIOD の照合の正しさの修正（"escaped" の誤検出）
 upstream:musl:be5ba5695df9	musl	not-affected	asprintf の失敗時に結果ポインタを NULL にする強化。戻り値を見ない呼び出し側の保険で、脆弱性の修正ではない
 upstream:musl:3594657b8896	musl	not-affected	printf の * 幅が INT_MIN のときの符号付きオーバーフロー（UB）。書式と引数を呼び出し側が決めるもので、攻撃面がない
 upstream:musl:9ec8ef2c6c8a	musl	not-affected	マジックナンバー 4 を MB_LEN_MAX に置き換えただけで、挙動は変わらない
-upstream:musl:c2541fd53fa6	musl	todo	vfwscanf の割り当て付き %c が UTF-8 で 2 バイトの領域に最大 4 バイト書く heap overflow。1.2.6 より後。深刻度は低（wide scanf の %mc を使うプログラムのみ。Kimigayo の同梱物では未確認）
+upstream:musl:c2541fd53fa6	musl	patched	src/libc/patches/0004-vfwscanf-mc-heap-overflow.patch
 upstream:musl:7d7b03b8e8db	musl	not-affected	%mlc の幅×sizeof(wchar_t) のオーバーフローは 32 ビット size_t の環境だけ。Kimigayo は x86_64/arm64
 upstream:musl:0c34aa688ec1	musl	not-affected	scandir の errno を正しく返す修正。実質到達しない
 upstream:musl:ec9daea2c3a9	musl	not-affected	powl の数値精度の修正
 upstream:musl:691ba934aec3	musl	not-affected	riscv 専用
 upstream:musl:c5e2f7e7ad36	musl	not-affected	gai_strerror・hstrerror・regerror に極端なエラー番号を渡したときの符号付きオーバーフロー（UB）。呼び出し側が異常値を渡す場合だけ
-upstream:musl:897937236ddb	musl	todo	resolv.conf の attempts:0 で名前解決がゼロ除算（SIGFPE）になる。1.2.6 より後。深刻度は低（resolv.conf を書ける者による DoS。コンテナでは実行環境が resolv.conf を書く）
+upstream:musl:897937236ddb	musl	patched	src/libc/patches/0005-dns-zero-attempts-division.patch
 upstream:musl:4a0406c85122	musl	not-affected	ftello の LLONG_MAX 付近のオーバーフロー報告の修正。セキュリティと無関係
 upstream:musl:30cc6422bc61	musl	not-affected	fseeko の LLONG_MIN 付近のオーバーフローの修正。セキュリティと無関係
 upstream:musl:c2021b7795c7	musl	not-affected	mktime の tm_mday=INT_MIN のときのオーバーフロー。セキュリティと無関係
@@ -192,9 +193,9 @@ upstream:musl:f21a96538f78	musl	not-affected	前回の alpine:musl:0001-fix-toct
 upstream:musl:bf96b52a4429	musl	not-affected	極端なアラインメントの確保で、free 時に安全に trap するだけ。64 ビットでは追加の検査も最適化で消える
 upstream:musl:b3291b9a9f77	musl	patched	CVE-2026-40200。Kimigayo の src/libc/patches/0001 の [PATCH 2/3] と同じ
 upstream:musl:228da39e38c1	musl	patched	CVE-2026-40200。Kimigayo の src/libc/patches/0001 の [PATCH 1/3] と同じ
-upstream:musl:40acb04b2c12	musl	todo	BRE の未完了の部分式への後方参照を受け付け、regexec が無限ループする。1.2.6 より後。BusyBox の grep/sed/expr などが musl の regcomp を使う。深刻度は低（信頼できない BRE を受け取る場合の DoS）
+upstream:musl:40acb04b2c12	musl	patched	src/libc/patches/0006-regex-bre-invalid-backref-loop.patch
 upstream:musl:0572555dab1d	musl	not-affected	strptime %Z で tzset 前だと NULL 参照する。書式を呼び出し側が決めるローカルなクラッシュで、セキュリティ境界がない
-upstream:musl:6f6bd4a1896b	musl	todo	IPv6 が使えない環境（IPv6 を無効にしたコンテナでよくある）の名前解決で、conf->ns[nns] と配列の 1 つ先を読む。1.2.6 より後。深刻度は低（構造体内の範囲外読み取りで、判定を誤る程度）
+upstream:musl:6f6bd4a1896b	musl	patched	src/libc/patches/0007-dns-ipv6-disabled-ns-oob-read.patch
 upstream:musl:149d87297031	musl	fixed-upstream	v1.2.6 に含まれる（v1.2.6~2）
 upstream:musl:5c901bb36041	musl	fixed-upstream	v1.2.6 に含まれる（syscall 番号の更新。セキュリティとは無関係）
 upstream:musl:5c26c890ede4	musl	fixed-upstream	v1.2.6 に含まれる（行頭の余分な ';' の削除。セキュリティとは無関係）
