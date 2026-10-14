@@ -301,6 +301,28 @@ v3.0.1 の公開イメージで `scan-image.sh` が 5 件を検出しました�
 **CI（毎 push）とリリース（push 前）でも CVE を照合する**ので、
 未対応の CVE があるイメージは公開されません。
 
+#### 上流との突き合わせで取り込んだ修正（2026-10-14）
+
+`scan-image.sh` は NVD の CPE しか見ないので、Alpine・Debian だけが持つ修正や、
+リリース前の上流の修正は見えません。2026-10-14 に `watch-upstream-fixes.py` で
+初めて突き合わせ、**修正があるのに持っていなかった 33 件**が見つかりました。
+
+- **30 件を取り込みました**（BusyBox 19 本・musl 5 本のパッチと、OpenRC の
+  bootmisc の既定の変更）。BusyBox の CVE は 13 件で、httpd の認証・ACL、
+  libpwdgrp の heap overflow、TLS、awk、wget、tar・netstat の端末エスケープ。
+  CVE ID の無いものでは、bunzip2 のメモリ破壊（v3.0.2 の bzcat が攻撃サンプルで
+  segfault）と musl の floatscan の範囲外書き込みが重い
+- **wget の https は証明書を検証できないので、既定で失敗させる**ようにしました
+  （CVE-2018-1000500。`--no-check-certificate` で従来どおり）
+- **minimal から httpd・ssl_server・udhcpc など 38 個のネットワーク系アプレットを
+  外しました。** config に書いていない項目が既定値で有効になっていたためで、
+  上の CVE の多くが minimal にも当たっていた原因です
+- **CVE-2026-108119（tar）は待ちます。** 上流 git に修正はあるがリリースされて
+  いないため、リリースか Debian / Alpine に入るまで取り込みません
+
+1 件ずつの根拠と状態は [upstream-triage.tsv](upstream-triage.tsv)、
+出所は各パッチの冒頭にあります。
+
 #### 5. 上流更新の検知（`base-image-update.yml`）
 毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。
 
