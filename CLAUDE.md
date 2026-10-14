@@ -615,6 +615,14 @@ make benchmark             # 全ベンチマーク
 | `src/busybox/patches/0004-CVE-2026-38755-ash-evalfun-recursion.patch` | ash の関数の無限再帰でシェルが落ちる。同上。**深さ 1000 で打ち切る挙動の変更を伴う**（`verify-image.sh` が回帰を見る） |
 | `src/libc/patches/0001-CVE-2026-40200-qsort-stack-corruption.patch` | musl の qsort のスタック破壊。上流の 3 コミットで、musl 1.2.6 の次の版で不要になる。Alpine aports と sha512 で突合 |
 | `src/libc/patches/0002-CVE-2026-6042-iconv-gb18030-dos.patch` | musl の iconv（GB18030）の CPU DoS。同上 |
+| `src/busybox/patches/0005`〜`0023`・`src/libc/patches/0003`〜`0007` | 2026-10-14 に上流との差分（`watch-upstream-fixes.py`）で見つかった、修正があるのに持っていなかったもの。**出所と照合方法は各パッチの冒頭、仕分けは `docs/security/upstream-triage.tsv`**（ここに重複させない）。上流 git・Alpine（sha512 一致）・Debian から取った。上流が版を出したら、含まれているものから消す |
+| `0017-CVE-2018-1000500-wget-https-fail-closed.patch` | **挙動の変更を伴う。** wget の https は `--no-check-certificate` なしでは失敗する（内部 TLS が証明書を検証しないため。Alpine と同じ。2026-10-14 にユーザーが決定）。`verify-image.sh` が見る |
+| `0021-bunzip2-runcnt-overflow.patch` | 上流のコミットから testsuite の部分（バイナリのサンプルを含む）を外したもの。サンプルは `tests/samples/` にあり `verify-image.sh` が使う |
+
+**CVE-2026-108119（tar）の上流の修正 382008b / 5da2010 は取り込まない。**
+リリースか Debian / Alpine に入るまで待つと決めた（2026-10-14）。
+OpenRC にはパッチの仕組みが無いので、Alpine のパッチ相当の変更（bootmisc の
+`wipe_tmp` の既定を NO）は `build-rootfs.sh` の置き換えで行う。
 
 **CVE パッチのファイル名には CVE ID を入れる。** `build-rootfs.sh` が
 ファイル名から `/.kimigayo-build-info` の `PATCHED_CVES` を作り、
@@ -796,7 +804,7 @@ ls -l build/rootfs/sbin/openrc build/rootfs/usr/lib/libc.so
 
 ```bash
 make test                      # コンテナ内で pytest
-python3 -m pytest tests -q               # 65 件（2026-10-14 時点）
+python3 -m pytest tests -q               # 75 件（2026-10-14 時点）
 pip install -r requirements-dev.txt      # pytest / PyYAML
 ```
 
@@ -1314,7 +1322,7 @@ Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/
 **ローカルで変更したら、外に出す前に最低これを通す:**
 
 ```bash
-python3 -m pytest tests -q                         # 65 件（2026-10-14 時点）
+python3 -m pytest tests -q                         # 75 件（2026-10-14 時点）
 make shellcheck-scan                               # scripts/ の静的解析
 make ci-build-local                                # rootfs → イメージ → smoke
 make security-scan                                 # scan-image + Trivy FS + ShellCheck
