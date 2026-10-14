@@ -215,6 +215,9 @@ make security-scan
 2. **`wget` の HTTPS**: v3.0.1 以前は取得後に Segmentation fault で落ちます（v3.0.2 で修正）。
    → [busybox-wget-https-segfault.md](../troubleshooting/busybox-wget-https-segfault.md)
 3. **TLS 証明書の検証**: BusyBox の `wget` は証明書を検証しません。
+   v3.0.2 までは注意を出して取得を続けていました。次の版からは、
+   `--no-check-certificate` を付けない限り `https://` の取得を失敗させます
+   （CVE-2018-1000500。Alpine と同じ）。
    信頼できない経路で HTTPS を使うなら `curl` などを持ち込んでください
 
 ## 参考リソース

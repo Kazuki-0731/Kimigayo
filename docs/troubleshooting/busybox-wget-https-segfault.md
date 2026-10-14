@@ -104,6 +104,9 @@ grep して、本当に切り替わったかを確かめる。**
 
 **証明書は検証しない。** BusyBox の wget は修正後も
 `TLS certificate validation not implemented` のまま（上流の仕様）。
+v3.0.2 の次の版からは Alpine と同じ `0017` を当て
+（`src/busybox/patches/0017-CVE-2018-1000500-wget-https-fail-closed.patch`）、
+`--no-check-certificate` を付けない限り `https://` の取得を失敗させる。
 信頼できない経路で HTTPS を使うなら `curl` などを持ち込む。
 
 ## 関連
