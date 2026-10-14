@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] "Himawari" (向日葵) - 2026-10-14
+
+**上流（BusyBox・musl・Alpine・Debian）と突き合わせて見つけた修正 30 件を取り込み、
+arm64 の強化（FORTIFY・スタック保護）とライセンス文書・対応するソースの公開を揃えた版。**
+wget の https と minimal の中身に挙動の変更がある。
+
 ### Security
 
 - **arm64 でも `_FORTIFY_SOURCE` が効くようにした。** musl は FORTIFY を実装せず、

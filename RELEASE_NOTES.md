@@ -1,5 +1,92 @@
 # Kimigayo OS Release Notes
 
+## バージョン 3.1.0 "Himawari" (向日葵) - 2026-10-14
+
+**上流と突き合わせて見つけたセキュリティ修正 30 件を取り込んだ版です。**
+arm64 の強化の抜けを埋め、ライセンス文書と対応するソースの公開も揃えました。
+**`wget` の https と Minimal の中身に、挙動の変更があります**（下記）。
+
+### ⚠️ 挙動の変更
+
+- **`wget https://...` は、`--no-check-certificate` を付けない限り失敗します。**
+  BusyBox の内蔵 TLS は証明書を検証しません。v3.0.2 までは注意を出して取得を
+  続けていましたが、検証しないまま繋ぐのをやめました（CVE-2018-1000500。
+  Alpine と同じ対応）。信頼できない経路で HTTPS を使うなら `curl` を持ち込んでください
+- **Minimal からネットワークのサーバー・クライアント 38 個を外しました**
+  （`httpd`・`ssl_server`・`ssl_client`・`udhcpc`・`telnetd`・`ftpd`・`tftpd`・
+  `inetd`・`ntpd`・`nslookup`・`netstat`・`traceroute` など）。config に書いていない
+  項目が既定値で有効になっていたためで、Minimal のアプレットは 367 → 329 です。
+  **Standard / Extended には引き続き入っています**
+- **起動時に `/tmp` を丸ごと消さなくなりました。** OpenRC の bootmisc の
+  `wipe_tmp` の既定を NO にしました（Alpine と同じ）。`/sbin/init` を PID 1 にした
+  とき、`/tmp` にマウントしたボリュームが消えることがありました
+
+### 🔒 上流との差分 30 件を取り込みました
+
+NVD の CPE で照合する `scan-image.sh` では見えない修正（Alpine・Debian だけが
+持つもの、上流 git にあってまだリリースされていないもの）を、毎日
+上流と突き合わせる仕組みを入れました。初回の突き合わせで、
+**修正があるのに持っていなかったものが 33 件**見つかり、30 件を取り込みました。
+
+| 部品 | 取り込んだもの |
+| --- | --- |
+| BusyBox（19 本） | CVE 13 件: httpd の認証・ACL（CVE-2026-88831・88834・88837）、`/etc/passwd` 読み込みの heap overflow（CVE-2026-88839）、TLS（CVE-2026-88830・88840）、romfs のラベル（CVE-2026-88832）、awk（CVE-2023-42366・CVE-2026-38752）、wget（CVE-2025-60876・CVE-2018-1000500）、netstat・tar の端末エスケープ（CVE-2024-58251・CVE-2025-46394）。CVE ID の無いもの 6 件: **細工した `.bz2` でのメモリ破壊**（v3.0.2 の `bzcat` が攻撃サンプルで落ちることを確認）、`tar --overwrite` がシンボリックリンクを辿る問題、tar・nslookup・逆引き名の端末エスケープ、awk の読み過ぎ |
+| musl（5 本） | 数値の読み取り（`strtold`・`scanf %Lf`）の範囲外書き込み、`vfwscanf` の heap overflow、resolver のゼロ除算と範囲外読み取り、正規表現の無限ループ |
+| OpenRC | bootmisc の `wipe_tmp` の既定（上記） |
+
+出所は上流 git・Alpine aports（sha512 で突合）・Debian です。
+1 件ずつの根拠は [docs/security/upstream-triage.tsv](docs/security/upstream-triage.tsv) にあります。
+これからは `security.yml` が毎日突き合わせ、新しい差分を Issue で知らせます。
+
+> **既知の問題: CVE-2026-108119（`tar`）は未修正です。**
+> 2 本の tar を同じディレクトリに続けて展開すると、展開先の外にファイルを
+> 書けます（v3.0.2 も同じ）。上流 git に修正はありますがリリースされていないため、
+> BusyBox のリリースか Debian / Alpine に入るのを待ちます。実際に悪用された記録は
+> ありません。**信頼できない tar を同じディレクトリに続けて展開しないでください。**
+> 追跡: [#121](https://github.com/Kazuki-0731/Kimigayo/issues/121)
+
+### 🛡️ arm64 の強化の抜けを埋めました
+
+- **`_FORTIFY_SOURCE` が arm64 でも効きます。** v3.0.2 の arm64 の BusyBox には
+  検査が 1 つも入っていませんでした（x86_64 は効いていました）
+- **arm64 の OpenRC にもスタック保護が付きます。** v3.0.2 の arm64 では
+  `openrc`・`librc`・`libeinfo` など 20 本以上に付いていませんでした
+
+どちらも `verify-image.sh` が出荷物のバイナリで毎回検査します。
+
+### 📜 ライセンス文書と対応するソースを公開します
+
+- イメージの `/usr/share/licenses/` に BusyBox・musl・OpenRC・libcap の
+  ライセンス文書を入れました（v3.0.2 以前には入っていませんでした）
+- BusyBox は GPL-2.0 なので、**対応するソース**（上流の tarball 3 本と
+  このリポジトリの archive）を GitHub Release に添付します。集められなければ
+  公開しません
+- イメージのラベルを `GPL-2.0-only AND MIT AND BSD-2-Clause AND BSD-3-Clause` にしました
+
+### 📏 イメージサイズ
+
+| | x86_64 | arm64 |
+| --- | --- | --- |
+| Minimal | 2.34MB | 2.73MB |
+| Standard | 2.64MB | 3.06MB |
+| Extended | 2.67MB | 3.09MB |
+
+（CI でビルドしたイメージの値。v3.0.2 は Minimal 2.46 / 2.82MB、Standard 2.59 / 2.97MB、
+Extended 2.62 / 3.01MB。Minimal はアプレットを減らした分小さく、Standard / Extended は
+ライセンス文書・パッチ・arm64 の FORTIFY の分わずかに大きくなりました）
+
+### アップグレード
+
+```dockerfile
+FROM ishinokazuki/kimigayo-os:3.1.0
+```
+
+`wget` で https を取得しているなら、`--no-check-certificate` を付けるか
+`curl` に替えてください。Minimal で `httpd` や `udhcpc` を使っているなら、
+Standard に替えてください。
+
+---
+
 ## バージョン 3.0.2 "Himawari" (向日葵) - 2026-10-12
 
 **既知の CVE 5 件を塞ぎ、`wget` の HTTPS を直した版です。**
