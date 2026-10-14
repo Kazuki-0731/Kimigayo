@@ -644,6 +644,76 @@ if in_image "busybox --list" | grep -qx wget; then
     fi
 fi
 
+# **wget の https は証明書を検証できないので、既定では取得を止める（fail-closed）。**
+#
+# BusyBox の内部 TLS は証明書を検証しない。上流の wget は注意を出したうえで
+# 取得を続けていた（CVE-2018-1000500）。Alpine の 0017 を当て、
+# --no-check-certificate を明示しない限り失敗させる（2026-10-14 に決定）。
+# ネットワークに頼らないよう、イメージ内の httpd に https で繋いで、TLS を
+# 始める前に止まることを見る（httpd は平文なので、止まらなければ別のエラーになる）。
+if in_image "busybox --list" | grep -qx wget; then
+    out="$(in_image 'httpd -p 127.0.0.1:18080 -h /tmp && wget -q -O /dev/null https://127.0.0.1:18080/; echo "rc=$?"')"
+    # 修正前も同じ文言を「注意」として出してから TLS を始め、平文の httpd に
+    # 弾かれて rc=1 になる。文言と rc だけでは区別できないので、**その 2 行
+    # 以外に何も出ていない**（TLS を始めていない）ことで判定する
+    rest="$(printf '%s\n' "$out" | grep -v -e 'certificate validation not implemented' -e '^rc=1$')"
+    if printf '%s\n' "$out" | grep -q 'certificate validation not implemented' &&
+       printf '%s\n' "$out" | grep -qx 'rc=1' && [ -z "$rest" ]; then
+        pass "wget refuses https without certificate validation (CVE-2018-1000500)"
+    else
+        fail "wget does not fail closed on https (0017-CVE-2018-1000500 patch missing?)"
+        show_output "$out"
+    fi
+fi
+
+# **細工した .bz2 でメモリを壊さないか（bunzip2 の runCnt の桁あふれ）。**
+# 上流の検査用サンプルで、v3.0.2 の bzcat は segfault（rc=139）した。
+# 修正後は "bunzip error -5" で止まる。
+BZ2_SAMPLE="$(cd "$(dirname "$0")/.." && pwd)/tests/samples/bz2_runcnt_overflow.bz2"
+out="$(docker run --rm -i --platform "$PLATFORM" --entrypoint /bin/sh "$IMAGE" \
+    -c 'bzcat >/dev/null; echo "rc=$?"' < "$BZ2_SAMPLE" 2>&1)"
+case "$out" in
+    *"bunzip error"*rc=1)
+        pass "bzcat rejects a run-length overflow (0021-bunzip2-runcnt-overflow)" ;;
+    *)  fail "bzcat does not reject the run-length overflow sample (0021 patch missing?)"
+        show_output "$out" ;;
+esac
+
+# **awk の関数の無限再帰でスタックを溢れさせないか（CVE-2026-38752）。**
+# v3.0.2 の minimal で segfault（rc=139）した。修正後はエラーで止まる。
+out="$(in_image "awk 'function f(n){ return f(n+1) } BEGIN{ f(0) }' >/dev/null 2>&1; echo \"rc=\$?\"")"
+case "$out" in
+    *rc=139*) fail "awk crashes on runaway recursion (CVE-2026-38752 patch missing?)"
+              show_output "$out" ;;
+    *rc=0*)   fail "awk runaway recursion returned success (unexpected)"
+              show_output "$out" ;;
+    *)        pass "awk stops runaway recursion without crashing (CVE-2026-38752)" ;;
+esac
+
+# **bootmisc が起動のたびに /tmp を丸ごと消さないか。**
+# OpenRC の上流の既定は wipe_tmp="YES"。/tmp にマウントしたボリュームが消える。
+# build-rootfs.sh が Alpine と同じく NO に変える。
+out="$(in_image 'grep "^wipe_tmp=" /etc/conf.d/bootmisc')"
+if [ "$out" = 'wipe_tmp="NO"' ]; then
+    pass "bootmisc does not wipe /tmp by default"
+else
+    fail "bootmisc wipes /tmp on boot (wipe_tmp is not NO)"
+    show_output "$out"
+fi
+
+# **minimal にネットワークのサーバー・クライアントが入っていないか。**
+# config に書かないと BusyBox の既定値で有効になり、v3.0.2 の minimal には
+# httpd・ssl_server・udhcpc・telnetd などが入っていた（2026-10-14 に外した）。
+# 一覧の正本は tests/unit/test_busybox_config_explicit.py。ここでは代表を見る
+if [ "$VARIANT" = "minimal" ]; then
+    found="$(in_image 'busybox --list' | grep -xE 'httpd|ssl_server|ssl_client|udhcpc|telnetd|ftpd|tftpd|inetd|ntpd|nslookup|netstat' | tr '\n' ' ')"
+    if [ -z "$found" ]; then
+        pass "minimal has no network servers/clients (httpd, ssl_*, udhcpc, ...)"
+    else
+        fail "minimal still has network applets: ${found}"
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
