@@ -109,7 +109,7 @@ cat "$ROOTFS/.kimigayo-build-info"
 ### 8. セキュリティの回帰（イメージがあるとき）
 
 **まず `scripts/verify-image.sh <image> <variant> <arch>` を回します。**
-次の4つはそこに入っており、手で再現しなくてよい:
+次のものはそこに入っており、手で再現しなくてよい:
 
 - **全 ELF の強化**（PIE / RELRO / BIND_NOW / 非実行スタック / スタック保護）。
   BusyBox だけでなく OpenRC・librc・libeinfo・libc.so も見る
@@ -120,6 +120,11 @@ cat "$ROOTFS/.kimigayo-build-info"
   書き出さないこと（v3.0.1 の公開イメージは外に書き出す＝修正前）
 - **ash の関数の無限再帰**（CVE-2026-38755）。`f(){ f; }; f` がエラーで
   止まること（v3.0.1 は Segmentation fault で落ちる＝パッチ前）
+- **2026-10-14 に取り込んだ修正の回帰**。wget の https が証明書を検証できずに
+  TLS の前で止まること（fail-closed）、bunzip2 の攻撃サンプル
+  （`tests/samples/bz2_runcnt_overflow.bz2`）と awk の無限再帰で落ちないこと、
+  bootmisc の `wipe_tmp` が NO であること、minimal に httpd・ssl_server・udhcpc
+  などのネットワーク系アプレットが無いこと（v3.0.2 はどれも修正前）
 
 秘密情報と CVE は `scripts/scan-image.sh`（`make scan-image`）。
 CVE が出ても**不合格とは書かず**、件数と ID を「要確認」として報告する

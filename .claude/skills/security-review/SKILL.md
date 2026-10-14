@@ -174,7 +174,8 @@ Discord に失敗を送る。手元では `/status` に同じ結果が出る。
 1. 中身を読む（CVE ページ・パッチ・コミット）
 2. 影響を見る。**config ファイルに書いていない項目も oldconfig の既定値で y に
    なる**ので、`src/busybox/config/*.config` だけでなく公開イメージの
-   `busybox --list` で確かめる（minimal にも httpd・ssl_server・udhcpc が入っている）
+   `busybox --list` で確かめる（v3.0.2 の minimal には既定値で httpd・ssl_server・udhcpc
+   が入っていた。2026-10-14 に明示的に外した）
 3. 上流の版に入っているかはソースか dry-run で確かめる（Debian の unfixed 表示は
    追随が遅れることがある）
 4. 状態を付ける: `patched` / `fixed-upstream` / `not-affected` / `todo`（修正あり・
