@@ -25,7 +25,7 @@ allowed-tools: Bash(make print-versions), Bash(git:*), Bash(find:*), Bash(ls:*),
 
 !`git status --short; echo '--- 未追跡 ---'; git ls-files --others --exclude-standard | head -20`
 
-## 上流の修正待ちの CVE（修正が出ていないか）
+## 上流のセキュリティ情報との差分（仕分けていないもの・取り込み待ち）
 
 !`python3 -I scripts/watch-upstream-fixes.py 2>&1 || echo '(取得に失敗。ネットワークを確認)'`
 
