@@ -55,13 +55,14 @@ case "$ARCH" in
 esac
 
 # バリアントごとのアプレット数の下限。
-# 実測は minimal 367 / standard 400 / extended 411（v3.0.1 以降。
+# 実測は minimal 329 / standard 400 / extended 411（2026-10-14 以降。
+# minimal はネットワーク系の 38 個を外す前の v3.0.1〜v3.0.2 が 367、
 # dpkg 等の 3 つを外す前の v3.0.0 までは 370 / 403 / 413）。
 # 下限で見るのは、アプレットが増える変更を落とさないため。
 # 上限も見るのは、バリアントの取り違え（minimal に standard の BusyBox が
 # 入る事故が実際にあった）を捕まえるため。
 case "$VARIANT" in
-    minimal)  APPLET_MIN=350; APPLET_MAX=385 ;;
+    minimal)  APPLET_MIN=315; APPLET_MAX=345 ;;
     standard) APPLET_MIN=385; APPLET_MAX=408 ;;
     extended) APPLET_MIN=408; APPLET_MAX=460 ;;
     *) echo "Unsupported VARIANT: $VARIANT" >&2; exit 2 ;;
@@ -672,12 +673,14 @@ fi
 BZ2_SAMPLE="$(cd "$(dirname "$0")/.." && pwd)/tests/samples/bz2_runcnt_overflow.bz2"
 out="$(docker run --rm -i --platform "$PLATFORM" --entrypoint /bin/sh "$IMAGE" \
     -c 'bzcat >/dev/null; echo "rc=$?"' < "$BZ2_SAMPLE" 2>&1)"
-case "$out" in
-    *"bunzip error"*rc=1)
-        pass "bzcat rejects a run-length overflow (0021-bunzip2-runcnt-overflow)" ;;
-    *)  fail "bzcat does not reject the run-length overflow sample (0021 patch missing?)"
-        show_output "$out" ;;
-esac
+# stderr（エラー）と stdout（rc=）の順は入れ替わる（arm64 で実測）ので別々に見る
+if printf '%s\n' "$out" | grep -q 'bunzip error' &&
+   printf '%s\n' "$out" | grep -qx 'rc=1'; then
+    pass "bzcat rejects a run-length overflow (0021-bunzip2-runcnt-overflow)"
+else
+    fail "bzcat does not reject the run-length overflow sample (0021 patch missing?)"
+    show_output "$out"
+fi
 
 # **awk の関数の無限再帰でスタックを溢れさせないか（CVE-2026-38752）。**
 # v3.0.2 の minimal で segfault（rc=139）した。修正後はエラーで止まる。
