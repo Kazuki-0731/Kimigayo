@@ -150,26 +150,41 @@ standard 400 / extended 411 アプレット。1つの答えで済ませないこ
 
 ---
 
-### 修正がまだ無い CVE は「待つ」を登録する
+### 上流との差分は毎日自動で見ている（仕分けが仕事）
 
-**影響を受けるのに上流にも Alpine にも修正が無い CVE は、待つと決めたら
-`scripts/watch-upstream-fixes.py` の `WATCH` に足す。** 文章で「上流を待つ」と
-書くだけでは、誰も見に行かず忘れられる。
+`security.yml` の `upstream-fix-watch` が毎日 `scripts/watch-upstream-fixes.py` を回し、
+出荷物の 4 つ（BusyBox・musl・OpenRC・OpenRC に静的リンクした libcap）について
+次の 4 か所と Kimigayo を突き合わせる。
 
-1. `WATCH` に `(CVE ID, Debian / Alpine のパッケージ名, パッチの置き場)` を足す
-2. 追跡用の Issue を立てる（影響・発動条件・回避策・修正が出たらやること。
-   例: #121 CVE-2026-108119）
-3. 既知の問題として `HARDENING_GUIDE.md`・`CHANGELOG.md` に書く
+| 見る場所 | 何を見るか |
+| --- | --- |
+| Debian security-tracker | パッケージに載る全 CVE。修正待ちの CVE は unstable の Fixed Version |
+| Alpine aports（GitHub ミラー） | 同じ上流版に当てているパッチ、secfixes の CVE |
+| 上流 git（公式リポジトリ） | 直近 150 コミットのうちセキュリティらしいもの（**リリース前の修正**。CVE-2026-108119 の修正はここにしか無かった） |
+| CISA KEV | 実際に悪用されている脆弱性 |
 
-`security.yml` の `upstream-fix-watch` が毎日、Debian の security-tracker
-（unstable の Fixed Version）と Alpine aports の APKBUILD（master と
-`<ALPINE_VERSION>-stable`）を見て、修正が出たら Issue を立てて **Discord に
-通知する**。監視が判定できなかったときも Discord に失敗を送る。
-手元では `/status` に同じ結果が出る。
+**Kimigayo 側の状態は `docs/security/upstream-triage.tsv`**（仕分け済みの一覧）。
+ここに無いもの（new）・修正待ちに修正が出たもの（fix）・直していないのに
+KEV に載ったもの（exploited）が出ると、Issue を立てて **Discord に通知する**
+（同じ項目は開いている Issue があれば出さない）。判定できなかったときも
+Discord に失敗を送る。手元では `/status` に同じ結果が出る。
+
+**通知が来たら仕分けて TSV に足す**（足せば次から出なくなる）:
+
+1. 中身を読む（CVE ページ・パッチ・コミット）
+2. 影響を見る。**config ファイルに書いていない項目も oldconfig の既定値で y に
+   なる**ので、`src/busybox/config/*.config` だけでなく公開イメージの
+   `busybox --list` で確かめる（minimal にも httpd・ssl_server・udhcpc が入っている）
+3. 上流の版に入っているかはソースか dry-run で確かめる（Debian の unfixed 表示は
+   追随が遅れることがある）
+4. 状態を付ける: `patched` / `fixed-upstream` / `not-affected` / `todo`（修正あり・
+   取り込み待ち）/ `watching`（修正がどこにも無い）/ `accepted` / `unknown`
+5. `watching` にしたら追跡 Issue を立て、`HARDENING_GUIDE.md`・`CHANGELOG.md` に
+   既知の問題として書く（例: #121）
 
 **取り込んだら:** パッチを `src/<component>/patches/` に CVE ID 入りの名前で
-置き（`PATCHED_CVES` に載る）、再現手順を `verify-image.sh` の回帰テストにし、
-`WATCH` から消す（消し忘れても、パッチがあれば「取り込み済み。消す」と出る）。
+置き（`PATCHED_CVES` に載る）、再現手順があれば `verify-image.sh` の回帰テストにし、
+TSV の状態を `patched` にする。
 
 ## 3. 強化フラグが成果物に効いているかを検証する
 
@@ -336,7 +351,7 @@ git log --all --diff-filter=A --name-only | grep -x '.env' && echo "過去にコ
 
 | ワークフロー | いつ | 何をするか |
 | --- | --- | --- |
-| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流の修正待ちの CVE の監視**（修正が出たら Issue と Discord 通知）・Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（Debian・Alpine・上流 git・KEV。差分が出たら Issue と Discord 通知）・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC | 上流の更新を検知して PR |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | `fail-on-severity: high` |
 
