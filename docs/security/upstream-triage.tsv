@@ -158,3 +158,56 @@ CVE-2019-14697	musl	baseline	2026-10-14 の初回の突き合わせ時点で Deb
 CVE-2020-28928	musl	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
 CVE-2018-21269	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
 CVE-2021-42341	openrc	baseline	2026-10-14 の初回の突き合わせ時点で Debian では解決済み（または Alpine の過去の secfixes）。版の範囲での照合は scan-image（Grype）
+upstream:busybox:382008b3f07d	busybox	todo	CVE-2026-108119 の修正（create_links_from_list で遅延リンクの解決先が展開先の中に収まるかを確かめる）。1_38_0 より後で、tarball に当たる。tar は全バリアント。深刻度は中（CVSS 6.3）
+upstream:busybox:5da20102b5db	busybox	todo	CVE-2026-108119 の関連修正（unsafe_prefix が ".." 単体も危険な名前として扱う）。1_38_0 より後で、tarball に当たる。tar/cpio は全バリアント。深刻度は中。382008b と一緒に取り込むもの
+upstream:busybox:f15a204bb28f	busybox	not-affected	xxd -p -c 0 の出力形式の修正。セキュリティと無関係
+upstream:busybox:e65b5600381f	busybox	not-affected	chrt の -R オプション追加（機能追加）
+upstream:busybox:14f6b6b580a4	busybox	todo	bunzip2 の runCnt が 32 ビットで溢れ、1.38.0 の dbufCount+runCnt の範囲検査をすり抜ける。上流の攻撃サンプル bz2_runcnt_overflow.bz2 で 3.0.2-minimal の bzcat が segfault（rc=139）するのを実測。bzcat と tar の bz2 自動判別は全バリアント、bunzip2 は standard/extended。深刻度は高（信頼できない .bz2 の展開でメモリ破壊）
+upstream:busybox:bfdf3560d64e	busybox	not-affected	fdisk の DOS 互換フラグの既定値変更。セキュリティと無関係
+upstream:busybox:659644d8d674	busybox	not-affected	fdisk のコメント追加のみ
+upstream:busybox:d3c8cfa6745f	busybox	not-affected	tr の "\-" の解釈修正（"escape" の誤検出）。セキュリティと無関係
+upstream:busybox:0e09d2f8577e	busybox	not-affected	tr のエスケープしたダッシュを範囲としない修正（誤検出）。セキュリティと無関係
+upstream:busybox:218f32862560	busybox	not-affected	wget の再試行回数（-t）の機能追加
+upstream:busybox:6885d4c3100b	busybox	not-affected	security_context_t の型の置き換え（誤検出）。SELINUX は全バリアントで n
+upstream:busybox:436223e2b77d	busybox	todo	tar cv（作成時の verbose）でファイル名の端末エスケープを素通しする。1.38.0 に未修正で、tarball に当たる。全バリアント。深刻度は低（ローカルのファイル名による端末エスケープ注入）
+upstream:busybox:15666f3e9a0b	busybox	todo	awk の next_token の文字列解析で 1 バイトの heap 範囲外読み取り（CVE-2023-42366 とは別のバグ）。tarball に当たる。awk は全バリアント。深刻度は低
+upstream:busybox:a448b6d5b21e	busybox	patched	CVE-2026-38754。Kimigayo の 0002 と同じ修正（前回 Debian・Alpine 0040 と変更行が完全一致を確認）
+upstream:busybox:0309c029800c	busybox	not-affected	hush のコンパイラ警告の抑止（誤検出）。HUSH は全バリアントで n
+upstream:musl:dd856098ad76	musl	todo	floatscan の循環バッファで、wrap 時に添字 -1 へ 0 を書く範囲外書き込み。80 ビット long double（x86_64）と IEEE quad（aarch64）が報告どおり該当し、Kimigayo の 2 アーキの両方。strtold や scanf %Lf などに細工した数値文字列を渡すと発動。深刻度は中
+upstream:musl:c4e1bb3994c1	musl	not-affected	fnmatch の FNM_PERIOD の照合の正しさの修正（"escaped" の誤検出）
+upstream:musl:be5ba5695df9	musl	not-affected	asprintf の失敗時に結果ポインタを NULL にする強化。戻り値を見ない呼び出し側の保険で、脆弱性の修正ではない
+upstream:musl:3594657b8896	musl	not-affected	printf の * 幅が INT_MIN のときの符号付きオーバーフロー（UB）。書式と引数を呼び出し側が決めるもので、攻撃面がない
+upstream:musl:9ec8ef2c6c8a	musl	not-affected	マジックナンバー 4 を MB_LEN_MAX に置き換えただけで、挙動は変わらない
+upstream:musl:c2541fd53fa6	musl	todo	vfwscanf の割り当て付き %c が UTF-8 で 2 バイトの領域に最大 4 バイト書く heap overflow。1.2.6 より後。深刻度は低（wide scanf の %mc を使うプログラムのみ。Kimigayo の同梱物では未確認）
+upstream:musl:7d7b03b8e8db	musl	not-affected	%mlc の幅×sizeof(wchar_t) のオーバーフローは 32 ビット size_t の環境だけ。Kimigayo は x86_64/arm64
+upstream:musl:0c34aa688ec1	musl	not-affected	scandir の errno を正しく返す修正。実質到達しない
+upstream:musl:ec9daea2c3a9	musl	not-affected	powl の数値精度の修正
+upstream:musl:691ba934aec3	musl	not-affected	riscv 専用
+upstream:musl:c5e2f7e7ad36	musl	not-affected	gai_strerror・hstrerror・regerror に極端なエラー番号を渡したときの符号付きオーバーフロー（UB）。呼び出し側が異常値を渡す場合だけ
+upstream:musl:897937236ddb	musl	todo	resolv.conf の attempts:0 で名前解決がゼロ除算（SIGFPE）になる。1.2.6 より後。深刻度は低（resolv.conf を書ける者による DoS。コンテナでは実行環境が resolv.conf を書く）
+upstream:musl:4a0406c85122	musl	not-affected	ftello の LLONG_MAX 付近のオーバーフロー報告の修正。セキュリティと無関係
+upstream:musl:30cc6422bc61	musl	not-affected	fseeko の LLONG_MIN 付近のオーバーフローの修正。セキュリティと無関係
+upstream:musl:c2021b7795c7	musl	not-affected	mktime の tm_mday=INT_MIN のときのオーバーフロー。セキュリティと無関係
+upstream:musl:f21a96538f78	musl	not-affected	前回の alpine:musl:0001-fix-toctou-race-in-popen... と同じ判断。マルチスレッドでしか起きず、Kimigayo の popen 利用者（OpenRC librc・BusyBox awk）は単一スレッド
+upstream:musl:bf96b52a4429	musl	not-affected	極端なアラインメントの確保で、free 時に安全に trap するだけ。64 ビットでは追加の検査も最適化で消える
+upstream:musl:b3291b9a9f77	musl	patched	CVE-2026-40200。Kimigayo の src/libc/patches/0001 の [PATCH 2/3] と同じ
+upstream:musl:228da39e38c1	musl	patched	CVE-2026-40200。Kimigayo の src/libc/patches/0001 の [PATCH 1/3] と同じ
+upstream:musl:40acb04b2c12	musl	todo	BRE の未完了の部分式への後方参照を受け付け、regexec が無限ループする。1.2.6 より後。BusyBox の grep/sed/expr などが musl の regcomp を使う。深刻度は低（信頼できない BRE を受け取る場合の DoS）
+upstream:musl:0572555dab1d	musl	not-affected	strptime %Z で tzset 前だと NULL 参照する。書式を呼び出し側が決めるローカルなクラッシュで、セキュリティ境界がない
+upstream:musl:6f6bd4a1896b	musl	todo	IPv6 が使えない環境（IPv6 を無効にしたコンテナでよくある）の名前解決で、conf->ns[nns] と配列の 1 つ先を読む。1.2.6 より後。深刻度は低（構造体内の範囲外読み取りで、判定を誤る程度）
+upstream:musl:149d87297031	musl	fixed-upstream	v1.2.6 に含まれる（v1.2.6~2）
+upstream:musl:5c901bb36041	musl	fixed-upstream	v1.2.6 に含まれる（syscall 番号の更新。セキュリティとは無関係）
+upstream:musl:5c26c890ede4	musl	fixed-upstream	v1.2.6 に含まれる（行頭の余分な ';' の削除。セキュリティとは無関係）
+upstream:musl:0ccaf0572e9c	musl	fixed-upstream	printf の浮動小数点の 10 進整形のバッファオーバーフロー。v1.2.6 に含まれる（v1.2.6~14）
+upstream:musl:8fd5d0318763	musl	fixed-upstream	v1.2.6 に含まれる（aarch64 の hwcap のマスク）
+upstream:musl:f96e47a26102	musl	fixed-upstream	v1.2.6 に含まれる（ld128 での大きな double の整形の退行修正）
+upstream:musl:c47ad25ea3b4	musl	fixed-upstream	CVE-2025-26519 の強化分。v1.2.6 に含まれ、ソースの L551 で確認済み（前回）
+upstream:musl:e5adcd97b519	musl	fixed-upstream	CVE-2025-26519 の本体。v1.2.6 に含まれ、ソースの L505 で確認済み（前回）
+upstream:musl:5e594aeabf33	musl	fixed-upstream	ShiftJIS の不正列の復号の修正。v1.2.6 に含まれる
+upstream:musl:882aedf6a138	musl	fixed-upstream	sem_post の起床漏れの修正。v1.2.6 に含まれる
+upstream:musl:8cca79a72ccc	musl	fixed-upstream	exit の同時呼び出しの安全化。v1.2.6 に含まれる
+upstream:openrc:3ccf90013c67	openrc	not-affected	openrc-run のメモリリーク修正（短命なプロセス）。セキュリティと無関係
+upstream:openrc:0ab566681708	openrc	not-affected	不正な deptree での NULL 参照。deptree は root だけが書ける /run/openrc 配下か、--deptree-file で明示したファイルなので、攻撃者が触れる面がない
+upstream:openrc:4db94791dfaa	openrc	not-affected	空の softlevel ファイルで 1 バイト手前を読む。softlevel は root だけが書けるので攻撃面がない
+upstream:openrc:1cf3944ed9bc	openrc	not-affected	rc-cgroup.sh の変数の局所化と typo の修正（cgroup の誤検出）。機能修正
+upstream:openrc:29f620c16036	openrc	not-affected	openrc-run.sh で start_pre/stop_post などのフックの呼び出しが壊れていた退行の修正（原因の 529956e は 0.63.2 に含まれる）。機能修正で、セキュリティとは無関係
