@@ -1,0 +1,39 @@
+Kimigayo OS: terminal escapes in tar cv
+
+tar: file names printed while creating an archive with -v are not
+sanitized. No CVE ID.
+
+Source: BusyBox git https://git.busybox.net/busybox/commit/?id=436223e2b77d
+  exported with git format-patch from git.busybox.net on 2026-10-14.
+The original message follows unchanged.
+
+From 436223e2b77dd60aca7dfec91bf9af0b1787e5fe Mon Sep 17 00:00:00 2001
+From: Anton Skorup <anton.skorup@axis.com>
+Date: Thu, 27 Aug 2026 13:47:52 +0200
+Subject: [PATCH] tar: Sanitize verbose file names
+
+function                                             old     new   delta
+writeTarHeader                                       859     869     +10
+
+Signed-off-by: Anton Skorup <anton.skorup@axis.com>
+Signed-off-by: Denys Vlasenko <vda.linux@googlemail.com>
+---
+ archival/tar.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/archival/tar.c b/archival/tar.c
+index 87ad7bb..af39ede 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -428,7 +428,7 @@ static int writeTarHeader(struct TarBallInfo *tbInfo,
+ 		/* GNU "tar cvvf" prints "extended" listing a-la "ls -l" */
+ 		/* We don't have such excesses here: for us "v" == "vv" */
+ 		/* '/' is probably a GNUism */
+-		fprintf(vbFd, "%s%s\n", header_name,
++		fprintf(vbFd, "%s%s\n", printable_string(header_name),
+ 				S_ISDIR(statbuf->st_mode) ? "/" : "");
+ 	}
+ 
+-- 
+2.50.1 (Apple Git-155)
+

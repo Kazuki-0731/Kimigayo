@@ -1,0 +1,113 @@
+Kimigayo OS: awk next_token string over-read
+
+awk: one-byte heap over-read while parsing a string literal in
+next_token(). A different bug from CVE-2023-42366. No CVE ID.
+
+Source: BusyBox git https://git.busybox.net/busybox/commit/?id=15666f3e9a0b
+  exported with git format-patch from git.busybox.net on 2026-10-14.
+The original message follows unchanged.
+
+From 15666f3e9a0b54305cec1b01f34bc5b2a1794e74 Mon Sep 17 00:00:00 2001
+From: Ediz <ediz.research@gmail.com>
+Date: Thu, 20 Aug 2026 01:45:36 +0300
+Subject: [PATCH] awk: fix 1-byte heap-buffer-overflow in next_token() string
+ parse
+
+When the awk program ends with \<newline> right after the last string
+token, nextchar() eats the newline and then reads the terminating NUL
+that xmalloc_read_with_initial_buf() appends, advancing past the end
+of the buffer. The string-scan loop in next_token() then dereferences
+one byte past the buffer (heap-buffer-overflow, READ of size 1).
+
+Fix: test every nextchar() return for NULs.
+
+Reproducer (ASan build):
+awk 'BEGIN { print "string\
+'
+
+function                                             old     new   delta
+next_token                                           934     933      -1
+
+Signed-off-by: Ediz <ediz.research@gmail.com>
+Signed-off-by: Denys Vlasenko <vda.linux@googlemail.com>
+---
+ editors/awk.c | 49 +++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 33 insertions(+), 16 deletions(-)
+
+diff --git a/editors/awk.c b/editors/awk.c
+index 42a1c3c..798675d 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -890,24 +890,30 @@ static char *nextword(char **s)
+ 	return p;
+ }
+ 
++/* Note: will NOT stop at NUL (either on <NUL> or \<newline><NUL>):
++ * *s will be advanced past NUL!
++ * Make sure you always check NUL return before continuing.
++ */
+ static char nextchar(char **s)
+ {
+-	char c, *pps;
++	char c;
+  again:
+ 	c = *(*s)++;
+-	pps = *s;
+-	if (c == '\\')
++
++	if (c == '\\') {
++		char *pps = *s;
+ 		c = bb_process_escape_sequence((const char**)s);
+-	/* Example awk statement:
+-	 * s = "abc\"def"
+-	 * we must treat \" as "
+-	 */
+-	if (c == '\\' && *s == pps) { /* unrecognized \z? */
+-		c = *(*s); /* yes, fetch z */
+-		if (c) { /* advance unless z = NUL */
+-			(*s)++;
+-			if (c == '\n') /* \<newline>? eat it */
+-				goto again;
++		/* Example awk statement:
++		 * s = "abc\"def"
++		 * we must treat \" as "
++		 */
++		if (c == '\\' && *s == pps) { /* unrecognized \z? */
++			c = *(*s); /* yes, fetch z */
++			if (c) { /* advance unless z = NUL */
++				(*s)++;
++				if (c == '\n') /* \<newline>? eat it */
++					goto again;
++			}
+ 		}
+ 	}
+ 	return c;
+@@ -1205,11 +1211,22 @@ static uint32_t next_token(uint32_t expected)
+ 			/* it's a string */
+ 			char *s = t_string = ++p;
+ 			while (*p != '"') {
+-				char *pp;
+-				if (*p == '\0' || *p == '\n')
++				char c, *pp;
++
++				/* Since we need to handle \<newline><NUL>
++				 * below, we can handle ordinary NUL there as well,
++				 * instead of here. Thus commented out.
++				 */
++				if (/* *p == '\0' || */ *p == '\n')
+ 					syntax_error(EMSG_UNEXP_EOS);
+ 				pp = p;
+-				*s++ = nextchar(&pp);
++				c = *s++ = nextchar(&pp);
++				/* awk 'BEGIN { print "unterminated\
++				 * '
++				 * results in NUL here after nextchar() eats \<newline>
++				 */
++				if (c == '\0')
++					syntax_error(EMSG_UNEXP_EOS);
+ 				p = pp;
+ 			}
+ 			p++;
+-- 
+2.50.1 (Apple Git-155)
+
