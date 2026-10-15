@@ -6,7 +6,7 @@ This directory contains sample derivative images built on top of Kimigayo OS.
 
 ### 1. **Nginx** - Web Server
 - **Directory**: `nginx/`
-- **Image Size**: 10.6MB
+- **Image Size**: 10.7MB
 - **Use Case**: Static websites, reverse proxy, load balancer
 - **Documentation**: [nginx/README.md](nginx/README.md)
 
@@ -18,7 +18,7 @@ docker run -d -p 8080:8080 kimigayo-nginx
 
 ### 2. **Python** - Python Runtime
 - **Directory**: `python/`
-- **Image Size**: 49.5MB
+- **Image Size**: 49.6MB
 - **Use Case**: Web APIs, data processing, automation scripts
 - **Documentation**: [python/README.md](python/README.md)
 
@@ -30,7 +30,7 @@ docker run -d -p 8000:8000 kimigayo-python
 
 ### 3. **Node.js** - JavaScript Runtime
 - **Directory**: `nodejs/`
-- **Image Size**: 72.9MB
+- **Image Size**: 73.0MB
 - **Use Case**: Web applications, APIs, real-time services
 - **Documentation**: [nodejs/README.md](nodejs/README.md)
 
@@ -44,13 +44,13 @@ docker run -d -p 3000:3000 kimigayo-nodejs
 
 | Image | Kimigayo OS example | Official Alpine-based image |
 |-------|---------------------|-----------------------------|
-| **Base OS** | 2.98MB (`3.0.2`, Standard) | 8.66MB (`alpine:3.24`) |
-| **+ Nginx** | 10.6MB | 62.4MB (`nginx:alpine`) |
-| **+ Python** | 49.5MB | 57.4MB (`python:alpine`) |
-| **+ Node.js** | 72.9MB | 181MB (`node:alpine`) |
+| **Base OS** | 3.06MB (`3.1.0`, Standard) | 8.66MB (`alpine:3.24`) |
+| **+ Nginx** | 10.7MB | 68.5MB (`nginx:alpine`) |
+| **+ Python** | 49.6MB | 59.5MB (`python:alpine`) |
+| **+ Node.js** | 73.0MB | 181MB (`node:alpine`) |
 
-Measured 2026-10-12 on arm64 with `docker images`. The reduction depends on
-the runtime: about 83% for nginx, 60% for Node.js, but only about 14% for
+Measured 2026-10-15 on arm64 with `docker images`. The reduction depends on
+the runtime: about 84% for nginx, 60% for Node.js, but only about 17% for
 Python, whose size is mostly the interpreter and standard library. The
 official images also include pip / npm, which these examples leave out.
 
@@ -82,14 +82,14 @@ CMD ["python3", "app.py"]
 
 **Development** (with shell access and more BusyBox applets):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2-standard
+FROM ishinokazuki/kimigayo-os:3.1.0-standard
 # ... COPY your tools from a builder stage ...
 CMD ["/bin/sh"]
 ```
 
 **Production** (minimal):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2-minimal
+FROM ishinokazuki/kimigayo-os:3.1.0-minimal
 # ... only runtime deps ...
 CMD ["./app"]
 ```
@@ -117,7 +117,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | grep -v 'ld-musl' | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 COPY . /app
 WORKDIR /app
@@ -156,7 +156,7 @@ docker run -it --rm -p 8080:8080 your-image:latest
    FROM builder AS build
    # ... build steps ...
 
-   FROM ishinokazuki/kimigayo-os:3.0.2
+   FROM ishinokazuki/kimigayo-os:3.1.0
    COPY --from=build /app /app
    ```
 
@@ -182,7 +182,7 @@ docker run -it --rm -p 8080:8080 your-image:latest
 
 2. **Use specific tags**
    ```dockerfile
-   FROM ishinokazuki/kimigayo-os:3.0.2-standard
+   FROM ishinokazuki/kimigayo-os:3.1.0-standard
    # not :latest in production
    ```
 

@@ -4,7 +4,7 @@ Nginx web server running on Kimigayo OS - a small container OS without a package
 
 ## Features
 
-- **Small**: 10.6MB including nginx (arm64, measured 2026-10-12; `nginx:alpine` is 62.4MB)
+- **Small**: 10.7MB including nginx (arm64, measured 2026-10-15; `nginx:alpine` is 68.5MB)
 - **Runs as non-root**: `USER 65534` (nobody), listening on port 8080
 - **Hardened configuration**: security headers, directory listing disabled, hidden files denied
 - **Health check and logging**: `HEALTHCHECK` built in, access/error logs go to stdout/stderr (`docker logs`)
@@ -145,11 +145,11 @@ spec:
 
 | Image | Size |
 |-------|------|
-| `kimigayo-nginx` (this example) | 10.6MB |
-| `nginx:alpine` | 62.4MB |
+| `kimigayo-nginx` (this example) | 10.7MB |
+| `nginx:alpine` | 68.5MB |
 
-Measured 2026-10-12 on arm64 (`docker images`), built from
-`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's nginx 1.30.4.
+Measured 2026-10-15 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.1.0` and Alpine 3.24's nginx 1.30.4.
 Memory usage and startup time have not been measured.
 
 ## Security

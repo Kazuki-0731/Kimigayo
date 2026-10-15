@@ -4,7 +4,7 @@ Python runtime running on Kimigayo OS - a small container OS without a package m
 
 ## Features
 
-- **Small**: 49.5MB including Python and its standard library (arm64, measured 2026-10-12; `python:alpine` is 57.4MB)
+- **Small**: 49.6MB including Python and its standard library (arm64, measured 2026-10-15; `python:alpine` is 59.5MB)
 - **Python 3 from Alpine 3.24** (3.14 at the time of writing). The command is **`python3`** (there is no `python`). **pip is not in the image** - install packages in a build stage (below)
 - **Runs as non-root**: `USER 65534` (nobody)
 - **Health check**: `HEALTHCHECK` on `/api/health`, unbuffered output for `docker logs`
@@ -185,11 +185,11 @@ spec:
 
 | Image | Size |
 |-------|------|
-| `kimigayo-python` (this example) | 49.5MB |
-| `python:alpine` | 57.4MB |
+| `kimigayo-python` (this example) | 49.6MB |
+| `python:alpine` | 59.5MB |
 
-Measured 2026-10-12 on arm64 (`docker images`), built from
-`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's Python 3.14.8.
+Measured 2026-10-15 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.1.0` and Alpine 3.24's Python 3.14.8.
 `python:alpine` includes pip; this example does not.
 Memory usage and startup time have not been measured.
 

@@ -4,7 +4,7 @@ Node.js runtime running on Kimigayo OS - a small container OS without a package 
 
 ## Features
 
-- **Small**: 72.9MB including Node.js and its shared libraries (arm64, measured 2026-10-12; `node:alpine` is 181MB)
+- **Small**: 73.0MB including Node.js and its shared libraries (arm64, measured 2026-10-15; `node:alpine` is 181MB)
 - **Node.js from Alpine 3.24** (v24 at the time of writing). **npm is not in the image** - install dependencies in a build stage (below)
 - **Runs as non-root**: `USER 65534` (nobody)
 - **Health check and graceful shutdown**: `HEALTHCHECK` on `/health`, `SIGTERM` closes the server
@@ -224,11 +224,11 @@ spec:
 
 | Image | Size |
 |-------|------|
-| `kimigayo-nodejs` (this example) | 72.9MB |
+| `kimigayo-nodejs` (this example) | 73.0MB |
 | `node:alpine` | 181MB |
 
-Measured 2026-10-12 on arm64 (`docker images`), built from
-`ishinokazuki/kimigayo-os:3.0.2` and Alpine 3.24's Node.js v24.18.1.
+Measured 2026-10-15 on arm64 (`docker images`), built from
+`ishinokazuki/kimigayo-os:3.1.0` and Alpine 3.24's Node.js v24.18.1.
 `node:alpine` includes npm; this example does not.
 Memory usage and startup time have not been measured.
 
