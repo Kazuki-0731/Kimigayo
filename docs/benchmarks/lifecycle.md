@@ -252,6 +252,29 @@ docker stop --timeout 2 <container>
 docker run --stop-timeout 2 ...
 ```
 
+### v3.1.0 の起動と常駐メモリ（2026-10-15）
+
+**測定条件:** v3.1.0 の公開イメージ、macOS / Apple Silicon、arm64 ネイティブ、
+起動は `docker run --rm <image> /bin/true` の実時間の 10 回中央値、
+常駐メモリは `sleep` で常駐させたコンテナの `docker stats`（40 回読み、`0B` の 22 回を捨てた 18 標本。
+18 標本はどのイメージでもすべて同じ値）。Alpine 3.24・Ubuntu 24.04 と同じセッションで測った。
+
+| イメージ | 起動 | 常駐メモリ |
+|----|------|-----------|
+| Kimigayo Minimal | 0.61秒 | 280KB |
+| **Kimigayo Standard** | 0.65秒 | 288KB |
+| Kimigayo Extended | 0.62秒 | 280KB |
+| `alpine:3.24` | 0.61秒 | 268KB |
+| `ubuntu:24.04` | 0.65秒 | 316KB |
+
+- **起動はどのイメージでも差が出ない**（0.61〜0.65 秒。同じイメージでも 1 回ごとに 0.55〜0.70 秒の間で前後する）
+- **常駐メモリは v3.0.2 と同じ**（Standard 288KB）。Alpine と同程度
+- 同じ日に 20 回読みで先に測った回は Kimigayo Standard 292KB・Alpine 268KB・Ubuntu 532KB で、
+  Ubuntu だけが大きく外れた。標本を増やして測り直した上の値を採った
+- OpenRC が `default` ランレベルを完走するまで（Standard）は **0.76 秒**
+
+README と同じ値（→ [README.md](../../README.md) の「パフォーマンス実績」節）。
+
 ### v3.0.2 の起動と常駐メモリ（2026-10-12）
 
 **測定条件:** v3.0.2 の公開イメージ、macOS / Apple Silicon、arm64 ネイティブ、
@@ -272,8 +295,6 @@ Alpine 3.24・Ubuntu 24.04 と同じセッションで測った。
   動的リンクにし、`sleep` などの BusyBox のコマンドも `libc.so` を読み込むようになったため
 - OpenRC が `default` ランレベルを完走するまで（`docker run --rm <image> /sbin/openrc default`、
   Standard）は **0.72 秒**
-
-README と同じ値（→ [README.md](../../README.md) の「パフォーマンス実績」節）。
 
 ### 他OSとの比較（2026-10-11、v3.0.1）
 

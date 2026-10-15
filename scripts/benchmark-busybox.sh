@@ -81,7 +81,7 @@ calculate_median() {
 
 # Function to calculate the ratio Alpine / Kimigayo (> 1.00 = Kimigayo faster)
 #
-# **比は中央値どうしで取る。** README・CLAUDE.md の「0.97〜1.01x」は
+# **比は中央値どうしで取る。** README・CLAUDE.md の「0.97〜1.02x」は
 # 中央値の比。2026-10-13 まで平均の比を "Speedup" と表示しており、
 # 同じ名前で別の値を指していた（docker run の外れ値に平均が引っ張られる）。
 # JSON には平均の比も ratio_avg として残す。"speedup" は
