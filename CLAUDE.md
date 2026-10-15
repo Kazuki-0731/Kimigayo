@@ -908,7 +908,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - **上流のセキュリティ情報との差分は `security.yml` が毎日見る**
   （`scripts/watch-upstream-fixes.py`。Debian security-tracker・Alpine aports・
   上流 git・CISA KEV）。Kimigayo 側の状態は `docs/security/upstream-triage.tsv`。
-  そこに無いものが出たら Issue と Discord で知らせるので、**仕分けて TSV に足す**
+  そこに無いものが出たら非公開の Project と Discord で知らせるので、**仕分けて TSV に足す**
   （手順は `security-review` skill）。scan-image（Grype）は NVD の CPE しか見ないので、
   これが無いと Alpine・Debian だけの修正やリリース前の上流の修正は見えない
 - **外部 Action は tag で固定する。** `@master` 参照は供給網のリスクかつ
@@ -1329,7 +1329,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | --- | --- | --- |
 | `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
 | `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
-| `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら Issue と Discord）・Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら非公開の Project と Discord。公開の Issue は立てない） |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `ci.yml` を起動する |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
