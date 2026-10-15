@@ -168,7 +168,7 @@ docker compose run --rm -T kimigayo-build sh -c \
 
 ## 9. ドキュメントに反映する（ここまでで1セット）
 
-- `CHANGELOG.md` の `[Unreleased]`（タグを打つ前に必ず）
+- `CHANGELOG.md` の `[Unreleased]` に区分付きで足す（上流のマイナー以上の版上げは「マイナー」、パッチ版への更新は「パッチ」。SPECIFICATION.md 10.2）。「次の版」も更新する
 - `README.md`・`docs/` のバージョン表記と数値
 - 捨てた古い値が残っていないか:
 
