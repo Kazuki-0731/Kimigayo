@@ -5,7 +5,7 @@
   タグ push で走るワークフローは、いまの main にあるものではなく
   **そのタグが指すコミットの .github/workflows/** で決まる。
 
-  release.yml を `gh workflow disable` で止めて v0.1.1 を push したが、
+  on-tag-publish-release.yml を `gh workflow disable` で止めて v0.1.1 を push したが、
   v0.1.1 のコミット（2025-12-22）には当時の別ワークフロー
   "Docker Build and Push" があり、それが走って
   **Docker Hub の latest を含む公開イメージが差し替わった。**

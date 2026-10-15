@@ -73,14 +73,14 @@ lines_cmd() {
         true
 }
 
-# v*.*.* のタグ「作成」は release.yml を起動し、Docker Hub の latest を
+# v*.*.* のタグ「作成」は on-tag-publish-release.yml を起動し、Docker Hub の latest を
 # 差し替える。削除（-d）・一覧（-l / --list）・検証は読むだけなので通す。
 tag_lines="$(lines_with '\bgit[[:space:]]+tag\b')"
 if [ -n "$tag_lines" ] &&
    printf '%s' "$tag_lines" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+' &&
    ! printf '%s' "$tag_lines" | grep -qE '(^|[[:space:]])(-d|--delete|-l|--list|--verify|-n[0-9]*)([[:space:]]|$)'; then
     block "リリースタグの作成" \
-"v*.*.* タグを push すると .github/workflows/release.yml が走り、
+"v*.*.* タグを push すると .github/workflows/on-tag-publish-release.yml が走り、
 Docker Hub の公開イメージ（latest を含む）を差し替えます。
 
 タグ・リリースは毎回ユーザーの明示的な承認が必要です
@@ -97,7 +97,7 @@ if [ -n "$push_lines" ] &&
     #
     # タグ push で走るのは、いまの main にあるものではなく、タグが
     # 指すコミットの .github/workflows/ で決まる。
-    # 2026-10-09 にこれで事故った: release.yml を gh workflow disable で
+    # 2026-10-09 にこれで事故った: on-tag-publish-release.yml を gh workflow disable で
     # 止めて v0.1.1 を push したところ、当時のコミットにあった
     # docker-publish.yml（"Docker Build and Push"）が走り、
     # **Docker Hub の latest を含む公開イメージが差し替わった。**

@@ -5,7 +5,7 @@ updates:
   # docker エコシステムのブロックは置かない。Dockerfile は
   # FROM alpine:${ALPINE_VERSION} と ARG で版を受け取り（Dependabot は追えない）、
   # Dockerfile.runtime は scratch。構成要素と Alpine の版は versions.mk が
-  # 単一の真実の源で、base-image-update.yml が上流の更新を検知する。
+  # 単一の真実の源で、component-update-pr.yml が上流の更新を検知する。
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

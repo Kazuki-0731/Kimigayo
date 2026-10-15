@@ -2,7 +2,7 @@
 //
 // 出荷物に当たっていて、まだ直っていない脆弱性を公開の Issue に書くと、攻撃の
 // 手がかりを渡すことになる（CLAUDE.md「危険度の高いものは Issue にしない」節）。
-// security.yml と dependency-review.yml は、見つけたものをここから Project に足す。
+// upstream-security-watch.yml と published-image-cve-scan.yml は、見つけたものをここから Project に足す。
 //
 // github は Project を書き換えられるトークン（classic PAT の project スコープ）で
 // 作ったものを渡す。ワークフローの GITHUB_TOKEN は個人の Project に届かない。
