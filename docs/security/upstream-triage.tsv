@@ -13,11 +13,11 @@
 #              accepted       影響ありを承知で受け入れる（理由を書く）
 #              unknown        判断材料が足りない
 #
-# ここに無い CVE・パッチ・上流のコミットが現れると、security.yml が非公開の Project と
+# ここに無い CVE・パッチ・上流のコミットが現れると、upstream-security-watch.yml が非公開の Project と
 # Discord で知らせる。仕分けたらここに足す（手順は security-review skill）。
 # 2026-10-14 の初回の仕分け: BusyBox の実際の config（oldconfig 後）・上流 git・
 # Debian / Alpine のパッチの dry-run・公開イメージ 3.0.2 での実測に基づく。
-CVE-2026-108119	busybox	watching	tar の遅延リンクが展開先の外を検証しない（全バリアント、2 本の tar で実測）。上流 BusyBox に修正コミット 382008b3f07d（2026-10-09）と 5da20102b5db があるが、リリース・Debian・Alpine には未収録。**リリースか Debian / Alpine に入るまで待つ**（2026-10-14 に決定）。Debian か Alpine で直ると security.yml が知らせる。BusyBox の新版は base-image-update.yml が見る。#121
+CVE-2026-108119	busybox	watching	tar の遅延リンクが展開先の外を検証しない（全バリアント、2 本の tar で実測）。上流 BusyBox に修正コミット 382008b3f07d（2026-10-09）と 5da20102b5db があるが、リリース・Debian・Alpine には未収録。**リリースか Debian / Alpine に入るまで待つ**（2026-10-14 に決定）。Debian か Alpine で直ると upstream-security-watch.yml が知らせる。BusyBox の新版は component-update-pr.yml が見る。#121
 CVE-2018-1000500	busybox	patched	src/busybox/patches/0017-CVE-2018-1000500-wget-https-fail-closed.patch（Alpine 0017）。https は --no-check-certificate なしでは失敗する（fail-closed。2026-10-14 に決定）。verify-image.sh が見る
 CVE-2022-30065	busybox	fixed-upstream	修正 e63d7cdfdac78c6fd27e9e63150335767592b85e は 1_36_0 以降のタグに含まれ、1.38.0 にある
 CVE-2023-39810	busybox	fixed-upstream	9a8796436b9b0641e13480811902ea2ac57881d3 は 1.38.0 に入っている。ただし既定 n の CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION の下でしか効かない。Kimigayo は 3 バリアントとも y を明示しており verify-image.sh が回帰を見ている

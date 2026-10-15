@@ -18,7 +18,7 @@ The schedule below is what that maintainer aims for, not a staffed rota.
 ### Daily Tasks
 
 #### Security Update Check
-- **Workflow:** `.github/workflows/security.yml`
+- **Workflow:** `.github/workflows/upstream-security-watch.yml`
 - **Schedule:** Daily at 02:00 UTC
 - **Actions:**
   - Check musl libc version updates
@@ -37,7 +37,7 @@ the kernel is not built into the image).
 ### Weekly Tasks
 
 #### Base Image Update Check
-- **Workflow:** `.github/workflows/base-image-update.yml`
+- **Workflow:** `.github/workflows/component-update-pr.yml`
 - **Schedule:** Weekly on Monday at 03:00 UTC
 - **Actions:**
   - Check component versions (musl, BusyBox, OpenRC)
@@ -45,13 +45,13 @@ the kernel is not built into the image).
     if updates are available. The summary and a review checklist are in the PR
     body (no `UPDATES.md` is committed). An empty, non-version or not-newer
     version fails the run instead of opening a PR
-  - It does not build anything itself, but it starts `build-and-verify.yml` on the PR branch
+  - It does not build anything itself, but it starts `on-push-and-pr-build-and-verify-all-images.yml` on the PR branch
     via `workflow_dispatch` (a PR created with `GITHUB_TOKEN` does not trigger
     workflows by itself)
   - `force_rebuild=true` on a manual run opens an empty-commit PR even without
     updates (to check the workflow itself)
 
-**Manual Review Required:** Check the `build-and-verify.yml` run linked from the PR body,
+**Manual Review Required:** Check the `on-push-and-pr-build-and-verify-all-images.yml` run linked from the PR body,
 update the checksums in `scripts/download-*.sh`, and follow the `version-bump`
 skill before merging.
 
@@ -61,19 +61,14 @@ skill before merging.
 - **Actions:** Open PRs for outdated actions (labels `dependencies`, `automated`;
   subject `⬆️ Bump ...`). Docker base images are not watched by Dependabot:
   `FROM alpine:${ALPINE_VERSION}` comes from `versions.mk`, which
-  `base-image-update.yml` handles
+  `component-update-pr.yml` handles
 
 **Manual Review Required:** Review and merge the PRs
 
 #### Dependency Vulnerability Scan
-- **Workflow:** `.github/workflows/dependency-review.yml`
+- **Workflow:** `.github/workflows/published-image-cve-scan.yml`
 - **Schedule:** Weekly on Monday at 04:00 UTC
 - **Actions:**
-  - Run filesystem vulnerability scan (`vulnerability-scan`)
-  - Check build scripts for `http://` URLs and `eval` outside comments; any hit
-    fails the job (only the `eval` in `scripts/lib/versions.sh` is allowed).
-    Secrets are covered by Trivy and `scripts/scan-image.sh`, not by a grep
-  - Upload scan results to Security tab
   - Pull the published image (`ishinokazuki/kimigayo-os:latest`) and match
     its shipped component versions against CVEs, plus scan it for secrets
     (`published-image-scan` → `scripts/scan-image.sh`)
@@ -197,8 +192,8 @@ the scan fail again without any code change; that is a real signal.
   In short: write CHANGELOG.md and RELEASE_NOTES.md by hand (`make changelog`
   only writes a draft to `build/CHANGELOG.generated.md`), run the quality
   checks, and get explicit approval before pushing a `v*.*.*` tag — the tag
-  push makes `release.yml` replace the public images on Docker Hub, including
-  `latest`. Running `release.yml` manually only builds, verifies and scans
+  push makes `on-tag-publish-release.yml` replace the public images on Docker Hub, including
+  `latest`. Running `on-tag-publish-release.yml` manually only builds, verifies and scans
   (it does not push to Docker Hub); publishing happens only on a tag push.
 
 ---

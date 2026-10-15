@@ -258,7 +258,7 @@ for 90 days is reviewed by hand:
 
 ### Component Update Check
 
-**Source:** `.github/workflows/security.yml`
+**Source:** `.github/workflows/upstream-security-watch.yml`
 
 **Triggers:**
 - Daily at 02:00 UTC
@@ -271,15 +271,14 @@ for 90 days is reviewed by hand:
 
 ### Weekly Security Scan
 
-**Source:** `.github/workflows/dependency-review.yml`
+**Source:** `.github/workflows/published-image-cve-scan.yml`
 
 **Triggers:**
-- Weekly on Monday at 04:00 UTC
-- Pull requests (the scheduled-only jobs do not open issues for PRs)
+- Weekly on Monday at 04:00 UTC (and manual runs)
 
-**Creates Issues:** when a **scheduled** run fails, for example because the
+**Creates no public issue.** When a **scheduled** run fails, for example because the
 published `latest` image matches a CVE (`published-image-scan` →
-`scripts/scan-image.sh`)
+`scripts/scan-image.sh`), `add-to-project` adds a draft item to the private Project
 
 **Labels:** `security`, `automated`, and `vulnerability`
 (the last one does not exist as a repository label)
@@ -292,7 +291,7 @@ published `latest` image matches a CVE (`published-image-scan` →
 
 ### Automated Base Image Updates
 
-**Source:** `.github/workflows/base-image-update.yml`
+**Source:** `.github/workflows/component-update-pr.yml`
 
 **Triggers:**
 - Weekly on Monday at 03:00 UTC
@@ -308,8 +307,8 @@ published `latest` image matches a CVE (`published-image-scan` →
 
 **Handling:**
 1. Review automated PR
-2. Check the `build-and-verify.yml` run on the PR branch — the PR is created with `GITHUB_TOKEN`,
-   which does not trigger workflows, so the workflow starts `build-and-verify.yml` itself
+2. Check the `on-push-and-pr-build-and-verify-all-images.yml` run on the PR branch — the PR is created with `GITHUB_TOKEN`,
+   which does not trigger workflows, so the workflow starts `on-push-and-pr-build-and-verify-all-images.yml` itself
    via `workflow_dispatch` (the PR body links to the run)
 3. Update checksums and verify patches (`version-bump` skill)
 4. Merge if all checks pass

@@ -18,19 +18,20 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 
 | ワークフロー | トリガー | 役割 |
 |------------|---------|------|
-| `build-and-verify.yml` | `main` への push・PR、手動（`base-image-update.yml` が PR ブランチで起動する） | 日常の検証 |
-| `release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
-| `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
-| `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
-| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分（非公開の Project に追加） |
-| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
-| `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
-| `project-sync.yml` | Issue の作成・再開・クローズ・移動、毎日 02:30 UTC、手動 | Issue を非公開の Project にそろえる（`scripts/project-issue.py sync`。冪等） |
+| `on-push-and-pr-build-and-verify-all-images.yml` | `main` への push・PR、手動（`component-update-pr.yml` が PR ブランチで起動する） | 日常の検証 |
+| `on-tag-publish-release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
+| `reusable-build-and-verify-image.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
+| `manual-build-image-and-kernel.yml` | 手動のみ | variant / arch を選んでビルド |
+| `upstream-security-watch.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分（非公開の Project に追加） |
+| `component-update-pr.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
+| `on-pr-dependency-review.yml` | `main` への PR | 依存レビュー（`fail-on-severity: high`） |
+| `published-image-cve-scan.yml` | 毎週月曜 04:00 UTC、手動 | 公開イメージの CVE 照合（`scan-image.sh`）。定期実行で落ちたら非公開の Project に足す |
+| `on-issue-sync-private-project.yml` | Issue の作成・再開・クローズ・移動、毎日 02:30 UTC、手動 | Issue を非公開の Project にそろえる（`scripts/project-issue.py sync`。冪等） |
 
-### 1. CI (`.github/workflows/build-and-verify.yml`)
+### 1. CI (`.github/workflows/on-push-and-pr-build-and-verify-all-images.yml`)
 
 **トリガー:** `main` への push、`main` への PR、手動（workflow_dispatch）。
-手動は `base-image-update.yml` が更新 PR のブランチで CI を回すためにある
+手動は `component-update-pr.yml` が更新 PR のブランチで CI を回すためにある
 （`GITHUB_TOKEN` で作った PR ではワークフローが起動しないが、workflow_dispatch だけは例外）。
 `develop` ブランチは 2026-10-13 にトリガーから外した（ブランチが存在しない）。
 
@@ -54,17 +55,17 @@ strategy:
 **`fail-fast: false` は意図的です。** 以前は 1 つの失敗が兄弟ジョブを
 キャンセルして、本当の失敗を隠していました。
 
-> **`build-and-verify.yml` はカーネルをビルドしません**（2026-10-10 に外しました）。
+> **`on-push-and-pr-build-and-verify-all-images.yml` はカーネルをビルドしません**（2026-10-10 に外しました）。
 > 成果物は rootfs だけを詰めた Docker イメージで、コンテナはホストの
 > カーネルで動くため、CI がカーネルを作ってもイメージの中身は
 > 1 バイトも変わりません。それでいて 1 run あたり数十分かかっていました。
 >
-> **したがってカーネル関連の変更は `build-and-verify.yml` が緑でも検証されていません。**
+> **したがってカーネル関連の変更は `on-push-and-pr-build-and-verify-all-images.yml` が緑でも検証されていません。**
 > `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったときは、
-> `manual-build.yml` を `build_kernel=true` で手動実行するか、
+> `manual-build-image-and-kernel.yml` を `build_kernel=true` で手動実行するか、
 > コンテナ内で `make kernel` を通してください。
 
-### 2. Release (`.github/workflows/release.yml`)
+### 2. Release (`.github/workflows/on-tag-publish-release.yml`)
 
 **トリガー:**
 - タグ push (`v*.*.*`) — **公開するのはこれだけ**
@@ -92,12 +93,12 @@ strategy:
 > 差し替わります。** 取り消せないので、タグとリリースは毎回明示的な承認を
 > 取ってください（`.claude/hooks/guard-bash.sh` が機械的に止めます）。
 
-### 3. Build Workflow (`.github/workflows/build-workflow.yml`)
+### 3. Build Workflow (`.github/workflows/reusable-build-and-verify-image.yml`)
 
 **トリガー:** 他のワークフローからの `workflow_call` のみ
 
-`build-and-verify.yml` と `manual-build.yml` が共有するビルド本体です
-（`release.yml` はこれを呼ばず、同じ入口の `make build-no-kernel` を自前のジョブで回します）。
+`on-push-and-pr-build-and-verify-all-images.yml` と `manual-build-image-and-kernel.yml` が共有するビルド本体です
+（`on-tag-publish-release.yml` はこれを呼ばず、同じ入口の `make build-no-kernel` を自前のジョブで回します）。
 入力に `variant` / `arch` / `build_kernel` / `upload_artifacts` を取ります。
 `build_kernel` の既定は `false` です。
 
@@ -113,7 +114,7 @@ strategy:
 > 出荷物に未対応の CVE があるという信号なので、握り潰さずに
 > パッチを当てるか版を上げます（`security-review` skill）。
 
-### 4. Manual Build (`.github/workflows/manual-build.yml`)
+### 4. Manual Build (`.github/workflows/manual-build-image-and-kernel.yml`)
 
 **トリガー:** 手動のみ（workflow_dispatch）
 
@@ -121,11 +122,11 @@ variant と arch を選んでビルドします。**カーネルを CI でビル
 唯一の経路**で、`build_kernel=true` を指定します。
 
 ```bash
-gh workflow run manual-build.yml \
+gh workflow run manual-build-image-and-kernel.yml \
   -f variant=standard -f arch=x86_64 -f build_kernel=true
 ```
 
-### 5. Security Scan (`.github/workflows/security.yml`)
+### 5. Security Scan (`.github/workflows/upstream-security-watch.yml`)
 
 **トリガー:**
 - 毎日 02:00 UTC
@@ -149,12 +150,12 @@ gh workflow run manual-build.yml \
 > **「脆弱性 0 件」ではなく「スキャンしていない」**という意味です。
 > 出荷物の構成要素の CVE 照合は `scripts/scan-image.sh` が行い、
 > 公開イメージに対しては
-> [7. Dependency Review](#7-dependency-review-githubworkflowsdependency-reviewyml)
+> [7. Dependency Review](#7-dependency-review-githubworkflowson-pr-dependency-reviewyml-と-published-image-cve-scan-githubworkflowspublished-image-cve-scanyml)
 > の `published-image-scan` が毎週回します。
 > ファイルシステムスキャン（`trivy-fs-scan`）はリポジトリ側の依存を
 > 見るので有効です。
 
-### 6. Base Image Update (`.github/workflows/base-image-update.yml`)
+### 6. Base Image Update (`.github/workflows/component-update-pr.yml`)
 
 **トリガー:** 毎週月曜 03:00 UTC、手動（`force_rebuild` を入力）
 
@@ -166,7 +167,7 @@ gh workflow run manual-build.yml \
   （2026-10-12 までは後段に値が渡っておらず、`versions.mk` の版を空にした PR を作っていた）
 - 変更内容は PR の本文にだけ書きます（以前のように `UPDATES.md` をコミットしない）
 - PR は `GITHUB_TOKEN` で作るため、そのままでは CI が起動しません。
-  **ワークフローが PR ブランチで `build-and-verify.yml` を workflow_dispatch で起動します**
+  **ワークフローが PR ブランチで `on-push-and-pr-build-and-verify-all-images.yml` を workflow_dispatch で起動します**
 - `force_rebuild=true` で手動実行すると、更新が無くても空コミットの PR を作ります
   （ワークフロー自体の動作確認用）
 
@@ -179,18 +180,22 @@ gh workflow run manual-build.yml \
 更新 PR を作ります（ラベルは `dependencies`・`automated`、件名は `⬆️ Bump ...`）。
 Dockerfile のベースイメージは見ません。`FROM alpine:${ALPINE_VERSION}` は
 Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` と
-`base-image-update.yml` が扱うためです（2026-10-13 に docker のブロックを外した）。
+`component-update-pr.yml` が扱うためです（2026-10-13 に docker のブロックを外した）。
 
-### 7. Dependency Review (`.github/workflows/dependency-review.yml`)
+### 7. Dependency Review (`.github/workflows/on-pr-dependency-review.yml`) と Published Image CVE Scan (`.github/workflows/published-image-cve-scan.yml`)
 
-**トリガー:** `main` への PR、毎週月曜 04:00 UTC、手動
+2026-10-16 まで `dependency-review.yml` 1 本にまとまっていたものを、性格ごとに分けた。
 
-| ジョブ | いつ | 何をするか |
-| --- | --- | --- |
-| `dependency-review` | PR のみ | 依存のレビュー（`fail-on-severity: high`） |
-| `vulnerability-scan` | PR・定期・手動 | リポジトリの Trivy FS スキャンと、ビルドスクリプトの検査（コメント以外の `http://` と `eval` があれば落ちる。`scripts/lib/versions.sh` の `eval` だけ許可）。秘密情報の grep は外した（Trivy と `scan-image.sh` が見る） |
-| `published-image-scan` | 定期・手動（PR では走らない） | Docker Hub の `ishinokazuki/kimigayo-os:latest`（standard / amd64）を pull し、`scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。SBOM を `sbom-published-latest` として保存 |
-| `add-to-project` | 定期実行で `published-image-scan` が失敗したとき | 非公開の Project に項目を足す（公開の Issue は立てない） |
+| ワークフロー | ジョブ | いつ | 何をするか |
+| --- | --- | --- | --- |
+| `on-pr-dependency-review.yml` | `dependency-review` | `main` への PR | 依存のレビュー（`fail-on-severity: high`） |
+| `published-image-cve-scan.yml` | `published-image-scan` | 毎週月曜 04:00 UTC・手動 | Docker Hub の `ishinokazuki/kimigayo-os:latest`（standard / amd64）を pull し、`scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。SBOM を `sbom-published-latest` として保存 |
+| `published-image-cve-scan.yml` | `add-to-project` | 定期実行で `published-image-scan` が失敗したとき | 非公開の Project に項目を足す（公開の Issue は立てない） |
+
+以前同居していた `vulnerability-scan` のうち、ビルドスクリプトの検査（コメント以外の `http://` と
+`eval` があれば落ちる。`scripts/lib/versions.sh` の `eval` とループバックの `http://` だけ許可）は
+`on-push-and-pr-build-and-verify-all-images.yml` の ShellCheck ジョブに移した（push ごと）。
+週 1 回のリポジトリの Trivy は、push ごとと毎日の検査に重なるので外した。
 
 `published-image-scan` が見るのは `latest` だけです。構成要素の版は
 バリアント・アーキテクチャで共通なためです。新しい CVE はコードが
@@ -266,15 +271,15 @@ Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` �
 
 版は `meta` ジョブがタグ名（`refs/tags/v3.1.0` → `3.1.0`）から解決し、
 後続のジョブへ `needs.meta.outputs.version` として渡します
-（`scripts/get-version.sh` を使うのは `build-workflow.yml` の方です）。
+（`scripts/get-version.sh` を使うのは `reusable-build-and-verify-image.yml` の方です）。
 
 > **ここを渡し忘れると、タグ名だけ合っていて中身の版がずれます。**
-> 以前 `release.yml` が版を渡さず、`os-release` が `dev` になる事故が
+> 以前 `on-tag-publish-release.yml` が版を渡さず、`os-release` が `dev` になる事故が
 > ありました。下の検証（`EXPECT_VERSION`）はそれを止めるためのものです。
 
 #### 5. Rootfsビルド
 
-**`build-and-verify.yml` とまったく同じ入口を使います。** 経路が分かれていると、
+**`on-push-and-pr-build-and-verify-all-images.yml` とまったく同じ入口を使います。** 経路が分かれていると、
 CI が緑でもリリースで落ちる（逆も）ことになります。
 
 ```yaml
@@ -339,18 +344,18 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
       "${{ matrix.arch }}"
 ```
 
-**検証の実体は `scripts/verify-image.sh`**（34 項目、minimal は 33）で、`build-and-verify.yml` と
+**検証の実体は `scripts/verify-image.sh`**（34 項目、minimal は 33）で、`on-push-and-pr-build-and-verify-all-images.yml` と
 ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
 
-> **`release.yml` に Trivy の脆弱性スキャンも pytest も統合テストもありません。**
+> **`on-tag-publish-release.yml` に Trivy の脆弱性スキャンも pytest も統合テストもありません。**
 > Trivy のイメージの脆弱性スキャンは、パッケージデータベースが無く
 > 何も識別できないため 2026-10-09 に外しました。
-> `release.yml` では push の前に `scripts/scan-image.sh` で秘密情報
+> `on-tag-publish-release.yml` では push の前に `scripts/scan-image.sh` で秘密情報
 > （Trivy の secret スキャナ）と CVE（Grype）を照合し、作った SBOM を
 > GitHub Release に添付します。
-> pytest は `build-and-verify.yml` 側で回ります。
+> pytest は `on-push-and-pr-build-and-verify-all-images.yml` 側で回ります。
 > 以前は検証に `continue-on-error` が付いており、
 > tarball が小さくても `exit 0` でスキップしていました。
 
@@ -447,7 +452,7 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 # ローカル実行
 docker compose run --rm kimigayo-build pytest tests/unit/ -v
 
-# CI（build-and-verify.yml の tests ジョブ）
+# CI（on-push-and-pr-build-and-verify-all-images.yml の tests ジョブ）
 docker compose run --rm -w /build/kimigayo kimigayo-build \
   pytest tests/unit -q
 ```
@@ -515,7 +520,7 @@ make shellcheck-scan
 
 ShellCheck は Action を使わず、版をダイジェストで固定した
 `koalaman/shellcheck` のイメージを直接 `docker run` します
-（`build-and-verify.yml` と `release.yml`。ローカルの `make shellcheck-scan` と同じ対象・重大度）。
+（`on-push-and-pr-build-and-verify-all-images.yml` と `on-tag-publish-release.yml`。ローカルの `make shellcheck-scan` と同じ対象・重大度）。
 
 ```yaml
 - name: Run ShellCheck
@@ -535,8 +540,8 @@ ShellCheck は Action を使わず、版をダイジェストで固定した
 
 ### Trivy（リポジトリのファイルシステムスキャン）
 
-Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使います（`build-and-verify.yml`・
-`security.yml`・`dependency-review.yml`）。イメージの脆弱性スキャンには
+Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使います（`on-push-and-pr-build-and-verify-all-images.yml`・
+`upstream-security-watch.yml`）。イメージの脆弱性スキャンには
 使いません（何も識別できないため）。イメージに対しては
 `scripts/scan-image.sh` の中で**秘密情報スキャン（`--scanners secret`）だけ**に使います。
 
@@ -566,9 +571,9 @@ Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使いま�
 
 | どこで | 何を | 失敗したら |
 | --- | --- | --- |
-| `build-workflow.yml`（ビルドごと） | CVE 照合 + 秘密情報 | ジョブが落ちる |
-| `release.yml`（Docker Hub への push 前） | CVE 照合 + 秘密情報。SBOM を Release に添付 | push しない |
-| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | ジョブが落ちる。定期実行のときだけ非公開の Project に項目を足す |
+| `reusable-build-and-verify-image.yml`（ビルドごと） | CVE 照合 + 秘密情報 | ジョブが落ちる |
+| `on-tag-publish-release.yml`（Docker Hub への push 前） | CVE 照合 + 秘密情報。SBOM を Release に添付 | push しない |
+| `published-image-cve-scan.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | ジョブが落ちる。定期実行のときだけ非公開の Project に項目を足す |
 
 ## リリースプロセス
 
@@ -614,12 +619,12 @@ git push origin v3.1.1
 8. GitHub Releases を作成
 9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS + SBOM 6 本 + 対応するソース 4 本）を添付
 
-**Trivy の脆弱性スキャンと pytest は `release.yml` では走りません**
-（pytest は `build-and-verify.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
+**Trivy の脆弱性スキャンと pytest は `on-tag-publish-release.yml` では走りません**
+（pytest は `on-push-and-pr-build-and-verify-all-images.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
 2026-10-09 に外しました。秘密情報と CVE は `scan-image.sh` で見ます）。
 
 **`CHANGELOG.md` は自動生成されません。** タグを打つ前に手で更新して
-おいてください（→ [2. Release](#2-release-githubworkflowsreleaseyml)）。
+おいてください（→ [2. Release](#2-release-githubworkflowson-tag-publish-releaseyml)）。
 
 #### 3. リリースノートの確認
 
@@ -634,7 +639,7 @@ GitHub Releasesページで以下を確認:
 
 ```bash
 # ビルド・検証・スキャンだけ（Docker Hub には push しない）
-gh workflow run release.yml -f tag=v3.1.1
+gh workflow run on-tag-publish-release.yml -f tag=v3.1.1
 ```
 
 または、GitHubのActionsタブから手動実行。
@@ -675,7 +680,7 @@ act
 act push
 
 # 特定のジョブのみ実行
-# release.yml の実際のジョブ名は次の8つ:
+# on-tag-publish-release.yml の実際のジョブ名は次の8つ:
 #   meta / shellcheck / build / verify-and-push /
 #   create-manifest / sign / create-github-release / notify
 act -j build
@@ -787,7 +792,7 @@ jobs:
 ### セキュリティスキャン統合
 
 ```yaml
-# .github/workflows/security.yml
+# .github/workflows/upstream-security-watch.yml
 name: Security Scan
 
 on:

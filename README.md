@@ -4,7 +4,7 @@
 
 **軽量・セキュアなコンテナ向けオペレーティングシステム**
 
-[![Release](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/release.yml)
+[![Release](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/on-tag-publish-release.yml/badge.svg)](https://github.com/Kazuki-0731/Kimigayo/actions/workflows/on-tag-publish-release.yml)
 [![License: GPL-2.0 / MIT / BSD](https://img.shields.io/badge/License-GPL--2.0%20%7C%20MIT%20%7C%20BSD-blue.svg)](LICENSE)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-ishinokazuki%2Fkimigayo--os-blue?logo=docker)](https://hub.docker.com/r/ishinokazuki/kimigayo-os)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -315,7 +315,7 @@ docker run --rm \
 - **リリース資産のハッシュ配布**: `SHA256SUMS` と `SHA512SUMS` を
   GitHub Release に添付
 
-**公開イメージは v3.0.2 から Cosign で署名しています**（`release.yml` の
+**公開イメージは v3.0.2 から Cosign で署名しています**（`on-tag-publish-release.yml` の
 `sign` ジョブ）。鍵を持たないキーレス署名（Sigstore OIDC）で、署名は
 Rekor の透明性ログに載ります。**検証には cosign v3 以降が必要です**
 （署名は新しい形式で置いてあり、cosign v2 では `no signatures found` になる。
@@ -457,13 +457,14 @@ distroless は 2026-10-11 の値。
 
 | ワークフロー | トリガー | 目的 | 処理内容 |
 |------------|---------|------|---------|
-| **build-and-verify.yml** | PR、main push、手動 | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、build-workflow.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
-| **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・対応するソース・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
-| **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
-| **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
-| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら非公開の Project に追加）<br>• 上流のセキュリティ情報（Debian・Alpine・上流 git・CISA KEV）との差分（差分が出たら非公開の Project と Discord 通知）<br>• Trivy ファイルシステムスキャン |
-| **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox/OpenRC バージョンチェック<br>• 更新があればPR自動作成 |
-| **dependency-review.yml** | PR時、週次（月曜 04:00 UTC） | 依存関係レビュー | • 依存関係の変更を検証（PR）<br>• Trivy ファイルシステムスキャン<br>• 公開中の `latest` を `scan-image.sh` で照合（定期実行で失敗したら非公開の Project に追加） |
+| **on-push-and-pr-build-and-verify-all-images.yml** | PR、main push、手動 | 継続的インテグレーション | • ShellCheck・リンク検査・pytest（unit）<br>• **全variant × 全arch**ビルドとイメージ検証（6パターン、reusable-build-and-verify-image.yml 経由。カーネルは作らない）<br>• Trivy ファイルシステムスキャン（リポジトリ側）<br>• Discord通知 |
+| **on-tag-publish-release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・対応するソース・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
+| **reusable-build-and-verify-image.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
+| **manual-build-image-and-kernel.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
+| **upstream-security-watch.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら非公開の Project に追加）<br>• 上流のセキュリティ情報（Debian・Alpine・上流 git・CISA KEV）との差分（差分が出たら非公開の Project と Discord 通知）<br>• Trivy ファイルシステムスキャン |
+| **component-update-pr.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox/OpenRC バージョンチェック<br>• 更新があればPR自動作成 |
+| **on-pr-dependency-review.yml** | PR時 | 依存関係レビュー | • 依存関係の変更を検証（`fail-on-severity: high`） |
+| **published-image-cve-scan.yml** | 週次（月曜 04:00 UTC）、手動 | 公開イメージの CVE 照合 | • 公開中の `latest` を `scan-image.sh` で照合（定期実行で失敗したら非公開の Project に追加） |
 
 **CI/CD改善点（v1.0.0 時点の記録）:**
 - ✅ **全フレーバー×全アーキテクチャのテスト**: minimal/standard/extended × x86_64/arm64の6パターンを自動テスト

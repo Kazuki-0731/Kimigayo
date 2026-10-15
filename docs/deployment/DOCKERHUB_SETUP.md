@@ -57,7 +57,7 @@ Minimal 2.34MB / 2.73MB、Standard 2.64MB / 3.06MB、Extended 2.67MB / 3.10MB �
 
 #### タグの例
 
-**`release.yml` が実際に作るタグだけを書く。** 増やすときは
+**`on-tag-publish-release.yml` が実際に作るタグだけを書く。** 増やすときは
 ワークフローを先に直す（書いただけのタグは永久に現れない）。
 
 ```
@@ -86,23 +86,23 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 > バージョン指定でアーキを固定するならバリアント名が必要。
 >
 > **`stable` と `edge` も存在しない。** 2026-10-10 までこの手順書が
-> 両方を案内していたが、`release.yml` に生成箇所が無く、Docker Hub の
+> 両方を案内していたが、`on-tag-publish-release.yml` に生成箇所が無く、Docker Hub の
 > タグ一覧にも1度も現れていない。
 
 ### タグ付けワークフロー
 
-**Docker Hub へ push するのは `release.yml` の `v*.*.*` タグの push だけ**。
-`release.yml` の手動実行はビルドと検証だけで push しない。`main` へのコミットでは
-`build-and-verify.yml` が走るが、イメージは公開されない。タグの push は公開物を変えるので、
+**Docker Hub へ push するのは `on-tag-publish-release.yml` の `v*.*.*` タグの push だけ**。
+`on-tag-publish-release.yml` の手動実行はビルドと検証だけで push しない。`main` へのコミットでは
+`on-push-and-pr-build-and-verify-all-images.yml` が走るが、イメージは公開されない。タグの push は公開物を変えるので、
 ユーザーの明示的な承認を取る。
 
 1. **安定版リリース**
-   - `git tag -a v3.0.3` → push で `release.yml` が走る（版は例）
+   - `git tag -a v3.0.3` → push で `on-tag-publish-release.yml` が走る（版は例）
    - バージョン指定タグ（10本）と `latest` 系（12本）を更新し、Cosign で署名する
    - フォーマット: `3.1.0`、`3.1.1`
 
 2. **手動実行**
-   - Actions から `release.yml` を `workflow_dispatch` で実行する
+   - Actions から `on-tag-publish-release.yml` を `workflow_dispatch` で実行する
    - **Docker Hub には push しない**。ビルド・検証・スキャン・SBOM の保存まで
      （2026-10-12 までは `<ver>-<variant>-<arch>` と `latest-<variant>-<arch>` を
      push していた）。マニフェスト作成・署名・GitHub Release も走らない
@@ -137,7 +137,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 - [DOCKERHUB_README.md](../../DOCKERHUB_README.md) を貼る（→ ステップ4）
 
 #### Buildsタブ
-- 使わない。ビルドと push は GitHub Actions の `release.yml` が行う
+- 使わない。ビルドと push は GitHub Actions の `on-tag-publish-release.yml` が行う
   （→ [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md)）
 
 #### Collaboratorsタブ
@@ -149,7 +149,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 [DOCKERHUB_README.md](../../DOCKERHUB_README.md) の中身をそのまま
 Docker Hub の Overview に貼る。**ここに文章を写さない**（上記参照）。
 
-**Overview は自動では同期されない。** `release.yml` も触らない。
+**Overview は自動では同期されない。** `on-tag-publish-release.yml` も触らない。
 
 - `.env` / GitHub Secrets の push 用トークン（`DOCKER_HUB_ACCESS_TOKEN`）では、
   API での更新は **403** になる（ログインは通るが説明文の書き換え権限が無い）
@@ -166,7 +166,7 @@ Docker Hub の Overview に貼る。**ここに文章を写さない**（上記�
 
 ### イメージ署名
 
-**v3.0.2 から Cosign のキーレス署名を行う**（`release.yml` の `sign` ジョブ。
+**v3.0.2 から Cosign のキーレス署名を行う**（`on-tag-publish-release.yml` の `sign` ジョブ。
 Sigstore OIDC、Rekor の透明性ログに載る）。**検証には cosign v3 以降が要る。**
 署名は v3 の形式で置いてあり、cosign v2 では `no signatures found` になる
 （2026-10-12 に v2.4.1 と v3.0.6 で確かめた）。Docker Content Trust は使わない。
@@ -186,8 +186,8 @@ GitHub Release に添付する `SHA256SUMS` / `SHA512SUMS` を案内する。
 構成要素（BusyBox / musl / OpenRC）の CVE は `scripts/scan-image.sh`
 （`make scan-image`）で照合する。イメージ内のバイナリから読んだ版で
 SBOM を作り、Grype で照合する。公開中の `latest` には
-`dependency-review.yml` の `published-image-scan` が毎週月曜
-04:00 UTC に回す（→ [CICD_GUIDE.md](../developer/CICD_GUIDE.md#7-dependency-review-githubworkflowsdependency-reviewyml)）。
+`published-image-cve-scan.yml` の `published-image-scan` が毎週月曜
+04:00 UTC に回す（→ [CICD_GUIDE.md](../developer/CICD_GUIDE.md#7-dependency-review-githubworkflowson-pr-dependency-reviewyml-と-published-image-cve-scan-githubworkflowspublished-image-cve-scanyml)）。
 
 ### 更新ポリシー
 
@@ -224,7 +224,7 @@ LABEL io.kimigayo.variant="${IMAGE_VARIANT}"
 LABEL io.kimigayo.architecture="${TARGETARCH}"
 ```
 
-`VERSION` / `IMAGE_VARIANT` / `BUILD_DATE` / `VCS_REF` は `release.yml` が
+`VERSION` / `IMAGE_VARIANT` / `BUILD_DATE` / `VCS_REF` は `on-tag-publish-release.yml` が
 `--build-arg` で渡します。
 
 ## 次のステップ

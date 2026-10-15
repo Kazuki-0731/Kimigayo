@@ -493,7 +493,7 @@ output/kimigayo-<variant>-<version>-<arch>.tar.gz
 
 `<version>` にはホストの `Makefile` の `VERSION` が入ります（既定は `latest`）。
 `git describe` 由来の版（`KIMIGAYO_VERSION`）が入るのは `/etc/os-release` などの
-中身で、tarball 名ではありません。リリースでは `release.yml` がタグの版で名前を付けます。
+中身で、tarball 名ではありません。リリースでは `on-tag-publish-release.yml` がタグの版で名前を付けます。
 
 - **ISO イメージは生成されません。** ベアメタル起動は対象外です
   （→ [SPECIFICATION.md](../../SPECIFICATION.md) 6.2・9.2）
@@ -547,7 +547,7 @@ standard / x86_64 の tarball の SHA-256 が一致しました。
 
 ### 自分で確かめるには
 
-同じコミットで `manual-build.yml` を回し、CI の `rootfs-<variant>-<arch>`
+同じコミットで `manual-build-image-and-kernel.yml` を回し、CI の `rootfs-<variant>-<arch>`
 成果物と `shasum -a 256` を比べます。手元で作った tarball は、
 上の tar のオプションを付けない限り一致しません。
 
@@ -642,9 +642,9 @@ GitHub Actions のワークフローは `.github/workflows/` にあります。
 
 | ワークフロー | いつ | 何をするか |
 |------------|------|-----------|
-| `build-and-verify.yml` | `main` への push・PR、手動 | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
-| `release.yml` | `v*.*.*` タグ、手動 | Docker Hub への公開・Cosign 署名・GitHub Release（**公開はタグのときだけ**。手動実行はビルド・検証・スキャンまでで push しない） |
-| `manual-build.yml` | 手動 | バリアント・アーキを選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
+| `on-push-and-pr-build-and-verify-all-images.yml` | `main` への push・PR、手動 | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
+| `on-tag-publish-release.yml` | `v*.*.*` タグ、手動 | Docker Hub への公開・Cosign 署名・GitHub Release（**公開はタグのときだけ**。手動実行はビルド・検証・スキャンまでで push しない） |
+| `manual-build-image-and-kernel.yml` | 手動 | バリアント・アーキを選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
 詳しくは [CICD_GUIDE.md](CICD_GUIDE.md)。
 

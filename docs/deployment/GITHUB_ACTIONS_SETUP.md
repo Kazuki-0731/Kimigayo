@@ -13,8 +13,8 @@ GitHub Actions を動かすために、**リポジトリ側で用意するもの
 
 | シークレット名 | 必須 | 用途 |
 |--------------|------|------|
-| `DOCKER_HUB_ACCESS_TOKEN` | 必須 | `release.yml` が Docker Hub にログインして push する |
-| `DISCORD_WEBHOOK` | 任意 | `build-and-verify.yml` と `release.yml` の結果通知。未設定なら通知ステップを飛ばす |
+| `DOCKER_HUB_ACCESS_TOKEN` | 必須 | `on-tag-publish-release.yml` が Docker Hub にログインして push する |
+| `DISCORD_WEBHOOK` | 任意 | `on-push-and-pr-build-and-verify-all-images.yml` と `on-tag-publish-release.yml` の結果通知。未設定なら通知ステップを飛ばす |
 
 - Docker Hub のユーザー名（`ishinokazuki`）はシークレットではなく、
   ワークフローの `env` に直書きしています。`DOCKER_HUB_TOKEN` という
@@ -55,7 +55,7 @@ git tag -a v3.1.1 -m "Release v3.1.1"   # 例。2026-10-15 時点の最新は v3
 git push origin v3.0.3
 ```
 
-**タグを push した瞬間に `release.yml` が走り、`latest` を含む公開イメージが
+**タグを push した瞬間に `on-tag-publish-release.yml` が走り、`latest` を含む公開イメージが
 差し替わります。取り消せないので、タグの作成と push は毎回ユーザーの明示的な
 承認を取ります**（`.claude/hooks/guard-bash.sh` も機械的に止めます）。
 タグを打つ前に `CHANGELOG.md` を手で更新しておきます。
@@ -69,7 +69,7 @@ git push origin v3.0.3
 Actions タブの **Release** ワークフロー、または:
 
 ```bash
-gh workflow run release.yml -f tag=v3.0.3
+gh workflow run on-tag-publish-release.yml -f tag=v3.0.3
 ```
 
 **手動実行は Docker Hub に push しません。** タグ push と同じ経路でビルドし、

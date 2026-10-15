@@ -275,15 +275,15 @@ make trivy-scan          # Kimigayo は識別されない（下記）
 
 CI 側では次のように回る:
 
-- **ビルドごと** — `build-workflow.yml` の verify-image ジョブが
+- **ビルドごと** — `reusable-build-and-verify-image.yml` の verify-image ジョブが
   `scan-image.sh` で CVE と秘密情報を見る（失敗すればジョブも落ちる）。
-  `release.yml` も Docker Hub への push 前に同じものを走らせる
-- **毎週月曜 04:00 UTC と手動** — `dependency-review.yml` の
+  `on-tag-publish-release.yml` も Docker Hub への push 前に同じものを走らせる
+- **毎週月曜 04:00 UTC と手動** — `published-image-cve-scan.yml` の
   `published-image-scan` ジョブが Docker Hub の `latest` を pull し、
   `scan-image.sh`（CVE + 秘密情報）を回す。定期実行で失敗したときだけ
   `add-to-project` が非公開の Project に項目を足す（手動実行では足さない）
-- **PR** — `dependency-review.yml` の依存レビュー。リポジトリの Trivy FS スキャン
-  （`vulnerability-scan`）は PR と定期の両方で走る
+- **PR** — `on-pr-dependency-review.yml` の依存レビュー。リポジトリの Trivy FS スキャンは
+  push・PR ごと（`on-push-and-pr-build-and-verify-all-images.yml`）と毎日（`upstream-security-watch.yml`）
 
 ## パフォーマンス測定
 
@@ -370,7 +370,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 ### リリース手順
 
 **`develop` ブランチは存在しない。** 作業は `main` で行う
-（`build-and-verify.yml` のトリガーからも 2026-10-13 に外した）。
+（`on-push-and-pr-build-and-verify-all-images.yml` のトリガーからも 2026-10-13 に外した）。
 
 1. すべてのテストが通ることを確認（`make test` / `make shellcheck-scan`）
 2. 成果物を検査（`rootfs-verifier` subagent、`scripts/verify-image.sh`）
@@ -380,7 +380,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 4. README・docs の数値とバージョン表記を突合
 5. **ユーザーの明示的な承認を取る**
 6. タグ作成と push: `git tag -a v<版> -m "..." && git push origin v<版>`
-7. `release.yml` が走り Docker Hub と GitHub Release を公開
+7. `on-tag-publish-release.yml` が走り Docker Hub と GitHub Release を公開
 8. **公開物を pull して中身を検証**
 
 > **`v*.*.*` タグを push した瞬間に Docker Hub の `latest` を含む

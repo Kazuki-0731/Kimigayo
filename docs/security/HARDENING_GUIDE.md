@@ -487,7 +487,7 @@ EPSS は 0.14%。2026-10-14 時点）。**Kimigayo は上流のコミットを�
 リリースか Debian / Alpine に入るのを待つ**（2026-10-14 に決定）。
 **それまでは、信頼できない tar を同じディレクトリに続けて展開しないこと。**
 仕分けの一覧（`docs/security/upstream-triage.tsv`）では修正待ち（watching）で、
-Debian か Alpine で直ると `security.yml` が非公開の Project と Discord で知らせる
+Debian か Alpine で直ると `upstream-security-watch.yml` が非公開の Project と Discord で知らせる
 （追跡: [#121](https://github.com/Kazuki-0731/Kimigayo/issues/121)）。
 
 ---

@@ -30,13 +30,13 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
   - イメージ内のバイナリを実行して読んだ BusyBox / musl / OpenRC の版から
     CycloneDX の SBOM を作り、Grype で NVD の CPE と照合する
   - 公開イメージ（Docker Hub の `latest`）に対して毎週月曜 04:00 UTC
-    （`dependency-review.yml` の `published-image-scan`）
+    （`published-image-cve-scan.yml` の `published-image-scan`）
   - 加えて CI（毎 push）とリリース（Docker Hub への push 前）でも照合する
     （下記「自動化された監査」）
-- **リポジトリ**: Trivy のファイルシステムスキャン（push / PR・毎日・毎週）
+- **リポジトリ**: Trivy のファイルシステムスキャン（push / PR・毎日）
 - **重大度**: 出荷物は `FAIL_ON`（既定 `low`、Grype の `--fail-on`）で、
-  見つかればジョブが落ちる。リポジトリは CI と `security.yml` が CRITICAL, HIGH、
-  `dependency-review.yml` の週次とローカルの `make trivy-fs-scan` は MEDIUM も含む。
+  見つかればジョブが落ちる。リポジトリは CI と `upstream-security-watch.yml` が CRITICAL, HIGH、
+  ローカルの `make trivy-fs-scan` は MEDIUM も含む。
   **リポジトリの Trivy は SARIF を Security タブに送るだけで、結果ではジョブは落ちない**
 
 #### b. 静的解析
@@ -46,7 +46,7 @@ Kimigayo OSのセキュリティ監査は以下の目的で実施されます：
 
 #### c. 構成監査
 - **ツール**: Trivy（`scanners: config`）
-- **頻度**: 毎日（`security.yml`）と週次（`dependency-review.yml`）
+- **頻度**: 毎日（`upstream-security-watch.yml`）
 - **スコープ**: Dockerfile などリポジトリ内の設定ファイル（GitHub Actions の
   ワークフローを Trivy が検査対象にしているかは確かめていない）
 
@@ -128,7 +128,7 @@ ASLR・NX・KASLR・カーネルの CVE はホスト側の監査項目です。
       `scripts/scan-image.sh` で照合する）
 - [ ] イメージ署名の検証
       — v3.0.2 から Cosign のキーレス署名（Sigstore OIDC）を
-      `release.yml` の `sign` ジョブで行う。**v3.0.1 以前は未署名**。
+      `on-tag-publish-release.yml` の `sign` ジョブで行う。**v3.0.1 以前は未署名**。
       検証には cosign v3 以上が要る（手順は
       [SECURITY_POLICY.md](SECURITY_POLICY.md#イメージの署名)）
 
@@ -202,13 +202,13 @@ ASLR・NX・KASLR・カーネルの CVE はホスト側の監査項目です。
 
 ### GitHub Actionsによる継続的監査
 
-#### 1. PR / push 時（`build-and-verify.yml`）
+#### 1. PR / push 時（`on-push-and-pr-build-and-verify-all-images.yml`）
 
 **外部 Action はコミット SHA で固定します**（`@master` は供給網の
 リスクかつ再現性がない）。
 
 ShellCheck は Action を使わず、ダイジェストで固定した `koalaman/shellcheck` の
-イメージを直接動かします（`release.yml` も同じ。2026-10-13 まで使っていた
+イメージを直接動かします（`on-tag-publish-release.yml` も同じ。2026-10-13 まで使っていた
 `ludeeus/action-shellcheck` は `.claude/hooks` を実際には検査していなかった）。
 
 ```yaml
@@ -226,7 +226,7 @@ ShellCheck は Action を使わず、ダイジェストで固定した `koalaman
     severity: 'CRITICAL,HIGH'
 ```
 
-#### 2. リリース時（`release.yml`）
+#### 2. リリース時（`on-tag-publish-release.yml`）
 
 ShellCheck と `scripts/verify-image.sh`（34 項目、minimal は 33）、push 前に
 `scripts/scan-image.sh`（CVE 照合 + 秘密情報）。作った SBOM（CycloneDX）は
@@ -245,14 +245,14 @@ GitHub Release に添付します。
   v3.0.1 は Segmentation fault で落ちる）
 - setuid/setgid・`/etc/shadow` の権限・パッケージマネージャーの不在 など
 
-#### 2b. ビルドごと（`build-workflow.yml`）
+#### 2b. ビルドごと（`reusable-build-and-verify-image.yml`）
 
-`build-and-verify.yml`・`manual-build.yml` が呼ぶビルド本体で、`verify-image.sh` の
+`on-push-and-pr-build-and-verify-all-images.yml`・`manual-build-image-and-kernel.yml` が呼ぶビルド本体で、`verify-image.sh` の
 あとに `scripts/scan-image.sh` を実行します
 （CVE 照合と rootfs の秘密情報。見つかればジョブが落ちる）。
 NVD に新しい CVE が載ると、コードを変えていない push でも落ちます。
 
-#### 3. 定期監査（`security.yml`）
+#### 3. 定期監査（`upstream-security-watch.yml`）
 - **頻度**: **毎日 02:00 UTC**
 - **スコープ**: 構成要素の版確認 + **ファイルシステム**スキャン
 - **通知**: musl / BusyBox の新版を検知したときに Issue を自動作成
@@ -267,11 +267,10 @@ NVD に新しい CVE が載ると、コードを変えていない push でも�
 > **`scripts/scan-image.sh` が出荷物の版で行います**（下記 4.）。
 > カーネルはイメージに入らないので対象外です。
 
-#### 4. 依存レビューと公開イメージの照合（`dependency-review.yml`）
-`main` への PR と毎週月曜 04:00 UTC、手動。
+#### 4. 依存レビュー（`on-pr-dependency-review.yml`）と公開イメージの照合（`published-image-cve-scan.yml`）
 
-- `dependency-review`（PR のみ）: `fail-on-severity: high`
-- `published-image-scan`（定期・手動のみ）: Docker Hub の `latest` を pull し、
+- `dependency-review`（`main` への PR）: `fail-on-severity: high`
+- `published-image-scan`（毎週月曜 04:00 UTC・手動）: Docker Hub の `latest` を pull し、
   `scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。定期実行で
   失敗すると `add-to-project` が非公開の Project に項目を足します
 
@@ -323,7 +322,7 @@ v3.0.1 の公開イメージで `scan-image.sh` が 5 件を検出しました�
 1 件ずつの根拠と状態は [upstream-triage.tsv](upstream-triage.tsv)、
 出所は各パッチの冒頭にあります。
 
-#### 5. 上流更新の検知（`base-image-update.yml`）
+#### 5. 上流更新の検知（`component-update-pr.yml`）
 毎週月曜 03:00 UTC。構成要素の新版を検知して PR を作成します。
 
 ### ローカル監査実行

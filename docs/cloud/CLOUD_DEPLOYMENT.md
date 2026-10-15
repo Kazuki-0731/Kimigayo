@@ -454,7 +454,7 @@ reads versions out of the binaries and matches them against CVEs:
 bash scripts/scan-image.sh ishinokazuki/kimigayo-os:3.1.0-standard standard x86_64
 ```
 
-The published images are also checked weekly (`dependency-review.yml`), and
+The published images are also checked weekly (`published-image-cve-scan.yml`), and
 each GitHub Release carries a CycloneDX SBOM per image.
 
 ### Cost Optimization

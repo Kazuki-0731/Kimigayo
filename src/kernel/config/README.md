@@ -54,7 +54,7 @@
 docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64
 ```
 
-CI で作るなら Actions から `manual-build.yml` を `build_kernel=true` で実行する。
+CI で作るなら Actions から `manual-build-image-and-kernel.yml` を `build_kernel=true` で実行する。
 
 ### 自分の config を使いたいとき
 

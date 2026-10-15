@@ -128,7 +128,7 @@ bash scripts/verify-image.sh <image> <variant> <arch>
 
 ### イメージの署名
 
-v3.0.2 から、公開イメージは `release.yml` の `sign` ジョブで
+v3.0.2 から、公開イメージは `on-tag-publish-release.yml` の `sign` ジョブで
 Cosign のキーレス署名（Sigstore OIDC）をしています。v3.0.1 以前は未署名です。
 **検証には cosign v3 以上が必要です**（v2 では `no signatures found` になります）。
 
@@ -165,8 +165,9 @@ cat /proc/sys/kernel/randomize_va_space
 
 ### 自動の検査
 
-- **依存関係スキャン**: 毎週（`dependency-review.yml`）
-- **構成要素の版の確認・リポジトリの脆弱性スキャン**: 毎日（`security.yml`）
+- **依存関係スキャン**: PR ごと（`on-pr-dependency-review.yml`）
+- **公開イメージの CVE 照合**: 毎週（`published-image-cve-scan.yml`）
+- **構成要素の版の確認・リポジトリの脆弱性スキャン**: 毎日（`upstream-security-watch.yml`）
 - **出荷物の CVE 照合と秘密情報スキャン**: 毎 push とリリース前（上記）
 
 ### 外部監査

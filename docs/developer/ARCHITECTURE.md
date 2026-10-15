@@ -68,7 +68,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 > **カーネルは Docker イメージに入りません。** 想定する使い方は
 > VPS 上の Docker コンテナで、ベアメタル起動は対象外です
 > （カーネルのビルド手段は QEMU やベアメタルを試すために残してありますが、
-> `build-and-verify.yml` ではビルドしません）。
+> `on-push-and-pr-build-and-verify-all-images.yml` ではビルドしません）。
 >
 > **ルートファイルシステムも、コンテナでは `overlay` です**
 > （`ext4` はこの rootfs をベアメタルや VM で使う場合の話）。
@@ -342,7 +342,7 @@ CONFIG_PANIC_ON_OOPS=y         # PANIC_TIMEOUT=10
 （`modules.order` があるとき）だけ実行し、失敗したらビルドを止めます。
 
 **実際にビルドされた `.config` で、上の意図はすべて効いています**
-（2026-10-13、6.18.55、`manual-build.yml` を `build_kernel=true` で両アーキに
+（2026-10-13、6.18.55、`manual-build-image-and-kernel.yml` を `build_kernel=true` で両アーキに
 回した run 38287999391 / 38288004527 の artifact `kernel-config-<arch>`）。
 以前ここで「手元の `.config` は `CONFIG_NETFILTER=y`」と書いていたのは、
 途中で止まった実行の残骸でした。
@@ -372,7 +372,7 @@ NETFILTER を無効にしているので、このカーネルでは iptables も
 頼る Docker の既定のブリッジネットワークも使えません。x86_64 は `OVERLAY_FS` も無いので、
 このカーネルの上で Docker を動かす用途には向きません。
 
-確かめ直すには `manual-build.yml` を `build_kernel=true` で回します。
+確かめ直すには `manual-build-image-and-kernel.yml` を `build_kernel=true` で回します。
 主な強化項目がジョブのサマリーに出て、`.config` が artifact
 `kernel-config-<arch>` に残ります（手元なら `build/kernel/output/config-<version>-<arch>`）。
 
@@ -487,7 +487,7 @@ Layer 1 と 2 はホストと利用者の設定によります
 
 **配布していないもの**: seccomp プロファイル、SELinux / AppArmor の
 ポリシー、`iptables`。
-（イメージの署名は v3.0.2 から `release.yml` の `sign` ジョブで
+（イメージの署名は v3.0.2 から `on-tag-publish-release.yml` の `sign` ジョブで
 Cosign のキーレス署名をしています。検証には cosign v3 以上が要ります。）
 **ファイアウォールはイメージに入っていません**（`iptables` 無し）。
 
@@ -646,7 +646,7 @@ versions.mk ─┬→ download-musl    → build-musl     [1/4]
 
 **カーネル（[2/4]）の成果物は Docker イメージに入りません。**
 `build/kernel/output/vmlinuz-<version>-<arch>` に置かれ、
-ベアメタル／QEMU 検証でだけ使います。`build-and-verify.yml` ではビルドしません。
+ベアメタル／QEMU 検証でだけ使います。`on-push-and-pr-build-and-verify-all-images.yml` ではビルドしません。
 
 プロジェクト自身の版は `scripts/get-version.sh`（`git describe --tags`）が
 決め、`build-rootfs.sh` の `resolve_project_version()` が 1 箇所で

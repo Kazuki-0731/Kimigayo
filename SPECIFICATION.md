@@ -149,10 +149,10 @@ Docker イメージに入るのは BusyBox / OpenRC / musl libc までで、
   ダウンロードした tarball の SHA256 を検証する。チェックサムは
   上流の公開値と突合して登録する（musl と OpenRC は公式の SHA256 一覧が
   無いため Alpine aports の `sha512sums` と突合する）
-- **リリース資産のハッシュ配布**: `release.yml` が `SHA256SUMS` と
+- **リリース資産のハッシュ配布**: `on-tag-publish-release.yml` が `SHA256SUMS` と
   `SHA512SUMS` を GitHub Release に添付する
 
-**公開イメージは v3.0.2 から Cosign でキーレス署名する**（`release.yml` の `sign`
+**公開イメージは v3.0.2 から Cosign でキーレス署名する**（`on-tag-publish-release.yml` の `sign`
 ジョブ。検証には cosign v3 以上が要る）。SBOM（CycloneDX）は GitHub Release に
 添付する（イメージへの attestation ではない）。Docker Content Trust は使わない。
 
@@ -255,7 +255,7 @@ Kimigayo の想定は VPS やクラウド上の Docker コンテナであり、
 カーネルだけ作りたいときは
 `docker compose run --rm kimigayo-build make kernel` で作れるが
 （`kernel` ターゲットはビルドコンテナ内の `build-system/Makefile` にある。
-ホストの `Makefile` には無い）、CI では `manual-build.yml` を
+ホストの `Makefile` には無い）、CI では `manual-build-image-and-kernel.yml` を
 `build_kernel=true` で回したとき以外はビルドしない
 （→ [CLAUDE.md](CLAUDE.md)「カーネルは CI で作らない」）。
 
