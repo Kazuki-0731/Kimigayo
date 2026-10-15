@@ -100,8 +100,8 @@ done
 いないイメージの値**で、現在の値と同じものを測った数字ではありません。
 並べるなら必ずその旨を書きます。
 
-バリアント間の差はアプレット数だけです（v3.0.1 以降 minimal 367 /
-standard 400 / extended 411）。差が出ないときは BusyBox のビルドがスキップされた
+バリアント間の差はアプレット数だけです（v3.1.0 以降 minimal 329 /
+standard 400 / extended 411。v3.0.1〜3.0.2 の minimal は 367）。差が出ないときは BusyBox のビルドがスキップされた
 疑いを持ちます（スタンプは `1.38.0+standard+dynamic+<hash>` の形式）。
 
 ---
@@ -117,13 +117,13 @@ standard 400 / extended 411）。差が出ないときは BusyBox のビルド�
 | `benchmark-startup.sh` | `docker run -d <image> sleep 5` の**終了まで**。正常なイメージほど必ず約 5,600ms（439ms はこの `sleep` が成立しなかった＝**イメージが壊れているほど速く見える**値）| `docker run --rm <image> /bin/true` の実時間。`MODE=init` なら `/sbin/openrc default` の完走まで |
 | `benchmark-memory.sh` | `KiB` を `0.001` に置換したうえ整数 MB に丸め、**1MB 未満を 0 としか表せなかった**（旧 0.2MB）| 単位を見て KB に正規化。KB で保持する |
 
-**起動時間でイメージの優劣を主張しないこと。** v3.0.2（2026-10-12、
-arm64 ネイティブ、10 回中央値）の Standard は 0.60 秒で、Alpine も Ubuntu も
-0.59 秒。**差は出ません**。測っている時間のほとんどが Docker のコンテナ生成です。
+**起動時間でイメージの優劣を主張しないこと。** v3.1.0（2026-10-15、
+arm64 ネイティブ、10 回中央値）の Standard は 0.65 秒で、Alpine 0.61 秒・Ubuntu
+0.65 秒。**差は出ません**（同じイメージでも 1 回ごとに 0.55〜0.70 秒の間で前後します）。測っている時間のほとんどが Docker のコンテナ生成です。
 
 **常駐メモリでも優劣を主張しないこと。** v3.0.1 は 232KB で Alpine より
-少なかったが、v3.0.2 は BusyBox の動的リンク化で 288KB になり、Alpine（272KB）と
-ほぼ同じ。**差が出るのはサイズだけ**です（Alpine 8.42MB / Ubuntu 78.2MB）。
+少なかったが、v3.0.2 から BusyBox の動的リンク化で 288KB になり、Alpine（v3.1.0 の計測で
+268KB）とほぼ同じ。**差が出るのはサイズだけ**です（Alpine 8.42MB / Ubuntu 78.2MB）。
 
 - **x86_64 を QEMU で測った時間を載せないこと。** 時間の比較になりません。
   開発機（Apple Silicon）では arm64 ネイティブで測ります
@@ -138,8 +138,8 @@ arm64 ネイティブ、10 回中央値）の Standard は 0.60 秒で、Alpine 
 
 `benchmark-busybox.sh` は `ls`・`grep`・`find` などを 1 コマンドずつ
 `docker run` で実行します。2026-10-10 の実測は 1 コマンド 570〜790ms で、
-**そのほとんどがコンテナ生成**です。結果は Alpine 比 **0.97〜1.01x**
-（v3.0.2、中央値の比。有意差なし）。
+**そのほとんどがコンテナ生成**です。結果は Alpine 比 **0.97〜1.02x**
+（v3.1.0、中央値の比。有意差なし）。
 
 > `docs/benchmarks/busybox.md` は v1.0.0 時点で
 > 「~1.11〜1.16x、目標 > 1.10x を達成」と書いていましたが、
@@ -155,7 +155,7 @@ arm64 ネイティブ、10 回中央値）の Standard は 0.60 秒で、Alpine 
 
 `benchmark-lifecycle.sh` は v3.0.1（2026-10-11）で測り直した値が
 `docs/benchmarks/lifecycle.md` にあります（`docker stop` 約 10.4 秒は
-PID 1 の SIGTERM の扱いで、Alpine も同じ）。**v3.0.2 では測り直していません**。
+PID 1 の SIGTERM の扱いで、Alpine も同じ）。**v3.0.2 以降は測り直していません**。
 v1.0.0 の ~234ms などの古い値は引用しません。
 
 ---

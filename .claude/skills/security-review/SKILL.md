@@ -143,8 +143,8 @@ grep -n 'CONFIG_<APPLET>' src/busybox/config/*.config
 docker run --rm --platform linux/<arch> <image> busybox --list | grep -x '<applet>'
 ```
 
-**バリアントごとに結論が変わります。** v3.0.1 以降 minimal 367 /
-standard 400 / extended 411 アプレット。1つの答えで済ませないこと。
+**バリアントごとに結論が変わります。** v3.1.0 以降 minimal 329 /
+standard 400 / extended 411 アプレット（v3.0.1〜3.0.2 の minimal は 367）。1つの答えで済ませないこと。
 
 `version-auditor` subagent に上流の新版調査を任せられます。
 
