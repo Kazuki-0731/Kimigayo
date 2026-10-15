@@ -120,6 +120,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # add-unreleased.py が「次の版」を前回のタグから計算するため
+          fetch-depth: 0
 
       # 値は ${{ }} を run に直接埋め込まず env で渡す。
       - name: Update component versions
@@ -178,6 +181,9 @@ jobs:
               exit 1
             fi
             echo "- **${label}**: ${current} → ${latest}" >> "$changes"
+            # CHANGELOG の [Unreleased] に区分付きで足す。書かないと
+            # ci.yml の check-unreleased.py が落ちる（SPECIFICATION.md 10.2）
+            python3 scripts/add-unreleased.py "$label" "$current" "$latest"
             echo "✅ ${name}: ${current} -> ${latest}"
           }
 
@@ -189,7 +195,7 @@ jobs:
           grep -E '^[A-Z_]+[[:space:]]*\?=' versions.mk
 
           if [ -s "$changes" ]; then
-            git add versions.mk
+            git add versions.mk CHANGELOG.md
             git commit -m "⬆️ 構成要素の版を上流の最新に合わせる（自動検知）
 
           $(cat "$changes")"
@@ -218,6 +224,12 @@ jobs:
 
           \`ci.yml\` はカーネルを作らない。カーネルの版は自動検知の対象外。
 
+          ### CHANGELOG
+
+          \`CHANGELOG.md\` の \`[Unreleased]\` に区分付きで 1 行ずつ足してある
+          （最後の数字だけの更新はパッチ、それより上はマイナー）。
+          中身を読んで、区分と書きぶりが合っているか確かめる。
+
           ### ⚠️ この PR だけでは完結しない
 
           **チェックサムは自動で更新していない。** マージする前に
@@ -232,6 +244,7 @@ jobs:
 
           - [ ] \`scripts/download-*.sh\` のチェックサム表を更新した
           - [ ] 上流の NEWS / Changelog を読んだ
+          - [ ] \`CHANGELOG.md\` の \`[Unreleased]\` の区分と書きぶりを確かめた
           - [ ] 上記の \`ci.yml\` が全バリアント × 両アーキで通った
           - [ ] \`build/busybox-patches.log\` に \`skipped: [1-9]\` や \`not applicable\` が無い
           - [ ] 性能が退行していない
