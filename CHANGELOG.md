@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!--
+次のリリースに入る変更を、SPECIFICATION.md「10.2 バージョニングとリリースの方針」の
+区分ごとに書く。コミットを push した時点で、その変更をここに足す。
+- 次の版は、項目のある区分のうちいちばん大きいもので決まる（下の「次の版」を更新する）
+- 「リリースしない」だけなら出さない。相乗りする変更の記録として残す
+- リリースするときは、版の見出しを立てて Security / Removed / Fixed / Changed /
+  Added に並べ直し、この節を空の雛形に戻す
+-->
+
+**次の版: なし**（公開イメージの中身を変える変更がまだ無い）
+
+### メジャー
+
+### マイナー
+
+### パッチ
+
+### リリースしない（次のリリースに相乗りする）
+
+- **GitHub Actions の更新 8 件**（Dependabot）。checkout v7.0.1・setup-buildx-action v4.4.1・
+  upload-artifact v7.0.2・download-artifact v8.0.2・dependency-review-action v5.0.0・
+  github-script v9.0.0・login-action v4.6.0・action-gh-release v3.0.3。
+  **login-action と action-gh-release はタグを打ったときにしか動かない**ので、
+  次のリリースが初めての実地の確認になる
+- **`scripts/merge-dependabot-prs.sh` を足した。** 条件を満たす Dependabot の PR を
+  手元から管理者権限でまとめて merge する。自動 merge の仕組みはリポジトリに置かない
+- **`docs/maintainer/ACCOUNT_SECURITY.md` を足した**（メンテナーのアカウントとトークンの守り方）
+- **バージョンの上げ方とリリースの時期を決めた**（SPECIFICATION.md 10.2。release skill の
+  最初の段と、月次の保守のリリース見直しから参照する）
+- 文書の実測値と例のタグを v3.1.0 の公開イメージに合わせた。`examples/` の土台を 3.1.0 にした
+
 ## [3.1.0] "Himawari" (向日葵) - 2026-10-14
 
 **上流（BusyBox・musl・Alpine・Debian）と突き合わせて見つけた修正 30 件を取り込み、
