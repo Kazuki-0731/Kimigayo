@@ -59,7 +59,7 @@ SCANS=vuln bash scripts/scan-image.sh <image> <variant> <arch>
 | --- | --- |
 | `build-workflow.yml`（毎 push） | CVE + 秘密情報。SBOM を成果物に残す |
 | `release.yml`（Docker Hub への push 前） | CVE + 秘密情報。SBOM を GitHub Release に添付 |
-| `dependency-review.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。失敗すると Issue が立つ |
+| `dependency-review.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。定期実行で失敗すると非公開の Project に項目が足される |
 
 **照合が効いていることは古い版で確かめてあります**（BusyBox 1.36.1 /
 musl 1.2.4 / OpenRC 0.40 で既知の 12 件が出る）。
@@ -165,7 +165,7 @@ standard 400 / extended 411 アプレット（v3.0.1〜3.0.2 の minimal は 367
 
 **Kimigayo 側の状態は `docs/security/upstream-triage.tsv`**（仕分け済みの一覧）。
 ここに無いもの（new）・修正待ちに修正が出たもの（fix）・直していないのに
-KEV に載ったもの（exploited）が出ると、Issue を立てて **Discord に通知する**
+KEV に載ったもの（exploited）が出ると、非公開の Project に項目を足して **Discord に通知する**
 （同じ項目は開いている Issue があれば出さない）。判定できなかったときも
 Discord に失敗を送る。手元では `/status` に同じ結果が出る。
 
@@ -353,7 +353,7 @@ git log --all --diff-filter=A --name-only | grep -x '.env' && echo "過去にコ
 
 | ワークフロー | いつ | 何をするか |
 | --- | --- | --- |
-| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（Debian・Alpine・上流 git・KEV。差分が出たら Issue と Discord 通知）・Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（Debian・Alpine・上流 git・KEV。差分が出たら非公開の Project と Discord 通知）。**公開の Issue は立てない** |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC | 上流の更新を検知して PR |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | `fail-on-severity: high` |
 
