@@ -9,7 +9,7 @@
 #   - `trivy image` は Kimigayo を何も識別できない。scratch 上の手組み
 #     rootfs でパッケージデータベースが無いため、`Target: -` /
 #     `Not scanned` のまま「✅ 完了」と出る（→ CLAUDE.md「セキュリティ」節）
-#   - dependency-review.yml の「Check component versions against CVE
+#   - 当時の dependency-review.yml の「Check component versions against CVE
 #     databases」は CVE データベースを一切照会しておらず、versions.mk の
 #     版を表示していただけだった
 #

@@ -58,7 +58,7 @@ def test_nothing_changed_passes():
 
 def test_docs_only_change_needs_no_level():
     text = changelog("**次の版: なし**", none="- 文書を直した\n")
-    assert cu.check(["README.md", ".github/workflows/build-and-verify.yml"], "v3.1.0", text) == []
+    assert cu.check(["README.md", ".github/workflows/on-push-and-pr-build-and-verify-all-images.yml"], "v3.1.0", text) == []
 
 
 def test_image_input_without_entry_fails():

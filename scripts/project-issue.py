@@ -26,7 +26,7 @@ Project の一覧への反映は数分遅れる（2026-10-15 に実測、5 分�
   python3 scripts/project-issue.py set 122 --priority High --status "In Progress"
 
   # 全部をそろえる: 開いている Issue を Project に入れ、閉じた Issue を Done にする。
-  # Priority の無い Issue を一覧にする（project-sync.yml が Issue の変化のたびに回す）
+  # Priority の無い Issue を一覧にする（on-issue-sync-private-project.yml が Issue の変化のたびに回す）
   python3 scripts/project-issue.py sync
 
 Project を書き換えるので、gh のトークンに project スコープが要る。

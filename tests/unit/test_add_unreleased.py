@@ -1,7 +1,7 @@
 """
 scripts/add-unreleased.py のテスト
 
-2026-10-15: base-image-update.yml が版上げの PR を作るときに、CHANGELOG の
+2026-10-15: component-update-pr.yml が版上げの PR を作るときに、CHANGELOG の
 [Unreleased] へ区分付きで 1 行足すようにした。足した結果が
 check-unreleased.py を通ることまで見る。
 """

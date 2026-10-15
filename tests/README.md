@@ -65,10 +65,10 @@ Makefile が `VARIANT` / `ARCH` / `VERSION` を渡します
 
 ## 継続的インテグレーション
 
-GitHub Actions（`build-and-verify.yml` の Tests ジョブ）が、`main` への push と PR で
+GitHub Actions（`on-push-and-pr-build-and-verify-all-images.yml` の Tests ジョブ）が、`main` への push と PR で
 `pytest tests/unit -q` を回します。
 
 - `tests/integration/` のシェルは CI では回していません
 - イメージの検証は pytest ではなく `scripts/verify-image.sh` が、variant × arch の
   ビルドごとに行います
-- スケジュール実行はセキュリティスキャン（`security.yml`・`dependency-review.yml`）です
+- スケジュール実行はセキュリティスキャン（`upstream-security-watch.yml`・`published-image-cve-scan.yml`）です

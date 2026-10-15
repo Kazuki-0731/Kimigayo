@@ -6,7 +6,7 @@
 #
 # 公開イメージは BusyBox（GPL-2.0-only）をバイナリで配布している。
 # GPL-2.0 はバイナリと同じ場所でソースを入手できるようにすることを求めるので、
-# release.yml がこの出力を GitHub Release に添付する。v3.0.2 以前の
+# on-tag-publish-release.yml がこの出力を GitHub Release に添付する。v3.0.2 以前の
 # リリースにはソースが付いていなかった（2026-10-14 に追加）。
 #
 # 集めるもの:

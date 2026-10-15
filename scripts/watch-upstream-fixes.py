@@ -4,7 +4,7 @@
 使い方:
     python3 -I scripts/watch-upstream-fixes.py                  # 報告を標準出力に
     python3 -I scripts/watch-upstream-fixes.py --json out.json  # 要対応を JSON にも
-        （security.yml がこれを読み、まだ非公開の Project に無いものだけ
+        （upstream-security-watch.yml がこれを読み、まだ非公開の Project に無いものだけ
          Project と Discord で知らせる。公開の Issue にはしない）
 
 なぜ必要か:

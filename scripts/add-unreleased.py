@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """構成要素の版上げを CHANGELOG.md の [Unreleased] に区分付きで 1 行足す。
 
-base-image-update.yml が更新 PR を作るときに呼ぶ。手で書き足さないと
+component-update-pr.yml が更新 PR を作るときに呼ぶ。手で書き足さないと
 check-unreleased.py が CI を落とすので、PR を作る側で書いておく
 （SPECIFICATION.md「10.2 バージョニングとリリースの方針」）。
 
@@ -88,7 +88,7 @@ def main() -> int:
         print("前回のタグが見つかりません（CI なら actions/checkout に fetch-depth: 0 が要る）")
         return 1
     level = level_for(current, latest)
-    entry = (f"**{name} を {current} → {latest} に上げた**（`base-image-update.yml` が自動検知。"
+    entry = (f"**{name} を {current} → {latest} に上げた**（`component-update-pr.yml` が自動検知。"
              "チェックサム・パッチ・ビルドオプションは PR で確かめる）")
     text = CHANGELOG.read_text(encoding="utf-8")
     try:

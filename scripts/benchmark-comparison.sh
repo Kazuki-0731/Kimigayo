@@ -41,7 +41,7 @@ KIMIGAYO_VERSION="${KIMIGAYO_VERSION:-$(bash "${PROJECT_ROOT}/scripts/get-versio
 #
 # 既定のアーキテクチャはホストに合わせる。2026-10-13 まで `-standard-arm64`
 # に固定されており、x86_64 ホストでは QEMU 経由で arm64 を測っていた。
-# 公開タグの命名は release.yml の `<版>-standard-amd64` / `-standard-arm64`。
+# 公開タグの命名は on-tag-publish-release.yml の `<版>-standard-amd64` / `-standard-arm64`。
 case "$(uname -m)" in
     arm64|aarch64) HOST_IMAGE_ARCH="arm64" ;;
     x86_64|amd64)  HOST_IMAGE_ARCH="amd64" ;;

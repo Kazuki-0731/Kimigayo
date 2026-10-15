@@ -57,7 +57,7 @@
 #       prefix maps themselves, gated on REPRODUCIBLE_BUILD.
 #
 # **Verified 2026-10-12 for the rootfs tarball only:** the same commit
-# (46b05da) built independently by build-and-verify.yml and manual-build.yml produced
+# (46b05da) built independently by on-push-and-pr-build-and-verify-all-images.yml and manual-build-image-and-kernel.yml produced
 # standard/x86_64 tarballs with identical SHA-256. Getting there also needed
 # a deterministic /.kimigayo-build-info (commit time, no hostname) and a
 # normalized tar (--sort=name, --mtime, gzip -n) in the workflows.

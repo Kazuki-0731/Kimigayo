@@ -16,7 +16,7 @@
 #   - チェックがすべて完了していて、失敗・取り消し・タイムアウトが 1 つも無い
 #     （SUCCESS / NEUTRAL / SKIPPED だけ。SUCCESS が 1 つ以上ある）
 #   - 衝突していない（GitHub の mergeable が MERGEABLE）
-# base-image-update.yml の PR（構成要素の版上げ）は対象外。カーネルは CI で
+# component-update-pr.yml の PR（構成要素の版上げ）は対象外。カーネルは CI で
 # ビルドしないので、CI が通っても確かめたことにならない（CLAUDE.md
 # 「カーネルは CI で作らない」節）。
 #
@@ -125,5 +125,5 @@ for n in $ready; do
 done
 
 log_info "Merged: ${merged}, not merged: ${failed}"
-log_info "Next: git pull origin main (build-and-verify.yml runs on the merge commits)"
+log_info "Next: git pull origin main (on-push-and-pr-build-and-verify-all-images.yml runs on the merge commits)"
 [ "$failed" -eq 0 ]
