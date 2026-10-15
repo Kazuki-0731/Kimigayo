@@ -47,7 +47,7 @@ grep -n -A10 'environment:' docker-compose.yml
 ### 2. 渡す側（各ワークフロー）と突合する
 
 対象は7本:
-`ci.yml` / `release.yml` / `build-workflow.yml` / `manual-build.yml` /
+`build-and-verify.yml` / `release.yml` / `build-workflow.yml` / `manual-build.yml` /
 `security.yml` / `base-image-update.yml` / `dependency-review.yml`
 
 ```bash
@@ -60,12 +60,12 @@ grep -n -B3 -A8 'build-rootfs.sh' .github/workflows/*.yml
 
 ### 3. ワークフロー間の差分を見る
 
-**`ci.yml` で直した修正が `release.yml` に入っていないことがあります。**
+**`build-and-verify.yml` で直した修正が `release.yml` に入っていないことがあります。**
 逆もあります。2026-10-10 の3件のうち2件はこの形でした。
 
 ```bash
 # 同じことをしている2本を並べて、片方にしか無い引数を探す
-for w in ci.yml release.yml build-workflow.yml manual-build.yml; do
+for w in build-and-verify.yml release.yml build-workflow.yml manual-build.yml; do
     echo "=== $w"
     grep -oE '\-\-build-arg [A-Z_]+' ".github/workflows/$w" | sort -u
 done

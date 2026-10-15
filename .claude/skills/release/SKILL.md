@@ -57,7 +57,7 @@ make ci-build-local                                # Linux ホストのみ
 macOS では `make ci-build-local` が通りません（musl の `configure` が
 `unsupported long double type` で落ちる）。CI の結果で代替します。
 
-**CI を見ます。** `ci.yml` は 3 バリアント × 2 アーキテクチャの 6 ジョブ。
+**CI を見ます。** `build-and-verify.yml` は 3 バリアント × 2 アーキテクチャの 6 ジョブ。
 `fail-fast: false` なので、1つ落ちても他が走ります
 （以前は `fail-fast` が兄弟ジョブを**キャンセル**して真の失敗を隠していました）。
 
