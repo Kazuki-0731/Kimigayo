@@ -119,7 +119,7 @@ jobs:
   # いまは Docker Hub から実際に pull し、イメージ内のバイナリから読んだ版で
   # SBOM を作って Grype で照合する（scripts/scan-image.sh）。
   # 新しい CVE はコードが変わらなくても出るので、push ではなく定期で回す。
-  # 見つかれば失敗し、create-security-issue が Issue を起票する。
+  # 見つかれば失敗し、add-to-project が非公開の Project に項目を足す。
   #
   # 構成要素の版はバリアント・アーキで共通なので、latest（standard /
   # amd64）だけを見る。
@@ -150,60 +150,49 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-  create-security-issue:
-    needs: [vulnerability-scan, published-image-scan]
+  # 公開中のイメージに CVE が見つかったら、公開の Issue ではなく非公開の Project に
+  # 足す。「公開イメージに当たっていて、まだ直っていない」ことは攻撃の手がかりになる
+  # （CLAUDE.md「危険度の高いものは Issue にしない」節）。Project への書き込みは
+  # GITHUB_TOKEN では届かないので secrets.KIMIGAYO_PROJECT_TOKEN を使う。
+  #
+  # vulnerability-scan（リポジトリのファイルシステム）だけが落ちたときは
+  # ここでは扱わない。中身は公開されているコードの点検で、実行ログで見る。
+  add-to-project:
+    needs: [published-image-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: failure() && github.event_name == 'schedule'
+    if: failure() && needs.published-image-scan.result == 'failure' && github.event_name == 'schedule'
 
     steps:
-      - name: Create security issue
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Add the finding to the private Project
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROJECT_ID: ${{ vars.KIMIGAYO_PROJECT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
+          github-token: ${{ secrets.KIMIGAYO_PROJECT_TOKEN }}
           script: |
-            const issueTitle = `🔒 Weekly Security Scan Failed - ${new Date().toISOString().split('T')[0]}`;
-
-            // Check if issue already exists
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: 'security,automated',
-              state: 'open'
+            const project = require('./.github/scripts/project-draft.js');
+            const id = process.env.PROJECT_ID;
+            const state = await project.load(github, id);
+            const date = new Date().toISOString().split('T')[0];
+            // 週ごとに 1 件。同じ週に手動で回し直しても重ねない。
+            const key = `published-image-scan:${date.slice(0, 8)}${Math.ceil(Number(date.slice(8)) / 7)}`;
+            if (state.seen.has(key)) { core.info(`${key} は Project にある`); return; }
+            await project.add(github, id, state, {
+              title: `🔒 公開中の latest に CVE（${date}）`,
+              body: [
+                '毎週の published-image-scan（scripts/scan-image.sh が公開中の latest を Grype で照合）が CVE を見つけた。',
+                '',
+                `- 実行: ${process.env.RUN_URL}（SBOM は artifact の sbom-published-latest）`,
+                '- 本当に当たるかを確かめる（.claude/skills/security-review/SKILL.md）',
+                '- 当たるなら構成要素の版上げかパッチで直し、docs/security/upstream-triage.tsv に仕分ける',
+                '- 直してリリースしたら、CHANGELOG・RELEASE_NOTES で公開する',
+                '',
+                `<!-- key:${key} -->`,
+              ].join('\n'),
+              priority: 'High',
             });
-
-            const existingIssue = issues.data.find(issue =>
-              issue.title.startsWith('🔒 Weekly Security Scan Failed')
-            );
-
-            const issueBody = `## Weekly Security Scan Failed
-
-            The automated weekly security scan has detected issues.
-
-            ### Details
-
-            - **Workflow Run**: [${context.runId}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
-            - **Date**: ${new Date().toISOString().split('T')[0]}
-
-            ### Action Required
-
-            1. published-image-scan ジョブのログを見る（scripts/scan-image.sh が公開中の latest を Grype で照合した結果。SBOM は artifact の sbom-published-latest）
-            2. 出た CVE が本当に該当するかを確かめる（.claude/skills/security-review/SKILL.md）
-            3. 該当するなら構成要素の版上げかパッチで対応する
-            4. Trivy（リポジトリのファイルシステム）の結果は Security タブにあるが、失敗させない設定なので通常この Issue の原因ではない
-
-            ### Resources
-
-            - [Security Policy](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/security/SECURITY_POLICY.md)
-            - [NVD](https://nvd.nist.gov/)
-
-            🤖 This issue was automatically created by the dependency review workflow.`;
-
-            if (!existingIssue) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: issueTitle,
-                body: issueBody,
-                labels: ['security', 'automated']
-              });
-            }
