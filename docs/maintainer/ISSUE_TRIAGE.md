@@ -308,8 +308,8 @@ published `latest` image matches a CVE (`published-image-scan` →
 
 **Handling:**
 1. Review automated PR
-2. Check the `ci.yml` run on the PR branch — the PR is created with `GITHUB_TOKEN`,
-   which does not trigger workflows, so the workflow starts `ci.yml` itself
+2. Check the `build-and-verify.yml` run on the PR branch — the PR is created with `GITHUB_TOKEN`,
+   which does not trigger workflows, so the workflow starts `build-and-verify.yml` itself
    via `workflow_dispatch` (the PR body links to the run)
 3. Update checksums and verify patches (`version-bump` skill)
 4. Merge if all checks pass

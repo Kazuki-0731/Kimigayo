@@ -68,7 +68,7 @@ Kimigayo OSは、Googleのdistrolessと同様の設計思想を採用し、不�
 > **カーネルは Docker イメージに入りません。** 想定する使い方は
 > VPS 上の Docker コンテナで、ベアメタル起動は対象外です
 > （カーネルのビルド手段は QEMU やベアメタルを試すために残してありますが、
-> `ci.yml` ではビルドしません）。
+> `build-and-verify.yml` ではビルドしません）。
 >
 > **ルートファイルシステムも、コンテナでは `overlay` です**
 > （`ext4` はこの rootfs をベアメタルや VM で使う場合の話）。
@@ -646,7 +646,7 @@ versions.mk ─┬→ download-musl    → build-musl     [1/4]
 
 **カーネル（[2/4]）の成果物は Docker イメージに入りません。**
 `build/kernel/output/vmlinuz-<version>-<arch>` に置かれ、
-ベアメタル／QEMU 検証でだけ使います。`ci.yml` ではビルドしません。
+ベアメタル／QEMU 検証でだけ使います。`build-and-verify.yml` ではビルドしません。
 
 プロジェクト自身の版は `scripts/get-version.sh`（`git describe --tags`）が
 決め、`build-rootfs.sh` の `resolve_project_version()` が 1 箇所で

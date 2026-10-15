@@ -370,7 +370,7 @@ musl / BusyBox / OpenRC は許容範囲だが、カーネルのフルビルド�
 ### リリース手順
 
 **`develop` ブランチは存在しない。** 作業は `main` で行う
-（`ci.yml` のトリガーからも 2026-10-13 に外した）。
+（`build-and-verify.yml` のトリガーからも 2026-10-13 に外した）。
 
 1. すべてのテストが通ることを確認（`make test` / `make shellcheck-scan`）
 2. 成果物を検査（`rootfs-verifier` subagent、`scripts/verify-image.sh`）

@@ -45,13 +45,13 @@ the kernel is not built into the image).
     if updates are available. The summary and a review checklist are in the PR
     body (no `UPDATES.md` is committed). An empty, non-version or not-newer
     version fails the run instead of opening a PR
-  - It does not build anything itself, but it starts `ci.yml` on the PR branch
+  - It does not build anything itself, but it starts `build-and-verify.yml` on the PR branch
     via `workflow_dispatch` (a PR created with `GITHUB_TOKEN` does not trigger
     workflows by itself)
   - `force_rebuild=true` on a manual run opens an empty-commit PR even without
     updates (to check the workflow itself)
 
-**Manual Review Required:** Check the `ci.yml` run linked from the PR body,
+**Manual Review Required:** Check the `build-and-verify.yml` run linked from the PR body,
 update the checksums in `scripts/download-*.sh`, and follow the `version-bump`
 skill before merging.
 

@@ -14,7 +14,7 @@ GitHub Actions を動かすために、**リポジトリ側で用意するもの
 | シークレット名 | 必須 | 用途 |
 |--------------|------|------|
 | `DOCKER_HUB_ACCESS_TOKEN` | 必須 | `release.yml` が Docker Hub にログインして push する |
-| `DISCORD_WEBHOOK` | 任意 | `ci.yml` と `release.yml` の結果通知。未設定なら通知ステップを飛ばす |
+| `DISCORD_WEBHOOK` | 任意 | `build-and-verify.yml` と `release.yml` の結果通知。未設定なら通知ステップを飛ばす |
 
 - Docker Hub のユーザー名（`ishinokazuki`）はシークレットではなく、
   ワークフローの `env` に直書きしています。`DOCKER_HUB_TOKEN` という

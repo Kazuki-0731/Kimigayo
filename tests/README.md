@@ -65,7 +65,7 @@ Makefile が `VARIANT` / `ARCH` / `VERSION` を渡します
 
 ## 継続的インテグレーション
 
-GitHub Actions（`ci.yml` の Tests ジョブ）が、`main` への push と PR で
+GitHub Actions（`build-and-verify.yml` の Tests ジョブ）が、`main` への push と PR で
 `pytest tests/unit -q` を回します。
 
 - `tests/integration/` のシェルは CI では回していません

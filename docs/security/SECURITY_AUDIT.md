@@ -202,7 +202,7 @@ ASLR・NX・KASLR・カーネルの CVE はホスト側の監査項目です。
 
 ### GitHub Actionsによる継続的監査
 
-#### 1. PR / push 時（`ci.yml`）
+#### 1. PR / push 時（`build-and-verify.yml`）
 
 **外部 Action はコミット SHA で固定します**（`@master` は供給網の
 リスクかつ再現性がない）。
@@ -247,7 +247,7 @@ GitHub Release に添付します。
 
 #### 2b. ビルドごと（`build-workflow.yml`）
 
-`ci.yml`・`manual-build.yml` が呼ぶビルド本体で、`verify-image.sh` の
+`build-and-verify.yml`・`manual-build.yml` が呼ぶビルド本体で、`verify-image.sh` の
 あとに `scripts/scan-image.sh` を実行します
 （CVE 照合と rootfs の秘密情報。見つかればジョブが落ちる）。
 NVD に新しい CVE が載ると、コードを変えていない push でも落ちます。

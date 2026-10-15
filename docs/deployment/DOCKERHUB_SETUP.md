@@ -93,7 +93,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 
 **Docker Hub へ push するのは `release.yml` の `v*.*.*` タグの push だけ**。
 `release.yml` の手動実行はビルドと検証だけで push しない。`main` へのコミットでは
-`ci.yml` が走るが、イメージは公開されない。タグの push は公開物を変えるので、
+`build-and-verify.yml` が走るが、イメージは公開されない。タグの push は公開物を変えるので、
 ユーザーの明示的な承認を取る。
 
 1. **安定版リリース**

@@ -18,7 +18,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 
 | ワークフロー | トリガー | 役割 |
 |------------|---------|------|
-| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が PR ブランチで起動する） | 日常の検証 |
+| `build-and-verify.yml` | `main` への push・PR、手動（`base-image-update.yml` が PR ブランチで起動する） | 日常の検証 |
 | `release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
@@ -27,7 +27,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 | `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
 | `project-sync.yml` | Issue の作成・再開・クローズ・移動、毎日 02:30 UTC、手動 | Issue を非公開の Project にそろえる（`scripts/project-issue.py sync`。冪等） |
 
-### 1. CI (`.github/workflows/ci.yml`)
+### 1. CI (`.github/workflows/build-and-verify.yml`)
 
 **トリガー:** `main` への push、`main` への PR、手動（workflow_dispatch）。
 手動は `base-image-update.yml` が更新 PR のブランチで CI を回すためにある
@@ -54,12 +54,12 @@ strategy:
 **`fail-fast: false` は意図的です。** 以前は 1 つの失敗が兄弟ジョブを
 キャンセルして、本当の失敗を隠していました。
 
-> **`ci.yml` はカーネルをビルドしません**（2026-10-10 に外しました）。
+> **`build-and-verify.yml` はカーネルをビルドしません**（2026-10-10 に外しました）。
 > 成果物は rootfs だけを詰めた Docker イメージで、コンテナはホストの
 > カーネルで動くため、CI がカーネルを作ってもイメージの中身は
 > 1 バイトも変わりません。それでいて 1 run あたり数十分かかっていました。
 >
-> **したがってカーネル関連の変更は `ci.yml` が緑でも検証されていません。**
+> **したがってカーネル関連の変更は `build-and-verify.yml` が緑でも検証されていません。**
 > `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったときは、
 > `manual-build.yml` を `build_kernel=true` で手動実行するか、
 > コンテナ内で `make kernel` を通してください。
@@ -96,7 +96,7 @@ strategy:
 
 **トリガー:** 他のワークフローからの `workflow_call` のみ
 
-`ci.yml` と `manual-build.yml` が共有するビルド本体です
+`build-and-verify.yml` と `manual-build.yml` が共有するビルド本体です
 （`release.yml` はこれを呼ばず、同じ入口の `make build-no-kernel` を自前のジョブで回します）。
 入力に `variant` / `arch` / `build_kernel` / `upload_artifacts` を取ります。
 `build_kernel` の既定は `false` です。
@@ -166,7 +166,7 @@ gh workflow run manual-build.yml \
   （2026-10-12 までは後段に値が渡っておらず、`versions.mk` の版を空にした PR を作っていた）
 - 変更内容は PR の本文にだけ書きます（以前のように `UPDATES.md` をコミットしない）
 - PR は `GITHUB_TOKEN` で作るため、そのままでは CI が起動しません。
-  **ワークフローが PR ブランチで `ci.yml` を workflow_dispatch で起動します**
+  **ワークフローが PR ブランチで `build-and-verify.yml` を workflow_dispatch で起動します**
 - `force_rebuild=true` で手動実行すると、更新が無くても空コミットの PR を作ります
   （ワークフロー自体の動作確認用）
 
@@ -274,7 +274,7 @@ Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` �
 
 #### 5. Rootfsビルド
 
-**`ci.yml` とまったく同じ入口を使います。** 経路が分かれていると、
+**`build-and-verify.yml` とまったく同じ入口を使います。** 経路が分かれていると、
 CI が緑でもリリースで落ちる（逆も）ことになります。
 
 ```yaml
@@ -339,7 +339,7 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
       "${{ matrix.arch }}"
 ```
 
-**検証の実体は `scripts/verify-image.sh`**（34 項目、minimal は 33）で、`ci.yml` と
+**検証の実体は `scripts/verify-image.sh`**（34 項目、minimal は 33）で、`build-and-verify.yml` と
 ローカルの `make` も同じものを呼びます。`EXPECT_VERSION` を渡すと、
 `LABEL version` と `/etc/os-release` の `VERSION_ID` がこの版と
 一致しなければ落ちます。
@@ -350,7 +350,7 @@ CI が緑でもリリースで落ちる（逆も）ことになります。
 > `release.yml` では push の前に `scripts/scan-image.sh` で秘密情報
 > （Trivy の secret スキャナ）と CVE（Grype）を照合し、作った SBOM を
 > GitHub Release に添付します。
-> pytest は `ci.yml` 側で回ります。
+> pytest は `build-and-verify.yml` 側で回ります。
 > 以前は検証に `continue-on-error` が付いており、
 > tarball が小さくても `exit 0` でスキップしていました。
 
@@ -447,7 +447,7 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 # ローカル実行
 docker compose run --rm kimigayo-build pytest tests/unit/ -v
 
-# CI（ci.yml の tests ジョブ）
+# CI（build-and-verify.yml の tests ジョブ）
 docker compose run --rm -w /build/kimigayo kimigayo-build \
   pytest tests/unit -q
 ```
@@ -515,7 +515,7 @@ make shellcheck-scan
 
 ShellCheck は Action を使わず、版をダイジェストで固定した
 `koalaman/shellcheck` のイメージを直接 `docker run` します
-（`ci.yml` と `release.yml`。ローカルの `make shellcheck-scan` と同じ対象・重大度）。
+（`build-and-verify.yml` と `release.yml`。ローカルの `make shellcheck-scan` と同じ対象・重大度）。
 
 ```yaml
 - name: Run ShellCheck
@@ -535,7 +535,7 @@ ShellCheck は Action を使わず、版をダイジェストで固定した
 
 ### Trivy（リポジトリのファイルシステムスキャン）
 
-Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使います（`ci.yml`・
+Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使います（`build-and-verify.yml`・
 `security.yml`・`dependency-review.yml`）。イメージの脆弱性スキャンには
 使いません（何も識別できないため）。イメージに対しては
 `scripts/scan-image.sh` の中で**秘密情報スキャン（`--scanners secret`）だけ**に使います。
@@ -615,7 +615,7 @@ git push origin v3.1.1
 9. リリースアセット（tar.gz 6 本 + SHA256SUMS + SHA512SUMS + SBOM 6 本 + 対応するソース 4 本）を添付
 
 **Trivy の脆弱性スキャンと pytest は `release.yml` では走りません**
-（pytest は `ci.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
+（pytest は `build-and-verify.yml` 側。Trivy のイメージの脆弱性スキャンは何も識別できないため
 2026-10-09 に外しました。秘密情報と CVE は `scan-image.sh` で見ます）。
 
 **`CHANGELOG.md` は自動生成されません。** タグを打つ前に手で更新して

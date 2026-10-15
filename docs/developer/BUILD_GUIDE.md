@@ -642,7 +642,7 @@ GitHub Actions のワークフローは `.github/workflows/` にあります。
 
 | ワークフロー | いつ | 何をするか |
 |------------|------|-----------|
-| `ci.yml` | `main` への push・PR、手動 | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
+| `build-and-verify.yml` | `main` への push・PR、手動 | ShellCheck・リンク検査・pytest・3 バリアント × 2 アーキのビルドとイメージ検証（カーネルは作らない） |
 | `release.yml` | `v*.*.*` タグ、手動 | Docker Hub への公開・Cosign 署名・GitHub Release（**公開はタグのときだけ**。手動実行はビルド・検証・スキャンまでで push しない） |
 | `manual-build.yml` | 手動 | バリアント・アーキを選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
