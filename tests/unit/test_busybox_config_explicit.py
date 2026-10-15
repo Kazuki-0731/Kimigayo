@@ -38,6 +38,13 @@ WITH_WGET = {
     "FEATURE_WGET_OPENSSL": "n",
 }
 
+# httpd を持つバリアントだけで明示されていること。
+# リバースプロキシ（P: 行）は既定値 y。2026-10-15 に外した（CVE-2026-88829。
+# 上流・Debian・Alpine に修正が無い。プロキシは前段の nginx などに任せる）
+WITH_HTTPD = {
+    "FEATURE_HTTPD_PROXY": "n",
+}
+
 # minimal に入れないもの（standard / extended にはある）。書かないと既定値で入る
 MINIMAL_EXCLUDED = (
     "HTTPD SSL_SERVER SSL_CLIENT FTPD FTPPUT TFTP TFTPD TELNETD INETD DNSD "
@@ -67,6 +74,8 @@ def test_risky_defaults_are_explicit(variant):
     expected = dict(ALWAYS)
     if values.get("WGET") == "y":
         expected.update(WITH_WGET)
+    if values.get("HTTPD") == "y":
+        expected.update(WITH_HTTPD)
     for name, want in expected.items():
         assert name in values, (
             f"{variant}.config に CONFIG_{name} が書かれていない"
