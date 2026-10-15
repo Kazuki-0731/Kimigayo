@@ -227,13 +227,13 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
 
 > **`-Wno-error` は 2026-10-11 に `scripts/build-kernel.sh` から外した。**
 > カーネル 6.6 系を GCC 15 でビルドするための回避策だったが、6.18 では
-> 不要になっていた。`manual-build.yml` を `build_kernel=true` で
+> 不要になっていた。`manual-build-image-and-kernel.yml` を `build_kernel=true` で
 > 両アーキに回して確認済み（x86_64/GCC 27分・arm64/LLVM 53分、
 > どちらも `vmlinuz-6.18.55-*` を生成してイメージ検証も通過）。
-> **`build-and-verify.yml` はカーネルを作らないので、緑でも検証にならない。**
+> **`on-push-and-pr-build-and-verify-all-images.yml` はカーネルを作らないので、緑でも検証にならない。**
 >
 > **Kconfig の `|| true` は 2026-10-12 に外した**（`run_kconfig` が
-> 失敗したらログの末尾を出して止める）。`manual-build.yml` を
+> 失敗したらログの末尾を出して止める）。`manual-build-image-and-kernel.yml` を
 > `build_kernel=true` で両アーキに回して確認した（c851a25、
 > x86_64 17分・arm64 59分、どちらも `vmlinuz-6.18.55-*` を生成）。残る `|| true` は進捗表示の後始末
 > （kill / wait）・診断用の find・任意の記録だけで、成否に関わらない。
@@ -262,7 +262,7 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
 | 進捗の監視と報告 | **タグを打つ・Docker Hub へ push する**（`main` への push は除く） |
 | 明らかな異常の検知と報告 | **失敗したときの作戦変更** |
 
-**`git tag v*.*.*` は push した瞬間に `release.yml` が走り、Docker Hub の
+**`git tag v*.*.*` は push した瞬間に `on-tag-publish-release.yml` が走り、Docker Hub の
 `latest` を含む公開イメージを差し替える。** タグとリリースは
 **毎回ユーザーの明示的な承認を取る**（→「Git の運用ルール」節）。
 **通常の `main` への push は承認不要**（修正したら push するまでが1セット）。
@@ -433,7 +433,7 @@ ALPINE_VERSION  ?= 3.24
 > 2026-10-09 以前は 5 箇所に散っていた（`config.mk` は `6.6`、
 > `scripts/download-kernel.sh` は `6.6.11`、`scripts/build-kernel.sh` は `6.6.11`、
 > `scripts/apply-kernel-patches.sh` は `6.6.11`、`src/kernel/build.py` の
-> `KernelVersion` enum は `"6.6"`）。`.github/workflows/dependency-review.yml` には
+> `KernelVersion` enum は `"6.6"`）。当時の `.github/workflows/dependency-review.yml` には
 > さらに古い `OpenRC: 0.44` が残っていた。
 
 ---
@@ -558,7 +558,7 @@ make benchmark             # 全ベンチマーク
 
   **この数字はカーネル込み。** いまは CI でカーネルを作らないので
   これより大幅に短い（→ 下の「カーネルは CI で作らない」節）。
-  `build-workflow.yml` の `timeout-minutes` は 120 にしてある。
+  `reusable-build-and-verify-image.yml` の `timeout-minutes` は 120 にしてある。
   **arm64 を開発機のネイティブビルドに移す必要はない**
   （`platform` 固定を外す話も不要）
 - **開発機でやるのは「段を絞ったビルド」まで。** 例:
@@ -575,7 +575,7 @@ make benchmark             # 全ベンチマーク
 
 ### カーネルは CI で作らない
 
-**`build-and-verify.yml` はカーネルをビルドしない。** 2026-10-10 に決めた。
+**`on-push-and-pr-build-and-verify-all-images.yml` はカーネルをビルドしない。** 2026-10-10 に決めた。
 
 - **理由は、成果物に入らないものを検証していたから。** Kimigayo の成果物は
   rootfs だけを詰めた Docker イメージで、コンテナはホストのカーネルで動く。
@@ -595,12 +595,12 @@ make benchmark             # 全ベンチマーク
 | やりたいこと | どうするか |
 | --- | --- |
 | 手元でカーネルを作る | `docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64`（数十分〜数時間）。**ホストの `make kernel` は存在しない** |
-| CI でカーネルを作る | Actions から `manual-build.yml` を `build_kernel=true` で実行 |
-| カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`build-and-verify.yml` は通っても検証にならない** |
+| CI でカーネルを作る | Actions から `manual-build-image-and-kernel.yml` を `build_kernel=true` で実行 |
+| カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`on-push-and-pr-build-and-verify-all-images.yml` は通っても検証にならない** |
 
-**カーネル関連の変更をしたときは、`build-and-verify.yml` が緑でも「カーネルは見ていない」。**
+**カーネル関連の変更をしたときは、`on-push-and-pr-build-and-verify-all-images.yml` が緑でも「カーネルは見ていない」。**
 `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったら、
-手で `manual-build.yml` を回すか、コンテナ内で `make kernel` を通す。
+手で `manual-build-image-and-kernel.yml` を回すか、コンテナ内で `make kernel` を通す。
 
 ### パッチはなぜ存在するか
 
@@ -835,7 +835,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
   ホストの `make test-docker` / `test-func` が `VARIANT` / `ARCH` / `VERSION` を渡す
   （2026-10-13 までは実在しない名前を既定にして、何も検査せずに通っていた）
 - **CI のテストを `|| echo "... not ready yet"` で握り潰さない。**
-  2026-10-09 まで `build-workflow.yml`・`release.yml`・`Makefile` の
+  2026-10-09 まで `reusable-build-and-verify-image.yml`・`on-tag-publish-release.yml`・`Makefile` の
   `test-integration` がこの形になっていて、**522 件すべて通るのに CI では
   絶対に落ちない**状態だった。テストが落ちたら CI は落ちるべき
 
@@ -879,7 +879,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
     tar の並び順・mtime・gzip ヘッダ（CI と release で固定）。
     **確かめたのは 1 組・1 バリアントだけで、Docker イメージの digest は
     見ていない。** 名乗る範囲は「rootfs の tarball」に留める。
-    確かめ直すときは、同じコミットで `manual-build.yml` を回し、
+    確かめ直すときは、同じコミットで `manual-build-image-and-kernel.yml` を回し、
     CI の `rootfs-<variant>-<arch>` 成果物と `shasum` を比べる
 - `make security-scan` = `scan-image` + Trivy（ファイルシステム）+ ShellCheck
 - **`make trivy-scan`（イメージスキャン）は何も検査していない。**
@@ -893,19 +893,19 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
   イメージ内のバイナリから読んだ版で SBOM を作り、Grype で NVD の CPE と
   照合する。**「0 件」は「CPE の範囲で 0 件」で、Alpine だけが持つ
   修正は見えない**ので、出た CVE は `security-review` skill で確かめる。
-  CI（毎 push）と `release.yml`（push 前）で CVE と秘密情報を見る。
-  加えて `dependency-review.yml` が毎週、公開中の `latest` を照合する。
+  CI（毎 push）と `on-tag-publish-release.yml`（push 前）で CVE と秘密情報を見る。
+  加えて `published-image-cve-scan.yml` が毎週、公開中の `latest` を照合する。
   **NVD に CVE が載るとコードを変えていない push でも落ちる**（正しい信号）
 - **ビルド後の検査は `scripts/verify-image.sh` に集める**（CI・release・
   ローカル共通）。強化まわりでは、全 ELF の PIE / RELRO / BIND_NOW /
   非実行スタック / スタック保護、出荷物の版と `versions.mk` の突合、cpio の
   パストラバーサル回帰を見る。**ビルド前の検査（ShellCheck・Trivy FS・
   Dependency Review）だけでは、出荷物に何が入ったかは分からない**
-- `.github/workflows/security.yml` が毎日 02:00 UTC に走り、
-  `base-image-update.yml` が毎週月曜に上流の版を確認する。
+- `.github/workflows/upstream-security-watch.yml` が毎日 02:00 UTC に走り、
+  `component-update-pr.yml` が毎週月曜に上流の版を確認する。
   **これらが作る PR / Issue は「上流が動いた」という一次情報**なので、
   バージョン更新の起点として先に見る
-- **上流のセキュリティ情報との差分は `security.yml` が毎日見る**
+- **上流のセキュリティ情報との差分は `upstream-security-watch.yml` が毎日見る**
   （`scripts/watch-upstream-fixes.py`。Debian security-tracker・Alpine aports・
   上流 git・CISA KEV）。Kimigayo 側の状態は `docs/security/upstream-triage.tsv`。
   そこに無いものが出たら非公開の Project と Discord で知らせるので、**仕分けて TSV に足す**
@@ -914,7 +914,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - **外部 Action は tag で固定する。** `@master` 参照は供給網のリスクかつ
   再現性がない（2026-10-09 に `trivy-action`・`action-shellcheck` を固定した）。
   ShellCheck は 2026-10-13 に Action をやめ、ダイジェストで固定した
-  `koalaman/shellcheck` を `build-and-verify.yml`・`release.yml` から直接 `docker run` している
+  `koalaman/shellcheck` を `on-push-and-pr-build-and-verify-all-images.yml`・`on-tag-publish-release.yml` から直接 `docker run` している
   （`ludeeus/action-shellcheck` は `.claude/hooks` を実際には検査していなかった）
 - 脆弱性の報告・運用は [docs/security/](docs/security/) 配下
   （`SECURITY_POLICY.md`・`VULNERABILITY_REPORTING.md`・`HARDENING_GUIDE.md`）
@@ -944,7 +944,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - **優先度も Project の項目で持つ。** 公開のラベルにすると「どれを急いでいるか」が外から読める
 - **Issue も下書きも `scripts/project-issue.py` で作る**（`issue` / `draft` / `set` / `sync`）。
   Issue を作ると同時に Project に入れて Priority を付ける。同じタイトルなら作らずに直す（冪等）。
-  Web で作った Issue や閉じた Issue は `project-sync.yml` が拾う。`gh issue create` を直接使わない
+  Web で作った Issue や閉じた Issue は `on-issue-sync-private-project.yml` が拾う。`gh issue create` を直接使わない
 
 ---
 
@@ -1004,7 +1004,7 @@ make check-links        # scripts/check-links.py（#見出し へのリンク切
 make check-stale-docs   # 一度直した古い記述が戻っていないか（scripts/check-stale-docs.py の RULES）
 ```
 
-`build-and-verify.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
+`on-push-and-pr-build-and-verify-all-images.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
 書かないこと（それでは今回の件を検知できない）。
 
 経緯をドキュメントに残したいときは、メモにリンクするのではなく
@@ -1089,7 +1089,7 @@ make check-stale-docs   # 一度直した古い記述が戻っていないか（
 
 > **`spec-auditor` と `workflow-auditor` は 2026-10-10 に追加した。**
 > 同じ日に「CI が緑なのに全イメージが `variant=minimal` と名乗る」
-> 「`release.yml` が版を渡さず `os-release` が `dev` になる」
+> 「`on-tag-publish-release.yml` が版を渡さず `os-release` が `dev` になる」
 > 「`latest-amd64` が永久に更新されない」を立て続けに踏んだため
 > （→ `workflow-auditor`）。また `SPECIFICATION.md` §8.3 の目標値が
 > バリアントごとに違うのに README が一律 `< 5MB` で達成率を出していた
@@ -1198,9 +1198,9 @@ Subagent の方が速くて安い。3〜5人から始める。
 - **修正したら push するまでが1セット。** コミットだけして
   「承認待ち」で止めない。直した結果が GitHub に出ていなければ、
   ユーザーから見れば直っていないのと同じ。
-  `main` への push が起こすのは `build-and-verify.yml` だけで、公開物は変わらない。
+  `main` への push が起こすのは `on-push-and-pr-build-and-verify-all-images.yml` だけで、公開物は変わらない。
 - **承認を取るのは「外に出て取り消せないもの」だけ。**
-  **`v*.*.*` タグの作成と push**（`release.yml` が走り、Docker Hub の
+  **`v*.*.*` タグの作成と push**（`on-tag-publish-release.yml` が走り、Docker Hub の
   公開イメージを `latest` ごと差し替える）と、**Docker Hub への直接 push**。
   この2つは `guard-bash.sh` が機械的に止めるので、文章で覚えなくてよい
 - **コミットメッセージは日本語。先頭に絵文字を1つ置き、`feat:` のような
@@ -1330,14 +1330,15 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `build-and-verify.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
-| `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
-| `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら非公開の Project と Discord。公開の Issue は立てない） |
-| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `build-and-verify.yml` を起動する |
-| `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
-| `project-sync.yml` | Issue の作成・再開・クローズ、毎日 02:30 UTC、手動 | 開いている Issue を非公開の Project に入れ、閉じた Issue を Done にする（`scripts/project-issue.py sync`） |
-| `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
-| `manual-build.yml` | 手動のみ | variant / arch を選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
+| `on-push-and-pr-build-and-verify-all-images.yml` | `main` への push・PR、手動（`component-update-pr.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
+| `on-tag-publish-release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
+| `upstream-security-watch.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら非公開の Project と Discord。公開の Issue は立てない） |
+| `component-update-pr.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `on-push-and-pr-build-and-verify-all-images.yml` を起動する |
+| `on-pr-dependency-review.yml` | PR | 依存レビュー（`fail-on-severity: high`） |
+| `published-image-cve-scan.yml` | 毎週月曜 04:00 UTC、手動 | Docker Hub で公開中の `latest` を CVE と照合（`scan-image.sh`）。定期実行で落ちたら非公開の Project に足す |
+| `on-issue-sync-private-project.yml` | Issue の作成・再開・クローズ、毎日 02:30 UTC、手動 | 開いている Issue を非公開の Project に入れ、閉じた Issue を Done にする（`scripts/project-issue.py sync`） |
+| `reusable-build-and-verify-image.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
+| `manual-build-image-and-kernel.yml` | 手動のみ | variant / arch を選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
 詳細は [docs/developer/CICD_GUIDE.md](docs/developer/CICD_GUIDE.md)、
 Docker Hub 側の設定は [docs/deployment/DOCKERHUB_SETUP.md](docs/deployment/DOCKERHUB_SETUP.md)。
