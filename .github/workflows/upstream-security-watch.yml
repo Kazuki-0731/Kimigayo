@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 # issues: write は付けない。見つけたものは公開の Issue ではなく非公開の Project に
-# 足す（CLAUDE.md「危険度の高いものは Issue にしない」節）。Project への書き込みは
+# 足す（CLAUDE.md「セキュリティに関するものは Issue にしない」節）。Project への書き込みは
 # GITHUB_TOKEN では届かないので、secrets.KIMIGAYO_PROJECT_TOKEN（classic PAT の
 # project スコープだけ）を使う。足す先は vars.KIMIGAYO_PROJECT_ID。
 permissions:
@@ -191,7 +191,7 @@ jobs:
 
       # 公開の Issue にしない。まだ仕分けていない差分は「Kimigayo に当たるかも
       # しれない未対応のもの」なので、非公開の Project に足す
-      # （CLAUDE.md「危険度の高いものは Issue にしない」節）。
+      # （CLAUDE.md「セキュリティに関するものは Issue にしない」節）。
       # 同じ項目で毎日足さないよう、Project の下書きの本文に埋めた
       # <!-- key:... --> と突き合わせ、まだ無いものだけを足す。
       - name: Add new findings to the private Project

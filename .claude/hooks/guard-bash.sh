@@ -227,10 +227,10 @@ if [ -n "$(lines_cmd 'gh[[:space:]]+issue[[:space:]]+create')" ]; then
 同じタイトルなら作らずに直します（冪等）:
   python3 scripts/project-issue.py issue --title ... --body-file ... --priority High|Middle|Low
 
-危険度の高いもの（直っていない脆弱性・攻撃面の穴）は Issue にせず下書きにします:
+セキュリティに関するものは Issue にせず、非公開の Project の下書きにします:
   python3 scripts/project-issue.py draft --title ... --body-file ... --priority ...
 
-（CLAUDE.md「危険度の高いものは Issue にしない」節）"
+（CLAUDE.md「セキュリティに関するものは Issue にしない」節）"
 fi
 
 add_lines="$(lines_with '\bgit[[:space:]]+add\b')"

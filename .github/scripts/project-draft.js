@@ -1,7 +1,7 @@
 // 非公開の Project に下書きの項目を足す（actions/github-script から require する）。
 //
 // 出荷物に当たっていて、まだ直っていない脆弱性を公開の Issue に書くと、攻撃の
-// 手がかりを渡すことになる（CLAUDE.md「危険度の高いものは Issue にしない」節）。
+// 手がかりを渡すことになる（CLAUDE.md「セキュリティに関するものは Issue にしない」節）。
 // upstream-security-watch.yml と published-image-cve-scan.yml は、見つけたものをここから Project に足す。
 //
 // github は Project を書き換えられるトークン（classic PAT の project スコープ）で

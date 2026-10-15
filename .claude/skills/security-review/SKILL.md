@@ -181,7 +181,7 @@ Discord に失敗を送る。手元では `/status` に同じ結果が出る。
 4. 状態を付ける: `patched` / `fixed-upstream` / `not-affected` / `todo`（修正あり・
    取り込み待ち）/ `watching`（修正がどこにも無い）/ `accepted` / `unknown`
 5. `watching` / `todo` にしたら、**追跡は非公開の Project の下書きに置く。公開の
-   Issue にしない**（CLAUDE.md「危険度の高いものは Issue にしない」節。#121 は
+   Issue にしない**（セキュリティに関するものは全部 Project）（CLAUDE.md「セキュリティに関するものは Issue にしない」節。#121 は
    このルールの前に公開で立てたもの）。利用者に知らせる（`HARDENING_GUIDE.md`・
    `CHANGELOG.md` の既知の問題）のは、回避策か修正を出すときにする
 
