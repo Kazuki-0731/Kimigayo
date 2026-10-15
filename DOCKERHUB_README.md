@@ -11,7 +11,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 ### distroless からの継承
 - ✅ **不変インフラ**: パッケージマネージャーなし、実行時の変更を排除
 - ✅ **最小攻撃面**: 実行時にパッケージをインストールする仕組みを持たない
-- ✅ **軽量**: 2.46〜3.01MB のイメージサイズ（v3.0.2、バリアント × アーキテクチャ）
+- ✅ **軽量**: 2.34〜3.10MB のイメージサイズ（v3.1.0、バリアント × アーキテクチャ）
 
 ### Alpine Linux からの継承
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
@@ -32,8 +32,8 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 
 ## 主な特徴
 
-- 🪶 **超軽量**: Standard（x86_64）**2.60MB** / arm64 2.98MB（v3.0.2、2026-10-12 実測）
-- 💾 **常駐メモリ**: 288KB（Alpine 272KB / Ubuntu 24.04 312KB と同程度。同条件で実測）
+- 🪶 **超軽量**: Standard（x86_64）**2.64MB** / arm64 3.06MB（v3.1.0、2026-10-15 実測）
+- 💾 **常駐メモリ**: 288KB（Alpine 268KB / Ubuntu 24.04 316KB と同程度。同条件で実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE・Full RELRO・非実行スタックでビルド
 - 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除（`apk` も `dpkg` も無い）
 - ✍️ **署名済み**: Cosign のキーレス署名（v3.0.2 から）。SBOM は GitHub Release に添付
@@ -115,15 +115,15 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ## イメージバリアント
 
-- **kimigayo-os:latest** - Standardバリアント（x86_64 2.60MB / arm64 2.98MB）
+- **kimigayo-os:latest** - Standardバリアント（x86_64 2.64MB / arm64 3.06MB）
   - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
-- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.46MB / arm64 2.83MB）
+- **kimigayo-os:latest-minimal** - Minimalバリアント（x86_64 2.34MB / arm64 2.73MB）
   - musl libc + 最小限のBusyBox + OpenRC
-  - Standard から `vi`・`wget`・`less`・`tr`・`tee` など 33 アプレットを除いたもの
+  - Standard から `vi`・`wget`・`less`・`tr`・`tee` などと、`httpd`・`telnetd`・`udhcpc` などのネットワーク系を除いたもの（329 アプレット。Standard より 71 少ない）
 
-- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.62MB / arm64 3.01MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.67MB / arm64 3.10MB）
   - Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの
   - コンパイラなどの開発ツールは含まない
 
@@ -187,7 +187,7 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 **出荷するイメージそのものを照合しています。** イメージ内のバイナリから
 読んだ版で SBOM（CycloneDX）を作り、Grype で NVD と照合します。
 CI（毎 push）とリリースの公開前に走り、公開中の `latest` も毎週照合します。
-v3.0.2 は公開時点で **0 件**でした（NVD の CPE に載っている範囲で。NVD に新しい CVE が載れば変わります）。
+v3.1.0 は公開時点で **0 件**でした（NVD の CPE に載っている範囲で。NVD に新しい CVE が載れば変わります）。
 
 - 上流が修正版を出していない CVE はパッチを当てて出荷し、
   `/.kimigayo-build-info` の `PATCHED_CVES` に記録しています
