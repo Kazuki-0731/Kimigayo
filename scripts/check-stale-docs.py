@@ -50,7 +50,7 @@ RULES = [
     (r"\bmemory: 2G\b", None,
      "docker-compose.yml の memory 上限は 8G"),
     (r"security-updates\.yml|docker-publish\.yml", None,
-     "存在しないワークフロー。security.yml / release.yml"),
+     "存在しないワークフロー。upstream-security-watch.yml / on-tag-publish-release.yml"),
     (r"needs-triage|feature-request|high-priority|\bP0\b.*label", None,
      "存在しないラベル。実在するのは gh label list の 12 個"),
     # 2026-10-13: build-openrc.sh が build/logs/openrc-build.log を書くようになった。
@@ -61,7 +61,7 @@ RULES = [
      "build-openrc.sh は build/logs/openrc-build.log を書く。make log-openrc は動く"),
     (r"手動実行でも[^\n]*push|manual(ly)?[^\n]*(run|running)[^\n]*(also )?push|[Rr]unning `?release\.yml`? manually also pushes",
      r"以前|当時|まで|was|used to|no longer|しない|not push|does not",
-     "release.yml の手動実行は Docker Hub に push しない（公開は v*.*.* タグの push だけ）"),
+     "on-tag-publish-release.yml の手動実行は Docker Hub に push しない（公開は v*.*.* タグの push だけ）"),
     (r"arm64 の OpenRC[^\n]*(付いていない|付いていません|渡していない|無い|を除く)|arm64 OpenRC[^\n]*no stack protector|Stack Protector は arm64 の OpenRC$",
      r"v3\.0\.2|以前|当時|まで|was|used to|until",
      "arm64 の OpenRC は main でスタック保護つき。付いていないのは v3.0.2 の公開イメージ（「v3.0.2 の」と明記する）"),
@@ -76,11 +76,18 @@ RULES = [
      "CI の ShellCheck は koalaman/shellcheck を直接 docker run する（ludeeus の Action は外した）"),
     (r"UPDATES\.md",
      r"以前|当時|まで|was|used to|no |しない|not ",
-     "base-image-update.yml は UPDATES.md をコミットしない（PR 本文だけ）"),
+     "component-update-pr.yml は UPDATES.md をコミットしない（PR 本文だけ）"),
     (r"`?main`? ?/ ?`?develop`? への push|main/develop", None,
-     "build-and-verify.yml のトリガーに develop は無い（main への push・PR と手動）"),
+     "on-push-and-pr-build-and-verify-all-images.yml のトリガーに develop は無い（main への push・PR と手動）"),
     (r"\bci\.yml\b", r"旧名|改名|renamed",
-     "ci.yml は build-and-verify.yml に改名した（2026-10-15。名前で中身が分かるように）"),
+     "ci.yml は on-push-and-pr-build-and-verify-all-images.yml に改名した（2026-10-15。名前で中身が分かるように）"),
+    # 2026-10-16 にワークフローのファイル名を「いつ動くか + 何をするか」に揃えた。
+    # 古い名前は、経緯を書いた行（当時・まで・改名・分けた）だけ許す
+    (r"(?<![\w-])(build-and-verify|build-workflow|base-image-update|security|dependency-review|manual-build|project-sync|release)\.yml(?![\w-])",
+     r"当時|まで|旧名|改名|renamed|分けた|中にあった",
+     "ワークフローは改名済み（on-push-and-pr-build-and-verify-all-images / reusable-build-and-verify-image / "
+     "component-update-pr / upstream-security-watch / on-pr-dependency-review / published-image-cve-scan / "
+     "manual-build-image-and-kernel / on-issue-sync-private-project / on-tag-publish-release）"),
     (r"REPRODUCIBLE_BUILD.*(どこも|誰も)設定", r"誤り",
      "build-system/Makefile が REPRODUCIBLE_BUILD ?= yes を設定している"),
     (r"isn \(Package Manager\)|isn info|isn install", None,
