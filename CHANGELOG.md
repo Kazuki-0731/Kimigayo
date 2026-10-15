@@ -45,15 +45,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI が `[Unreleased]` の書き忘れを止めるようにした**（`scripts/check-unreleased.py`）。
   前回のタグから公開イメージの中身に効くファイルが変わったのにメジャー・マイナー・パッチの
   項目が無いとき、「次の版」が区分や前回のタグからの計算と合わないときに落ちる
-- **構成要素の更新 PR（`base-image-update.yml`）が `[Unreleased]` に区分付きで 1 行足すようにした**
+- **構成要素の更新 PR（`component-update-pr.yml`）が `[Unreleased]` に区分付きで 1 行足すようにした**
   （`scripts/add-unreleased.py`）。最後の数字だけの更新はパッチ、それより上はマイナー
 - **脆弱性の自動検知の結果を、公開の Issue ではなく非公開の Project に足すようにした**
-  （`security.yml`・`dependency-review.yml`）。まだ直っていない脆弱性を公開の場に書かない。
-  `security.yml` の実行ログとサマリーにも、上流との差分の中身を出さない（件数だけ）
+  （`upstream-security-watch.yml`・`published-image-cve-scan.yml`）。まだ直っていない脆弱性を公開の場に書かない。
+  `upstream-security-watch.yml` の実行ログとサマリーにも、上流との差分の中身を出さない（件数だけ）
 - 上流のセキュリティ情報の仕分け（`docs/security/upstream-triage.tsv`）を更新した
-- **`ci.yml` を `build-and-verify.yml` に改名した**（名前で中身が分かるように。表示名も Build and Verify）
+- **ワークフローのファイル名を「いつ動くか + 何をするか」に揃えた**（名前で中身が分かるように。定期実行には接頭辞を付けない）。
+  `ci.yml` → `on-push-and-pr-build-and-verify-all-images.yml`、`build-workflow.yml` → `reusable-build-and-verify-image.yml`、
+  `base-image-update.yml` → `component-update-pr.yml`、`security.yml` → `upstream-security-watch.yml`、
+  `manual-build.yml` → `manual-build-image-and-kernel.yml`、`project-sync.yml` → `on-issue-sync-private-project.yml`、
+  `release.yml` → `on-tag-publish-release.yml`。`dependency-review.yml` は PR の依存レビュー
+  （`on-pr-dependency-review.yml`）と毎週の公開イメージの CVE 照合（`published-image-cve-scan.yml`）に分け、
+  シェルスクリプトの `http://` と `eval` の点検は push ごとに回すようにした
 - **Issue と非公開の Project を一緒に作る・直す `scripts/project-issue.py` を足した**（冪等）。
-  `project-sync.yml` が Issue の変化のたびと毎日、Project にそろえる
+  `on-issue-sync-private-project.yml` が Issue の変化のたびと毎日、Project にそろえる
 - 文書の実測値と例のタグを v3.1.0 の公開イメージに合わせた。`examples/` の土台を 3.1.0 にした
 
 ## [3.1.0] "Himawari" (向日葵) - 2026-10-14
