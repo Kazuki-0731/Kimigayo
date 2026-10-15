@@ -6,10 +6,13 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
+# issues: write は付けない。見つけたものは公開の Issue ではなく非公開の Project に
+# 足す（CLAUDE.md「危険度の高いものは Issue にしない」節）。Project への書き込みは
+# GITHUB_TOKEN では届かないので、secrets.KIMIGAYO_PROJECT_TOKEN（classic PAT の
+# project スコープだけ）を使う。足す先は vars.KIMIGAYO_PROJECT_ID。
 permissions:
   contents: read
   security-events: write
-  issues: write
 
 concurrency:
   group: security-${{ github.ref }}
@@ -112,41 +115,46 @@ jobs:
             echo "- [ ] Update BusyBox to ${{ steps.busybox_check.outputs.latest }}" >> reports/security-check-$(date +%Y%m%d).md
           fi
 
-      - name: Create issue for security updates
+      # 公開の Issue にしない。上流の新版は「Kimigayo がまだ古い版で出している」
+      # ことを示すので、非公開の Project に足す。同じ版は二度足さない。
+      - name: Add security updates to the private Project
         if: steps.musl_check.outputs.update_needed == 'true' || steps.busybox_check.outputs.update_needed == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROJECT_ID: ${{ vars.KIMIGAYO_PROJECT_ID }}
+          MUSL_UPDATE: ${{ steps.musl_check.outputs.update_needed }}
+          MUSL_CURRENT: ${{ steps.musl_check.outputs.current }}
+          MUSL_LATEST: ${{ steps.musl_check.outputs.latest }}
+          BUSYBOX_UPDATE: ${{ steps.busybox_check.outputs.update_needed }}
+          BUSYBOX_CURRENT: ${{ steps.busybox_check.outputs.current }}
+          BUSYBOX_LATEST: ${{ steps.busybox_check.outputs.latest }}
         with:
+          github-token: ${{ secrets.KIMIGAYO_PROJECT_TOKEN }}
           script: |
-            const fs = require('fs');
-            const reportPath = `reports/security-check-${new Date().toISOString().split('T')[0].replace(/-/g, '')}.md`;
-            const reportContent = fs.readFileSync(reportPath, 'utf8');
-
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: 'security,automated',
-              state: 'open'
-            });
-
-            const existingIssue = issues.data.find(issue =>
-              issue.title.startsWith('🔒 Security Update Available')
-            );
-
-            if (existingIssue) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existingIssue.number,
-                body: `## Update - ${new Date().toISOString().split('T')[0]}\n\n${reportContent}`
+            const project = require('./.github/scripts/project-draft.js');
+            const id = process.env.PROJECT_ID;
+            const state = await project.load(github, id);
+            const e = process.env;
+            const updates = [
+              ['musl', e.MUSL_UPDATE, e.MUSL_CURRENT, e.MUSL_LATEST],
+              ['BusyBox', e.BUSYBOX_UPDATE, e.BUSYBOX_CURRENT, e.BUSYBOX_LATEST],
+            ].filter(u => u[1] === 'true');
+            for (const [name, , current, latest] of updates) {
+              const key = `version:${name}:${latest}`;
+              if (state.seen.has(key)) { core.info(`${key} は Project にある`); continue; }
+              await project.add(github, id, state, {
+                title: `⬆️ ${name} の新しい版 ${latest}（いまは ${current}）`,
+                body: [
+                  `上流に ${name} ${latest} が出た。Kimigayo の公開イメージは ${current}。`,
+                  '',
+                  '- 上流の NEWS / Changelog でセキュリティ修正を含むかを見る',
+                  '- 版上げは version-bump skill。区分は SPECIFICATION.md 10.2',
+                  '',
+                  `<!-- key:${key} -->`,
+                ].join('\n'),
+                priority: 'Middle',
               });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `🔒 Security Update Available - ${new Date().toISOString().split('T')[0]}`,
-                body: reportContent,
-                labels: ['security', 'automated', 'dependencies']
-              });
+              core.info(`added ${key}`);
             }
 
       - name: Upload security report
@@ -159,8 +167,8 @@ jobs:
   # 上流のセキュリティ情報（Debian の security-tracker・Alpine aports・CISA KEV）と
   # Kimigayo の差分を毎日見る（scripts/watch-upstream-fixes.py）。
   # 仕分け済みの一覧（docs/security/upstream-triage.tsv）に無いもの・修正待ちに
-  # 修正が出たもの・実際に悪用されているものが出たら、まだ Issue に無いものだけ
-  # Issue にまとめて Discord に知らせる。判定できないときは失敗させて Discord に
+  # 修正が出たもの・実際に悪用されているものが出たら、まだ Project に無いものだけ
+  # 非公開の Project にまとめて Discord に知らせる。判定できないときは失敗させて Discord に
   # 送る（黙って「差分なし」と読むと、差分が出ても気づけない）。
   upstream-fix-watch:
     name: Watch upstream security
@@ -175,29 +183,33 @@ jobs:
       - name: Compare upstream security data with Kimigayo
         run: |
           set -euo pipefail
-          python3 -I scripts/watch-upstream-fixes.py --json findings.json | tee watch-report.md
-          { echo '## 上流との差分'; cat watch-report.md; } >> "$GITHUB_STEP_SUMMARY"
+          # 公開リポジトリの実行ログとサマリーは誰でも読める。中身は Project にだけ
+          # 書き、ここには件数だけを出す。
+          python3 -I scripts/watch-upstream-fixes.py --json findings.json > watch-report.md
+          n="$(python3 -c 'import json; print(len(json.load(open("findings.json"))))')"
+          echo "上流との差分: ${n} 件（中身は非公開の Project）" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # 同じ項目で毎日 Issue と通知を出さないよう、開いている Issue の本文に
-      # 埋めた <!-- key:... --> と突き合わせ、まだ無いものだけを出す。
-      - name: Open an issue for new findings
-        id: issue
+      # 公開の Issue にしない。まだ仕分けていない差分は「Kimigayo に当たるかも
+      # しれない未対応のもの」なので、非公開の Project に足す
+      # （CLAUDE.md「危険度の高いものは Issue にしない」節）。
+      # 同じ項目で毎日足さないよう、Project の下書きの本文に埋めた
+      # <!-- key:... --> と突き合わせ、まだ無いものだけを足す。
+      - name: Add new findings to the private Project
+        id: project
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROJECT_ID: ${{ vars.KIMIGAYO_PROJECT_ID }}
         with:
+          github-token: ${{ secrets.KIMIGAYO_PROJECT_TOKEN }}
           script: |
             const fs = require('fs');
+            const project = require('./.github/scripts/project-draft.js');
             const findings = JSON.parse(fs.readFileSync('findings.json', 'utf8'));
             if (findings.length === 0) { core.info('no findings'); return; }
-            const open = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner, repo: context.repo.repo,
-              labels: 'security,automated', state: 'open', per_page: 100
-            });
-            const seen = new Set();
-            for (const i of open) {
-              for (const m of (i.body || '').matchAll(/<!-- key:(\S+) -->/g)) seen.add(m[1]);
-            }
-            const fresh = findings.filter(f => !seen.has(`${f.kind}:${f.key}`));
-            if (fresh.length === 0) { core.info('all findings already have issues'); return; }
+            const id = process.env.PROJECT_ID;
+            const state = await project.load(github, id);
+            const fresh = findings.filter(f => !state.seen.has(`${f.kind}:${f.key}`));
+            if (fresh.length === 0) { core.info('all findings are already in the Project'); return; }
             const urgent = fresh.some(f => f.kind === 'exploited');
             const date = new Date().toISOString().split('T')[0];
             const title = `${urgent ? '🚨' : '🔒'} 上流との差分: ${fresh.length} 件（${date}）`;
@@ -208,24 +220,21 @@ jobs:
               '',
               '仕分けて `docs/security/upstream-triage.tsv` に足すと、次から出なくなります（手順は `security-review` skill）。',
             ].join('\n');
-            const created = await github.rest.issues.create({
-              owner: context.repo.owner, repo: context.repo.repo,
-              title, body, labels: ['security', 'automated']
-            });
-            core.setOutput('url', created.data.html_url);
+            await project.add(github, id, state, { title, body, priority: urgent ? 'High' : 'Middle' });
+            core.setOutput('url', state.url);
             core.setOutput('title', title);
             core.setOutput('urgent', urgent ? 'true' : 'false');
 
       - name: Notify Discord (new findings)
-        if: steps.issue.outputs.url != '' && env.DISCORD_WEBHOOK != ''
+        if: steps.project.outputs.url != '' && env.DISCORD_WEBHOOK != ''
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         with:
           webhook: ${{ env.DISCORD_WEBHOOK }}
-          status: ${{ steps.issue.outputs.urgent == 'true' && 'failure' || 'success' }}
-          title: ${{ steps.issue.outputs.title }}
+          status: ${{ steps.project.outputs.urgent == 'true' && 'failure' || 'success' }}
+          title: ${{ steps.project.outputs.title }}
           description: |
-            上流のセキュリティ情報と Kimigayo の差分が見つかりました。
-            ${{ steps.issue.outputs.url }}
+            上流のセキュリティ情報と Kimigayo の差分が見つかりました（非公開の Project に追加）。
+            ${{ steps.project.outputs.url }}
           username: 'Kimigayo Security Bot'
 
       # 監視そのものが壊れたら（ページの形が変わった・取得に失敗）知らせる。
