@@ -31,7 +31,8 @@ import re
 import sys
 
 # 監視対象。ここに無いコマンドの引数は判定されない。
-WATCHED = {"git", "make", "docker", "rm", "tar", "apk", "pip", "pip3"}
+# gh は Issue の直接作成を止めるため（scripts/project-issue.py を使わせる）
+WATCHED = {"git", "make", "docker", "rm", "tar", "apk", "pip", "pip3", "gh"}
 
 HEREDOC_RE = re.compile(r"<<-?\s*[\"']?([A-Za-z_][A-Za-z0-9_]*)[\"']?")
 ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")

@@ -219,6 +219,20 @@ fi
 # 5. 機密
 # ---------------------------------------------------------------------------
 
+# Issue を gh で直接作ると、非公開の Project に入らず優先度も付かない。
+# scripts/project-issue.py は gh を subprocess で呼ぶので、ここには掛からない。
+if [ -n "$(lines_cmd 'gh[[:space:]]+issue[[:space:]]+create')" ]; then
+    block "gh issue create の直接実行" \
+"Issue は scripts/project-issue.py で作ります。Project に入れて Priority を付け、
+同じタイトルなら作らずに直します（冪等）:
+  python3 scripts/project-issue.py issue --title ... --body-file ... --priority High|Middle|Low
+
+危険度の高いもの（直っていない脆弱性・攻撃面の穴）は Issue にせず下書きにします:
+  python3 scripts/project-issue.py draft --title ... --body-file ... --priority ...
+
+（CLAUDE.md「危険度の高いものは Issue にしない」節）"
+fi
+
 add_lines="$(lines_with '\bgit[[:space:]]+add\b')"
 if [ -n "$add_lines" ] &&
    printf '%s' "$add_lines" | grep -qE '(^|[[:space:]/])\.env([[:space:]]|$)'; then
