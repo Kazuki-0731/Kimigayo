@@ -429,13 +429,13 @@ docker run -d --log-opt max-size=10m --log-opt max-file=3 \
 
 ### 起動時間について
 
-**イメージを軽くしても起動は速くなりません。** v3.0.2 の実測は
-`docker run` が 0.60 秒ですが、同じ条件で Alpine・Ubuntu 24.04 とも
-0.59 秒で、**Ubuntu（arm64 で約 100MB）と差がありません**。
+**イメージを軽くしても起動は速くなりません。** v3.1.0 の実測は
+`docker run` が 0.65 秒ですが、同じ条件で Alpine 0.61 秒・Ubuntu 24.04
+0.65 秒で、**Ubuntu（arm64 で約 100MB）と差がありません**。
 測っている時間のほとんどがコンテナランタイム自身の処理なので、
 イメージの中身はほとんど効きません。
 
-常駐メモリも同程度（Kimigayo 288KB / Alpine 272KB / Ubuntu 312KB）で、
+常駐メモリも同程度（Kimigayo 288KB / Alpine 268KB / Ubuntu 316KB）で、
 差が出るのはサイズの方です。測定条件は
 [docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) を参照してください。
 

@@ -65,9 +65,9 @@ cat /etc/os-release
 
 | バリアント | イメージ | BusyBox アプレット | タグ |
 |-----------|---------|------------------|------|
-| Minimal | 2.46MB / arm64 2.83MB | 367 | `latest-minimal` / `3.1.0-minimal` |
-| **Standard**（推奨）| 2.60MB / arm64 2.98MB | 400 | `latest` / `latest-standard` / `3.1.0-standard` |
-| Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.1.0-extended` |
+| Minimal | 2.34MB / arm64 2.73MB | 329 | `latest-minimal` / `3.1.0-minimal` |
+| **Standard**（推奨）| 2.64MB / arm64 3.06MB | 400 | `latest` / `latest-standard` / `3.1.0-standard` |
+| Extended | 2.67MB / arm64 3.10MB | 411 | `latest-extended` / `3.1.0-extended` |
 
 **Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
 （Standard との差は 33 アプレット）。v3.1.0 からは `httpd`・`ssl_client`・
@@ -277,22 +277,22 @@ exit
 
 ## パフォーマンス実績
 
-v3.0.2 の実測値（2026-10-12、ホストは macOS / Apple Silicon）:
+v3.1.0 の実測値（2026-10-15、ホストは macOS / Apple Silicon）:
 
 | 指標 | 実測値 | 目標値 |
 |------|-------|--------|
-| イメージサイズ (Minimal) | 2.46MB / arm64 2.83MB | < 5MB |
-| イメージサイズ (Standard) | 2.60MB / arm64 2.98MB | < 15MB |
-| イメージサイズ (Extended) | 2.62MB / arm64 3.01MB | < 50MB |
-| 起動時間 | 0.60秒 | < 10秒 |
+| イメージサイズ (Minimal) | 2.34MB / arm64 2.73MB | < 5MB |
+| イメージサイズ (Standard) | 2.64MB / arm64 3.06MB | < 15MB |
+| イメージサイズ (Extended) | 2.67MB / arm64 3.10MB | < 50MB |
+| 起動時間 | 0.65秒 | < 10秒 |
 | 常駐メモリ | 288KB | < 128MB |
-| BusyBox コマンド性能 | Alpine 比 0.97〜1.01x | Alpine 同等 |
+| BusyBox コマンド性能 | Alpine 比 0.97〜1.02x | Alpine 同等 |
 
-> **起動時間の 0.60 秒は「Kimigayo が速い」という意味ではありません。**
-> 同じ条件で測ると Alpine・Ubuntu 24.04 とも 0.59 秒で、差は出ません。
+> **起動時間の 0.65 秒は「Kimigayo が速い」という意味ではありません。**
+> 同じ条件で測ると Alpine 0.61 秒・Ubuntu 24.04 0.65 秒で、差は出ません。
 > 測っている時間のほとんどがコンテナランタイム自身の処理なので、
 > イメージの中身はほとんど効きません。常駐メモリも
-> Kimigayo 288KB / Alpine 272KB / Ubuntu 312KB と同程度で、
+> Kimigayo 288KB / Alpine 268KB / Ubuntu 316KB と同程度で、
 > **差が出るのはサイズの方です。**
 
 測定条件は [docs/benchmarks/lifecycle.md](../benchmarks/lifecycle.md) に

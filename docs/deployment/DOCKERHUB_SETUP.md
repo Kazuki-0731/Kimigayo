@@ -35,14 +35,14 @@ Docker Hub の Overview に貼る文章はこのファイルだけで管理す�
 
 各バージョンは、イメージサイズと含まれる機能に基づいて3つのバリアントで提供されます:
 
-サイズは目標（`SPECIFICATION.md` §8.3）で、実測（v3.0.2、x86_64 / arm64）は
-Minimal 2.46MB / 2.83MB、Standard 2.60MB / 2.98MB、Extended 2.62MB / 3.01MB です。
+サイズは目標（`SPECIFICATION.md` §8.3）で、実測（v3.1.0、x86_64 / arm64）は
+Minimal 2.34MB / 2.73MB、Standard 2.64MB / 3.06MB、Extended 2.67MB / 3.10MB です。
 3 つの違いは BusyBox のアプレットだけです。
 
 1. **Minimal**（`-minimal`接尾辞）
    - サイズ目標: < 5MB
-   - 含まれるもの: musl libc + BusyBox（367 アプレット）+ OpenRC
-   - Standard と比べて `vi`・`wget`・`du`・`less`・`tr` などが無い
+   - 含まれるもの: musl libc + BusyBox（329 アプレット）+ OpenRC
+   - Standard と比べて `vi`・`wget`・`du`・`less`・`tr` などと、`httpd`・`udhcpc` などのネットワーク系が無い
 
 2. **Standard**（接尾辞なし、または `-standard`。デフォルト）
    - サイズ目標: < 15MB

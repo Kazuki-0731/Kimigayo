@@ -37,7 +37,7 @@ Dockerを使用したインストールが最も簡単です。
 #### 前提条件
 - Docker 20.10以降がインストールされていること
 
-#### Minimalイメージ（2.46MB / arm64 2.83MB）
+#### Minimalイメージ（2.34MB / arm64 2.73MB）
 
 ```bash
 # Kimigayo OS Minimalイメージをpull
@@ -47,7 +47,7 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 docker run -it ishinokazuki/kimigayo-os:latest-minimal
 ```
 
-#### Standardイメージ（2.60MB / arm64 2.98MB、推奨）
+#### Standardイメージ（2.64MB / arm64 3.06MB、推奨）
 
 ```bash
 # Kimigayo OS Standardイメージをpull
@@ -57,7 +57,7 @@ docker pull ishinokazuki/kimigayo-os:latest
 docker run -it ishinokazuki/kimigayo-os:latest
 ```
 
-#### Extendedイメージ（2.62MB / arm64 3.01MB）
+#### Extendedイメージ（2.67MB / arm64 3.10MB）
 
 ```bash
 # Kimigayo OS Extendedイメージをpull
