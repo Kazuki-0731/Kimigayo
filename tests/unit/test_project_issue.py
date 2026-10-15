@@ -81,3 +81,46 @@ def test_duplicate_drafts_keep_oldest_with_newest_body():
 def test_no_duplicates_is_noop():
     items = [item(type="DRAFT_ISSUE", title="X"), item(type="DRAFT_ISSUE", title="Y")]
     assert pi.duplicate_drafts(items) == []
+
+
+@pytest.mark.parametrize("current, priority, add, remove", [
+    ([], "High", ["priority: high"], []),
+    (["security", "priority: high"], "High", [], []),
+    (["priority: low", "bug"], "Middle", ["priority: middle"], ["priority: low"]),
+    (["priority: low", "priority: high"], "High", [], ["priority: low"]),
+])
+def test_label_changes(current, priority, add, remove):
+    assert pi.label_changes(current, priority) == (add, remove)
+
+
+def test_priority_from_labels():
+    assert pi.priority_from_labels(["bug", "priority: middle"]) == "Middle"
+    assert pi.priority_from_labels(["bug"]) is None
+    assert pi.priority_from_labels(["priority: low", "priority: high"]) is None
+
+
+def lbl(*names):
+    return [{"name": n} for n in names]
+
+
+def test_label_plan_follows_project_priority():
+    issues = [{"number": 1, "labels": lbl("security")},
+              {"number": 2, "labels": lbl("priority: high")},
+              {"number": 3, "labels": lbl("priority: low")}]
+    items = [item(1, priority="High"), item(2, priority="High"), item(3, priority="Middle")]
+    plan = pi.label_plan(issues, items)
+    assert plan["labels"] == [(1, ["priority: high"], []), (3, ["priority: middle"], ["priority: low"])]
+    assert plan["adopt"] == []
+
+
+def test_label_plan_adopts_label_when_project_has_none():
+    issues = [{"number": 4, "labels": lbl("priority: middle")}, {"number": 5, "labels": []}]
+    items = [item(4)]                       # #5 は Project にまだ無い
+    plan = pi.label_plan(issues, items)
+    assert plan["adopt"] == [(4, "Middle")]
+    assert plan["labels"] == []
+
+
+def test_label_plan_is_idempotent():
+    issues = [{"number": 1, "labels": lbl("priority: low")}]
+    assert pi.label_plan(issues, [item(1, priority="Low")]) == {"labels": [], "adopt": []}

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Issue と非公開の Project（Kimigayo Security）を、いつも一緒に作る・直す。
 
-Issue だけ作って Project に入れ忘れる、優先度を公開のラベルに書いてしまう、
-を手順ではなくこのスクリプトで防ぐ（2026-10-15 に決定）。
+Issue だけ作って Project に入れ忘れる、Project と Issue のラベルで優先度が
+食い違う、を手順ではなくこのスクリプトで防ぐ（2026-10-15 に決定）。
+優先度の正本は Project の Priority で、Issue には同じ値のラベル
+（priority: high / middle / low）を付ける。
 何度実行しても同じ結果になる（冪等）:
 
   - 同じタイトルの開いている Issue があれば、作らずにそれを直す
@@ -18,15 +20,17 @@ Project の一覧への反映は数分遅れる（2026-10-15 に実測、5 分�
   python3 scripts/project-issue.py issue --title "..." --body-file body.md \\
       --label security --priority Middle
 
-  # 危険度の高いものは Issue にせず、Project の下書きにする
-  # （CLAUDE.md「危険度の高いものは Issue にしない」節）
+  # セキュリティに関するものは Issue にせず、Project の下書きにする
+  # （CLAUDE.md「セキュリティに関するものは Issue にしない」節）
   python3 scripts/project-issue.py draft --title "..." --body-file body.md --priority High
 
   # 既存の Issue の優先度・状態を変える
   python3 scripts/project-issue.py set 122 --priority High --status "In Progress"
 
-  # 全部をそろえる: 開いている Issue を Project に入れ、閉じた Issue を Done にする。
-  # Priority の無い Issue を一覧にする（on-issue-sync-private-project.yml が Issue の変化のたびに回す）
+  # 全部をそろえる: 開いている Issue を Project に入れ、閉じた Issue を Done にし、
+  # Issue の優先度のラベルを Project の Priority に合わせる。Priority が無く
+  # ラベルだけある Issue は、ラベルを Project に写す。どちらも無い Issue を一覧にする
+  # （on-issue-sync-private-project.yml が Issue の変化のたびに回す）
   python3 scripts/project-issue.py sync
 
 Project を書き換えるので、gh のトークンに project スコープが要る。
@@ -38,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -45,6 +50,11 @@ OWNER = "Kazuki-0731"
 REPO = "Kazuki-0731/Kimigayo"
 PROJECT_NUMBER = 3          # https://github.com/users/Kazuki-0731/projects/3
 PRIORITIES = ("High", "Middle", "Low")
+# Issue に付ける優先度のラベル（Project の Priority と同じ値）
+PRIORITY_LABELS = {p: f"priority: {p.lower()}" for p in PRIORITIES}
+LABEL_COLORS = {"High": ("d73a4a", "優先度: 高（先に着手する）"),
+                "Middle": ("fbca04", "優先度: 中"),
+                "Low": ("f9a03f", "優先度: 低（手が空いたら）")}
 STATUSES = ("Todo", "In Progress", "Done")
 
 
@@ -52,8 +62,13 @@ STATUSES = ("Todo", "In Progress", "Done")
 # gh
 # ---------------------------------------------------------------------------
 
-def gh(*args: str, input: str | None = None) -> str:
-    r = subprocess.run(["gh", *args], capture_output=True, text=True, input=input)
+def gh(*args: str, input: str | None = None, issues: bool = False) -> str:
+    """issues=True は Issue とラベルの書き換え。CI では Project 用のトークン
+    （project スコープだけ）では書けないので、KIMIGAYO_ISSUES_TOKEN があればそれを使う。"""
+    env = None
+    if issues and os.environ.get("KIMIGAYO_ISSUES_TOKEN"):
+        env = {**os.environ, "GH_TOKEN": os.environ["KIMIGAYO_ISSUES_TOKEN"]}
+    r = subprocess.run(["gh", *args], capture_output=True, text=True, input=input, env=env)
     if r.returncode != 0:
         msg = r.stderr.strip()
         if "INSUFFICIENT_SCOPES" in msg or "missing required scopes" in msg:
@@ -215,13 +230,73 @@ def sync_plan(open_issues: list[int], items: list[dict]) -> dict:
     return plan
 
 
+def label_changes(current: list[str], priority: str) -> tuple[list[str], list[str]]:
+    """Issue のラベルを Priority に合わせるための (足す, 外す)。"""
+    want = PRIORITY_LABELS[priority]
+    add = [] if want in current else [want]
+    remove = [l for l in current if l in PRIORITY_LABELS.values() and l != want]
+    return add, remove
+
+
+def priority_from_labels(current: list[str]) -> str | None:
+    """優先度のラベルがちょうど 1 つならその Priority。無い・複数なら None。"""
+    found = [p for p, l in PRIORITY_LABELS.items() if l in current]
+    return found[0] if len(found) == 1 else None
+
+
+def label_plan(issues: list[dict], items: list[dict]) -> dict:
+    """labels: [(番号, 足す, 外す)]、adopt: [(番号, Priority)]（ラベルを Project に写す）。
+    Project の Priority が正本。Priority が無いときだけラベルを採る。"""
+    ours = {i["number"]: i for i in items if i["type"] == "ISSUE" and i["repo"] == REPO}
+    plan = {"labels": [], "adopt": []}
+    for issue in issues:
+        current = [l["name"] for l in issue.get("labels", [])]
+        item = ours.get(issue["number"])
+        priority = item and item["priority"]
+        if not priority:
+            from_label = priority_from_labels(current)
+            if from_label:
+                plan["adopt"].append((issue["number"], from_label))
+            continue
+        add, remove = label_changes(current, priority)
+        if add or remove:
+            plan["labels"].append((issue["number"], add, remove))
+    return plan
+
+
 # ---------------------------------------------------------------------------
 # サブコマンド
 # ---------------------------------------------------------------------------
 
 def open_issues() -> list[dict]:
     return json.loads(gh("issue", "list", "--repo", REPO, "--state", "open",
-                         "--limit", "1000", "--json", "number,title"))
+                         "--limit", "1000", "--json", "number,title,labels"))
+
+
+def ensure_labels() -> None:
+    """優先度のラベルを作る（あれば色と説明をそろえる。何度呼んでも同じ）。"""
+    for p, name in PRIORITY_LABELS.items():
+        color, desc = LABEL_COLORS[p]
+        gh("label", "create", name, "--repo", REPO, "--color", color,
+           "--description", desc, "--force", issues=True)
+
+
+def apply_priority_label(number: int, current: list[str], priority: str) -> bool:
+    add, remove = label_changes(current, priority)
+    if not add and not remove:
+        return False
+    args = ["issue", "edit", str(number), "--repo", REPO]
+    for l in add:
+        args += ["--add-label", l]
+    for l in remove:
+        args += ["--remove-label", l]
+    gh(*args, issues=True)
+    return True
+
+
+def issue_labels(number: int) -> list[str]:
+    d = json.loads(gh("issue", "view", str(number), "--repo", REPO, "--json", "labels"))
+    return [l["name"] for l in d["labels"]]
 
 
 def cmd_issue(a) -> None:
@@ -254,6 +329,8 @@ def cmd_issue(a) -> None:
 
     item = project.add_issue(number)
     project.set(item, "Priority", a.priority)
+    ensure_labels()
+    apply_priority_label(number, issue_labels(number), a.priority)
     # 既存の Issue の Status は、指定されたときだけ変える（In Progress を Todo に戻さない）
     status = a.status or ("Todo" if created else None)
     project.set(item, "Status", status)
@@ -291,6 +368,9 @@ def cmd_set(a) -> None:
     item = project.add_issue(a.number)
     project.set(item, "Priority", a.priority)
     project.set(item, "Status", a.status)
+    if a.priority:
+        ensure_labels()
+        apply_priority_label(a.number, issue_labels(a.number), a.priority)
     print(f"#{a.number}: " + " ".join(f"{k}={v}" for k, v in
                                        (("Priority", a.priority), ("Status", a.status)) if v))
 
@@ -308,7 +388,8 @@ def cmd_sync(a) -> int:
               mutation($p: ID!, $i: ID!) { deleteProjectV2Item(input: {projectId: $p, itemId: $i}) { deletedItemId } }
             """, p=project.id, i=e["id"])
         print(f"重複した下書きをまとめた: {keep['title']}（{len(extra)} 件を消した）")
-    plan = sync_plan([i["number"] for i in open_issues()], items)
+    issues = open_issues()
+    plan = sync_plan([i["number"] for i in issues], items)
     for n in plan["add"]:
         item = project.add_issue(n)
         project.set(item, "Status", "Todo")
@@ -319,6 +400,22 @@ def cmd_sync(a) -> int:
         project.set(item, "Status", "Done")
     if plan["todo"] or plan["done"]:
         print(f"Status をそろえた: Todo {len(plan['todo'])} 件 / Done {len(plan['done'])} 件")
+
+    # 優先度: Project の Priority を正本にして Issue のラベルを合わせる。
+    # Priority が無くラベルだけある Issue（Web でラベルを付けた）は、ラベルを Project に写す
+    lp = label_plan(issues, items)
+    if lp["labels"] or lp["adopt"]:
+        ensure_labels()
+    for n, p in lp["adopt"]:
+        project.set(project.add_issue(n), "Priority", p)
+        print(f"#{n}: ラベルの優先度 {p} を Project に写した")
+    for n, add, remove in lp["labels"]:
+        gh("issue", "edit", str(n), "--repo", REPO,
+           *sum((["--add-label", l] for l in add), []),
+           *sum((["--remove-label", l] for l in remove), []), issues=True)
+        print(f"#{n}: 優先度のラベルを Project に合わせた（+{','.join(add) or '-'} -{','.join(remove) or '-'}）")
+    adopted = {n for n, _ in lp["adopt"]}
+    plan["no_priority"] = [n for n in plan["no_priority"] if n not in adopted]
     if plan["no_priority"]:
         nums = " ".join(f"#{n}" for n in plan["no_priority"])
         print(f"Priority が無い Issue: {nums}")
@@ -339,7 +436,7 @@ def main(argv=None) -> int:
     s.add_argument("--priority", required=True, choices=PRIORITIES)
     s.add_argument("--status", choices=STATUSES)
 
-    s = sub.add_parser("draft", help="Issue にせず Project の下書きにする（危険度の高いもの）")
+    s = sub.add_parser("draft", help="Issue にせず Project の下書きにする（セキュリティに関するもの）")
     s.add_argument("--title", required=True)
     s.add_argument("--body-file", required=True)
     s.add_argument("--priority", required=True, choices=PRIORITIES)
