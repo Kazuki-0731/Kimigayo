@@ -273,7 +273,7 @@ NVD に新しい CVE が載ると、コードを変えていない push でも�
 - `dependency-review`（PR のみ）: `fail-on-severity: high`
 - `published-image-scan`（定期・手動のみ）: Docker Hub の `latest` を pull し、
   `scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。定期実行で
-  失敗すると `create-security-issue` が Issue を起票します
+  失敗すると `add-to-project` が非公開の Project に項目を足します
 
 > 以前の「Check component versions against CVE databases」ステップは
 > CVE データベースを照会せず、`versions.mk` の版を表示するだけでした

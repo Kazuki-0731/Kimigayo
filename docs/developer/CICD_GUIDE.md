@@ -22,7 +22,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 | `release.yml` | `v*.*.*` タグ（公開）、手動（ビルドと検証だけ。push しない） | **Docker Hub への公開** |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド |
-| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分、Issue 起票 |
+| `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分（非公開の Project に追加） |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
 | `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
 
@@ -139,7 +139,7 @@ gh workflow run manual-build.yml \
 4. 上流のセキュリティ情報との差分（`upstream-fix-watch`）。`scripts/watch-upstream-fixes.py` が
    Debian の security-tracker・Alpine aports・上流 git・CISA KEV を見て、
    `docs/security/upstream-triage.tsv`（仕分け済みの一覧）に無いものを出す。
-   修正が出たら Issue を立てて Discord に通知し、判定できなかったときも Discord に失敗を送る
+   修正が出たら非公開の Project に項目を足して Discord に通知し、判定できなかったときも Discord に失敗を送る
 
 > **イメージの Trivy スキャン（`trivy-image-scan`）は 2026-10-09 に外しました。**
 > Kimigayo は `scratch` 上の手組み rootfs でパッケージデータベースを
@@ -189,7 +189,7 @@ Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` �
 | `dependency-review` | PR のみ | 依存のレビュー（`fail-on-severity: high`） |
 | `vulnerability-scan` | PR・定期・手動 | リポジトリの Trivy FS スキャンと、ビルドスクリプトの検査（コメント以外の `http://` と `eval` があれば落ちる。`scripts/lib/versions.sh` の `eval` だけ許可）。秘密情報の grep は外した（Trivy と `scan-image.sh` が見る） |
 | `published-image-scan` | 定期・手動（PR では走らない） | Docker Hub の `ishinokazuki/kimigayo-os:latest`（standard / amd64）を pull し、`scripts/scan-image.sh` で CVE 照合と秘密情報スキャン。SBOM を `sbom-published-latest` として保存 |
-| `create-security-issue` | 定期実行で上の2つのどちらかが失敗したとき | Issue を起票 |
+| `add-to-project` | 定期実行で `published-image-scan` が失敗したとき | 非公開の Project に項目を足す（公開の Issue は立てない） |
 
 `published-image-scan` が見るのは `latest` だけです。構成要素の版は
 バリアント・アーキテクチャで共通なためです。新しい CVE はコードが
@@ -567,7 +567,7 @@ Trivy の脆弱性スキャンは**リポジトリ**に対してだけ使いま�
 | --- | --- | --- |
 | `build-workflow.yml`（ビルドごと） | CVE 照合 + 秘密情報 | ジョブが落ちる |
 | `release.yml`（Docker Hub への push 前） | CVE 照合 + 秘密情報。SBOM を Release に添付 | push しない |
-| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | ジョブが落ちる。定期実行のときだけ Issue を起票 |
+| `dependency-review.yml` の `published-image-scan`（毎週月曜 04:00 UTC・手動） | Docker Hub の `latest` に CVE 照合 + 秘密情報 | ジョブが落ちる。定期実行のときだけ非公開の Project に項目を足す |
 
 ## リリースプロセス
 

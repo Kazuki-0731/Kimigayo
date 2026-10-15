@@ -13,7 +13,7 @@
 #              accepted       影響ありを承知で受け入れる（理由を書く）
 #              unknown        判断材料が足りない
 #
-# ここに無い CVE・パッチ・上流のコミットが現れると、security.yml が Issue と
+# ここに無い CVE・パッチ・上流のコミットが現れると、security.yml が非公開の Project と
 # Discord で知らせる。仕分けたらここに足す（手順は security-review skill）。
 # 2026-10-14 の初回の仕分け: BusyBox の実際の config（oldconfig 後）・上流 git・
 # Debian / Alpine のパッチの dry-run・公開イメージ 3.0.2 での実測に基づく。

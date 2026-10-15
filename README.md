@@ -461,9 +461,9 @@ distroless は 2026-10-11 の値。
 | **release.yml** | タグpush (v*.*.*)、手動 | リリース成果物生成 | • 全variant × 全archビルド・`verify-image.sh`・`scan-image.sh`（CVE 照合と SBOM）<br>• Docker Hubへpush（マルチアーチマニフェスト作成）。**公開はタグpushのときだけ**で、手動実行はビルド・検証・スキャンまで<br>• Cosign のキーレス署名<br>• GitHub Release作成（rootfs tarball・SBOM・対応するソース・`SHA256SUMS`・`SHA512SUMS`、前回タグからのPRリスト。PR が無ければコミット一覧）<br>• Discord通知 |
 | **build-workflow.yml** | 再利用可能ワークフロー | ビルド処理の共通化 | • rootfsビルド<br>• Docker imageビルド（push はしない）<br>• `verify-image.sh` でイメージを実行して検証<br>• `scan-image.sh` で CVE 照合（SBOM + Grype）と秘密情報スキャン |
 | **manual-build.yml** | 手動実行 | 検証用ビルド | • variant/arch選択可能<br>• `build_kernel=true` でカーネルも作る（**CI でカーネルを作る唯一の経路**）<br>• アーティファクトアップロード |
-| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら Issue）<br>• 上流のセキュリティ情報（Debian・Alpine・上流 git・CISA KEV）との差分（差分が出たら Issue と Discord 通知）<br>• Trivy ファイルシステムスキャン |
+| **security.yml** | 日次 02:00 UTC | セキュリティチェック | • 構成要素のバージョンチェック（新版を検知したら非公開の Project に追加）<br>• 上流のセキュリティ情報（Debian・Alpine・上流 git・CISA KEV）との差分（差分が出たら非公開の Project と Discord 通知）<br>• Trivy ファイルシステムスキャン |
 | **base-image-update.yml** | 週次（月曜 03:00 UTC） | コンポーネント更新チェック | • musl/BusyBox/OpenRC バージョンチェック<br>• 更新があればPR自動作成 |
-| **dependency-review.yml** | PR時、週次（月曜 04:00 UTC） | 依存関係レビュー | • 依存関係の変更を検証（PR）<br>• Trivy ファイルシステムスキャン<br>• 公開中の `latest` を `scan-image.sh` で照合（定期実行で失敗したら Issue） |
+| **dependency-review.yml** | PR時、週次（月曜 04:00 UTC） | 依存関係レビュー | • 依存関係の変更を検証（PR）<br>• Trivy ファイルシステムスキャン<br>• 公開中の `latest` を `scan-image.sh` で照合（定期実行で失敗したら非公開の Project に追加） |
 
 **CI/CD改善点（v1.0.0 時点の記録）:**
 - ✅ **全フレーバー×全アーキテクチャのテスト**: minimal/standard/extended × x86_64/arm64の6パターンを自動テスト

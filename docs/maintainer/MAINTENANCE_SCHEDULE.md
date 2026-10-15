@@ -77,7 +77,8 @@ skill before merging.
   - Pull the published image (`ishinokazuki/kimigayo-os:latest`) and match
     its shipped component versions against CVEs, plus scan it for secrets
     (`published-image-scan` → `scripts/scan-image.sh`)
-  - Create a GitHub issue if a scheduled run fails (`create-security-issue`)
+  - Add a draft item to the private Project if a scheduled run of
+    `published-image-scan` fails (`add-to-project`). No public issue is opened
 
 **Manual Review Required:** Review Security tab for findings, and the
 issue / SBOM artifact (`sbom-published-latest`) if `published-image-scan` failed.

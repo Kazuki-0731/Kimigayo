@@ -281,7 +281,7 @@ CI 側では次のように回る:
 - **毎週月曜 04:00 UTC と手動** — `dependency-review.yml` の
   `published-image-scan` ジョブが Docker Hub の `latest` を pull し、
   `scan-image.sh`（CVE + 秘密情報）を回す。定期実行で失敗したときだけ
-  `create-security-issue` が Issue を起票する（手動実行では起票しない）
+  `add-to-project` が非公開の Project に項目を足す（手動実行では足さない）
 - **PR** — `dependency-review.yml` の依存レビュー。リポジトリの Trivy FS スキャン
   （`vulnerability-scan`）は PR と定期の両方で走る
 
