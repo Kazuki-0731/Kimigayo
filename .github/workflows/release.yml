@@ -129,7 +129,7 @@ jobs:
         run: bash scripts/collect-sources.sh sources
 
       - name: Upload source archives
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sources
           path: sources/
@@ -209,7 +209,7 @@ jobs:
           ls -lh output/
 
       - name: Upload rootfs tarball
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kimigayo-${{ matrix.variant }}-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
           path: output/*.tar.gz
@@ -218,7 +218,7 @@ jobs:
 
       - name: Upload build logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-logs-${{ matrix.variant }}-${{ matrix.arch }}
           path: |
@@ -316,7 +316,7 @@ jobs:
             "${{ matrix.arch }}"
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-${{ matrix.variant }}-${{ matrix.arch }}
           path: sbom/*.cdx.json
