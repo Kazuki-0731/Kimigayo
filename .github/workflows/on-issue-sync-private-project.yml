@@ -8,7 +8,10 @@ name: Sync Issues to Private Project
 # Issue を Done にする。sync は何度回しても同じ結果になる（冪等）ので、
 # 取りこぼしは毎日の定期実行で拾う。
 #
-# 優先度（Priority）は人が付ける。sync は付いていない Issue を一覧に出すだけ。
+# 優先度は Project の Priority が正本で、Issue には同じ値のラベル
+# （priority: high / middle / low）を付ける。sync はラベルを Priority に合わせ、
+# Priority が無くラベルだけある Issue はラベルを Project に写す。
+# どちらも無い Issue は一覧に出す（付けるのは人）。
 
 on:
   issues:
@@ -19,9 +22,11 @@ on:
 
 # Project への書き込みは GITHUB_TOKEN では届かないので
 # secrets.KIMIGAYO_PROJECT_TOKEN（classic PAT の project スコープだけ）を使う。
-# Issue は公開リポジトリのものを読むだけなので、このトークンで読める。
+# Issue のラベルの書き換えはそのトークンではできないので GITHUB_TOKEN
+# （issues: write）を KIMIGAYO_ISSUES_TOKEN として渡す。
 permissions:
   contents: read
+  issues: write
 
 # 同時に回すと同じ Issue を二重に処理しうるので、順番に回す（取り消さない）。
 concurrency:
@@ -43,4 +48,5 @@ jobs:
       - name: Sync
         env:
           GH_TOKEN: ${{ secrets.KIMIGAYO_PROJECT_TOKEN }}
+          KIMIGAYO_ISSUES_TOKEN: ${{ github.token }}
         run: python3 -I scripts/project-issue.py sync
