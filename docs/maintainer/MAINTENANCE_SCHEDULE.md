@@ -113,6 +113,15 @@ the scan fail again without any code change; that is a real signal.
   - Check version numbers against `versions.mk` and `git describe --tags`
   - Check for broken links: `make check-links`
 
+##### Release Review
+- **Actions:**
+  - List what changed since the last tag: `git log --oneline <last tag>..main`
+  - Sort each change into major / minor / patch / not released, following
+    [SPECIFICATION.md](../../SPECIFICATION.md) "10.2 バージョニングとリリースの方針"
+  - If anything changes the published image, release it as one version
+    (the largest category wins). CI, docs, scripts and kernel changes alone
+    are not a reason to release
+
 ##### Security Audit
 - **Actions:**
   - Review all security findings from past month
@@ -178,7 +187,10 @@ the scan fail again without any code change; that is a real signal.
   5. Release if needed
 
 #### Release Preparation
-- **Trigger:** Fixes or updates worth shipping
+- **Trigger:** the monthly Release Review, or an urgent fix (a Critical or
+  CISA KEV CVE in the published image, or an image that does not start).
+  When and which version: [SPECIFICATION.md](../../SPECIFICATION.md)
+  "10.2 バージョニングとリリースの方針"
 - **Process:** follow
   [.claude/skills/release/SKILL.md](../../.claude/skills/release/SKILL.md).
   In short: write CHANGELOG.md and RELEASE_NOTES.md by hand (`make changelog`
