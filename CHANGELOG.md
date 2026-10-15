@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   項目が無いとき、「次の版」が区分や前回のタグからの計算と合わないときに落ちる
 - **構成要素の更新 PR（`base-image-update.yml`）が `[Unreleased]` に区分付きで 1 行足すようにした**
   （`scripts/add-unreleased.py`）。最後の数字だけの更新はパッチ、それより上はマイナー
+- **脆弱性の自動検知の結果を、公開の Issue ではなく非公開の Project に足すようにした**
+  （`security.yml`・`dependency-review.yml`）。まだ直っていない脆弱性を公開の場に書かない。
+  `security.yml` の実行ログとサマリーにも、上流との差分の中身を出さない（件数だけ）
 - 文書の実測値と例のタグを v3.1.0 の公開イメージに合わせた。`examples/` の土台を 3.1.0 にした
 
 ## [3.1.0] "Himawari" (向日葵) - 2026-10-14
