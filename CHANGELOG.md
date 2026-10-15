@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI が `[Unreleased]` の書き忘れを止めるようにした**（`scripts/check-unreleased.py`）。
   前回のタグから公開イメージの中身に効くファイルが変わったのにメジャー・マイナー・パッチの
   項目が無いとき、「次の版」が区分や前回のタグからの計算と合わないときに落ちる
+- **構成要素の更新 PR（`base-image-update.yml`）が `[Unreleased]` に区分付きで 1 行足すようにした**
+  （`scripts/add-unreleased.py`）。最後の数字だけの更新はパッチ、それより上はマイナー
 - 文書の実測値と例のタグを v3.1.0 の公開イメージに合わせた。`examples/` の土台を 3.1.0 にした
 
 ## [3.1.0] "Himawari" (向日葵) - 2026-10-14
