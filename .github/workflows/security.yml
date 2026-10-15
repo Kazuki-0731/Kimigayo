@@ -205,9 +205,11 @@ jobs:
             const fs = require('fs');
             const project = require('./.github/scripts/project-draft.js');
             const findings = JSON.parse(fs.readFileSync('findings.json', 'utf8'));
-            if (findings.length === 0) { core.info('no findings'); return; }
+            // 差分が無い日も Project を読む。トークンの期限切れや設定漏れに、
+            // 差分が出た日ではなく毎日気づけるようにする（失敗は Discord に届く）。
             const id = process.env.PROJECT_ID;
             const state = await project.load(github, id);
+            if (findings.length === 0) { core.info('no findings'); return; }
             const fresh = findings.filter(f => !state.seen.has(`${f.kind}:${f.key}`));
             if (fresh.length === 0) { core.info('all findings are already in the Project'); return; }
             const urgent = fresh.some(f => f.kind === 'exploited');
