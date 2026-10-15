@@ -924,27 +924,38 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 **`.claude/` は共有する**ので、ここにも機密を置かない
 （→「Claude Code の設定を共有する」節）。
 
-### 危険度の高いものは Issue にしない
+### セキュリティに関するものは Issue にしない
 
 **このリポジトリは公開されているので、Issue は攻撃者にも読まれる。**
-「どこが弱くて、まだ直っていないか」を Issue に書くと、攻撃の手がかりを
-こちらから渡すことになる（2026-10-15 に決定。#122 を公開で起票したあとで
-ユーザーから指摘された）。
+セキュリティに関すること（どこが弱いか、何を直そうとしているか）を Issue に
+書くと、攻撃の手がかりをこちらから渡すことになる。**セキュリティに関するものは
+基本的に非公開の Project で管理し、Issue は作らない。** 機能追加・文書など、
+それ以外は Issue でよい（2026-10-15 に決定）。
+
+> このルールを最初「危険度の高いものだけ Project に置き、優先度は Project で持って
+> 公開のラベルは外す」と読み違え、頼まれていない優先度のラベルの削除までした
+> （2026-10-16 にユーザーが指摘）。**優先度のラベルを消してほしいとは言われていない。**
+> 決めたのは「セキュリティに関するものの置き場」だけ。
+>
+> ルールを決める前に公開で立てたセキュリティの Issue（#121〜#131 の一部）は、
+> そのままでよい（ユーザーが判断）。
 
 | 内容 | 置き場 |
 | --- | --- |
 | **まだ公表されていない脆弱性**（報告を受けた・自分で見つけた） | **GitHub Security Advisory**（非公開の下書き）。手順は `docs/security/VULNERABILITY_REPORTING.md` |
-| **危険度の高いもの:** 出荷物に当たっていて**まだ直っていない**脆弱性（公表済みの CVE でも、影響するバリアント・条件・回避策の有無が手がかりになる）、攻撃面や権限の穴の具体的な指摘 | **非公開の Project**（GitHub Projects の下書きの項目。Issue にしない） |
-| それ以外（直し終わったもの、悪用の手がかりにならない一般的な強化、機能、文書） | Issue |
+| **セキュリティに関するもの**（脆弱性の追跡、公表済みの CVE の対応、攻撃面や権限の穴、強化の作業） | **非公開の Project**（GitHub Projects の下書きの項目。Issue にしない） |
+| それ以外（機能追加、文書、性能、ビルドの改善など） | Issue |
 
 - **迷ったら Project に置く。** 公開はあとからできるが、取り消せない
-- 直してリリースしたら、Project の項目を Issue にするか、CHANGELOG・RELEASE_NOTES に書いて公開する
+- 直してリリースしたら、CHANGELOG・RELEASE_NOTES に書いて公開する
 - **Project の項目も公開の Issue と同じ形で書く**（何をするか・なぜ・恩恵・注意点・完了の条件）
 - Project に入れた公開 Issue は公開のまま。**Project を非公開にしても隠れるのは Project 独自の項目と下書きだけ**
-- **優先度も Project の項目で持つ。** 公開のラベルにすると「どれを急いでいるか」が外から読める
+- **優先度は Project の Priority と、Issue のラベル（`priority: high` / `middle` / `low`）の両方に付ける。**
+  正本は Project で、ラベルは `scripts/project-issue.py` がそろえる
 - **Issue も下書きも `scripts/project-issue.py` で作る**（`issue` / `draft` / `set` / `sync`）。
-  Issue を作ると同時に Project に入れて Priority を付ける。同じタイトルなら作らずに直す（冪等）。
-  Web で作った Issue や閉じた Issue は `on-issue-sync-private-project.yml` が拾う。`gh issue create` を直接使わない
+  Issue を作ると同時に Project に入れて Priority とラベルを付ける。同じタイトルなら作らずに直す（冪等）。
+  Web で作った Issue や閉じた Issue、Web で付け替えたラベルは `on-issue-sync-private-project.yml` が拾う。
+  `gh issue create` を直接使わない（フックが止める）
 
 ---
 
