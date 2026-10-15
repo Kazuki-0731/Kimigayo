@@ -8,7 +8,7 @@
 > **1. 構成要素を 2026-10-09 にまとめて更新したので、サイズは全部古い。**
 > カーネル 6.6.11 → 6.18.55、musl 1.2.4 → 1.2.6、
 > BusyBox 1.36.1 → 1.38.0、OpenRC 0.52.1 → 0.63.2。
-> Standard の現在の実測は **2.60MB**（x86_64、v3.0.2、2026-10-12）。
+> Standard の現在の実測は **2.64MB**（x86_64、v3.1.0、2026-10-15）。
 >
 > **2. ここに書かれたサイズは「Init が入っていないイメージ」の値。**
 > v2.0.1 までの rootfs は musl の `libc.so` も OpenRC のバイナリも
@@ -25,7 +25,7 @@
 > 起動時間ではない。`benchmark-memory.sh` も `KiB` を `0.001` に置換した
 > うえ整数 MB に丸めており、1MB 未満を 0 としか表せなかった。
 > **2026-10-10 に両方を書き直し、測り直した**（arm64 ネイティブで、
-> v3.0.1 は起動 0.61 秒 / 常駐 232KB、v3.0.2 は 0.60 秒 / 288KB → 下の比較の節）。
+> v3.0.1 は起動 0.61 秒 / 常駐 232KB、v3.0.2 は 0.60 秒 / 288KB、v3.1.0 は 0.65 秒 / 288KB → 下の比較の節）。
 > 下表の v2.0.1 列・v0.1.0 の節は当時の壊れた値なので **引用しない**。
 >
 > **4. 「実施した最適化」の節に出てくる設定ファイルのうち、`configs/openrc/` と
@@ -322,11 +322,11 @@ fs.suid_dumpable = 0
 カスタム init で 0.3秒）は、無効な計測から作った推定なので撤回する。
 カスタム init の開発は採用していない。
 
-現在分かっていること（v3.0.2、2026-10-12）:
+現在分かっていること（v3.1.0、2026-10-15）:
 
-- `docker run --rm <image> /bin/true` は 0.60 秒で、Alpine・Ubuntu（0.59 秒）と差が無い。
+- `docker run --rm <image> /bin/true` は 0.65 秒で、Alpine（0.61 秒）・Ubuntu（0.65 秒）と差が無い。
   ほとんどが Docker 自身のコンテナ生成
-- OpenRC が `default` ランレベルを完走するまでは 0.72 秒（`/bin/true` との差 約 0.12 秒が Init の分）
+- OpenRC が `default` ランレベルを完走するまでは 0.76 秒（`/bin/true` との差 約 0.11 秒が Init の分）
 
 ---
 
@@ -382,50 +382,50 @@ make benchmark-startup
 
 ---
 
-## 🔍 競合OSとの比較（2026-10-12 の実測）
+## 🔍 競合OSとの比較（2026-10-15 の実測）
 
-**測定条件:** macOS / Apple Silicon、Kimigayo v3.0.2 Standard の公開イメージ。
-起動時間・常駐メモリは **arm64 ネイティブ**、各10回の中央値（常駐メモリは 20 標本）で、
+**測定条件:** macOS / Apple Silicon、Kimigayo v3.1.0 Standard の公開イメージ。
+起動時間は **arm64 ネイティブ**、各10回の中央値、常駐メモリは 40 回読んで `0B` を捨てた 18 標本で、
 Alpine 3.24・Ubuntu 24.04 と同時に測った。
 **イメージサイズは `docker inspect` の値で、比較表は `--platform linux/amd64`**
-（Kimigayo は 2026-10-12、他は 2026-10-11 に同じホストで測った値）。
+（Kimigayo・Alpine・Ubuntu は 2026-10-15、distroless は 2026-10-11 に同じホストで測った値）。
 x86_64 の起動時間・メモリを QEMU 経由で測った値は比較に使わない。
 
 ### イメージサイズ
 
 | OS | サイズ | Kimigayo 比 |
 |----|--------|-----------|
-| `gcr.io/distroless/static-debian12` | 2.11MB | 0.81x |
-| **Kimigayo Standard (x86_64)** | **2.60MB** | 基準 |
-| Kimigayo Standard (arm64) | 2.98MB | 1.15x |
+| `gcr.io/distroless/static-debian12` | 2.11MB | 0.80x |
+| **Kimigayo Standard (x86_64)** | **2.64MB** | 基準 |
+| Kimigayo Standard (arm64) | 3.06MB | 1.16x |
 | `alpine:latest`（3.24.2） | 8.42MB | 3.2x |
-| `gcr.io/distroless/base-debian12` | 20.9MB | 8.0x |
+| `gcr.io/distroless/base-debian12` | 20.9MB | 7.9x |
 | `ubuntu:24.04` | 78.2MB | 30x |
 
-**シェルと Init を備えて 2.60MB。** distroless に 0.49MB 足すだけで
+**シェルと Init を備えて 2.64MB。** distroless に 0.53MB 足すだけで
 `sh` と 400 個のコマンドとサービス管理が付く。
 
 ### 起動時間
 
 | OS | 起動時間 |
 |----|---------|
-| **Kimigayo Standard** | 0.60秒 |
-| `alpine:latest` | 0.59秒 |
-| `ubuntu:24.04` | 0.59秒 |
+| **Kimigayo Standard** | 0.65秒 |
+| `alpine:latest` | 0.61秒 |
+| `ubuntu:24.04` | 0.65秒 |
 
-**差は出ない。100MB の Ubuntu とも同じ。**
+**差は出ない。100MB の Ubuntu とも同じ**（同じイメージでも回によって 0.55〜0.70 秒の間で前後する）。
 0.6 秒のほとんどは Docker 自身のコンテナ生成で、イメージは効かない。
 **「軽いから起動が速い」と書かないこと**（→ [CLAUDE.md](../../CLAUDE.md)）。
 
-OpenRC が `default` ランレベルを完走するまでは **0.72 秒**。
+OpenRC が `default` ランレベルを完走するまでは **0.76 秒**。
 
 ### 常駐メモリ
 
 | OS | 常駐メモリ | Kimigayo 比 |
 |----|-----------|-----------|
 | **Kimigayo Standard** | **288KB** | 基準 |
-| `alpine:latest` | 272KB | 0.94x |
-| `ubuntu:24.04` | 312KB | 1.08x |
+| `alpine:latest` | 268KB | 0.93x |
+| `ubuntu:24.04` | 316KB | 1.10x |
 
 **v3.0.1 では差の出る指標だったが、v3.0.2 で同程度になった**（v3.0.1 は 232KB）。
 BusyBox を動的リンクにしたので、`sleep` などの BusyBox のコマンドも
@@ -437,7 +437,7 @@ BusyBox を動的リンクにしたので、`sleep` などの BusyBox のコマ�
 
 ### コマンド実行性能
 
-BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.01x**（中央値の比、v3.0.2、
+BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.02x**（中央値の比、v3.1.0、
 [README.md](../../README.md) の値）。**有意差なし**。平均は 1 回の外れ値に引っ張られるので
 中央値で見る。測り方と限界は [docs/benchmarks/busybox.md](../benchmarks/busybox.md)。
 
@@ -445,7 +445,7 @@ BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.01x**（中央�
 
 | OS | サイズ | シェル | Init | パッケージマネージャー |
 |----|--------|--------|------|---------------------|
-| **Kimigayo Standard** | 2.60MB | ✅ BusyBox | ✅ OpenRC | ❌（設計方針） |
+| **Kimigayo Standard** | 2.64MB | ✅ BusyBox | ✅ OpenRC | ❌（設計方針） |
 | Distroless Static | 2.11MB | ❌ | ❌ | ❌ |
 | Alpine | 8.42MB | ✅ | ❌ | ✅ apk |
 | Ubuntu 24.04 | 78.2MB | ✅ | ❌ | ✅ apt |

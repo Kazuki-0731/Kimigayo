@@ -171,9 +171,9 @@ make ci-build-all
 docker images | grep kimigayo
 
 # 主要イメージ
-kimigayo-os:standard-x86_64    # Standard版 (2.60MB / 2026-10-12 実測)
-kimigayo-os:minimal-x86_64     # Minimal版 (2.46MB)
-kimigayo-os:extended-x86_64    # Extended版 (2.62MB)
+kimigayo-os:standard-x86_64    # Standard版 (2.64MB / 2026-10-15 実測)
+kimigayo-os:minimal-x86_64     # Minimal版 (2.34MB)
+kimigayo-os:extended-x86_64    # Extended版 (2.67MB)
 ```
 
 **使用方法:**
@@ -397,11 +397,11 @@ make ci-build-all ARCH=x86_64          # 3 バリアントを順に
 - **ホストの `make ci-build-local` は macOS では通りません**
   （musl の `configure` が `unsupported long double type` で落ちる）
 
-| バリアント | 目標（SPECIFICATION.md §8.3） | 実測（v3.0.2、x86_64 / arm64） | BusyBox アプレット |
+| バリアント | 目標（SPECIFICATION.md §8.3） | 実測（v3.1.0、x86_64 / arm64） | BusyBox アプレット |
 |-----------|------|------|------|
-| **Minimal** | < 5MB | 2.46MB / 2.83MB | 367（`vi`・`wget`・`du`・`less` が無い） |
-| **Standard** | < 15MB | 2.60MB / 2.98MB | 400 |
-| **Extended** | < 50MB | 2.62MB / 3.01MB | 411 |
+| **Minimal** | < 5MB | 2.34MB / 2.73MB | 329（`vi`・`wget`・`du`・`less` と、`httpd`・`udhcpc` などのネットワーク系が無い） |
+| **Standard** | < 15MB | 2.64MB / 3.06MB | 400 |
+| **Extended** | < 50MB | 2.67MB / 3.10MB | 411 |
 
 **3 バリアントの違いは BusyBox の config（`src/busybox/config/<variant>.config`）だけ**です。
 musl・OpenRC はどのバリアントにも同じものが入り、カーネルはどれにも入りません。
