@@ -1,0 +1,46 @@
+name: Project Sync
+
+# Issue と非公開の Project（Kimigayo Security）をそろえる。
+#
+# Issue は scripts/project-issue.py で作れば Project にも入るが、Web で作った
+# Issue・外部の人が立てた Issue・閉じた Issue はそれを通らない。Issue が
+# 変わるたびにここで sync を回し、開いている Issue を Project に入れ、閉じた
+# Issue を Done にする。sync は何度回しても同じ結果になる（冪等）ので、
+# 取りこぼしは毎日の定期実行で拾う。
+#
+# 優先度（Priority）は人が付ける。sync は付いていない Issue を一覧に出すだけ。
+
+on:
+  issues:
+    types: [opened, reopened, closed, transferred]
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+# Project への書き込みは GITHUB_TOKEN では届かないので
+# secrets.KIMIGAYO_PROJECT_TOKEN（classic PAT の project スコープだけ）を使う。
+# Issue は公開リポジトリのものを読むだけなので、このトークンで読める。
+permissions:
+  contents: read
+
+# 同時に回すと同じ Issue を二重に処理しうるので、順番に回す（取り消さない）。
+concurrency:
+  group: project-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync issues to the private Project
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Issue のタイトルや本文はスクリプトが API から読む。ここに
+      # ${{ github.event.issue.* }} を埋め込まない（外部の人が書いた文字列を
+      # シェルに渡さない）。
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ secrets.KIMIGAYO_PROJECT_TOKEN }}
+        run: python3 -I scripts/project-issue.py sync
