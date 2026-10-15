@@ -142,7 +142,7 @@ grep -rhoE 'make [a-z][a-z0-9_-]+' --include='*.md' . | grep -v '^./build' |
 - **宣伝されている仕組みの「受け取り側」を探す。** 2026-10-11 に
   `DOCKERHUB_README.md` から削除したもの: 「seccomp をデフォルトで
   有効化」（rootfs にプロファイルが無い）、「Cosign で署名」
-  （`release.yml` に工程が無い）、「再現可能ビルド＝ビット同一」
+  （`on-tag-publish-release.yml` に工程が無い）、「再現可能ビルド＝ビット同一」
   （当時はビット同一性の検証記録が無かった。※`REPRODUCIBLE_BUILD` は
   `build-system/Makefile` が設定しており、「誰も設定していない」とした当時の
   説明は誤り。rootfs の tarball のビット同一は v3.0.2 で 1 組確認済み）、「`stable` / `edge` タグ」（Docker Hub に

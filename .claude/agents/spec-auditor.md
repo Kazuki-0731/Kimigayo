@@ -154,7 +154,7 @@ grep -n 'ベアメタル\|組み込み\|VPS\|ISO' SPECIFICATION.md CLAUDE.md
 ```bash
 # 宣伝されている仕組みが本当にあるか、受け取る側を見る
 grep -rn 'seccomp' scripts/ Dockerfile* src/kernel/config/
-grep -rn -i 'sign\|cosign\|content trust' .github/workflows/release.yml
+grep -rn -i 'sign\|cosign\|content trust' .github/workflows/on-tag-publish-release.yml
 grep -rn 'REPRODUCIBLE_BUILD' Makefile build-system/Makefile scripts/
 # 宣伝しているタグが実在するか
 curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?page_size=100' |
@@ -163,7 +163,7 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 
 > 実例（2026-10-11 に全部削除）: 「seccomp-BPF をデフォルトで有効化」
 > （rootfs にプロファイルは無く、適用するのはホストの runtime）、
-> 「Cosign で署名」（`release.yml` に工程が無い）、
+> 「Cosign で署名」（`on-tag-publish-release.yml` に工程が無い）、
 > 「再現可能ビルド＝ビット同一」（当時は検証記録が無かった。
 > ※`REPRODUCIBLE_BUILD` は `build-system/Makefile` が設定しており、
 > 「どこも設定していない」とした当時の説明は誤り）、

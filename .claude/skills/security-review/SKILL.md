@@ -57,9 +57,9 @@ SCANS=vuln bash scripts/scan-image.sh <image> <variant> <arch>
 
 | どこで走るか | 何を見るか |
 | --- | --- |
-| `build-workflow.yml`（毎 push） | CVE + 秘密情報。SBOM を成果物に残す |
-| `release.yml`（Docker Hub への push 前） | CVE + 秘密情報。SBOM を GitHub Release に添付 |
-| `dependency-review.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。定期実行で失敗すると非公開の Project に項目が足される |
+| `reusable-build-and-verify-image.yml`（毎 push） | CVE + 秘密情報。SBOM を成果物に残す |
+| `on-tag-publish-release.yml`（Docker Hub への push 前） | CVE + 秘密情報。SBOM を GitHub Release に添付 |
+| `published-image-cve-scan.yml`（毎週月曜・手動） | **公開中の `latest`** の CVE + 秘密情報。定期実行で失敗すると非公開の Project に項目が足される |
 
 **照合が効いていることは古い版で確かめてあります**（BusyBox 1.36.1 /
 musl 1.2.4 / OpenRC 0.40 で既知の 12 件が出る）。
@@ -152,7 +152,7 @@ standard 400 / extended 411 アプレット（v3.0.1〜3.0.2 の minimal は 367
 
 ### 上流との差分は毎日自動で見ている（仕分けが仕事）
 
-`security.yml` の `upstream-fix-watch` が毎日 `scripts/watch-upstream-fixes.py` を回し、
+`upstream-security-watch.yml` の `upstream-fix-watch` が毎日 `scripts/watch-upstream-fixes.py` を回し、
 出荷物の 4 つ（BusyBox・musl・OpenRC・OpenRC に静的リンクした libcap）について
 次の 4 か所と Kimigayo を突き合わせる。
 
@@ -353,9 +353,10 @@ git log --all --diff-filter=A --name-only | grep -x '.env' && echo "過去にコ
 
 | ワークフロー | いつ | 何をするか |
 | --- | --- | --- |
-| `security.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（Debian・Alpine・上流 git・KEV。差分が出たら非公開の Project と Discord 通知）。**公開の Issue は立てない** |
-| `base-image-update.yml` | 毎週月曜 03:00 UTC | 上流の更新を検知して PR |
-| `dependency-review.yml` | PR、毎週月曜 04:00 UTC | `fail-on-severity: high` |
+| `upstream-security-watch.yml` | 毎日 02:00 UTC | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（Debian・Alpine・上流 git・KEV。差分が出たら非公開の Project と Discord 通知）。**公開の Issue は立てない** |
+| `component-update-pr.yml` | 毎週月曜 03:00 UTC | 上流の更新を検知して PR |
+| `on-pr-dependency-review.yml` | PR | `fail-on-severity: high` |
+| `published-image-cve-scan.yml` | 毎週月曜 04:00 UTC | 公開中の `latest` の CVE 照合。定期実行で落ちたら非公開の Project に足す |
 
 **これらが作る PR / Issue は「上流が動いた」という一次情報**なので、
 バージョン更新の起点として先に見ます。

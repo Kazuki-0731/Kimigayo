@@ -18,9 +18,9 @@ color: yellow
 
 | 起きたこと | 原因 | どこで露見したか |
 | --- | --- | --- |
-| CI が作るイメージが**全部 `variant=minimal`** と名乗っていた | `build-workflow.yml` が `--build-arg IMAGE_VARIANT` も `VERSION` も渡していなかった。`Dockerfile.runtime` の既定値がそのまま入った | LABEL 突合検査を足して初めて落ちた（それまで6ジョブ全部緑）|
-| 公開イメージの `/etc/os-release` が **`3.0.0` ではなく `dev`** になるところだった | `release.yml` の rootfs ビルドに `KIMIGAYO_VERSION` が無く、compose の既定値が使われた | **タグを打つまで分からない**。打つ直前に手で気づいた |
-| `latest-amd64` / `latest-arm64` が**永久に更新されなかった** | `release.yml` が作っていないのに `docs/RELEASE_CHECKLIST.md` は引けと書いていた | Docker Hub のタグ一覧を人が見るまで分からなかった |
+| CI が作るイメージが**全部 `variant=minimal`** と名乗っていた | `reusable-build-and-verify-image.yml` が `--build-arg IMAGE_VARIANT` も `VERSION` も渡していなかった。`Dockerfile.runtime` の既定値がそのまま入った | LABEL 突合検査を足して初めて落ちた（それまで6ジョブ全部緑）|
+| 公開イメージの `/etc/os-release` が **`3.0.0` ではなく `dev`** になるところだった | `on-tag-publish-release.yml` の rootfs ビルドに `KIMIGAYO_VERSION` が無く、compose の既定値が使われた | **タグを打つまで分からない**。打つ直前に手で気づいた |
+| `latest-amd64` / `latest-arm64` が**永久に更新されなかった** | `on-tag-publish-release.yml` が作っていないのに `docs/RELEASE_CHECKLIST.md` は引けと書いていた | Docker Hub のタグ一覧を人が見るまで分からなかった |
 
 **どれも CI は緑でした。** ビルドもテストも通り、イメージも動きます。
 **中身のメタデータだけが違う**ので、`docker images` を見ていても気づけません。
@@ -47,8 +47,8 @@ grep -n -A10 'environment:' docker-compose.yml
 ### 2. 渡す側（各ワークフロー）と突合する
 
 対象は7本:
-`build-and-verify.yml` / `release.yml` / `build-workflow.yml` / `manual-build.yml` /
-`security.yml` / `base-image-update.yml` / `dependency-review.yml`
+`on-push-and-pr-build-and-verify-all-images.yml` / `on-tag-publish-release.yml` / `reusable-build-and-verify-image.yml` / `manual-build-image-and-kernel.yml` /
+`upstream-security-watch.yml` / `component-update-pr.yml` / `published-image-cve-scan.yml` / `on-pr-dependency-review.yml`
 
 ```bash
 # docker build を叩いている箇所と、その --build-arg を並べる
@@ -60,18 +60,18 @@ grep -n -B3 -A8 'build-rootfs.sh' .github/workflows/*.yml
 
 ### 3. ワークフロー間の差分を見る
 
-**`build-and-verify.yml` で直した修正が `release.yml` に入っていないことがあります。**
+**`on-push-and-pr-build-and-verify-all-images.yml` で直した修正が `on-tag-publish-release.yml` に入っていないことがあります。**
 逆もあります。2026-10-10 の3件のうち2件はこの形でした。
 
 ```bash
 # 同じことをしている2本を並べて、片方にしか無い引数を探す
-for w in build-and-verify.yml release.yml build-workflow.yml manual-build.yml; do
+for w in on-push-and-pr-build-and-verify-all-images.yml on-tag-publish-release.yml reusable-build-and-verify-image.yml manual-build-image-and-kernel.yml; do
     echo "=== $w"
     grep -oE '\-\-build-arg [A-Z_]+' ".github/workflows/$w" | sort -u
 done
 ```
 
-**`build-workflow.yml` は `workflow_call` で他から呼ばれます。**
+**`reusable-build-and-verify-image.yml` は `workflow_call` で他から呼ばれます。**
 呼び出し側が `with:` で渡した値を、中で使っているかまで追ってください。
 `outputs:` で返している値があれば、受け取り側が使っているかも見ます。
 

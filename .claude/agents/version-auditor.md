@@ -21,7 +21,7 @@ color: orange
 いませんでした**（`config.mk` は `6.6`、`scripts/download-kernel.sh` は
 `6.6.11`、`scripts/build-kernel.sh` は `6.6.11`、
 `scripts/apply-kernel-patches.sh` は `6.6.11`、`src/kernel/build.py` の
-enum は `"6.6"`）。`dependency-review.yml` にはさらに古い
+enum は `"6.6"`）。当時の `dependency-review.yml` にはさらに古い
 `OpenRC: 0.44` が残っていました。
 
 さらに「版を上げたのに古いバイナリが使われ、しかも

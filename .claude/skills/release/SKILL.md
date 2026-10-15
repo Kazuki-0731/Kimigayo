@@ -5,7 +5,7 @@ description: リリースの準備と実行。タグを打つ前に揃えるも�
 
 # リリース
 
-**`git tag v*.*.*` を push した瞬間に `.github/workflows/release.yml` が走り、
+**`git tag v*.*.*` を push した瞬間に `.github/workflows/on-tag-publish-release.yml` が走り、
 Docker Hub の公開イメージ（`latest` を含む）が差し替わります。**
 
 **タグ・push・リリースは毎回ユーザーの明示的な承認を取ります**
@@ -57,7 +57,7 @@ make ci-build-local                                # Linux ホストのみ
 macOS では `make ci-build-local` が通りません（musl の `configure` が
 `unsupported long double type` で落ちる）。CI の結果で代替します。
 
-**CI を見ます。** `build-and-verify.yml` は 3 バリアント × 2 アーキテクチャの 6 ジョブ。
+**CI を見ます。** `on-push-and-pr-build-and-verify-all-images.yml` は 3 バリアント × 2 アーキテクチャの 6 ジョブ。
 `fail-fast: false` なので、1つ落ちても他が走ります
 （以前は `fail-fast` が兄弟ジョブを**キャンセル**して真の失敗を隠していました）。
 
@@ -113,7 +113,7 @@ CI は中身を検証しないので、実装していない機能が宣伝さ�
 ```bash
 # 宣伝している仕組みの「受け取り側」があるか
 grep -rn 'seccomp' scripts/ Dockerfile*                   # プロファイルは rootfs に入るか
-grep -rn -i 'cosign\|content trust' .github/workflows/release.yml
+grep -rn -i 'cosign\|content trust' .github/workflows/on-tag-publish-release.yml
 grep -rn 'REPRODUCIBLE_BUILD' Makefile build-system/Makefile scripts/
 # 案内しているタグが実在するか
 curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?page_size=100' |
@@ -126,7 +126,7 @@ curl -s 'https://hub.docker.com/v2/repositories/ishinokazuki/kimigayo-os/tags/?p
 > セキュリティパッチの期限も、`SECURITY_POLICY.md`（Critical 7日）より
 > 厳しい「24〜48時間」を公開面だけで約束していました。
 >
-> **Cosign は 2026-10-11 に実装しました**（`release.yml` の `sign`
+> **Cosign は 2026-10-11 に実装しました**（`on-tag-publish-release.yml` の `sign`
 > ジョブ、キーレス署名）。**効くのは v3.0.2 以降で、v3.0.1 以前の
 > 公開イメージは未署名です。** 「署名されている」と書くときは、
 > どの版からかを必ず添えてください。
@@ -170,7 +170,7 @@ git tag -a v<X.Y.Z> -m "<日本語の説明>"
 git push origin v<X.Y.Z>
 ```
 
-**`release.yml` が走り、Docker Hub の `latest` を含む公開イメージを
+**`on-tag-publish-release.yml` が走り、Docker Hub の `latest` を含む公開イメージを
 差し替えます。** 走り始めたら監視して報告します。
 
 ```bash
@@ -183,7 +183,7 @@ gh run watch
 
 ## 6. 公開されたものを実際に引いて確かめる
 
-**`release.yml` が成功した = 中身が正しい、ではありません。**
+**`on-tag-publish-release.yml` が成功した = 中身が正しい、ではありません。**
 ワークフローは「渡された値」でイメージを作るだけなので、
 渡す値が間違っていても緑になります（→ `workflow-auditor`）。
 **Docker Hub から実際に pull して中身を見ます。**
@@ -235,7 +235,7 @@ v0.1.0〜v2.0.1 の公開イメージは全部この状態でした（`0.1.0` �
 **「署名ジョブが緑」ではなく、実際に `cosign verify` が通ることを見ます。**
 
 ```bash
-# cosign は v3 以降で検証する。release.yml は v3 で署名しており、
+# cosign は v3 以降で検証する。on-tag-publish-release.yml は v3 で署名しており、
 # v3 の形式（OCI referrers）は v2 から見えず `no signatures found` になる
 # （v3.0.2 で v2.4.1 を使って一度これに引っかかった）
 docker run --rm ghcr.io/sigstore/cosign/cosign:v3.0.6 verify "ishinokazuki/kimigayo-os:<X.Y.Z>" \
@@ -283,7 +283,7 @@ SBOM（`kimigayo-<variant>-<ver>-<arch>.cdx.json`）6本、
 `kimigayo-<ver>-src.tar.gz`）の**計18ファイル**が付いていること
 （v3.0.2 は 14、v3.0.1 までは SBOM が無く 8 ファイル）。draft のままになっていないこと。
 **ソースは BusyBox（GPL-2.0）の配布条件なので、欠けたら出してはいけない**
-（`release.yml` は sources ジョブが失敗すると push しない）。
+（`on-tag-publish-release.yml` は sources ジョブが失敗すると push しない）。
 
 ---
 
