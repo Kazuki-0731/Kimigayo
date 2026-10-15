@@ -1236,7 +1236,8 @@ Subagent の方が速くて安い。3〜5人から始める。
   （2026-10-09 まで 0.1.0 止まりで、v2.0.1 までの 2 回のリリースが抜けていた）
 - **`[Unreleased]` には push した時点で区分付きで足す**（メジャー／マイナー／パッチ／
   リリースしない。区分は `SPECIFICATION.md` 10.2）。ドキュメントだけの変更でも
-  「リリースしない」に 1 行足す。項目の「次の版」で、出すかどうかと版が決まる
+  「リリースしない」に 1 行足す。項目の「次の版」で、出すかどうかと版が決まる。
+  **書き忘れは CI（`scripts/check-unreleased.py`）が止める**
 - **作業の区切りごとに `TODO.md`・`NEXT.md` を更新する。** とくに次の場合は必ず:
   - フェーズが進んだ（調査 → 変更 → ビルド検証）
   - 長時間のビルド・ベンチマークの状態が変わった
@@ -1307,7 +1308,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
+| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
 | `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら Issue と Discord）・Issue 起票 |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り、その PR ブランチで `ci.yml` を起動する |
