@@ -69,6 +69,22 @@ GitHub Actions はワークフローごとに発行されるトークンを使�
 
 ---
 
+## 非公開の Project に書き込むトークン
+
+`security.yml` と `dependency-review.yml` は、見つけた脆弱性を公開の Issue ではなく
+非公開の Project に足す（CLAUDE.md「危険度の高いものは Issue にしない」節）。
+ワークフローの `GITHUB_TOKEN` は個人の Project に届かないので、専用のトークンを
+シークレット `KIMIGAYO_PROJECT_TOKEN` に置いている。足す先の Project は
+リポジトリの変数 `KIMIGAYO_PROJECT_ID`。
+
+- **クラシックトークンで、スコープは `project` だけ。** fine-grained トークンは
+  個人の Project を扱えない。`repo` などを足さない（漏れたときに届く範囲を
+  Project だけにする）
+- **有効期限を付け、切れる前に作り直す。** 切れると Project に足せず、
+  `security.yml` の失敗が Discord に届く
+- 作り直したら `gh secret set KIMIGAYO_PROJECT_TOKEN --repo Kazuki-0731/Kimigayo`
+  （値は対話で入力し、コマンドラインに書かない）
+
 ## ブラウザで見る項目（API では確かめられない）
 
 半年に 1 回、またはトークンや端末をなくしたときに見る。
