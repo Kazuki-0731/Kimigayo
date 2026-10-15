@@ -11,7 +11,7 @@ name: Release
 #       push は build-push-action の別ビルド）
 #   - スモークの中身が /bin/sh・ls・busybox --help の3つだけ。当時の BusyBox は
 #     static-pie だったので、OpenRC も libc.so も /tmp も無くても全部通る
-#   - ビルド経路が ci.yml と違っていた（CI は make、ここは
+#   - ビルド経路が build-and-verify.yml と違っていた（CI は make、ここは
 #     build-rootfs.sh 直叩き）。CI が緑でも release が通る保証がない
 #   - matrix に fail-fast: false が無く、1セル失敗で他がキャンセルされる。
 #     push 済みのタグは残るのに create-manifest はスキップされ、
@@ -24,7 +24,7 @@ name: Release
 # いまの方針:
 #   build（x86 でクロスコンパイル）→ verify-and-push（ネイティブ
 #   ランナーでイメージ化・検証・push）。**検証したそのイメージを push する。**
-#   検証の実体は scripts/verify-image.sh で、ci.yml とローカルも同じものを呼ぶ。
+#   検証の実体は scripts/verify-image.sh で、build-and-verify.yml とローカルも同じものを呼ぶ。
 #
 # **公開するのは v*.*.* タグの push だけ。** 手動実行（workflow_dispatch）は
 # ビルドと検証（verify-image.sh・scan-image.sh）までで、Docker Hub には
@@ -98,7 +98,7 @@ jobs:
       # continue-on-error は付けない。静的解析がリリースを止められない
       # のでは意味がない。
       #
-      # ci.yml と同じく make shellcheck-scan と同じ対象を、ダイジェストで
+      # build-and-verify.yml と同じく make shellcheck-scan と同じ対象を、ダイジェストで
       # 固定したイメージで検査する。以前の ludeeus/action-shellcheck は
       # additional_files を ./scripts の中での find -name として扱うため、
       # .claude/hooks/ を検査していなかった。
@@ -160,7 +160,7 @@ jobs:
         env:
           KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
 
-      # ci.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
+      # build-and-verify.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
       # release で落ちる（逆も）ことになる。
       # カーネルはイメージに入らないので作らない。
       #

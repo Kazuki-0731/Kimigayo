@@ -47,5 +47,5 @@ jobs:
   # 「脆弱性 0 件」ではなく「スキャンしていない」ので、走らせると
   # 誤った安心を与える。そもそもこのジョブは needs: build を
   # 付けておらず、イメージが存在しない状態で走っていた。
-  # ファイルシステムスキャンは ci.yml と security.yml が担当する。
+  # ファイルシステムスキャンは build-and-verify.yml と security.yml が担当する。
   # → CLAUDE.md「セキュリティ」節、.claude/skills/security-review/

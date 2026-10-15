@@ -38,7 +38,7 @@ jobs:
       # Alpine の secdb を数えるステップは削除した（2026-10-12）。
       # jq 'length' はトップレベルのキー数（常に 6）を数えていただけで、
       # しかも Alpine のパッケージは出荷物に入らない（Alpine はビルド環境）。
-      # 出荷物の CVE は scripts/scan-image.sh が見る（ci.yml・release.yml・
+      # 出荷物の CVE は scripts/scan-image.sh が見る（build-and-verify.yml・release.yml・
       # dependency-review.yml の published-image-scan）。
 
       - name: Check musl libc updates
