@@ -14,7 +14,7 @@ export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build clean logs shell test test-docker test-func status clean-cache clean-all info
 .PHONY: docker-build docker-rebuild log-kernel log-musl log-openrc
-.PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs test-integration test-smoke ci-build-local ci-build-all
+.PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs check-unreleased test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan trivy-fs-scan shellcheck-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-busybox benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
@@ -64,6 +64,7 @@ help:
 	@echo "  make shellcheck-scan     - ShellCheckでスクリプトを静的解析"
 	@echo "  make check-links         - ドキュメントのリンク切れ検査（追跡ファイル基準）"
 	@echo "  make check-stale-docs    - 古い記述の検査（scripts/check-stale-docs.py）"
+	@echo "  make check-unreleased    - CHANGELOG の [Unreleased] と前回のタグからの変更の突合"
 	@echo ""
 	@echo "  設定方法（優先順位: コマンドライン > .env > デフォルト）:"
 	@echo "    1. .envファイルを作成: cp .env.example .env"
@@ -469,6 +470,13 @@ check-links:
 check-stale-docs:
 	@echo "=== Checking for stale statements in docs ==="
 	@python3 scripts/check-stale-docs.py
+
+# 前回のタグから公開イメージの中身に効くファイルが変わったのに、
+# CHANGELOG の [Unreleased] に区分（SPECIFICATION.md 10.2）が無いものを止める。
+# CI でも走る。
+check-unreleased:
+	@echo "=== Checking CHANGELOG [Unreleased] ==="
+	@python3 scripts/check-unreleased.py
 
 shellcheck-scan:
 	@echo "=== Running ShellCheck on scripts (severity: warning) ==="

@@ -29,6 +29,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # check-unreleased.py が前回のタグを git describe で探すため
+          fetch-depth: 0
 
       # 追跡ファイル基準でリンクを検査する。手元では .gitignore された
       # ファイルがあるせいで気づけない種類の壊れ方なので CI で止める。
@@ -39,6 +42,12 @@ jobs:
       # 規則は scripts/check-stale-docs.py の RULES にある。
       - name: Check for stale statements in docs
         run: python3 scripts/check-stale-docs.py
+
+      # 前回のタグから公開イメージの中身に効くファイルが変わったのに、
+      # CHANGELOG の [Unreleased] に区分（SPECIFICATION.md 10.2）が無ければ止める。
+      # 「次の版」と区分の食い違いも見る。
+      - name: Check CHANGELOG [Unreleased] against changes since the last tag
+        run: python3 scripts/check-unreleased.py
 
       # ローカルの make shellcheck-scan と同じ対象・同じ重大度で回す
       # （Makefile の SHELLCHECK_TARGETS）。
