@@ -942,6 +942,9 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - **Project の項目も公開の Issue と同じ形で書く**（何をするか・なぜ・恩恵・注意点・完了の条件）
 - Project に入れた公開 Issue は公開のまま。**Project を非公開にしても隠れるのは Project 独自の項目と下書きだけ**
 - **優先度も Project の項目で持つ。** 公開のラベルにすると「どれを急いでいるか」が外から読める
+- **Issue も下書きも `scripts/project-issue.py` で作る**（`issue` / `draft` / `set` / `sync`）。
+  Issue を作ると同時に Project に入れて Priority を付ける。同じタイトルなら作らずに直す（冪等）。
+  Web で作った Issue や閉じた Issue は `project-sync.yml` が拾う。`gh issue create` を直接使わない
 
 ---
 
@@ -1058,7 +1061,7 @@ make check-stale-docs   # 一度直した古い記述が戻っていないか（
 
 | Hook | いつ | 何をするか |
 | --- | --- | --- |
-| `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`reset --hard`／`filter-branch`・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add をブロック |
+| `guard-bash.sh` | PreToolUse(Bash) | リリースタグ・Docker Hub push・force push・rebase・`reset --hard`／`filter-branch`・`clean-all`・ダウンロードキャッシュ削除・`COPYFILE_DISABLE` なしの `tar`（macOS）・`.env` の add・`gh issue create` の直接実行（`scripts/project-issue.py` を使わせる）をブロック |
 | `guard-memo-files.sh` | PreToolUse(Bash) | メモ・下書きのファイルの `git add` / `git commit` をブロック（→「メモは機密扱いにする」節） |
 | `guard-edit-during-build.sh` | PreToolUse(Edit\|Write\|MultiEdit) | ビルドコンテナが走っている間の `scripts/`・`build-system/` の編集をブロック（bash は実行中のスクリプトを読み進めるため）。見るのはビルド環境のコンテナ（イメージ `kimigayo-os-build`・名前 `kimigayo-build-env`・compose のサービス `kimigayo-build`）だけで、`kimigayo-os:*` で動かす計測・テストのコンテナには反応しない |
 | `after-edit.sh` | PostToolUse(Edit\|Write\|MultiEdit) | `.sh` の構文エラーをブロック。`versions.mk` を触ったら連動先を出す。`-Wno-error` や `\|\| true` を**新しく足したら**指摘する |
@@ -1332,6 +1335,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら非公開の Project と Discord。公開の Issue は立てない） |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `ci.yml` を起動する |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
+| `project-sync.yml` | Issue の作成・再開・クローズ、毎日 02:30 UTC、手動 | 開いている Issue を非公開の Project に入れ、閉じた Issue を Done にする（`scripts/project-issue.py sync`） |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
 | `manual-build.yml` | 手動のみ | variant / arch を選んでビルド。**カーネルを CI で作る唯一の経路**（`build_kernel=true`） |
 
