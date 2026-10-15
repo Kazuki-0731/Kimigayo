@@ -230,7 +230,7 @@ Docker イメージを、クラウド上のコンテナで動かす** — これ
 > 不要になっていた。`manual-build.yml` を `build_kernel=true` で
 > 両アーキに回して確認済み（x86_64/GCC 27分・arm64/LLVM 53分、
 > どちらも `vmlinuz-6.18.55-*` を生成してイメージ検証も通過）。
-> **`ci.yml` はカーネルを作らないので、緑でも検証にならない。**
+> **`build-and-verify.yml` はカーネルを作らないので、緑でも検証にならない。**
 >
 > **Kconfig の `|| true` は 2026-10-12 に外した**（`run_kconfig` が
 > 失敗したらログの末尾を出して止める）。`manual-build.yml` を
@@ -575,7 +575,7 @@ make benchmark             # 全ベンチマーク
 
 ### カーネルは CI で作らない
 
-**`ci.yml` はカーネルをビルドしない。** 2026-10-10 に決めた。
+**`build-and-verify.yml` はカーネルをビルドしない。** 2026-10-10 に決めた。
 
 - **理由は、成果物に入らないものを検証していたから。** Kimigayo の成果物は
   rootfs だけを詰めた Docker イメージで、コンテナはホストのカーネルで動く。
@@ -596,9 +596,9 @@ make benchmark             # 全ベンチマーク
 | --- | --- |
 | 手元でカーネルを作る | `docker compose run --rm kimigayo-build make kernel TARGET_ARCH=x86_64`（数十分〜数時間）。**ホストの `make kernel` は存在しない** |
 | CI でカーネルを作る | Actions から `manual-build.yml` を `build_kernel=true` で実行 |
-| カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`ci.yml` は通っても検証にならない** |
+| カーネルの版を上げる | `versions.mk` を更新 → 上の2つで確認する。**`build-and-verify.yml` は通っても検証にならない** |
 
-**カーネル関連の変更をしたときは、`ci.yml` が緑でも「カーネルは見ていない」。**
+**カーネル関連の変更をしたときは、`build-and-verify.yml` が緑でも「カーネルは見ていない」。**
 `versions.mk` の `KERNEL_VERSION` や `src/kernel/` を触ったら、
 手で `manual-build.yml` を回すか、コンテナ内で `make kernel` を通す。
 
@@ -914,7 +914,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - **外部 Action は tag で固定する。** `@master` 参照は供給網のリスクかつ
   再現性がない（2026-10-09 に `trivy-action`・`action-shellcheck` を固定した）。
   ShellCheck は 2026-10-13 に Action をやめ、ダイジェストで固定した
-  `koalaman/shellcheck` を `ci.yml`・`release.yml` から直接 `docker run` している
+  `koalaman/shellcheck` を `build-and-verify.yml`・`release.yml` から直接 `docker run` している
   （`ludeeus/action-shellcheck` は `.claude/hooks` を実際には検査していなかった）
 - 脆弱性の報告・運用は [docs/security/](docs/security/) 配下
   （`SECURITY_POLICY.md`・`VULNERABILITY_REPORTING.md`・`HARDENING_GUIDE.md`）
@@ -1004,7 +1004,7 @@ make check-links        # scripts/check-links.py（#見出し へのリンク切
 make check-stale-docs   # 一度直した古い記述が戻っていないか（scripts/check-stale-docs.py の RULES）
 ```
 
-`ci.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
+`build-and-verify.yml` でも走る。ファイルシステムの存在で判定するスクリプトを
 書かないこと（それでは今回の件を検知できない）。
 
 経緯をドキュメントに残したいときは、メモにリンクするのではなく
@@ -1198,7 +1198,7 @@ Subagent の方が速くて安い。3〜5人から始める。
 - **修正したら push するまでが1セット。** コミットだけして
   「承認待ち」で止めない。直した結果が GitHub に出ていなければ、
   ユーザーから見れば直っていないのと同じ。
-  `main` への push が起こすのは `ci.yml` だけで、公開物は変わらない。
+  `main` への push が起こすのは `build-and-verify.yml` だけで、公開物は変わらない。
 - **承認を取るのは「外に出て取り消せないもの」だけ。**
   **`v*.*.*` タグの作成と push**（`release.yml` が走り、Docker Hub の
   公開イメージを `latest` ごと差し替える）と、**Docker Hub への直接 push**。
@@ -1330,10 +1330,10 @@ Subagent の方が速くて安い。3〜5人から始める。
 
 | ワークフロー | いつ走るか | 何をするか |
 | --- | --- | --- |
-| `ci.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
+| `build-and-verify.yml` | `main` への push・PR、手動（`base-image-update.yml` が更新 PR のブランチで起動する） | ShellCheck（`scripts/`・`scripts/lib/`・`.claude/hooks/`） → リンク検査（`#見出し` も） → 古い記述の検査 → `[Unreleased]` の突合 → pytest → variant × arch の matrix でビルドとイメージ検証（**カーネルは作らない**） |
 | `release.yml` | `v*.*.*` タグ、手動 | **Docker Hub へ公開**・Cosign 署名・GitHub Release 作成（**公開はタグのときだけ**。手動実行はビルド・検証・スキャン・SBOM と対応するソースの保存までで push しない）。**BusyBox は GPL-2.0 なので、対応するソース（`collect-sources.sh`）を集められなければ公開しない** |
 | `security.yml` | 毎日 02:00 UTC、手動 | 構成要素の版確認・脆弱性スキャン・**上流のセキュリティ情報との差分**（`watch-upstream-fixes.py`。差分が出たら非公開の Project と Discord。公開の Issue は立てない） |
-| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `ci.yml` を起動する |
+| `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR を作り（`versions.mk` と CHANGELOG の `[Unreleased]` に区分付きの 1 行。`scripts/add-unreleased.py`）、その PR ブランチで `build-and-verify.yml` を起動する |
 | `dependency-review.yml` | PR、毎週月曜 04:00 UTC | 依存レビュー（`fail-on-severity: high`） |
 | `project-sync.yml` | Issue の作成・再開・クローズ、毎日 02:30 UTC、手動 | 開いている Issue を非公開の Project に入れ、閉じた Issue を Done にする（`scripts/project-issue.py sync`） |
 | `build-workflow.yml` | 他から `workflow_call` | 再利用可能なビルド本体 |
