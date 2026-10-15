@@ -69,9 +69,9 @@ NVD の CPE で照合する `scan-image.sh` では見えない修正（Alpine・
 | --- | --- | --- |
 | Minimal | 2.34MB | 2.73MB |
 | Standard | 2.64MB | 3.06MB |
-| Extended | 2.67MB | 3.09MB |
+| Extended | 2.67MB | 3.10MB |
 
-（CI でビルドしたイメージの値。v3.0.2 は Minimal 2.46 / 2.82MB、Standard 2.59 / 2.97MB、
+（公開イメージを 2026-10-15 に測った値。v3.0.2 は Minimal 2.46 / 2.83MB、Standard 2.60 / 2.98MB、
 Extended 2.62 / 3.01MB。Minimal はアプレットを減らした分小さく、Standard / Extended は
 ライセンス文書・パッチ・arm64 の FORTIFY の分わずかに大きくなりました）
 
