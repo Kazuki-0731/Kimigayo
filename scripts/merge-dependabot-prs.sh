@@ -125,5 +125,5 @@ for n in $ready; do
 done
 
 log_info "Merged: ${merged}, not merged: ${failed}"
-log_info "Next: git pull origin main (ci.yml runs on the merge commits)"
+log_info "Next: git pull origin main (build-and-verify.yml runs on the merge commits)"
 [ "$failed" -eq 0 ]

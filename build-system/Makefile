@@ -193,7 +193,7 @@ build: musl kernel busybox init rootfs
 # Docker イメージにカーネルは入らない（コンテナはホストのカーネルで
 # 動く）。カーネルをビルドするのはベアメタル／QEMU 検証のためなので、
 # musl / BusyBox / OpenRC の変更を確かめたいだけならこれで足りる。
-# CI（ci.yml・release.yml）は常にこちらを使う。カーネルを CI で作るのは
+# CI（build-and-verify.yml・release.yml）は常にこちらを使う。カーネルを CI で作るのは
 # manual-build.yml を build_kernel=true で回したときだけ。
 build-no-kernel: musl busybox init rootfs
 	@echo ""

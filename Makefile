@@ -445,7 +445,7 @@ trivy-fs-scan:
 	@trivy fs --severity CRITICAL,HIGH,MEDIUM --scanners vuln,config,secret,license .
 
 # ShellCheckで静的解析
-# CI の shellcheck ジョブ（ci.yml / release.yml。ダイジェスト固定の
+# CI の shellcheck ジョブ（build-and-verify.yml / release.yml。ダイジェスト固定の
 # koalaman/shellcheck を docker run、severity: warning）と同じ条件でローカルに回す。
 # shellcheck が入っていなければ Docker イメージで代替する
 # （ビルド環境イメージにも Alpine の shellcheck は入っていない）。
