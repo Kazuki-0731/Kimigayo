@@ -1,0 +1,37 @@
+name: Dependency Review (PR)
+
+# PR で増える依存の脆弱性を見る（actions/dependency-review-action）。
+# High 以上があれば PR を落とし、結果を PR にコメントする。
+#
+# 2026-10-16 まで dependency-review.yml に、毎週の公開イメージの CVE 照合と
+# リポジトリの Trivy も同居していた。性格が違うので分けた:
+#   - 公開イメージの CVE 照合 → published-image-cve-scan.yml
+#   - シェルスクリプトの http:// と eval の点検 → on-push-and-pr-build-and-verify-all-images.yml
+#   - リポジトリの Trivy → upstream-security-watch.yml（毎日）と push ごとの検査に任せた
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dependency-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always

@@ -72,6 +72,45 @@ jobs:
             --severity=warning \
             scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh
 
+      # シェルスクリプトの静的な点検。**当たれば落とす。**
+      #
+      # 以前は毎回 ⚠️ を出しながら一度も失敗しない作りで、
+      # check-links.py のコメント中の http:// と versions.sh の eval に
+      # 毎回当たっていた。警告が常に出るので「✅」も「⚠️」も意味を持たなかった。
+      #
+      # いまはコメント行を除いたシェルスクリプトだけを見て、既知の安全な
+      # 箇所だけを許可リストで外す。秘密情報の検出は Trivy
+      # （security-scan ジョブ・upstream-security-watch.yml）と scripts/scan-image.sh が
+      # 受け持つので、ここではやらない。
+      # 2026-10-16 まで dependency-review.yml で週 1 回だけ回していた。スクリプトの
+      # 書き方の点検なので、ShellCheck と同じく push ごとに回す。
+      - name: Check shell scripts for insecure downloads and eval
+        run: |
+          set -euo pipefail
+          files=(scripts/*.sh scripts/lib/*.sh .claude/hooks/*.sh)
+          found=0
+
+          # コメント行（先頭が #）を除いた http://（ループバックは除く。
+          # verify-image.sh はイメージの中で httpd を立てて 127.0.0.1 に繋ぐ）
+          if grep -nE 'http://' "${files[@]}" \
+               | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+               | grep -vE 'http://(localhost|127\.0\.0\.1)[:/]'; then
+            echo "::error::http:// の URL がある（https にする）"
+            found=1
+          fi
+
+          # eval。許可リスト:
+          #   scripts/lib/versions.sh — versions.mk の "NAME ?= value" を
+          #   sed で NAME="${NAME:-value}" に変換したものだけを eval する
+          if grep -nwE 'eval' "${files[@]}" \
+               | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+               | grep -vE '^scripts/lib/versions\.sh:'; then
+            echo "::error::eval がある（必要なら理由を書いて許可リストに足す）"
+            found=1
+          fi
+
+          exit "$found"
+
   # pytest はビルド結果に依存しないので matrix から外す。
   # 以前は build ジョブの make test と独立した test ジョブの両方で
   # 走っており、1 run で 12 回（6 セル × 2）同じテストを回していた。
