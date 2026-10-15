@@ -180,8 +180,10 @@ Discord に失敗を送る。手元では `/status` に同じ結果が出る。
    追随が遅れることがある）
 4. 状態を付ける: `patched` / `fixed-upstream` / `not-affected` / `todo`（修正あり・
    取り込み待ち）/ `watching`（修正がどこにも無い）/ `accepted` / `unknown`
-5. `watching` にしたら追跡 Issue を立て、`HARDENING_GUIDE.md`・`CHANGELOG.md` に
-   既知の問題として書く（例: #121）
+5. `watching` / `todo` にしたら、**追跡は非公開の Project の下書きに置く。公開の
+   Issue にしない**（CLAUDE.md「危険度の高いものは Issue にしない」節。#121 は
+   このルールの前に公開で立てたもの）。利用者に知らせる（`HARDENING_GUIDE.md`・
+   `CHANGELOG.md` の既知の問題）のは、回避策か修正を出すときにする
 
 **取り込んだら:** パッチを `src/<component>/patches/` に CVE ID 入りの名前で
 置き（`PATCHED_CVES` に載る）、再現手順があれば `verify-image.sh` の回帰テストにし、
