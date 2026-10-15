@@ -23,7 +23,7 @@ RUN mkdir -p /stage/usr/sbin /stage/usr/lib /stage/etc/nginx \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Nginx web server on Kimigayo OS"

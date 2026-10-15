@@ -27,7 +27,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
 # 入れてから COPY する（→ README.md「Use your own Node.js application」）。
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Node.js runtime on Kimigayo OS"
