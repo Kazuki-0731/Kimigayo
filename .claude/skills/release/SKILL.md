@@ -18,9 +18,11 @@ Docker Hub の公開イメージ（`latest` を含む）が差し替わります
 ## 0. 出すか・どの版にするかを決める
 
 **[SPECIFICATION.md](../../../SPECIFICATION.md) の「10.2 バージョニングと
-リリースの方針」に従う。** 前回のタグからの変更を
-`git log --oneline <前回のタグ>..main` で並べ、それぞれをメジャー／マイナー／パッチ／
-リリースしないに振り分ける。
+リリースの方針」に従う。** 振り分けは `CHANGELOG.md` の `[Unreleased]` に
+区分ごとに溜まっているので、まずそこの「次の版」を読む。
+そのうえで `git log --oneline <前回のタグ>..main` と突き合わせ、
+**`[Unreleased]` に書かれていない変更が無いか**を確かめる（書き漏れは
+ここで区分を付けて足す）。
 
 - **リリースしないものしか無ければ出さない。** CI・ドキュメント・スクリプト・
   カーネルだけの変更なら、ユーザーに「出す理由が無い」と伝える
@@ -96,7 +98,7 @@ done
 
 | ファイル | 何を書くか |
 | --- | --- |
-| `CHANGELOG.md` | `[Unreleased]` を新しい版見出しに移す。**手で書く**（`make changelog` は `build/` に下書きを出すだけ。`CHANGELOG.md` は書き換えない） |
+| `CHANGELOG.md` | `[Unreleased]` の区分ごとの項目を新しい版見出しに移し、Security / Removed / Fixed / Changed / Added に並べ直す。`[Unreleased]` は空の雛形（区分の見出しと「次の版: なし」）に戻す。**手で書く**（`make changelog` は `build/` に下書きを出すだけ。`CHANGELOG.md` は書き換えない） |
 | `RELEASE_NOTES.md` | 利用者向けの要点 |
 | `versions.mk` | 構成要素の版（プロジェクト版は `git describe` 由来） |
 | `Dockerfile` の `LABEL version` | 実態とずれていた前例あり |
