@@ -667,6 +667,24 @@ if in_image "busybox --list" | grep -qx wget; then
     fi
 fi
 
+# **httpd のリバースプロキシ（P: 行）が動かないか（CVE-2026-88829）。**
+# パイプライン化した 2 本目のリクエストがパスの書き換えを受けずに中継される。
+# 上流・Debian・Alpine に修正が無いので、FEATURE_HTTPD_PROXY を外した
+# （2026-10-15。v3.1.0 の standard / extended では既定値 y で動いていた）。
+# 裏側の httpd に置いたファイルが、P: を書いた表側の httpd から取れなければよい。
+if in_image "busybox --list" | grep -qx httpd; then
+    out="$(in_image 'mkdir -p /tmp/pb/pub /tmp/pf && echo PROXIED > /tmp/pb/pub/a.txt &&
+        echo "P:/pub/:http://127.0.0.1:18082/pub/" > /tmp/pf.conf &&
+        httpd -p 127.0.0.1:18082 -h /tmp/pb && httpd -p 127.0.0.1:18081 -h /tmp/pf -c /tmp/pf.conf &&
+        sleep 1; wget -q -O - http://127.0.0.1:18081/pub/a.txt 2>&1; echo "rc=$?"')"
+    if printf '%s\n' "$out" | grep -qx PROXIED; then
+        fail "httpd still proxies P: requests (CONFIG_FEATURE_HTTPD_PROXY is enabled)"
+        show_output "$out"
+    else
+        pass "httpd has no reverse proxy (CVE-2026-88829)"
+    fi
+fi
+
 # **細工した .bz2 でメモリを壊さないか（bunzip2 の runCnt の桁あふれ）。**
 # 上流の検査用サンプルで、v3.0.2 の bzcat は segfault（rc=139）した。
 # 修正後は "bunzip error -5" で止まる。
