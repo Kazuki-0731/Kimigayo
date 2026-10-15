@@ -17,11 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added に並べ直し、この節を空の雛形に戻す
 -->
 
-**次の版: なし**（公開イメージの中身を変える変更がまだ無い）
+**次の版: マイナー（3.2.0）**
 
 ### メジャー
 
 ### マイナー
+
+- **Standard / Extended の httpd からリバースプロキシ（`httpd.conf` の `P:` 行）を外した**
+  （`CONFIG_FEATURE_HTTPD_PROXY=n`）。パイプライン化したリクエストがパスの制限を回避できる
+  CVE-2026-88829 に、上流・Debian・Alpine の修正が無いため。プロキシは nginx などに任せる。
+  `verify-image.sh` が、`P:` を書いても中継されないことを見る
 
 ### パッチ
 
