@@ -1,4 +1,4 @@
-name: Release
+name: Publish Release (tag)
 
 # タグを push すると Docker Hub の公開イメージを差し替える。
 #
@@ -11,7 +11,7 @@ name: Release
 #       push は build-push-action の別ビルド）
 #   - スモークの中身が /bin/sh・ls・busybox --help の3つだけ。当時の BusyBox は
 #     static-pie だったので、OpenRC も libc.so も /tmp も無くても全部通る
-#   - ビルド経路が build-and-verify.yml と違っていた（CI は make、ここは
+#   - ビルド経路が on-push-and-pr-build-and-verify-all-images.yml と違っていた（CI は make、ここは
 #     build-rootfs.sh 直叩き）。CI が緑でも release が通る保証がない
 #   - matrix に fail-fast: false が無く、1セル失敗で他がキャンセルされる。
 #     push 済みのタグは残るのに create-manifest はスキップされ、
@@ -24,7 +24,7 @@ name: Release
 # いまの方針:
 #   build（x86 でクロスコンパイル）→ verify-and-push（ネイティブ
 #   ランナーでイメージ化・検証・push）。**検証したそのイメージを push する。**
-#   検証の実体は scripts/verify-image.sh で、build-and-verify.yml とローカルも同じものを呼ぶ。
+#   検証の実体は scripts/verify-image.sh で、on-push-and-pr-build-and-verify-all-images.yml とローカルも同じものを呼ぶ。
 #
 # **公開するのは v*.*.* タグの push だけ。** 手動実行（workflow_dispatch）は
 # ビルドと検証（verify-image.sh・scan-image.sh）までで、Docker Hub には
@@ -98,7 +98,7 @@ jobs:
       # continue-on-error は付けない。静的解析がリリースを止められない
       # のでは意味がない。
       #
-      # build-and-verify.yml と同じく make shellcheck-scan と同じ対象を、ダイジェストで
+      # on-push-and-pr-build-and-verify-all-images.yml と同じく make shellcheck-scan と同じ対象を、ダイジェストで
       # 固定したイメージで検査する。以前の ludeeus/action-shellcheck は
       # additional_files を ./scripts の中での find -name として扱うため、
       # .claude/hooks/ を検査していなかった。
@@ -160,7 +160,7 @@ jobs:
         env:
           KIMIGAYO_VERSION: ${{ needs.meta.outputs.version }}
 
-      # build-and-verify.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
+      # on-push-and-pr-build-and-verify-all-images.yml と同じ入口を使う。経路が分かれていると、CI が緑でも
       # release で落ちる（逆も）ことになる。
       # カーネルはイメージに入らないので作らない。
       #
@@ -200,7 +200,7 @@ jobs:
           # root 権限で固める（/etc/shadow を読むため）。
           # --numeric-owner でホストのユーザー名を埋め込まない。
           # 並び順・mtime（コミット時刻）・gzip のヘッダを固定する（再現可能ビルド。
-          # build-workflow.yml と同じ）
+          # reusable-build-and-verify-image.yml と同じ）
           epoch="$(git log -1 --format=%ct)"
           sudo tar -C build/rootfs --sort=name --mtime="@${epoch}" \
             --owner=0 --group=0 --numeric-owner -cf - . \

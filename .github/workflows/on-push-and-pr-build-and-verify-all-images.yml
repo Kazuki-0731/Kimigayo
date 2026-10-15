@@ -1,4 +1,4 @@
-name: Build and Verify
+name: Build and Verify All Images (push / PR)
 
 # main への push と PR のたびに、文書・スクリプトの点検、pytest、
 # 全バリアント × 両アーキのビルドとイメージ検証を回す（公開はしない）。
@@ -9,7 +9,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # base-image-update.yml が作る更新 PR のブランチで CI を回すため。
+  # component-update-pr.yml が作る更新 PR のブランチで CI を回すため。
   # GITHUB_TOKEN で作った PR・push ではワークフローが起動しない
   # （workflow_dispatch だけは例外）ので、あちらが明示的にここを起動する。
   workflow_dispatch:
@@ -145,7 +145,7 @@ jobs:
   # カーネルをビルドしたいときは次のどちらかで行う:
   #   - ローカル: `docker compose run --rm kimigayo-build make kernel TARGET_ARCH=<arch>`
   #     （kernel ターゲットはコンテナ側の build-system/Makefile にしかない）
-  #   - CI: Actions から manual-build.yml を build_kernel=true で実行
+  #   - CI: Actions から manual-build-image-and-kernel.yml を build_kernel=true で実行
   build-and-verify:
     name: Build and Verify
     needs: [shellcheck]
@@ -158,7 +158,7 @@ jobs:
       matrix:
         variant: [minimal, standard, extended]
         arch: [x86_64, arm64]
-    uses: ./.github/workflows/build-workflow.yml
+    uses: ./.github/workflows/reusable-build-and-verify-image.yml
     with:
       variant: ${{ matrix.variant }}
       arch: ${{ matrix.arch }}

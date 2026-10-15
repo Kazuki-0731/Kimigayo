@@ -1,4 +1,4 @@
-name: Reusable Build Workflow
+name: "Reusable: Build and Verify Image"
 
 # ビルドして、イメージにして、**実際に実行して検証する**。
 #
@@ -46,7 +46,7 @@ jobs:
   build:
     name: Build ${{ inputs.variant }} ${{ inputs.arch }}${{ inputs.build_kernel && ' (+kernel)' || '' }}
     runs-on: ubuntu-latest
-    # 実測の最長は arm64 の 59 分（manual-build.yml を build_kernel=true で
+    # 実測の最長は arm64 の 59 分（manual-build-image-and-kernel.yml を build_kernel=true で
     # 回したとき、c851a25、2026-10-12）。カーネル抜きの CI はこれより大幅に短い。
     # 既定の 360 分だとハングしたときに 6 時間占有する。
     # timeout-minutes に式を書くのは対応が怪しいので定数にしてある。

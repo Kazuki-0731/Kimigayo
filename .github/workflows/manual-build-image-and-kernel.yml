@@ -1,4 +1,4 @@
-name: Manual Build
+name: Manual Build (image / kernel)
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ on:
 jobs:
   build:
     name: Build
-    uses: ./.github/workflows/build-workflow.yml
+    uses: ./.github/workflows/reusable-build-and-verify-image.yml
     with:
       variant: ${{ inputs.variant }}
       arch: ${{ inputs.arch }}
@@ -39,7 +39,7 @@ jobs:
 
   # security ジョブは外した。
   # 当時の make security-scan は trivy-scan（イメージスキャン）を含んでいたが
-  # （2026-10-11 に scan-image へ置き換え。いまは build-workflow.yml が
+  # （2026-10-11 に scan-image へ置き換え。いまは reusable-build-and-verify-image.yml が
   # 秘密情報と CVE の照合（scripts/scan-image.sh）を走らせる）、
   # Kimigayo は scratch 上の手組み rootfs でパッケージデータベースを
   # 持たないため Trivy は対象を1つも識別できない（実測で
@@ -47,5 +47,5 @@ jobs:
   # 「脆弱性 0 件」ではなく「スキャンしていない」ので、走らせると
   # 誤った安心を与える。そもそもこのジョブは needs: build を
   # 付けておらず、イメージが存在しない状態で走っていた。
-  # ファイルシステムスキャンは build-and-verify.yml と security.yml が担当する。
+  # ファイルシステムスキャンは on-push-and-pr-build-and-verify-all-images.yml と upstream-security-watch.yml が担当する。
   # → CLAUDE.md「セキュリティ」節、.claude/skills/security-review/
