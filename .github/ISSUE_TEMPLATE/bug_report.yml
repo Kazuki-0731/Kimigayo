@@ -54,7 +54,7 @@ body:
     attributes:
       label: Kimigayo OS Version
       description: "Output of: cat /etc/os-release"
-      placeholder: "e.g., 3.0.2"
+      placeholder: "e.g., 3.1.0"
     validations:
       required: true
 

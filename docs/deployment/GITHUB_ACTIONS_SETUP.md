@@ -51,7 +51,7 @@ GitHub Actions を動かすために、**リポジトリ側で用意するもの
 ### タグの push（通常のリリース）
 
 ```bash
-git tag -a v3.0.3 -m "Release v3.0.3"   # 例。2026-10-12 時点の最新は v3.0.2
+git tag -a v3.1.1 -m "Release v3.1.1"   # 例。2026-10-15 時点の最新は v3.1.0
 git push origin v3.0.3
 ```
 

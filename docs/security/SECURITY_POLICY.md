@@ -133,7 +133,7 @@ Cosign のキーレス署名（Sigstore OIDC）をしています。v3.0.1 以�
 **検証には cosign v3 以上が必要です**（v2 では `no signatures found` になります）。
 
 ```bash
-cosign verify ishinokazuki/kimigayo-os:3.0.2 \
+cosign verify ishinokazuki/kimigayo-os:3.1.0 \
   --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```

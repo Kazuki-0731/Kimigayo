@@ -138,7 +138,7 @@ docker run -d \
   --name kimigayo-target \
   --network pentest-network \
   --cap-drop=ALL \
-  ishinokazuki/kimigayo-os:3.0.2 sleep infinity
+  ishinokazuki/kimigayo-os:3.1.0 sleep infinity
 
 # 3. 攻撃用コンテナの起動（Kali Linux）
 docker run -d \

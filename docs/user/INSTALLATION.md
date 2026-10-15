@@ -114,7 +114,7 @@ spec:
     spec:
       containers:
       - name: kimigayo-os
-        image: ishinokazuki/kimigayo-os:3.0.2
+        image: ishinokazuki/kimigayo-os:3.1.0
         # 既定の /bin/sh は入力が無いとすぐ終了し CrashLoopBackOff になる。
         # 実際にはアプリのイメージと、そのコマンドを指定する
         command: ["sleep", "infinity"]
@@ -160,7 +160,7 @@ systemd から起動したい場合は、Podman の Quadlet（`.container` フ�
 ```ini
 # /etc/containers/systemd/kimigayo-app.container
 [Container]
-Image=docker.io/ishinokazuki/kimigayo-os:3.0.2
+Image=docker.io/ishinokazuki/kimigayo-os:3.1.0
 Exec=sleep infinity
 
 [Install]
@@ -180,7 +180,7 @@ systemctl start kimigayo-app
 `/etc/hostname` を書き換えてもホスト名は変わりません。
 
 ```bash
-docker run -it --hostname kimigayo ishinokazuki/kimigayo-os:3.0.2
+docker run -it --hostname kimigayo ishinokazuki/kimigayo-os:3.1.0
 ```
 
 **タイムゾーンのデータベースは入っていません。** `/usr/share/zoneinfo` が
@@ -191,7 +191,7 @@ docker run -it --hostname kimigayo ishinokazuki/kimigayo-os:3.0.2
 FROM alpine:3.24 AS tz
 RUN apk add --no-cache tzdata
 
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 ENV TZ=Asia/Tokyo
 ```
@@ -237,7 +237,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 ```
 

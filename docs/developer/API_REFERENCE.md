@@ -142,7 +142,7 @@ depend() {
 （`net.*` の多く）はランタイム側で指定します。
 
 ```bash
-docker run --sysctl net.ipv4.ip_forward=1 ishinokazuki/kimigayo-os:3.0.2
+docker run --sysctl net.ipv4.ip_forward=1 ishinokazuki/kimigayo-os:3.1.0
 ```
 
 イメージには `/etc/sysctl.d/99-kimigayo-performance.conf` が入っていますが、
@@ -320,7 +320,7 @@ WORKDIR /build
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags '-s -w' -o app .
 
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /build/app /usr/local/bin/app
 CMD ["/usr/local/bin/app"]
 ```

@@ -43,7 +43,7 @@ RULES = [
     (r"kimigayo-os\.org", None,
      "kimigayo-os.org というドメインは存在しない。報告は GitHub Security Advisories"),
     (r"ishinokazuki/kimigayo-os:(0\.1\.0|stable|edge|standard|minimal|extended)\b", None,
-     "Docker Hub に存在しないタグ。latest-<variant> か <版>-<variant>（例 3.0.2-standard）。\n"
+     "Docker Hub に存在しないタグ。latest-<variant> か <版>-<variant>（例 3.1.0-standard）。\n"
      "    手元でビルドしたイメージ名（kimigayo-os:standard-x86_64）は対象外"),
     (r"docker-compose (run|build|up|down|exec|logs)\b", None,
      "docker-compose（v1）は EOL。docker compose を使う"),

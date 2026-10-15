@@ -52,7 +52,7 @@ docker run -it --hostname my-server ishinokazuki/kimigayo-os:latest
 # docker-compose.yml
 services:
   app:
-    image: ishinokazuki/kimigayo-os:3.0.2
+    image: ishinokazuki/kimigayo-os:3.1.0
     hostname: my-server
 ```
 
@@ -93,7 +93,7 @@ FROM alpine:3.24 AS tz
 RUN apk add --no-cache tzdata
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=tz /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 ENV TZ=Asia/Tokyo
 ```
@@ -153,7 +153,7 @@ docker run -it --network kimigayo-net --ip 192.168.100.10 \
 # docker-compose.yml
 services:
   app:
-    image: ishinokazuki/kimigayo-os:3.0.2
+    image: ishinokazuki/kimigayo-os:3.1.0
     networks:
       kimigayo-net:
         ipv4_address: 192.168.100.10
@@ -214,11 +214,11 @@ OpenRC が起動していない状態で叩くと、こう警告されて失敗�
 
 ```bash
 docker run -d --name myapp --entrypoint /sbin/init \
-  ishinokazuki/kimigayo-os:3.0.2
+  ishinokazuki/kimigayo-os:3.1.0
 ```
 
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY myservice /etc/init.d/myservice
 RUN chmod +x /etc/init.d/myservice && rc-update add myservice default
 CMD ["/sbin/init"]
@@ -522,12 +522,12 @@ docker stats
 ```bash
 # ボリュームのバックアップ（ホスト側で実行）
 docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
-  ishinokazuki/kimigayo-os:3.0.2 \
+  ishinokazuki/kimigayo-os:3.1.0 \
   tar czf /backup/data-backup.tar.gz -C /data .
 
 # 復元
 docker run --rm -v myapp-data:/data -v "$PWD:/backup" \
-  ishinokazuki/kimigayo-os:3.0.2 \
+  ishinokazuki/kimigayo-os:3.1.0 \
   tar xzf /backup/data-backup.tar.gz -C /data
 ```
 
@@ -556,7 +556,7 @@ docker inspect <container-id> --format '{{.State.ExitCode}} {{.State.Error}}'
 
 ```bash
 # シェルで中を調べる
-docker run -it --entrypoint /bin/sh ishinokazuki/kimigayo-os:3.0.2
+docker run -it --entrypoint /bin/sh ishinokazuki/kimigayo-os:3.1.0
 ```
 
 ### ネットワークに接続できない

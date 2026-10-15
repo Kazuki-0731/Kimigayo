@@ -251,7 +251,7 @@ docker run --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
   --tmpfs /var/tmp:rw,noexec,nosuid,nodev,size=16m \
   --tmpfs /run:rw,noexec,nosuid,nodev \
-  ishinokazuki/kimigayo-os:3.0.2 <command>
+  ishinokazuki/kimigayo-os:3.1.0 <command>
 ```
 
 - `nodev`: デバイスファイルの無効化

@@ -263,7 +263,7 @@ Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` �
 
 #### 4. メタデータの抽出
 
-版は `meta` ジョブがタグ名（`refs/tags/v3.0.2` → `3.0.2`）から解決し、
+版は `meta` ジョブがタグ名（`refs/tags/v3.1.0` → `3.1.0`）から解決し、
 後続のジョブへ `needs.meta.outputs.version` として渡します
 （`scripts/get-version.sh` を使うのは `build-workflow.yml` の方です）。
 
@@ -587,8 +587,8 @@ Kimigayo OSは[Semantic Versioning](https://semver.org/)に従います:
 # 現在のバージョンを確認
 make version
 
-# 新しいバージョンでタグを作成（例。2026-10-12 時点の最新は v3.0.2）
-git tag -a v3.0.3 -m "Release v3.0.3
+# 新しいバージョンでタグを作成（例。2026-10-15 時点の最新は v3.1.0）
+git tag -a v3.1.1 -m "Release v3.1.1
 
 - 新機能A
 - バグ修正B
@@ -596,7 +596,7 @@ git tag -a v3.0.3 -m "Release v3.0.3
 "
 
 # タグをプッシュ（**ユーザーの明示的な承認が必要**）
-git push origin v3.0.3
+git push origin v3.1.1
 ```
 
 #### 2. 自動ビルドとリリース
@@ -633,7 +633,7 @@ GitHub Releasesページで以下を確認:
 
 ```bash
 # ビルド・検証・スキャンだけ（Docker Hub には push しない）
-gh workflow run release.yml -f tag=v3.0.3
+gh workflow run release.yml -f tag=v3.1.1
 ```
 
 または、GitHubのActionsタブから手動実行。

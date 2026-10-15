@@ -40,13 +40,13 @@ docker run -it ishinokazuki/kimigayo-os:latest
 **版を固定する場合**（`latest` は毎リリースで中身が変わります）:
 
 ```bash
-docker run -it ishinokazuki/kimigayo-os:3.0.2
+docker run -it ishinokazuki/kimigayo-os:3.1.0
 ```
 
 **バックグラウンドで起動して後から入る**:
 
 ```bash
-docker run -d --name myapp ishinokazuki/kimigayo-os:3.0.2 sleep infinity
+docker run -d --name myapp ishinokazuki/kimigayo-os:3.1.0 sleep infinity
 docker exec -it myapp /bin/sh
 ```
 
@@ -65,9 +65,9 @@ cat /etc/os-release
 
 | バリアント | イメージ | BusyBox アプレット | タグ |
 |-----------|---------|------------------|------|
-| Minimal | 2.46MB / arm64 2.83MB | 367 | `latest-minimal` / `3.0.2-minimal` |
-| **Standard**（推奨）| 2.60MB / arm64 2.98MB | 400 | `latest` / `latest-standard` / `3.0.2-standard` |
-| Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.0.2-extended` |
+| Minimal | 2.46MB / arm64 2.83MB | 367 | `latest-minimal` / `3.1.0-minimal` |
+| **Standard**（推奨）| 2.60MB / arm64 2.98MB | 400 | `latest` / `latest-standard` / `3.1.0-standard` |
+| Extended | 2.62MB / arm64 3.01MB | 411 | `latest-extended` / `3.1.0-extended` |
 
 **Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
 （Standard との差は 33 アプレット）。v3.1.0 からは `httpd`・`ssl_client`・
@@ -194,7 +194,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # 版を固定する。latest は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 
 CMD ["/bin/sh"]
@@ -213,7 +213,7 @@ docker run -it \
   --hostname my-kimigayo \
   --add-host myhost:10.0.0.9 \
   --dns 1.1.1.1 \
-  ishinokazuki/kimigayo-os:3.0.2
+  ishinokazuki/kimigayo-os:3.1.0
 ```
 
 **ネットワークはランタイムが設定します。** `/etc/network/interfaces` という
@@ -243,7 +243,7 @@ OpenRC が起動していない状態で叩くとこう警告されて失敗し�
 
 ```bash
 docker run -d --name myapp --entrypoint /sbin/init \
-  ishinokazuki/kimigayo-os:3.0.2
+  ishinokazuki/kimigayo-os:3.1.0
 
 docker exec -it myapp rc-status
 ```

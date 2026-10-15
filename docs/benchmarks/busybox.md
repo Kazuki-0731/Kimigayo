@@ -52,7 +52,7 @@ make benchmark-busybox
 bash scripts/benchmark-busybox.sh
 
 # 環境変数でカスタマイズ（スクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-standard \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-standard \
 ALPINE_IMAGE=alpine:3.24 \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-busybox.sh
@@ -252,7 +252,7 @@ BENCHMARK_ITERATIONS=20 make benchmark-busybox
 
 ```bash
 # 公開イメージを使用（スクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-standard \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-standard \
 bash scripts/benchmark-busybox.sh
 ```
 
@@ -297,13 +297,13 @@ make benchmark-busybox VARIANT=extended
 
 ```bash
 # Kimigayo OSのBusyBox設定確認
-docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox --help
+docker run --rm ishinokazuki/kimigayo-os:3.1.0-standard busybox --help
 
 # 利用可能なコマンド一覧
-docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox --list
+docker run --rm ishinokazuki/kimigayo-os:3.1.0-standard busybox --list
 
 # バージョン確認
-docker run --rm ishinokazuki/kimigayo-os:3.0.2-standard busybox | head -1
+docker run --rm ishinokazuki/kimigayo-os:3.1.0-standard busybox | head -1
 ```
 
 ## 更新履歴

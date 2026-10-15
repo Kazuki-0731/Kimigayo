@@ -194,7 +194,7 @@ blacklist tipc
 docker run -d -p 127.0.0.1:8080:8080 <your-app-image>
 
 # ネットワークを持たせない
-docker run --rm --network none ishinokazuki/kimigayo-os:3.0.2 <command>
+docker run --rm --network none ishinokazuki/kimigayo-os:3.1.0 <command>
 ```
 
 Kubernetes なら `NetworkPolicy` を使います。
@@ -241,7 +241,7 @@ docker run --rm \
   --user 65534:65534 \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ishinokazuki/kimigayo-os:3.0.2 id
+  ishinokazuki/kimigayo-os:3.1.0 id
 # → uid=65534(nobody) gid=65534(nogroup)
 ```
 
@@ -269,7 +269,7 @@ docker run --rm \
 （`verify-image.sh` が検査）。確認するには：
 
 ```bash
-docker run --rm ishinokazuki/kimigayo-os:3.0.2 \
+docker run --rm ishinokazuki/kimigayo-os:3.1.0 \
   find / -xdev -perm /6000 -type f
 # 何も出なければ setuid / setgid は無い
 ```
@@ -349,7 +349,7 @@ docker stop <container>
 mkdir snapshot && tar -xf incident-*.tar -C snapshot
 
 # 公開イメージと実行ファイルのハッシュを比べる
-docker run --rm ishinokazuki/kimigayo-os:3.0.2 sha256sum /bin/busybox
+docker run --rm ishinokazuki/kimigayo-os:3.1.0 sha256sum /bin/busybox
 sha256sum snapshot/bin/busybox
 
 # 最近変更されたファイル
@@ -366,7 +366,7 @@ find snapshot -perm -4000 -o -perm -2000
 
 ### 初期セットアップ時
 
-- [ ] 使うタグを固定する（例: `3.0.2-standard`）。必要なら `cosign verify` で署名を確認（→ [セキュリティポリシー](SECURITY_POLICY.md#イメージの署名)）
+- [ ] 使うタグを固定する（例: `3.1.0-standard`）。必要なら `cosign verify` で署名を確認（→ [セキュリティポリシー](SECURITY_POLICY.md#イメージの署名)）
 - [ ] `--read-only`・`--cap-drop ALL`・`--security-opt no-new-privileges`・`--user` を付ける
 - [ ] 公開するポートを絞る（`-p 127.0.0.1:...`、`--network none`）
 - [ ] ホストの OS 側でファイアウォール・SSH・カーネルパラメータを設定する

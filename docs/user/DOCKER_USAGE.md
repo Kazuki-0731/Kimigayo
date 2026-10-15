@@ -47,7 +47,7 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 docker pull ishinokazuki/kimigayo-os:latest-extended
 
 # 特定バージョンを指定（v なし）
-docker pull ishinokazuki/kimigayo-os:3.0.2
+docker pull ishinokazuki/kimigayo-os:3.1.0
 ```
 
 ### 基本的な起動
@@ -113,7 +113,7 @@ docker run -d \
 
 ```dockerfile
 # Dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2-minimal
+FROM ishinokazuki/kimigayo-os:3.1.0-minimal
 
 # 静的リンクしたアプリケーションバイナリをコピー
 COPY myapp /usr/local/bin/myapp
@@ -173,7 +173,7 @@ jobs:
       - name: Run tests in Kimigayo OS
         run: |
           docker run --rm -v "$PWD:/work" -w /work \
-            ishinokazuki/kimigayo-os:3.0.2 /bin/sh test.sh
+            ishinokazuki/kimigayo-os:3.1.0 /bin/sh test.sh
 ```
 
 ### 5. セキュアな実行環境
@@ -280,9 +280,9 @@ Error response from daemon: manifest for ishinokazuki/kimigayo-os:latest not fou
 
 **解決策:**
 1. イメージ名のスペルを確認
-2. タグが存在するか確認（版は `v` なしの `3.0.2` 形式。`0.1.0`・`stable`・`edge` はありません）:
+2. タグが存在するか確認（版は `v` なしの `3.1.0` 形式。`0.1.0`・`stable`・`edge` はありません）:
 ```bash
-docker pull ishinokazuki/kimigayo-os:3.0.2
+docker pull ishinokazuki/kimigayo-os:3.1.0
 ```
 3. ネットワーク接続を確認
 
@@ -445,7 +445,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 ```
 
@@ -453,7 +453,7 @@ COPY --from=builder /stage/ /
 
 ### Q3: 本番環境で使用できますか？
 
-**A:** 使えます。ただし**本番では版を固定してください**（`3.0.2-standard` のように
+**A:** 使えます。ただし**本番では版を固定してください**（`3.1.0-standard` のように
 版番号つきのタグ）。`latest` は毎リリースで中身が変わります。
 開発はメンテナー 1 人で行っているので、サポートの体制はそれを前提に判断してください。
 

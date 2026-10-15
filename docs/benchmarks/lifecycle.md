@@ -95,7 +95,7 @@ docker pull (already up to date)
 **`docker pull` が失敗した回は記録しません。** ローカルでビルドしただけの
 イメージ（`kimigayo-os:standard-arm64` など、レジストリに無いもの）では pull が
 必ず失敗するので、この項目は **N/A**（JSON では `"skipped": true`・`median_ms: null`）
-になります。測るなら Docker Hub にあるイメージ（`ishinokazuki/kimigayo-os:3.0.2` など）を
+になります。測るなら Docker Hub にあるイメージ（`ishinokazuki/kimigayo-os:3.1.0` など）を
 `IMAGE_NAME` に渡します。2026-10-13 までは失敗までの時間を「pull (warm)」として
 記録していました。
 
@@ -116,7 +116,7 @@ make benchmark-lifecycle
 bash scripts/benchmark-lifecycle.sh
 
 # 環境変数でカスタマイズ（任意のイメージを測るときはスクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-standard \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-standard \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-lifecycle.sh
 ```
@@ -352,7 +352,7 @@ spec:
 IMAGE_NAME=kimigayo-os:local bash scripts/benchmark-lifecycle.sh
 
 # または手動でプル
-docker pull ishinokazuki/kimigayo-os:3.0.2
+docker pull ishinokazuki/kimigayo-os:3.1.0
 ```
 
 ### 権限エラー
@@ -380,7 +380,7 @@ BENCHMARK_ITERATIONS=20 make benchmark-lifecycle
 
 ```bash
 # 公開イメージを使用（スクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2-minimal \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-minimal \
 bash scripts/benchmark-lifecycle.sh
 ```
 
@@ -388,10 +388,10 @@ bash scripts/benchmark-lifecycle.sh
 
 ```bash
 # 異なるバージョン間での比較（結果は毎回上書きされるので、都度コピーする）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.1 bash scripts/benchmark-lifecycle.sh
-cp benchmark-results/lifecycle.txt /tmp/lifecycle-3.0.1.txt
 IMAGE_NAME=ishinokazuki/kimigayo-os:3.0.2 bash scripts/benchmark-lifecycle.sh
-diff /tmp/lifecycle-3.0.1.txt benchmark-results/lifecycle.txt
+cp benchmark-results/lifecycle.txt /tmp/lifecycle-3.0.2.txt
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0 bash scripts/benchmark-lifecycle.sh
+diff /tmp/lifecycle-3.0.2.txt benchmark-results/lifecycle.txt
 ```
 
 ## 関連ドキュメント

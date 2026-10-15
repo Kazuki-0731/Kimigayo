@@ -44,7 +44,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'イメージに入れる版の表記（例: v3.0.2）。空なら edge。Docker Hub には push しない'
+        description: 'イメージに入れる版の表記（例: v3.1.0）。空なら edge。Docker Hub には push しない'
         required: false
         default: ''
 
@@ -423,7 +423,7 @@ jobs:
   # タグに対する署名は「どのイメージを署名したか」を特定できない。
   #
   # 検証（利用者側。cosign v3 以降が要る。v2 では no signatures found になる）:
-  #   cosign verify ishinokazuki/kimigayo-os:3.0.2 \
+  #   cosign verify ishinokazuki/kimigayo-os:3.1.0 \
   #     --certificate-identity-regexp '^https://github.com/Kazuki-0731/Kimigayo/' \
   #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
   sign:

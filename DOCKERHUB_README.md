@@ -100,7 +100,7 @@ RUN mkdir -p /stage/usr/sbin /stage/usr/lib /stage/etc/nginx \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # Kimigayo OSで最小ランタイム環境を構築（版を固定する）
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /var/lib/nginx/logs /var/www/html \
     && chown -R 65534:65534 /var/log/nginx /var/lib/nginx
@@ -131,21 +131,21 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ### バージョン指定タグ（本番ではこれを使ってください）
 ```
-kimigayo-os:3.0.2               # Standardバリアント
-kimigayo-os:3.0.2-minimal       # Minimalバリアント
-kimigayo-os:3.0.2-extended      # Extendedバリアント
+kimigayo-os:3.1.0               # Standardバリアント
+kimigayo-os:3.1.0-minimal       # Minimalバリアント
+kimigayo-os:3.1.0-extended      # Extendedバリアント
 ```
 
 ### アーキテクチャ指定タグ
 
-**バリアント名が必要です**（`3.0.2-amd64` というタグはありません）。
+**バリアント名が必要です**（`3.1.0-amd64` というタグはありません）。
 
 ```
-kimigayo-os:3.0.2-standard-amd64    # x86_64
-kimigayo-os:3.0.2-standard-arm64    # ARM64
+kimigayo-os:3.1.0-standard-amd64    # x86_64
+kimigayo-os:3.1.0-standard-arm64    # ARM64
 ```
 
-アーキテクチャ名を含まないタグ（`3.0.2`・`3.0.2-minimal`・`latest` など）はマルチアーキの
+アーキテクチャ名を含まないタグ（`3.1.0`・`3.1.0-minimal`・`latest` など）はマルチアーキの
 マニフェストなので、`docker pull` が自動で合うものを選びます。
 `latest-amd64`・`latest-arm64` は Standard の単一プラットフォームの別名です。
 

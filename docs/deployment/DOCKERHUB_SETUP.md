@@ -62,14 +62,14 @@ Minimal 2.46MB / 2.83MB、Standard 2.60MB / 2.98MB、Extended 2.62MB / 3.01MB �
 
 ```
 # バージョン指定（マルチアーキのマニフェスト）
-kimigayo-os:3.0.2               # Standardバリアント
-kimigayo-os:3.0.2-standard
-kimigayo-os:3.0.2-minimal
-kimigayo-os:3.0.2-extended
+kimigayo-os:3.1.0               # Standardバリアント
+kimigayo-os:3.1.0-standard
+kimigayo-os:3.1.0-minimal
+kimigayo-os:3.1.0-extended
 
 # バリアント + アーキテクチャ（単一プラットフォーム）
-kimigayo-os:3.0.2-standard-amd64
-kimigayo-os:3.0.2-minimal-arm64
+kimigayo-os:3.1.0-standard-amd64
+kimigayo-os:3.1.0-minimal-arm64
 
 # ローリングタグ（リリースごとに更新。全12本）
 kimigayo-os:latest              # standard のマニフェスト
@@ -82,7 +82,7 @@ kimigayo-os:latest-standard-amd64
 kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 ```
 
-> **`3.0.2-amd64` のようなバリアント名なしのアーキ別タグは存在しない。**
+> **`3.1.0-amd64` のようなバリアント名なしのアーキ別タグは存在しない。**
 > バージョン指定でアーキを固定するならバリアント名が必要。
 >
 > **`stable` と `edge` も存在しない。** 2026-10-10 までこの手順書が
@@ -99,7 +99,7 @@ kimigayo-os:latest-minimal-arm64  # ...（バリアント × アーキの6本）
 1. **安定版リリース**
    - `git tag -a v3.0.3` → push で `release.yml` が走る（版は例）
    - バージョン指定タグ（10本）と `latest` 系（12本）を更新し、Cosign で署名する
-   - フォーマット: `3.0.2`、`3.0.3`
+   - フォーマット: `3.1.0`、`3.1.1`
 
 2. **手動実行**
    - Actions から `release.yml` を `workflow_dispatch` で実行する

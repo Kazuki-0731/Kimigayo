@@ -40,7 +40,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 ```
 
@@ -56,8 +56,8 @@ C/C++ の `-static`）。このガイドの Go / Rust / C++ の例はいずれ�
 **実運用では版を固定してください。**
 
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2          # 推奨
-FROM ishinokazuki/kimigayo-os:3.0.2-minimal
+FROM ishinokazuki/kimigayo-os:3.1.0          # 推奨
+FROM ishinokazuki/kimigayo-os:3.1.0-minimal
 ```
 
 ## 基本的なカスタマイズ

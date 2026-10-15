@@ -206,7 +206,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # Kimigayo OSで最小ランタイム環境を構築（版を固定する）
-FROM ishinokazuki/kimigayo-os:3.0.2
+FROM ishinokazuki/kimigayo-os:3.1.0
 COPY --from=builder /stage/ /
 COPY app.py /app/
 USER 65534
@@ -255,7 +255,7 @@ Standard 2.98MB / Extended 3.01MB（→「パフォーマンス実績」節）�
 > [Releases](https://github.com/Kazuki-0731/Kimigayo/releases) を参照）。
 > マルチアーキなので `linux/amd64` と `linux/arm64` の
 > どちらを引いても同じ版が来る。
-> **本番では版を固定する**（`3.0.2-standard` のように版番号つきのタグ、
+> **本番では版を固定する**（`3.1.0-standard` のように版番号つきのタグ、
 > またはダイジェスト指定）。
 
 **比較**（`--platform linux/amd64`。Kimigayo Standard = 2.60MB は 2026-10-12、

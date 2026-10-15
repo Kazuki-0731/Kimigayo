@@ -14,7 +14,7 @@ So every example below assumes **your own application image built on top of
 Kimigayo**:
 
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.0.2-standard
+FROM ishinokazuki/kimigayo-os:3.1.0-standard
 # Copy your application (and the shared libraries it needs; see
 # examples/python/Dockerfile for collecting them with ldd)
 COPY --from=build /out/my-app /usr/local/bin/my-app
@@ -26,7 +26,7 @@ CMD ["/usr/local/bin/my-app"]
 docker build -t my-app:1.0.0 .
 ```
 
-- Pin the Kimigayo version (`3.0.2-standard`) or a digest; `latest` moves on every release
+- Pin the Kimigayo version (`3.1.0-standard`) or a digest; `latest` moves on every release
 - Minimal has no `wget`; use Standard or Extended if your health check needs it
 - Your application should handle SIGTERM; otherwise every stop waits for the
   platform's grace period (see [lifecycle.md](../benchmarks/lifecycle.md))
@@ -451,7 +451,7 @@ reads versions out of the binaries and matches them against CVEs:
 
 ```bash
 # In a clone of the Kimigayo repository
-bash scripts/scan-image.sh ishinokazuki/kimigayo-os:3.0.2-standard standard x86_64
+bash scripts/scan-image.sh ishinokazuki/kimigayo-os:3.1.0-standard standard x86_64
 ```
 
 The published images are also checked weekly (`dependency-review.yml`), and
@@ -544,8 +544,8 @@ gcloud logging read "resource.type=cloud_run_revision \
 ### Versioning
 
 Tag your own images with an explicit version, and pin the Kimigayo base image
-the same way. Kimigayo's own tags look like `3.0.2`, `3.0.2-standard` and
-`3.0.2-standard-amd64` (no `v` prefix); `latest` and `latest-<variant>` move
+the same way. Kimigayo's own tags look like `3.1.0`, `3.1.0-standard` and
+`3.1.0-standard-amd64` (no `v` prefix); `latest` and `latest-<variant>` move
 on every release.
 
 ```bash
