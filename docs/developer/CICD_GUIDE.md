@@ -25,6 +25,7 @@ Kimigayo OS は以下の 7 つのワークフローを使用しています。
 | `security.yml` | 毎日 02:00 UTC、手動 | 脆弱性スキャン、上流のセキュリティ情報との差分（非公開の Project に追加） |
 | `base-image-update.yml` | 毎週月曜 03:00 UTC、手動 | 上流の更新を検知して PR 作成 |
 | `dependency-review.yml` | `main` への PR、毎週月曜 04:00 UTC、手動 | 依存レビュー（`fail-on-severity: high`）、公開イメージの CVE 照合（定期・手動のみ） |
+| `project-sync.yml` | Issue の作成・再開・クローズ・移動、毎日 02:30 UTC、手動 | Issue を非公開の Project にそろえる（`scripts/project-issue.py sync`。冪等） |
 
 ### 1. CI (`.github/workflows/ci.yml`)
 

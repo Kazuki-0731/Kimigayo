@@ -72,7 +72,7 @@ GitHub Actions はワークフローごとに発行されるトークンを使�
 ## 非公開の Project に書き込むトークン
 
 `security.yml` と `dependency-review.yml` は、見つけた脆弱性を公開の Issue ではなく
-非公開の Project に足す（CLAUDE.md「危険度の高いものは Issue にしない」節）。
+非公開の Project に足す。`project-sync.yml` は Issue を Project にそろえる（CLAUDE.md「危険度の高いものは Issue にしない」節）。
 ワークフローの `GITHUB_TOKEN` は個人の Project に届かないので、専用のトークンを
 シークレット `KIMIGAYO_PROJECT_TOKEN` に置いている。足す先の Project は
 リポジトリの変数 `KIMIGAYO_PROJECT_ID`。
