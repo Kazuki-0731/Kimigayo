@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   運用（実行プロファイル 3 つ）と、昇格を解かずにホストから root メンテする方法（新イメージ入れ替え・
   `docker exec --user 0`・特権サイドカー）。README・HARDENING_GUIDE から参照
 - - **Falco ルールの発火を CI で検証するワークフローを足した**（`runtime-detection-verify.yml`、手動のみ・検証専用）。
-  わざと脆弱なターゲットに root 昇格・シェル起動を起こし、`kimigayo_rules.yaml` が検知することを確かめる
+  わざと脆弱なターゲットに root 昇格・シェル起動を起こし、`kimigayo_rules.yaml` が検知することを確かめる。
+  加えて、強化フラグ（`no-new-privileges` 他）で昇格が塞がれること（防御の退行防止）も確かめる
 - **ランタイム脅威検知ガイドと Falco ルールを追加した**（`docs/security/RUNTIME_DETECTION.md`・
   `docs/security/falco/kimigayo_rules.yaml`）。侵入後の権限奪取・不審アクセスを
   ホスト側で検知し、ログをコンテナ外へ逃がす手順。2026-10-16 の検証（脆弱コンテナへの

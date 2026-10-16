@@ -136,6 +136,28 @@ jobs:
             echo "❌ 集約先にログが届かなかった"; exit 1
           fi
 
+      # 防御（昇格を塞ぐ）の確認。強化フラグの退行を捕まえる。
+      # docs/maintainer/SERVER_MAINTENANCE.md の実行プロファイル。
+      - name: Verify hardening flags block escalation
+        run: |
+          set -euo pipefail
+          echo "== フラグ無し → 昇格できてしまう（比較用）"
+          docker run -d --rm --name p-off --platform linux/amd64 kimigayo-os-rtd-target:latest sleep 60 >/dev/null
+          off="$(docker exec p-off /usr/local/bin/rootshell id)"; echo "  $off"
+          echo "== 強化フラグ有り → 昇格できない"
+          docker run -d --rm --name p-on --platform linux/amd64 \
+            --user 65534 --cap-drop ALL --security-opt no-new-privileges \
+            kimigayo-os-rtd-target:latest sleep 60 >/dev/null
+          on="$(docker exec p-on /usr/local/bin/rootshell id)"; echo "  $on"
+          echo "== 強化したままホストから root メンテできる"
+          maint="$(docker exec --user 0 p-on id)"; echo "  $maint"
+          fail=0
+          if echo "$off" | grep -q 'uid=0(root)'; then echo "✅ フラグ無しは昇格できる（想定どおり）"; else echo "❌ フラグ無しで昇格できなかった（前提崩れ）"; fail=1; fi
+          if echo "$on" | grep -q 'uid=0(root)'; then echo "❌ 強化フラグでも昇格できてしまった（防御の退行）"; fail=1; else echo "✅ 強化フラグで昇格を阻止"; fi
+          if echo "$maint" | grep -q 'uid=0(root)'; then echo "✅ ホストからは root メンテできる"; else echo "❌ ホストからの root メンテができない"; fail=1; fi
+          docker rm -f p-off p-on >/dev/null
+          exit "$fail"
+
       - name: Dump Falco output on failure
         if: always()
         run: docker logs falco 2>&1 | tail -80 || true
