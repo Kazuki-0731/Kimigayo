@@ -125,6 +125,10 @@ cat "$ROOTFS/.kimigayo-build-info"
   （`tests/samples/bz2_runcnt_overflow.bz2`）と awk の無限再帰で落ちないこと、
   bootmisc の `wipe_tmp` が NO であること、minimal に httpd・ssl_server・udhcpc
   などのネットワーク系アプレットが無いこと（v3.0.2 はどれも修正前）
+- **2026-10-15〜16 に外したものの回帰**。standard / extended の httpd が
+  `P:` のプロキシを中継しないこと（CVE-2026-88829）、standard / extended に
+  telnetd・ftpd・udhcpc などの待ち受けと DHCP のアプレットが無いこと（#122。
+  v3.1.0 はどちらも外す前）
 
 秘密情報と CVE は `scripts/scan-image.sh`（`make scan-image`）。
 CVE が出ても**不合格とは書かず**、件数と ID を「要確認」として報告する
