@@ -55,7 +55,8 @@ case "$ARCH" in
 esac
 
 # バリアントごとのアプレット数の下限。
-# 実測は minimal 329 / standard 400 / extended 411（2026-10-14 以降。
+# 実測は minimal 329 / standard 379 / extended 390（2026-10-16 以降。
+# standard / extended は待ち受けと DHCP の 21 個を外す前の v3.1.0 が 400 / 411（#122）、
 # minimal はネットワーク系の 38 個を外す前の v3.0.1〜v3.0.2 が 367、
 # dpkg 等の 3 つを外す前の v3.0.0 までは 370 / 403 / 413）。
 # 下限で見るのは、アプレットが増える変更を落とさないため。
@@ -63,8 +64,8 @@ esac
 # 入る事故が実際にあった）を捕まえるため。
 case "$VARIANT" in
     minimal)  APPLET_MIN=315; APPLET_MAX=345 ;;
-    standard) APPLET_MIN=385; APPLET_MAX=408 ;;
-    extended) APPLET_MIN=408; APPLET_MAX=460 ;;
+    standard) APPLET_MIN=370; APPLET_MAX=385 ;;
+    extended) APPLET_MIN=386; APPLET_MAX=420 ;;
     *) echo "Unsupported VARIANT: $VARIANT" >&2; exit 2 ;;
 esac
 
