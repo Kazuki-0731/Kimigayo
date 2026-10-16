@@ -25,7 +25,7 @@ Project の一覧への反映は数分遅れる（2026-10-15 に実測、5 分�
   python3 scripts/project-issue.py draft --title "..." --body-file body.md --priority High
 
   # 既存の Issue の優先度・状態を変える
-  python3 scripts/project-issue.py set 122 --priority High --status "In Progress"
+  python3 scripts/project-issue.py set 122 --priority High --status 対応中
 
   # 全部をそろえる: 開いている Issue を Project に入れ、閉じた Issue を Done にし、
   # Issue の優先度のラベルを Project の Priority に合わせる。Priority が無く
@@ -55,9 +55,9 @@ PRIORITY_LABELS = {p: f"priority: {p.lower()}" for p in PRIORITIES}
 LABEL_COLORS = {"High": ("d73a4a", "優先度: 高（先に着手する）"),
                 "Middle": ("fbca04", "優先度: 中"),
                 "Low": ("f9a03f", "優先度: 低（手が空いたら）")}
-# 「リリース待ち」= 修正は main に入り、次のリリース（公開）を待っている状態。
-# In Progress（修正中）と区別するために足した（2026-10-16）。
-STATUSES = ("Todo", "In Progress", "リリース待ち", "Done")
+# Status は Project 側と同じ日本語。「リリース待ち」= 修正は main に入り、
+# 次のリリース（公開）を待っている状態（対応中＝修正中と区別。2026-10-16）。
+STATUSES = ("未着手", "対応中", "リリース待ち", "完了")
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ def sync_plan(open_issues: list[int], items: list[dict]) -> dict:
         if not item["priority"]:
             plan["no_priority"].append(n)
     for n, item in ours.items():
-        if item["state"] == "CLOSED" and item["status"] != "Done":
+        if item["state"] == "CLOSED" and item["status"] != "完了":
             plan["done"].append(item["id"])
     return plan
 
@@ -334,7 +334,7 @@ def cmd_issue(a) -> None:
     ensure_labels()
     apply_priority_label(number, issue_labels(number), a.priority)
     # 既存の Issue の Status は、指定されたときだけ変える（In Progress を Todo に戻さない）
-    status = a.status or ("Todo" if created else None)
+    status = a.status or ("未着手" if created else None)
     project.set(item, "Status", status)
     print(f"Project: Priority={a.priority}" + (f" Status={status}" if status else "") + f"  {project.url}")
 
@@ -359,7 +359,7 @@ def cmd_draft(a) -> None:
         item = d["addProjectV2DraftIssue"]["projectItem"]["id"]
         print(f"下書きを作った: {a.title}")
     project.set(item, "Priority", a.priority)
-    project.set(item, "Status", a.status or ("Todo" if not found else None))
+    project.set(item, "Status", a.status or ("未着手" if not found else None))
     print(f"Project: {project.url}")
 
 
@@ -394,12 +394,12 @@ def cmd_sync(a) -> int:
     plan = sync_plan([i["number"] for i in issues], items)
     for n in plan["add"]:
         item = project.add_issue(n)
-        project.set(item, "Status", "Todo")
+        project.set(item, "Status", "未着手")
         print(f"Project に足した: #{n}")
     for item in plan["todo"]:
-        project.set(item, "Status", "Todo")
+        project.set(item, "Status", "未着手")
     for item in plan["done"]:
-        project.set(item, "Status", "Done")
+        project.set(item, "Status", "完了")
     if plan["todo"] or plan["done"]:
         print(f"Status をそろえた: Todo {len(plan['todo'])} 件 / Done {len(plan['done'])} 件")
 

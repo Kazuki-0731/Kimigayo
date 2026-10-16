@@ -40,19 +40,19 @@ def test_find_draft_ignores_issues():
 
 
 def test_sync_adds_missing_and_reports_priority():
-    plan = pi.sync_plan([1, 2], [item(1, priority="High", status="Todo")])
+    plan = pi.sync_plan([1, 2], [item(1, priority="High", status="未着手")])
     assert plan["add"] == [2]
     assert plan["no_priority"] == [2]
     assert plan["done"] == [] and plan["todo"] == []
 
 
 def test_sync_is_idempotent_when_aligned():
-    items = [item(1, priority="High", status="Todo"), item(9, state="CLOSED", priority="Low", status="Done")]
+    items = [item(1, priority="High", status="未着手"), item(9, state="CLOSED", priority="Low", status="完了")]
     assert pi.sync_plan([1], items) == {"add": [], "done": [], "todo": [], "no_priority": []}
 
 
 def test_sync_marks_closed_done_and_fills_status():
-    items = [item(1, priority="Low"), item(3, state="CLOSED", status="In Progress")]
+    items = [item(1, priority="Low"), item(3, state="CLOSED", status="対応中")]
     plan = pi.sync_plan([1], items)
     assert plan["todo"] == ["I1"]
     assert plan["done"] == ["I3"]
