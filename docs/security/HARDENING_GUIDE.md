@@ -70,12 +70,14 @@ docker run -d \
 | `-p 127.0.0.1:...` | 外部への意図しない公開 |
 
 **`sshd`・`iptables`・`sudo` はイメージに入っていません。**
-一方で `telnetd`・`ftpd`・`httpd`・`nc`・`telnet`（クライアント）の BusyBox
-アプレットは standard 以上に、`crond` は全バリアントに入っています
-（v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd` などが入っていました。
-config に書いていない項目が既定値で有効になっていたためで、v3.1.0 で外します）。
+一方で `httpd`・`nc`・`telnet`（クライアント）の BusyBox アプレットは standard 以上に、
+`crond` は全バリアントに入っています。
+**待ち受け（サーバー）と DHCP のアプレット**（`telnetd`・`ftpd`・`tftpd`・`inetd`・
+`ntpd`・`udhcpc` など 21 個）は、v3.2.0 から全バリアントで外れます。
+config に書いていない項目が既定値で有効になっていたためで、v3.0.2 までは minimal にも、
+v3.1.0 までは standard・extended に入っていました。
 **既定ではどれも起動していません**（PID 1 は `/bin/sh`）。
-使わないなら、自分のイメージで該当するリンク（`/sbin/telnetd` など）を
+v3.1.0 以前を使い続けるなら、自分のイメージで該当するリンク（`/sbin/telnetd` など）を
 消しておくと確実です。
 
 **ホスト側** — ホストの OS で、ファイアウォールを有効にし、

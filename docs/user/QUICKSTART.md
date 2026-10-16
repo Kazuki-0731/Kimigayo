@@ -72,7 +72,8 @@ cat /etc/os-release
 **Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
 （Standard との差は 33 アプレット）。v3.1.0 からは `httpd`・`ssl_client`・
 `udhcpc`・`nslookup`・`netstat`・`telnetd` などのネットワークのサーバー・
-クライアントも Minimal から外れます（Standard 以上にはあります）。対話的に触る・シェルスクリプトを動かすなら
+クライアントも Minimal から外れます。そのうち `telnetd`・`udhcpc` などの
+待ち受けと DHCP のアプレットは、v3.2.0 で Standard・Extended からも外れます。対話的に触る・シェルスクリプトを動かすなら
 Standard 以上を選んでください。
 
 ```bash

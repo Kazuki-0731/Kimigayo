@@ -43,9 +43,10 @@ Kimigayo の攻撃面の小ささは、まず欠落によって成り立って�
 
 **入っているが起動していないもの**（BusyBox のアプレット）:
 `crond`・`su`・`nsenter`・`unshare`（全バリアント）、
-`telnetd`・`ftpd`・`httpd`・`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
-v3.0.2 までは minimal にも `telnetd`・`ftpd`・`httpd`・`ssl_server`・`udhcpc` などが
-入っていた（config に書いていない項目が既定値で有効になっていた。v3.1.0 で外す）。
+`httpd`・`nc`・`telnet`・`wget`（standard 以上）、`ar`（extended のみ）。
+`telnetd`・`ftpd`・`ssl_server`・`udhcpc` などの待ち受けと DHCP のアプレットは、
+v3.0.2 までは minimal にも、v3.1.0 までは standard・extended に入っていた
+（config に書いていない項目が既定値で有効になっていた。v3.2.0 で全バリアントから外す）。
 サーバー系のアプレットは、利用者が起動しない限り待ち受けません。
 
 **既定の PID 1 は `/bin/sh`** で、OpenRC は起動していません。
