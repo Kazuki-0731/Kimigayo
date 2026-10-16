@@ -55,7 +55,9 @@ PRIORITY_LABELS = {p: f"priority: {p.lower()}" for p in PRIORITIES}
 LABEL_COLORS = {"High": ("d73a4a", "優先度: 高（先に着手する）"),
                 "Middle": ("fbca04", "優先度: 中"),
                 "Low": ("f9a03f", "優先度: 低（手が空いたら）")}
-STATUSES = ("Todo", "In Progress", "Done")
+# 「リリース待ち」= 修正は main に入り、次のリリース（公開）を待っている状態。
+# In Progress（修正中）と区別するために足した（2026-10-16）。
+STATUSES = ("Todo", "In Progress", "リリース待ち", "Done")
 
 
 # ---------------------------------------------------------------------------
