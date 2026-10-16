@@ -15,6 +15,7 @@
 | ファイルシステム強化 | `--read-only` / `--tmpfs` を使う | ホストの OS で設定する |
 | アプリケーション強化（seccomp）| ランタイム側で指定 | — |
 | 監査 | `docker logs` / `docker diff` | ホストの `auditd` などで |
+| 実行時の監視・検知 | — | ホストの `Falco` / `auditd` で（→ [RUNTIME_DETECTION.md](RUNTIME_DETECTION.md)）|
 
 **「ホスト」の作業は、Kimigayo ではなくホストの OS（Ubuntu など）で行います。**
 Kimigayo はパッケージマネージャーを持たず、`iptables`・`sshd`・`auditd` を
@@ -22,6 +23,9 @@ Kimigayo はパッケージマネージャーを持たず、`iptables`・`sshd`�
 
 **コンテナで実際に効く設定は[システム設定ガイド](../user/CONFIGURATION.md#セキュリティ設定)に
 まとめてあります。** 迷ったらそちらを先に読んでください。
+
+**この文書は「侵入を防ぐ」設定まで。侵入されたときに気づく（検知・通知・ログ保全）は
+[ランタイム脅威検知ガイド](RUNTIME_DETECTION.md)にまとめてあります。**
 
 > **自動強化スクリプトは配布していません。**
 > 以前この文書は `/usr/share/kimigayo/security/harden-level{1,2,3}.sh` の
