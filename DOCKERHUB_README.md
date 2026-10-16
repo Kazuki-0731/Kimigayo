@@ -11,7 +11,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 ### distroless からの継承
 - ✅ **不変インフラ**: パッケージマネージャーなし、実行時の変更を排除
 - ✅ **最小攻撃面**: 実行時にパッケージをインストールする仕組みを持たない
-- ✅ **軽量**: 2.34〜2.99MB のイメージサイズ（v3.1.0、バリアント × アーキテクチャ）
+- ✅ **軽量**: 2.34〜2.99MB のイメージサイズ（v3.2.0、バリアント × アーキテクチャ）
 
 ### Alpine Linux からの継承
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
@@ -32,7 +32,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 
 ## 主な特徴
 
-- 🪶 **超軽量**: Standard（x86_64）**2.55MB** / arm64 2.96MB（v3.1.0、2026-10-15 実測）
+- 🪶 **超軽量**: Standard（x86_64）**2.55MB** / arm64 2.96MB（v3.2.0、2026-10-16 実測）
 - 💾 **常駐メモリ**: 288KB（Alpine 268KB / Ubuntu 24.04 316KB と同程度。同条件で実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE・Full RELRO・非実行スタックでビルド
 - 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除（`apk` も `dpkg` も無い）
@@ -100,7 +100,7 @@ RUN mkdir -p /stage/usr/sbin /stage/usr/lib /stage/etc/nginx \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
 # Kimigayo OSで最小ランタイム環境を構築（版を固定する）
-FROM ishinokazuki/kimigayo-os:3.1.0
+FROM ishinokazuki/kimigayo-os:3.2.0
 COPY --from=builder /stage/ /
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /var/lib/nginx/logs /var/www/html \
     && chown -R 65534:65534 /var/log/nginx /var/lib/nginx
@@ -131,7 +131,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ### バージョン指定タグ（本番ではこれを使ってください）
 ```
-kimigayo-os:3.1.0               # Standardバリアント
+kimigayo-os:3.2.0               # Standardバリアント
 kimigayo-os:3.2.0-minimal       # Minimalバリアント
 kimigayo-os:3.2.0-extended      # Extendedバリアント
 ```
@@ -187,7 +187,7 @@ cosign verify ishinokazuki/kimigayo-os:latest \
 **出荷するイメージそのものを照合しています。** イメージ内のバイナリから
 読んだ版で SBOM（CycloneDX）を作り、Grype で NVD と照合します。
 CI（毎 push）とリリースの公開前に走り、公開中の `latest` も毎週照合します。
-v3.1.0 は公開時点で **0 件**でした（NVD の CPE に載っている範囲で。NVD に新しい CVE が載れば変わります）。
+v3.2.0 は公開時点で **0 件**でした（NVD の CPE に載っている範囲で。NVD に新しい CVE が載れば変わります）。
 
 - 上流が修正版を出していない CVE はパッチを当てて出荷し、
   `/.kimigayo-build-info` の `PATCHED_CVES` に記録しています
