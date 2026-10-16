@@ -40,6 +40,16 @@ cd "$(dirname "$0")/.." || exit 1
 command -v gh >/dev/null || { log_error "gh が無い"; exit 1; }
 gh auth status >/dev/null 2>&1 || { log_error "gh が未認証"; exit 1; }
 
+# run の完了を待って conclusion を返す。瞬断に強く（watch が落ちても数回リトライ）。
+wait_conclusion() {
+  local id="$1" tries=0
+  while [ "$tries" -lt 5 ]; do
+    if gh run watch "$id" --repo "$REPO" --exit-status >/dev/null 2>&1; then break; fi
+    tries=$((tries + 1)); sleep 15   # 瞬断などの一時的な失敗。少し待って見直す
+  done
+  gh run view "$id" --repo "$REPO" --json conclusion --jq '.conclusion // "unknown"' 2>/dev/null || echo "unknown"
+}
+
 # 出す版: CHANGELOG の最上段の版見出し（## [X.Y.Z]）を使う
 VERSION="$(grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | head -1 | tr -d '## []')"
 [ -n "$VERSION" ] || { log_error "CHANGELOG.md の先頭に版見出しが無い"; exit 1; }
@@ -65,10 +75,12 @@ if [ -z "$CI_ID" ]; then
   FAIL=1
 else
   log_info "CI run $CI_ID を待ちます…"
-  gh run watch "$CI_ID" --repo "$REPO" --exit-status >/dev/null 2>&1
-  CONC="$(gh run view "$CI_ID" --repo "$REPO" --json conclusion --jq .conclusion)"
-  [ "$CONC" = success ] && log_success "ビルド 6 本 + scan-image（脆弱性診断）が緑" \
-    || { log_error "CI が緑でない（$CONC）。gh run view $CI_ID --log-failed"; FAIL=1; }
+  CONC="$(wait_conclusion "$CI_ID")"
+  if [ "$CONC" = success ]; then
+    log_success "ビルド 6 本 + scan-image（脆弱性診断）が緑"
+  else
+    log_error "CI が緑でない（$CONC）。gh run view $CI_ID --log-failed"; FAIL=1
+  fi
 fi
 
 # --- 4. セキュリティ検証（RCE / root 奪取 / 検知 / 防御）---
@@ -77,8 +89,7 @@ gh workflow run runtime-detection-verify.yml --repo "$REPO" --ref main >/dev/nul
 sleep 8
 SV_ID="$(gh run list --repo "$REPO" --workflow runtime-detection-verify.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
 log_info "検証 run $SV_ID を待ちます…"
-gh run watch "$SV_ID" --repo "$REPO" --exit-status >/dev/null 2>&1
-SV_CONC="$(gh run view "$SV_ID" --repo "$REPO" --json conclusion --jq .conclusion)"
+SV_CONC="$(wait_conclusion "$SV_ID")"
 if [ "$SV_CONC" = success ]; then
   log_success "root 奪取・シェル・外向き・ログ到達の検知 / 強化フラグで昇格阻止 を確認"
 else
@@ -89,16 +100,18 @@ fi
 step "ベンチマーク（${BENCH_VARIANT} / ${BENCH_ARCH} を CI 成果物から作って実測）"
 if [ -n "${CI_ID:-}" ]; then
   if gh run download "$CI_ID" --repo "$REPO" -n "rootfs-${BENCH_VARIANT}-${BENCH_ARCH}" -D "$WORK" >/dev/null 2>&1; then
-    TARBALL="$(find "$WORK" -name '*.tar.gz' | head -1)"
+    # tarball は build コンテキスト（リポジトリ）内に置く必要がある。output/ は .gitignore 済み。
+    mkdir -p output
+    cp "$(find "$WORK" -name '*.tar.gz' | head -1)" "output/benchprep.tar.gz"
     IMG="kimigayo-os:${VERSION}-${BENCH_VARIANT}-${BENCH_ARCH}-benchprep"
     if docker build --platform "linux/${BENCH_ARCH}" -f Dockerfile.runtime \
-         --build-arg "TARBALL_PATH=$(python3 -c "import os;print(os.path.relpath('$TARBALL'))")" \
-         -t "$IMG" . >/dev/null 2>&1; then
+         --build-arg "TARBALL_PATH=output/benchprep.tar.gz" -t "$IMG" . >/dev/null 2>&1; then
       log_success "ローカルイメージ作成: $IMG"
       echo "--- 起動 ---";   IMAGE="$IMG" bash scripts/benchmark-startup.sh 2>/dev/null | tail -3 || log_warning "起動ベンチ失敗"
       echo "--- メモリ ---"; IMAGE="$IMG" bash scripts/benchmark-memory.sh  2>/dev/null | tail -3 || log_warning "メモリベンチ失敗"
       echo "--- BusyBox ---"; IMAGE_NAME="$IMG" bash scripts/benchmark-busybox.sh 2>/dev/null | tail -5 || log_warning "BusyBox ベンチ失敗"
       docker rmi "$IMG" >/dev/null 2>&1
+      rm -f output/benchprep.tar.gz
     else
       log_warning "イメージの作成に失敗（ベンチはスキップ。公開後に公開イメージで測る）"
     fi
