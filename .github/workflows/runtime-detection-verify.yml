@@ -1,0 +1,106 @@
+name: Runtime Detection Verify (manual)
+
+# docs/security/falco/kimigayo_rules.yaml が、Kimigayo コンテナ内の
+# 権限奪取（root 昇格）とシェル起動を実際に検知できるかを確かめる。
+#
+# **検証専用。手動実行だけ。本番の経路（push / tag）には絶対に入れない。**
+# ここだけで、わざと脆弱なターゲット（setuid root ヘルパ入り、非 root で起動）を
+# 立て、攻撃に相当する操作（nobody → root 昇格、シェル起動）を行い、
+# Falco が発火することを assert する。ubuntu-latest は本物のカーネルで eBPF が
+# 使えるので Falco が動く（手元の macOS の Docker Desktop ではできない）。
+#
+# 背景: docs/security/RUNTIME_DETECTION.md
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Falco が root 昇格・シェル起動を検知するか
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # わざと脆弱なターゲット。公開中の Kimigayo を土台に、setuid root の
+      # ヘルパだけ足す（Kimigayo は本来 setuid 0 個）。アプリは nobody で動く。
+      # このコードはこの検証ワークフロー内にだけ存在する（リポジトリに残さない）。
+      - name: Build the intentionally-vulnerable target
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/target
+          cat > /tmp/target/Dockerfile <<'DOCKER'
+          FROM alpine:3.24 AS builder
+          RUN apk add --no-cache gcc musl-dev
+          RUN printf '#include <unistd.h>\nint main(int c,char**v){setuid(0);setgid(0);if(c>1)execvp(v[1],v+1);execl("/bin/sh","sh",0);return 1;}\n' > /tmp/rs.c \
+           && gcc -static -o /tmp/rootshell /tmp/rs.c
+          FROM ishinokazuki/kimigayo-os:3.1.0
+          COPY --from=builder /tmp/rootshell /usr/local/bin/rootshell
+          RUN chmod 4755 /usr/local/bin/rootshell
+          USER 65534
+          CMD ["sleep", "600"]
+          DOCKER
+          # イメージ名に kimigayo-os を含める（Falco ルールの対象マクロが見る）
+          docker build --platform linux/amd64 -t kimigayo-os-rtd-target:latest /tmp/target
+
+      - name: Start Falco with the Kimigayo rules
+        run: |
+          set -euo pipefail
+          docker run -d --name falco --privileged \
+            -v /var/run/docker.sock:/host/var/run/docker.sock \
+            -v /proc:/host/proc:ro \
+            -v "${{ github.workspace }}/docs/security/falco/kimigayo_rules.yaml:/etc/falco/rules.d/kimigayo_rules.yaml:ro" \
+            falcosecurity/falco:latest \
+            falco -o engine.kind=modern_ebpf -o json_output=false
+          # Falco が初期化してイベント取得を始めるまで待つ
+          for i in $(seq 1 60); do
+            if docker logs falco 2>&1 | grep -qiE 'Starting health|running!|Events detected|rules loaded|Loading rules'; then
+              echo "Falco up (${i}s)"; break
+            fi
+            sleep 1
+          done
+          sleep 5
+          echo "=== Falco 起動ログ ==="; docker logs falco 2>&1 | tail -20
+
+      - name: Launch target and simulate the attack
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name target --platform linux/amd64 kimigayo-os-rtd-target:latest
+          sleep 3
+          echo "== 1) nobody から setuid で root へ昇格（uid 0 のプロセスを作る）"
+          docker exec target /usr/local/bin/rootshell id
+          echo "== 2) シェルを起動（distroless 的な運用では異常）"
+          docker exec target /bin/sh -c 'echo shell-spawned'
+          echo "== 3) root で /etc に書き込み"
+          docker exec target /usr/local/bin/rootshell sh -c 'echo x >> /etc/hosts'
+          sleep 5
+
+      - name: Assert Falco detected the escalation
+        run: |
+          set -euo pipefail
+          out="$(docker logs falco 2>&1)"
+          echo "=== Kimigayo ルールの発火 ==="
+          echo "$out" | grep -E '\[Kimigayo\]' || true
+          fail=0
+          if echo "$out" | grep -q 'root 昇格の疑い'; then
+            echo "✅ root 昇格を検知"
+          else
+            echo "❌ root 昇格を検知できなかった"; fail=1
+          fi
+          if echo "$out" | grep -q 'シェル起動'; then
+            echo "✅ シェル起動を検知"
+          else
+            echo "❌ シェル起動を検知できなかった"; fail=1
+          fi
+          echo "--- 参考（任意のルール）---"
+          echo "$out" | grep -qE '機密ファイルへの書き込み' && echo "・/etc 書き込みも検知" || echo "・/etc 書き込みは未検知（任意）"
+          exit "$fail"
+
+      - name: Dump Falco output on failure
+        if: always()
+        run: docker logs falco 2>&1 | tail -80 || true
