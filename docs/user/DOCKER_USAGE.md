@@ -17,8 +17,8 @@ Kimigayo OSは3つのバリアントを提供しています:
 | バリアント | イメージ名 | サイズ | 用途 |
 |-----------|-----------|--------|------|
 | **Minimal** | `ishinokazuki/kimigayo-os:latest-minimal` | 2.34MB | 最小限の環境、特化したコンテナ |
-| **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | 2.64MB | 一般的な用途、開発、本番環境 |
-| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.67MB | Standard + 11 アプレット（[Q4](#q4-どのバリアントを選ぶべきですか) 参照）|
+| **Standard** (推奨) | `ishinokazuki/kimigayo-os:latest` | 2.55MB | 一般的な用途、開発、本番環境 |
+| **Extended** | `ishinokazuki/kimigayo-os:latest-extended` | 2.57MB | Standard + 11 アプレット（[Q4](#q4-どのバリアントを選ぶべきですか) 参照）|
 
 （x86_64、v3.0.2 を 2026-10-12 実測。arm64 は +0.37〜0.39MB。
 最新は [README.md](../../README.md) の「パフォーマンス実績」節）
@@ -113,7 +113,7 @@ docker run -d \
 
 ```dockerfile
 # Dockerfile
-FROM ishinokazuki/kimigayo-os:3.1.0-minimal
+FROM ishinokazuki/kimigayo-os:3.2.0-minimal
 
 # 静的リンクしたアプリケーションバイナリをコピー
 COPY myapp /usr/local/bin/myapp
@@ -419,7 +419,7 @@ docker images | grep kimigayo-os
 **A:** Kimigayo OSはGoogleのdistrolessと同様の設計思想を採用し、以下の特徴があります:
 
 - パッケージマネージャを意図的に排除（不変インフラの徹底。侵入されても追加ツールを取得できない）
-- イメージが小さい（Standard 2.64MB。Alpine は 8.42MB）。起動時間と常駐メモリは Alpine と差がありません
+- イメージが小さい（Standard 2.55MB。Alpine は 8.42MB）。起動時間と常駐メモリは Alpine と差がありません
 - デバッグ可能性（BusyBoxによるシェル・ツール提供）
 - バージョンを固定した決定的な構成（`versions.mk` + チェックサム検証）
 - 日本語ドキュメントの充実
@@ -453,7 +453,7 @@ COPY --from=builder /stage/ /
 
 ### Q3: 本番環境で使用できますか？
 
-**A:** 使えます。ただし**本番では版を固定してください**（`3.1.0-standard` のように
+**A:** 使えます。ただし**本番では版を固定してください**（`3.2.0-standard` のように
 版番号つきのタグ）。`latest` は毎リリースで中身が変わります。
 開発はメンテナー 1 人で行っているので、サポートの体制はそれを前提に判断してください。
 

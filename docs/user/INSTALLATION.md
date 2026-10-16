@@ -47,7 +47,7 @@ docker pull ishinokazuki/kimigayo-os:latest-minimal
 docker run -it ishinokazuki/kimigayo-os:latest-minimal
 ```
 
-#### Standardイメージ（2.64MB / arm64 3.06MB、推奨）
+#### Standardイメージ（2.55MB / arm64 2.96MB、推奨）
 
 ```bash
 # Kimigayo OS Standardイメージをpull
@@ -57,7 +57,7 @@ docker pull ishinokazuki/kimigayo-os:latest
 docker run -it ishinokazuki/kimigayo-os:latest
 ```
 
-#### Extendedイメージ（2.67MB / arm64 3.10MB）
+#### Extendedイメージ（2.57MB / arm64 2.99MB）
 
 ```bash
 # Kimigayo OS Extendedイメージをpull

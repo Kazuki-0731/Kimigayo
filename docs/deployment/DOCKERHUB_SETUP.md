@@ -36,7 +36,7 @@ Docker Hub の Overview に貼る文章はこのファイルだけで管理す�
 各バージョンは、イメージサイズと含まれる機能に基づいて3つのバリアントで提供されます:
 
 サイズは目標（`SPECIFICATION.md` §8.3）で、実測（v3.1.0、x86_64 / arm64）は
-Minimal 2.34MB / 2.73MB、Standard 2.64MB / 3.06MB、Extended 2.67MB / 3.10MB です。
+Minimal 2.34MB / 2.73MB、Standard 2.55MB / 2.96MB、Extended 2.57MB / 2.99MB です。
 3 つの違いは BusyBox のアプレットだけです。
 
 1. **Minimal**（`-minimal`接尾辞）
@@ -46,7 +46,7 @@ Minimal 2.34MB / 2.73MB、Standard 2.64MB / 3.06MB、Extended 2.67MB / 3.10MB �
 
 2. **Standard**（接尾辞なし、または `-standard`。デフォルト）
    - サイズ目標: < 15MB
-   - 含まれるもの: musl libc + BusyBox（400 アプレット）+ OpenRC
+   - 含まれるもの: musl libc + BusyBox（379 アプレット）+ OpenRC
    - 用途: 汎用コンテナベースイメージ
 
 3. **Extended**（`-extended`接尾辞）
@@ -63,13 +63,13 @@ Minimal 2.34MB / 2.73MB、Standard 2.64MB / 3.06MB、Extended 2.67MB / 3.10MB �
 ```
 # バージョン指定（マルチアーキのマニフェスト）
 kimigayo-os:3.1.0               # Standardバリアント
-kimigayo-os:3.1.0-standard
-kimigayo-os:3.1.0-minimal
-kimigayo-os:3.1.0-extended
+kimigayo-os:3.2.0-standard
+kimigayo-os:3.2.0-minimal
+kimigayo-os:3.2.0-extended
 
 # バリアント + アーキテクチャ（単一プラットフォーム）
-kimigayo-os:3.1.0-standard-amd64
-kimigayo-os:3.1.0-minimal-arm64
+kimigayo-os:3.2.0-standard-amd64
+kimigayo-os:3.2.0-minimal-arm64
 
 # ローリングタグ（リリースごとに更新。全12本）
 kimigayo-os:latest              # standard のマニフェスト

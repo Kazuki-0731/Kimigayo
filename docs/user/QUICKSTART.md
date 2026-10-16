@@ -65,9 +65,9 @@ cat /etc/os-release
 
 | バリアント | イメージ | BusyBox アプレット | タグ |
 |-----------|---------|------------------|------|
-| Minimal | 2.34MB / arm64 2.73MB | 329 | `latest-minimal` / `3.1.0-minimal` |
-| **Standard**（推奨）| 2.64MB / arm64 3.06MB | 400 | `latest` / `latest-standard` / `3.1.0-standard` |
-| Extended | 2.67MB / arm64 3.10MB | 411 | `latest-extended` / `3.1.0-extended` |
+| Minimal | 2.34MB / arm64 2.73MB | 329 | `latest-minimal` / `3.2.0-minimal` |
+| **Standard**（推奨）| 2.55MB / arm64 2.96MB | 379 | `latest` / `latest-standard` / `3.2.0-standard` |
+| Extended | 2.57MB / arm64 2.99MB | 390 | `latest-extended` / `3.2.0-extended` |
 
 **Minimal には `vi`・`wget`・`du`・`less`・`tr`・`tee`・`expr` などが入っていません**
 （Standard との差は 33 アプレット）。v3.1.0 からは `httpd`・`ssl_client`・
@@ -283,8 +283,8 @@ v3.1.0 の実測値（2026-10-15、ホストは macOS / Apple Silicon）:
 | 指標 | 実測値 | 目標値 |
 |------|-------|--------|
 | イメージサイズ (Minimal) | 2.34MB / arm64 2.73MB | < 5MB |
-| イメージサイズ (Standard) | 2.64MB / arm64 3.06MB | < 15MB |
-| イメージサイズ (Extended) | 2.67MB / arm64 3.10MB | < 50MB |
+| イメージサイズ (Standard) | 2.55MB / arm64 2.96MB | < 15MB |
+| イメージサイズ (Extended) | 2.57MB / arm64 2.99MB | < 50MB |
 | 起動時間 | 0.65秒 | < 10秒 |
 | 常駐メモリ | 288KB | < 128MB |
 | BusyBox コマンド性能 | Alpine 比 0.97〜1.02x | Alpine 同等 |

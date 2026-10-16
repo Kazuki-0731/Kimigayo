@@ -11,7 +11,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 ### distroless からの継承
 - ✅ **不変インフラ**: パッケージマネージャーなし、実行時の変更を排除
 - ✅ **最小攻撃面**: 実行時にパッケージをインストールする仕組みを持たない
-- ✅ **軽量**: 2.34〜3.10MB のイメージサイズ（v3.1.0、バリアント × アーキテクチャ）
+- ✅ **軽量**: 2.34〜2.99MB のイメージサイズ（v3.1.0、バリアント × アーキテクチャ）
 
 ### Alpine Linux からの継承
 - ✅ **musl libc**: 軽量でシンプルなCライブラリ
@@ -32,7 +32,7 @@ Kimigayo OSは、**distroless** と **Alpine Linux** の両方の長所を組み
 
 ## 主な特徴
 
-- 🪶 **超軽量**: Standard（x86_64）**2.64MB** / arm64 3.06MB（v3.1.0、2026-10-15 実測）
+- 🪶 **超軽量**: Standard（x86_64）**2.55MB** / arm64 2.96MB（v3.1.0、2026-10-15 実測）
 - 💾 **常駐メモリ**: 288KB（Alpine 268KB / Ubuntu 24.04 316KB と同程度。同条件で実測）
 - 🔒 **セキュリティ強化**: 全実行ファイルを PIE・Full RELRO・非実行スタックでビルド
 - 🛡️ **最小攻撃面**: パッケージマネージャーを意図的に排除（`apk` も `dpkg` も無い）
@@ -115,7 +115,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ## イメージバリアント
 
-- **kimigayo-os:latest** - Standardバリアント（x86_64 2.64MB / arm64 3.06MB）
+- **kimigayo-os:latest** - Standardバリアント（x86_64 2.55MB / arm64 2.96MB）
   - 一般的なユーティリティを含む
   - 汎用コンテナベースイメージとして推奨
 
@@ -123,7 +123,7 @@ CMD ["nginx", "-g", "daemon off;"]
   - musl libc + 最小限のBusyBox + OpenRC
   - Standard から `vi`・`wget`・`less`・`tr`・`tee` などと、`httpd`・`telnetd`・`udhcpc` などのネットワーク系を除いたもの（329 アプレット。Standard より 71 少ない）
 
-- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.67MB / arm64 3.10MB）
+- **kimigayo-os:latest-extended** - Extendedバリアント（x86_64 2.57MB / arm64 2.99MB）
   - Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの
   - コンパイラなどの開発ツールは含まない
 
@@ -132,8 +132,8 @@ CMD ["nginx", "-g", "daemon off;"]
 ### バージョン指定タグ（本番ではこれを使ってください）
 ```
 kimigayo-os:3.1.0               # Standardバリアント
-kimigayo-os:3.1.0-minimal       # Minimalバリアント
-kimigayo-os:3.1.0-extended      # Extendedバリアント
+kimigayo-os:3.2.0-minimal       # Minimalバリアント
+kimigayo-os:3.2.0-extended      # Extendedバリアント
 ```
 
 ### アーキテクチャ指定タグ
@@ -141,11 +141,11 @@ kimigayo-os:3.1.0-extended      # Extendedバリアント
 **バリアント名が必要です**（`3.1.0-amd64` というタグはありません）。
 
 ```
-kimigayo-os:3.1.0-standard-amd64    # x86_64
-kimigayo-os:3.1.0-standard-arm64    # ARM64
+kimigayo-os:3.2.0-standard-amd64    # x86_64
+kimigayo-os:3.2.0-standard-arm64    # ARM64
 ```
 
-アーキテクチャ名を含まないタグ（`3.1.0`・`3.1.0-minimal`・`latest` など）はマルチアーキの
+アーキテクチャ名を含まないタグ（`3.1.0`・`3.2.0-minimal`・`latest` など）はマルチアーキの
 マニフェストなので、`docker pull` が自動で合うものを選びます。
 `latest-amd64`・`latest-arm64` は Standard の単一プラットフォームの別名です。
 

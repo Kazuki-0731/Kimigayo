@@ -8,7 +8,7 @@
 > **1. 構成要素を 2026-10-09 にまとめて更新したので、サイズは全部古い。**
 > カーネル 6.6.11 → 6.18.55、musl 1.2.4 → 1.2.6、
 > BusyBox 1.36.1 → 1.38.0、OpenRC 0.52.1 → 0.63.2。
-> Standard の現在の実測は **2.64MB**（x86_64、v3.1.0、2026-10-15）。
+> Standard の現在の実測は **2.55MB**（x86_64、v3.1.0、2026-10-15）。
 >
 > **2. ここに書かれたサイズは「Init が入っていないイメージ」の値。**
 > v2.0.1 までの rootfs は musl の `libc.so` も OpenRC のバイナリも
@@ -396,13 +396,13 @@ x86_64 の起動時間・メモリを QEMU 経由で測った値は比較に使�
 | OS | サイズ | Kimigayo 比 |
 |----|--------|-----------|
 | `gcr.io/distroless/static-debian12` | 2.11MB | 0.80x |
-| **Kimigayo Standard (x86_64)** | **2.64MB** | 基準 |
-| Kimigayo Standard (arm64) | 3.06MB | 1.16x |
+| **Kimigayo Standard (x86_64)** | **2.55MB** | 基準 |
+| Kimigayo Standard (arm64) | 2.96MB | 1.16x |
 | `alpine:latest`（3.24.2） | 8.42MB | 3.2x |
 | `gcr.io/distroless/base-debian12` | 20.9MB | 7.9x |
 | `ubuntu:24.04` | 78.2MB | 30x |
 
-**シェルと Init を備えて 2.64MB。** distroless に 0.53MB 足すだけで
+**シェルと Init を備えて 2.55MB。** distroless に 0.53MB 足すだけで
 `sh` と 400 個のコマンドとサービス管理が付く。
 
 ### 起動時間
@@ -445,7 +445,7 @@ BusyBox のアプレットは Alpine の BusyBox 比 **0.97〜1.02x**（中央�
 
 | OS | サイズ | シェル | Init | パッケージマネージャー |
 |----|--------|--------|------|---------------------|
-| **Kimigayo Standard** | 2.64MB | ✅ BusyBox | ✅ OpenRC | ❌（設計方針） |
+| **Kimigayo Standard** | 2.55MB | ✅ BusyBox | ✅ OpenRC | ❌（設計方針） |
 | Distroless Static | 2.11MB | ❌ | ❌ | ❌ |
 | Alpine | 8.42MB | ✅ | ❌ | ✅ apk |
 | Ubuntu 24.04 | 78.2MB | ✅ | ❌ | ✅ apt |

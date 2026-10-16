@@ -171,9 +171,9 @@ make ci-build-all
 docker images | grep kimigayo
 
 # 主要イメージ
-kimigayo-os:standard-x86_64    # Standard版 (2.64MB / 2026-10-15 実測)
+kimigayo-os:standard-x86_64    # Standard版 (2.55MB / 2026-10-15 実測)
 kimigayo-os:minimal-x86_64     # Minimal版 (2.34MB)
-kimigayo-os:extended-x86_64    # Extended版 (2.67MB)
+kimigayo-os:extended-x86_64    # Extended版 (2.57MB)
 ```
 
 **使用方法:**
@@ -400,8 +400,8 @@ make ci-build-all ARCH=x86_64          # 3 バリアントを順に
 | バリアント | 目標（SPECIFICATION.md §8.3） | 実測（v3.1.0、x86_64 / arm64） | BusyBox アプレット |
 |-----------|------|------|------|
 | **Minimal** | < 5MB | 2.34MB / 2.73MB | 329（`vi`・`wget`・`du`・`less` と、`httpd`・`udhcpc` などのネットワーク系が無い） |
-| **Standard** | < 15MB | 2.64MB / 3.06MB | 400 |
-| **Extended** | < 50MB | 2.67MB / 3.10MB | 411 |
+| **Standard** | < 15MB | 2.55MB / 2.96MB | 379 |
+| **Extended** | < 50MB | 2.57MB / 2.99MB | 390 |
 
 **3 バリアントの違いは BusyBox の config（`src/busybox/config/<variant>.config`）だけ**です。
 musl・OpenRC はどのバリアントにも同じものが入り、カーネルはどれにも入りません。

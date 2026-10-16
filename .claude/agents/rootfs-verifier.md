@@ -97,7 +97,7 @@ grep -rIl 'DOCKER_HUB\|ACCESS_TOKEN' "$ROOTFS" 2>/dev/null | head
 ### 7. バリアントとアーキテクチャが宣言どおりか
 
 ```bash
-busybox --list | wc -l    # v3.1.0 以降は minimal 329 / standard 400 / extended 411 が目安（v3.0.1〜3.0.2 の minimal は 367）
+busybox --list | wc -l    # v3.2.0 以降は minimal 329 / standard 379 / extended 390 が目安（v3.1.0 は 329/400/411）
 cat "$ROOTFS/.kimigayo-build-info"
 ```
 

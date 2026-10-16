@@ -116,7 +116,7 @@ make benchmark-lifecycle
 bash scripts/benchmark-lifecycle.sh
 
 # 環境変数でカスタマイズ（任意のイメージを測るときはスクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-standard \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.2.0-standard \
 BENCHMARK_ITERATIONS=20 \
 bash scripts/benchmark-lifecycle.sh
 ```
@@ -401,7 +401,7 @@ BENCHMARK_ITERATIONS=20 make benchmark-lifecycle
 
 ```bash
 # 公開イメージを使用（スクリプトを直接呼ぶ）
-IMAGE_NAME=ishinokazuki/kimigayo-os:3.1.0-minimal \
+IMAGE_NAME=ishinokazuki/kimigayo-os:3.2.0-minimal \
 bash scripts/benchmark-lifecycle.sh
 ```
 
