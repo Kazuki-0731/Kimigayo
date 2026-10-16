@@ -484,6 +484,7 @@ distroless は 2026-10-11 の値。
 - [セキュリティ監査ガイドライン](docs/security/SECURITY_AUDIT.md) - 監査プロセスと手順
 - [ペネトレーションテストガイド](docs/security/PENETRATION_TEST.md) - 侵入テスト実施方法
 - [ランタイム脅威検知ガイド](docs/security/RUNTIME_DETECTION.md) - 侵入後の検知・通知・ログ保全（Falco / auditd）
+- [サーバーメンテナンス手順](docs/maintainer/SERVER_MAINTENANCE.md) - 昇格を塞いだままの運用・メンテ（実行プロファイル）
 
 #### リリース情報
 
