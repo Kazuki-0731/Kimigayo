@@ -26,7 +26,7 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 
 ### ✨ 主な特徴
 
-- 🪶 **軽量**: Standard で **2.64MB**（同じ platform で実測した
+- 🪶 **軽量**: Standard で **2.55MB**（同じ platform で実測した
   Alpine 8.42MB の約 1/3、Ubuntu 24.04 78.2MB の約 1/30）
 - 🔒 **セキュアバイデフォルト**: パッケージマネージャー排除による最小攻撃面、全 ELF を PIE・Full RELRO・非実行スタックでビルド
 - 🧩 **モジュラー設計**: 必要な機能のみを選択可能な3つのバリアント（Minimal/Standard/Extended）
@@ -42,8 +42,8 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 | 指標 | 実測値 | 目標値 | 達成状況 |
 |------|-------|--------|---------|
 | イメージサイズ (Minimal) | **2.34MB** / arm64 **2.73MB** | < 5MB | ✅ **目標の47%** / 55% |
-| イメージサイズ (Standard) | **2.64MB** / arm64 **3.06MB** | < 15MB | ✅ **目標の18%** / 20% |
-| イメージサイズ (Extended) | **2.67MB** / arm64 **3.10MB** | < 50MB | ✅ **目標の5%** / 6% |
+| イメージサイズ (Standard) | **2.55MB** / arm64 **2.96MB** | < 15MB | ✅ **目標の17%** / 20% |
+| イメージサイズ (Extended) | **2.57MB** / arm64 **2.99MB** | < 50MB | ✅ **目標の5%** / 6% |
 | 起動時間 | **0.65秒** | —（目標は未定義） | —（Alpine 0.61秒・Ubuntu 0.65秒で差なし） |
 | 常駐メモリ | **288KB** | —（目標は未定義） | —（Alpine 268KB・Ubuntu 316KB） |
 | BusyBoxコマンド性能 | Alpine比 **0.97〜1.02x** | —（目標は未定義） | —（Alpine と有意差なし） |
@@ -56,7 +56,7 @@ Kimigayo OS は、Google の distroless と Alpine Linux の両方の設計思�
 起動時間・常駐メモリ・コマンド性能には目標値が無い。
 **実際には 3 バリアントとも、いちばん厳しい Minimal の目標 5MB を下回っている。**
 
-v3.1.0 の公開イメージを 2026-10-15 に実測。サイズは 6 イメージすべて、起動時間・メモリ・
+v3.2.0 の公開イメージのサイズを 2026-10-16 に実測（起動・メモリは構成要素が同じなので v3.1.0 と同じ）。サイズは 6 イメージすべて、起動時間・メモリ・
 コマンド性能は arm64 ネイティブの Standard（Minimal / Extended の起動時間とメモリも
 同じ条件で測っており、値は「競合OS比較」節の表）。6 バリアントすべてが
 `scripts/verify-image.sh` の検査（40 項目、wget を持たない Minimal は 39）を通過している。
@@ -73,7 +73,7 @@ v3.1.0 の公開イメージを 2026-10-15 に実測。サイズは 6 イメー�
 > `/bin/sh` にも効かせるための選択で、目標（128MB 未満）には影響しない。
 
 
-**測定条件**: 2026-10-15 / 対象は v3.1.0 の公開イメージ / ホストは macOS（Apple Silicon, arm64）/
+**測定条件**: サイズは 2026-10-16 / 対象は v3.2.0 の公開イメージ（起動・メモリは v3.1.0 と同じ） / ホストは macOS（Apple Silicon, arm64）/
 Alpine 3.24 ベースのビルド環境 /
 カーネル 6.18.55・musl 1.2.6・BusyBox 1.38.0・OpenRC 0.63.2。
 
@@ -90,26 +90,24 @@ Alpine 3.24 ベースのビルド環境 /
 
 | バリアント | BusyBox アプレット | BusyBox 本体 | tarball | イメージ |
 | --- | --- | --- | --- | --- |
-| Minimal (x86_64) | 329 | 710KB | 1,103KB | **2.34MB** |
-| Standard (x86_64) | 400 | 1,002KB | 1,290KB | **2.64MB** |
-| Extended (x86_64) | 411 | 1,030KB | 1,313KB | **2.67MB** |
-| Minimal (arm64) | 329 | 781KB | 1,265KB | **2.73MB** |
-| Standard (arm64) | 400 | 1,105KB | 1,472KB | **3.06MB** |
-| Extended (arm64) | 411 | 1,140KB | 1,493KB | **3.10MB** |
+| Minimal (x86_64) | 329 | 709KB | 1,103KB | **2.34MB** |
+| Standard (x86_64) | 379 | 905KB | 1,234KB | **2.55MB** |
+| Extended (x86_64) | 390 | 933KB | 1,256KB | **2.57MB** |
+| Minimal (arm64) | 329 | 780KB | 1,265KB | **2.73MB** |
+| Standard (arm64) | 379 | 999KB | 1,408KB | **2.96MB** |
+| Extended (arm64) | 390 | 1,035KB | 1,431KB | **2.99MB** |
 
-> **v3.1.0 で Minimal が約 120KB 小さくなり、Standard・Extended は約 45KB 大きくなった**
-> （v3.0.2 は 2.46 / 2.60 / 2.62MB）。Minimal は httpd・telnetd・udhcpc などの
-> ネットワーク系 38 アプレットを外した（367 → 329。どれも Standard に入っている）。
-> 増えた分は主に `/usr/share/licenses/` に入れた条文。arm64 はさらに、
-> FORTIFY_SOURCE が効くようになった分だけ BusyBox 本体が約 20KB 大きい。
+> **v3.2.0 で Standard・Extended が約 100KB 小さくなった**（v3.1.0 は Standard 2.55 /
+> 2.96MB・Extended 2.57 / 2.99MB）。待ち受け（サーバー）と DHCP のアプレット 21 個を
+> 外したため（400 → 379・411 → 390）。Minimal は v3.1.0 から変わらない。
 
 > **v3.0.2 で BusyBox 本体が約 160KB 小さくなった**（v3.0.1 の Standard x86_64 は
 > 1,162KB / イメージ 2.76MB）。BusyBox を動的リンクにし、静的リンクで中に
 > 取り込んでいた libc を、OpenRC と共有の `/lib/libc.so` に寄せたため。
 
-> **v3.0.0 からアプレットが 3 つ減っている**（370/403/413 → 367/400/411）。
-> `dpkg`・`dpkg-deb`・`rpm` を外したため
-> （→ [CHANGELOG.md](CHANGELOG.md) の 3.0.1）。
+> **攻撃面の削減でアプレットが減ってきている**（v3.0.0 の 370/403/413 → v3.2.0 の 329/379/390）。
+> v3.0.1 で `dpkg`・`dpkg-deb`・`rpm`、v3.1.0 で Minimal のネットワーク系、
+> v3.2.0 で Standard / Extended の待ち受け・DHCP を外した（→ [CHANGELOG.md](CHANGELOG.md)）。
 
 **3バリアントの差は BusyBox のアプレット数だけで、x86_64 では 330KB しかない。**
 イメージの大半は musl の `libc.so`・BusyBox 本体・
@@ -123,7 +121,7 @@ OpenRC（バイナリ9個 + 共有ライブラリ2本 + ヘルパ）で、どの
 > 入っていなかった**こと（2026-10-09 に修正）。v3.0.1 までは BusyBox 1.38.0 を
 > 静的リンクしており、本体が単体で 1.16MB あったことも効いていた
 > （v3.0.2 で動的リンクにして約 1,001KB）。つまり 1.17MB は
-> 「Init システムが入っていない状態」の数字で、現在の 2.64MB と
+> 「Init システムが入っていない状態」の数字で、現在の 2.55MB と
 > 同じものを測った値ではない。
 >
 > **起動時間とメモリの旧値（439ms / 0.2MB）は破棄した。計測が壊れていた。**
@@ -133,7 +131,7 @@ OpenRC（バイナリ9個 + 共有ライブラリ2本 + ヘルパ）で、どの
 > **イメージが壊れているほど速く見える**計測だった）。
 > `scripts/benchmark-memory.sh` は `KiB` を `0.001` に置換したうえ
 > 結果を整数 MB に丸めており、**1MB 未満を 0 としか表せなかった**。
-> 2026-10-10 に両方を書き直した。上の値は 2026-10-15 に v3.1.0 で測ったもの。
+> 2026-10-10 に両方を書き直した。起動・メモリは v3.1.0（2026-10-15）の値で、v3.2.0 でも同じ。
 
 </details>
 
@@ -261,11 +259,11 @@ docker run --rm -it \
 | イメージタイプ | サイズ | 用途 | Docker Hubタグ |
 | -------------- | ------ | ---- | -------------- |
 | **Minimal** | **2.34MB**（329 アプレット） | コンテナ、最小限の環境 | `ishinokazuki/kimigayo-os:latest-minimal` |
-| **Standard** | **2.64MB**（400 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
-| **Extended** | **2.67MB**（411 アプレット） | Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの | `ishinokazuki/kimigayo-os:latest-extended` |
+| **Standard** | **2.55MB**（379 アプレット） | 一般的なサーバー環境（推奨） | `ishinokazuki/kimigayo-os:latest` |
+| **Extended** | **2.57MB**（390 アプレット） | Standard に `ar`・`ed`・`inotifyd`・`rfkill`・MTD/flash・framebuffer 系など 11 アプレットを足したもの | `ishinokazuki/kimigayo-os:latest-extended` |
 
-いずれも x86_64 / v3.1.0 を 2026-10-15 実測。arm64 は Minimal 2.73MB /
-Standard 3.06MB / Extended 3.10MB（→「パフォーマンス実績」節）。
+いずれも x86_64 / v3.2.0 を 2026-10-16 実測。arm64 は Minimal 2.73MB /
+Standard 2.96MB / Extended 2.99MB（→「パフォーマンス実績」節）。
 
 > **`latest` 系は最新リリースを指す**（公開済みの版は
 > [Releases](https://github.com/Kazuki-0731/Kimigayo/releases) を参照）。
@@ -274,7 +272,7 @@ Standard 3.06MB / Extended 3.10MB（→「パフォーマンス実績」節）�
 > **本番では版を固定する**（`3.1.0-standard` のように版番号つきのタグ、
 > またはダイジェスト指定）。
 
-**比較**（`--platform linux/amd64`。Kimigayo Standard = 2.64MB・Alpine・Ubuntu は 2026-10-15、
+**比較**（`--platform linux/amd64`。Kimigayo Standard = 2.55MB は v3.2.0、Alpine・Ubuntu は 2026-10-15、
 distroless は 2026-10-11 に同じホストで実測）:
 
 | イメージ | サイズ | Kimigayo 比 |
@@ -386,7 +384,7 @@ archive）は各 GitHub Release に添付しています。
 ### 🌟 競合OS比較
 
 **同じホスト（macOS / Apple Silicon）で実測。** Kimigayo・Alpine・Ubuntu の
-起動時間とメモリは 2026-10-15 に同時に測った値（Kimigayo は v3.1.0）。
+起動時間とメモリは 2026-10-15 に測った値（Kimigayo は v3.1.0。v3.2.0 でも構成要素が同じで変わらない）。サイズは v3.2.0 の値。
 distroless は 2026-10-11 の値。
 サイズは x86_64（`--platform linux/amd64`、QEMU）と arm64 の両方、
 **起動時間とメモリは arm64 ネイティブ**（QEMU を挟むと時間の比較に
@@ -395,8 +393,8 @@ distroless は 2026-10-11 の値。
 | OS | サイズ (x86_64 / arm64) | 起動時間 | 常駐メモリ | シェル | パッケージマネージャー | Init |
 |----|-------|---------|-------|-------|---------------------|------|
 | **Kimigayo Minimal** | **2.34** / **2.73MB** | 0.61秒 | 280KB | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Standard** | **2.64** / **3.06MB** | 0.65秒 | 288KB | ✅ BusyBox | ❌ | ✅ OpenRC |
-| **Kimigayo Extended** | **2.67** / **3.10MB** | 0.62秒 | 280KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Standard** | **2.55** / **2.96MB** | 0.65秒 | 288KB | ✅ BusyBox | ❌ | ✅ OpenRC |
+| **Kimigayo Extended** | **2.57** / **2.99MB** | 0.62秒 | 280KB | ✅ BusyBox | ❌ | ✅ OpenRC |
 | `gcr.io/distroless/static-debian12` | 2.11 / 2.11MB | — | — | ❌ | ❌ | ❌ |
 | `gcr.io/distroless/base-debian12` | 20.9 / 31.4MB | — | — | ❌ | ❌ | ❌ |
 | `alpine:latest`（3.24.2） | 8.42 / 8.66MB | 0.61秒 | **268KB** | ✅ ash | ✅ apk | ❌ |
@@ -418,7 +416,7 @@ distroless は 2026-10-11 の値。
 > メモリも測れない（`/bin/true` すら無い）。これは欠陥ではなく設計。
 
 #### vs Alpine Linux
-- ✅ **約3倍軽量**: 2.64MB vs 8.42MB（x86_64。arm64 でも 3.06 vs 8.66MB）
+- ✅ **約3倍軽量**: 2.55MB vs 8.42MB（x86_64。arm64 でも 2.96 vs 8.66MB）
 - ⚠️ **常駐メモリはほぼ同じ**: 288KB vs 268KB（arm64。v3.0.2 から BusyBox が動的リンク）
 - ✅ **パッケージマネージャーなし**: セキュリティ優先の設計（Alpine は apk を含む）
 - ✅ **Init を同梱**: OpenRC 0.63.2（Alpine のイメージには Init が入っていない）
@@ -431,7 +429,7 @@ distroless は 2026-10-11 の値。
 - ⚠️ **サイズ**: Distroless Static（2.11MB）より大きいが、機能が豊富
 
 #### 独自の強み
-- 🏆 **シェルと Init を備えて 2.64MB**
+- 🏆 **シェルと Init を備えて 2.55MB**
 - 🚀 **arm64 ネイティブイメージ**: Apple Silicon や arm64 の VPS でエミュレーションなしで動く
 - 🔒 **セキュリティとデバッグの両立**: 不変インフラ + シェルアクセス
 - 🇯🇵 **充実した日本語ドキュメント**: 日本発のOSS
@@ -543,7 +541,7 @@ A working multi-stage example is in [examples/python/Dockerfile](examples/python
 
 ### ✨ Key Features
 
-- 🪶 **Lightweight**: 2.64MB for Standard (vs. Alpine 8.42MB and Ubuntu 24.04 78.2MB,
+- 🪶 **Lightweight**: 2.55MB for Standard (vs. Alpine 8.42MB and Ubuntu 24.04 78.2MB,
   measured on the same host)
 - 🔒 **Secure-by-Default**: No package manager, minimal attack surface, PIE / full RELRO / non-executable stack on every ELF
 - 🧩 **Modular Design**: 3 variants (Minimal/Standard/Extended) for different use cases
@@ -558,8 +556,8 @@ A working multi-stage example is in [examples/python/Dockerfile](examples/python
 | Metric | Measured | Target | Status |
 |--------|----------|--------|---------|
 | Image size (Minimal) | **2.34MB** / arm64 **2.73MB** | < 5MB | ✅ **47% of target** / 55% |
-| Image size (Standard) | **2.64MB** / arm64 **3.06MB** | < 15MB | ✅ **18% of target** / 20% |
-| Image size (Extended) | **2.67MB** / arm64 **3.10MB** | < 50MB | ✅ **5% of target** / 6% |
+| Image size (Standard) | **2.55MB** / arm64 **2.96MB** | < 15MB | ✅ **17% of target** / 20% |
+| Image size (Extended) | **2.57MB** / arm64 **2.99MB** | < 50MB | ✅ **5% of target** / 6% |
 | Boot time | **0.65s** | — (no target defined) | — (Alpine 0.61s, Ubuntu 0.65s, no difference) |
 | Resident memory | **288KB** | — (no target defined) | — (Alpine 268KB, Ubuntu 316KB) |
 | BusyBox performance | **0.97-1.02x** of Alpine | — (no target defined) | — (no measurable difference from Alpine) |
@@ -572,7 +570,7 @@ Targets are the ones defined in [SPECIFICATION.md](SPECIFICATION.md) §8.3
 boot time, memory and command performance have none. **In practice all three
 variants come in under 5MB — the strictest of the three targets.**
 
-The published v3.1.0 images measured on 2026-10-15: sizes for all six images, and
+The published v3.2.0 image sizes measured on 2026-10-16 (boot time and memory unchanged from v3.1.0): sizes for all six images, and
 boot time, memory and command performance for Standard on native arm64 (Minimal and Extended
 boot time and memory were measured the same way; see the comparison table in the Japanese section). Every
 variant passes `scripts/verify-image.sh` (40 checks; 39 for Minimal, which has no wget).
@@ -589,7 +587,7 @@ variant passes `scripts/verify-image.sh` (40 checks; 39 for Minimal, which has n
 > nowhere near the 128MB target.
 
 
-**Measurement conditions**: 2026-10-15, published v3.1.0 images, host is macOS on Apple Silicon
+**Measurement conditions**: sizes 2026-10-16, published v3.2.0 images (boot/memory same as v3.1.0), host is macOS on Apple Silicon
 (arm64). Build environment is based on Alpine 3.24, with kernel 6.18.55 /
 musl 1.2.6 / BusyBox 1.38.0 / OpenRC 0.63.2.
 
@@ -606,14 +604,14 @@ The difference over `/bin/true` is what the init system costs.
 
 | Variant | BusyBox applets | BusyBox binary | tarball | image |
 | --- | --- | --- | --- | --- |
-| Minimal (x86_64) | 329 | 710KB | 1,103KB | **2.34MB** |
-| Standard (x86_64) | 400 | 1,002KB | 1,290KB | **2.64MB** |
-| Extended (x86_64) | 411 | 1,030KB | 1,313KB | **2.67MB** |
-| Minimal (arm64) | 329 | 781KB | 1,265KB | **2.73MB** |
-| Standard (arm64) | 400 | 1,105KB | 1,472KB | **3.06MB** |
-| Extended (arm64) | 411 | 1,140KB | 1,493KB | **3.10MB** |
+| Minimal (x86_64) | 329 | 709KB | 1,103KB | **2.34MB** |
+| Standard (x86_64) | 379 | 905KB | 1,234KB | **2.55MB** |
+| Extended (x86_64) | 390 | 933KB | 1,256KB | **2.57MB** |
+| Minimal (arm64) | 329 | 780KB | 1,265KB | **2.73MB** |
+| Standard (arm64) | 379 | 999KB | 1,408KB | **2.96MB** |
+| Extended (arm64) | 390 | 1,035KB | 1,431KB | **2.99MB** |
 
-> **In v3.1.0 Minimal shrank by about 120KB and Standard / Extended grew by about 45KB**
+> **In v3.2.0 Standard / Extended shrank by about 100KB** (removed 21 server/DHCP applets; 400→379, 411→390; Minimal unchanged from v3.1.0). Earlier,
 > (v3.0.2: 2.46 / 2.60 / 2.62MB). Minimal dropped 38 network applets such as httpd,
 > telnetd and udhcpc (367 → 329; all of them remain in Standard). The growth is mostly
 > the license texts now shipped in `/usr/share/licenses/`. On arm64 the BusyBox
@@ -623,7 +621,7 @@ The difference over `/bin/true` is what the init system costs.
 > 1,162KB / 2.76MB image). BusyBox is now dynamically linked and shares
 > `/lib/libc.so` with OpenRC instead of carrying its own copy of libc.
 
-> **Three applets fewer than v3.0.0** (370/403/413 → 367/400/411): `dpkg`,
+> **Attack surface has been trimmed over time** (v3.0.0 370/403/413 → v3.2.0 329/379/390): `dpkg`,
 > `dpkg-deb` and `rpm` were removed (see [CHANGELOG.md](CHANGELOG.md), 3.0.1).
 
 **The three variants differ only in the number of BusyBox applets — a span of
@@ -637,7 +635,7 @@ more space).
 
 > v2.0.1 (2026-01-16) reported 1.17MB for Standard. That figure was measured on
 > images that **did not actually contain musl's `libc.so` or any OpenRC binary**
-> (fixed on 2026-10-09), so it is not the same thing as today's 2.64MB.
+> (fixed on 2026-10-09), so it is not the same thing as today's 2.55MB.
 >
 > The old boot time and memory figures (439ms / 0.2MB) were discarded — the
 > benchmarks were broken. `scripts/benchmark-startup.sh` timed
@@ -646,7 +644,7 @@ more space).
 > runs, so **the more broken the image, the faster it looked**.
 > `scripts/benchmark-memory.sh` replaced `KiB` with `0.001` and then rounded to
 > whole megabytes, so **anything under 1MB came out as 0**. Both were rewritten
-> on 2026-10-10 and re-measured; the numbers above are from the 2026-10-15 run (v3.1.0).
+> on 2026-10-10 and re-measured; the sizes are from the 2026-10-16 run (v3.2.0); boot/memory are the v3.1.0 values.
 
 </details>
 
