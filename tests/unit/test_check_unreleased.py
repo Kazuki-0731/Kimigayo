@@ -119,3 +119,21 @@ def test_current_changelog_parses():
     level, _, sections = cu.parse_unreleased(text)
     assert level in ("なし", *cu.LEVELS)
     assert set(sections) >= set(cu.LEVELS)
+
+
+def test_image_change_ok_when_version_section_newer_than_tag():
+    # リリース作業中: [Unreleased] は空だが 3.2.0 の版見出しがあれば通る
+    text = changelog("**次の版: なし**") + "\n## [3.2.0] \"x\" - 2026-10-16\n- released\n"
+    assert cu.check(["src/busybox/config/standard.config"], "v3.1.0", text) == []
+
+
+def test_image_change_fails_when_no_newer_version_section():
+    text = changelog("**次の版: なし**") + "\n## [3.1.0] \"x\" - 2026-10-14\n- old\n"
+    errors = cu.check(["src/busybox/config/standard.config"], "v3.1.0", text)
+    assert len(errors) == 1
+
+
+def test_released_newer_than():
+    t = changelog("**次の版: なし**") + "\n## [3.2.0] x\n## [3.1.0] x\n"
+    assert cu.released_newer_than(t, "v3.1.0") is True
+    assert cu.released_newer_than(t, "v3.2.0") is False

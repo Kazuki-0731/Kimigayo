@@ -17,74 +17,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added に並べ直し、この節を空の雛形に戻す
 -->
 
-**次の版: マイナー（3.2.0）**
+**次の版: なし**（公開イメージの中身を変える変更がまだ無い）
 
 ### メジャー
 
 ### マイナー
 
-- **Standard / Extended の httpd からリバースプロキシ（`httpd.conf` の `P:` 行）を外した**
-  （`CONFIG_FEATURE_HTTPD_PROXY=n`）。パイプライン化したリクエストがパスの制限を回避できる
-  CVE-2026-88829 に、上流・Debian・Alpine の修正が無いため。プロキシは nginx などに任せる。
-  `verify-image.sh` が、`P:` を書いても中継されないことを見る
-- **Standard / Extended から待ち受け（サーバー）と DHCP のアプレット 21 個を外した**（#122）。
-  `telnetd`・`ftpd`・`tftpd`・`inetd`・`tcpsvd`・`udpsvd`・`ntpd`・`fakeidentd`・`ssl_server`・`dnsd`・`lpd`・
-  `udhcpc`・`udhcpc6`・`udhcpd`・`dhcprelay`・`dumpleases`・`zcip`・`ifplugd`・`ether-wake`・`nbd-client`・`sendmail`。
-  config に書いておらず Kconfig の既定値で入っていた。コンテナの IP は Docker が割り当てるので DHCP は
-  要らず、待ち受けの道具は侵入されたときの裏口になる。修正の無い CVE-2026-88833（udhcpc）にも当たらなくなる。
-  `httpd`（プロキシなし）と `nc`・`telnet`・`wget` などのクライアントは残す。
-  **移行の注意:** これらを使っていたら、マルチステージビルドで必要なバイナリを持ち込む。
-  IP の固定は `udhcpc` ではなく `docker run --ip` / compose の `ipv4_address` で行う
-
 ### パッチ
 
 ### リリースしない（次のリリースに相乗りする）
 
-- **security-review / rootfs-verifier / release の各定義に「能動的な攻撃の試行」を足した**。
-  実物イメージに対して昇格・RCE を試して「できない」ことを確かめる手順と、検証ワークフローへの導線
+## [3.2.0] "Himawari" (向日葵) - 2026-10-16
 
-- **サーバーメンテナンス手順を足した**（`docs/maintainer/SERVER_MAINTENANCE.md`）。昇格を塞いだままの
-  運用（実行プロファイル 3 つ）と、昇格を解かずにホストから root メンテする方法（新イメージ入れ替え・
-  `docker exec --user 0`・特権サイドカー）。README・HARDENING_GUIDE から参照
-- - **Falco ルールの発火を CI で検証するワークフローを足した**（`runtime-detection-verify.yml`、手動のみ・検証専用）。
-  わざと脆弱なターゲットに root 昇格・シェル起動を起こし、`kimigayo_rules.yaml` が検知することを確かめる。
-  加えて、強化フラグ（`no-new-privileges` 他）で昇格が塞がれること（防御の退行防止）も確かめる
-- **ランタイム脅威検知ガイドと Falco ルールを追加した**（`docs/security/RUNTIME_DETECTION.md`・
-  `docs/security/falco/kimigayo_rules.yaml`）。侵入後の権限奪取・不審アクセスを
-  ホスト側で検知し、ログをコンテナ外へ逃がす手順。2026-10-16 の検証（脆弱コンテナへの
-  root 奪取が既定では無検知）を根拠にした
+**Standard / Extended の攻撃面を減らした版。** 待ち受け（サーバー）と DHCP の
+アプレットを外し、httpd のリバースプロキシを無効化した。加えて、侵入後に気づくための
+ランタイム脅威検知のガイドと Falco ルール、昇格を塞いだまま運用するための
+サーバーメンテナンス手順を追加した。イメージの構成要素（musl / BusyBox / OpenRC /
+カーネル）の版は v3.1.0 と同じ。
 
-- **GitHub Actions の更新 8 件**（Dependabot）。checkout v7.0.1・setup-buildx-action v4.4.1・
-  upload-artifact v7.0.2・download-artifact v8.0.2・dependency-review-action v5.0.0・
-  github-script v9.0.0・login-action v4.6.0・action-gh-release v3.0.3。
-  **login-action と action-gh-release はタグを打ったときにしか動かない**ので、
-  次のリリースが初めての実地の確認になる
-- **`scripts/merge-dependabot-prs.sh` を足した。** 条件を満たす Dependabot の PR を
-  手元から管理者権限でまとめて merge する。自動 merge の仕組みはリポジトリに置かない
-- **`docs/maintainer/ACCOUNT_SECURITY.md` を足した**（メンテナーのアカウントとトークンの守り方）
-- **バージョンの上げ方とリリースの時期を決めた**（SPECIFICATION.md 10.2。release skill の
-  最初の段と、月次の保守のリリース見直しから参照する）
-- **CI が `[Unreleased]` の書き忘れを止めるようにした**（`scripts/check-unreleased.py`）。
-  前回のタグから公開イメージの中身に効くファイルが変わったのにメジャー・マイナー・パッチの
-  項目が無いとき、「次の版」が区分や前回のタグからの計算と合わないときに落ちる
-- **構成要素の更新 PR（`component-update-pr.yml`）が `[Unreleased]` に区分付きで 1 行足すようにした**
-  （`scripts/add-unreleased.py`）。最後の数字だけの更新はパッチ、それより上はマイナー
-- **脆弱性の自動検知の結果を、公開の Issue ではなく非公開の Project に足すようにした**
-  （`upstream-security-watch.yml`・`published-image-cve-scan.yml`）。まだ直っていない脆弱性を公開の場に書かない。
-  `upstream-security-watch.yml` の実行ログとサマリーにも、上流との差分の中身を出さない（件数だけ）
-- 上流のセキュリティ情報の仕分け（`docs/security/upstream-triage.tsv`）を更新した
-- **ワークフローのファイル名を「いつ動くか + 何をするか」に揃えた**（名前で中身が分かるように。定期実行には接頭辞を付けない）。
-  `ci.yml` → `on-push-and-pr-build-and-verify-all-images.yml`、`build-workflow.yml` → `reusable-build-and-verify-image.yml`、
-  `base-image-update.yml` → `component-update-pr.yml`、`security.yml` → `upstream-security-watch.yml`、
-  `manual-build.yml` → `manual-build-image-and-kernel.yml`、`project-sync.yml` → `on-issue-sync-private-project.yml`、
-  `release.yml` → `on-tag-publish-release.yml`。`dependency-review.yml` は PR の依存レビュー
-  （`on-pr-dependency-review.yml`）と毎週の公開イメージの CVE 照合（`published-image-cve-scan.yml`）に分け、
-  シェルスクリプトの `http://` と `eval` の点検は push ごとに回すようにした
-- **Issue と非公開の Project を一緒に作る・直す `scripts/project-issue.py` を足した**（冪等）。
-  `on-issue-sync-private-project.yml` が Issue の変化のたびと毎日、Project にそろえる
-- **Issue の優先度のラベル（`priority: high` / `middle` / `low`）を Project の Priority と同じ値でそろえるようにした**
-  （`project-issue.py` の `issue` / `set` / `sync`）
-- 文書の実測値と例のタグを v3.1.0 の公開イメージに合わせた。`examples/` の土台を 3.1.0 にした
+### Security
+
+- **httpd のリバースプロキシ（`httpd.conf` の `P:` 行）を Standard / Extended で無効化した**
+  （`CONFIG_FEATURE_HTTPD_PROXY=n`）。パイプライン化したリクエストがパスの制限を回避できる
+  CVE-2026-88829 に、上流・Debian・Alpine の修正が無いため。プロキシは nginx などに任せる。
+  `httpd` 本体は残す。`verify-image.sh` が `P:` を書いても中継されないことを見る
+- **修正の無い CVE-2026-88833（udhcpc）に当たらなくなった**（下の Removed で udhcpc を外したため）
+
+### Removed
+
+- **Standard / Extended から待ち受け（サーバー）と DHCP のアプレット 21 個を外した**（#122）:
+  `telnetd`・`ftpd`・`tftpd`・`inetd`・`tcpsvd`・`udpsvd`・`ntpd`・`fakeidentd`・`ssl_server`・`dnsd`・`lpd`・
+  `udhcpc`・`udhcpc6`・`udhcpd`・`dhcprelay`・`dumpleases`・`zcip`・`ifplugd`・`ether-wake`・`nbd-client`・`sendmail`。
+  config に書いておらず Kconfig の既定値で入っていた。コンテナの IP は Docker が割り当てるので DHCP は
+  要らず、待ち受けの道具は侵入されたときの裏口になる。`httpd`（プロキシなし）と `nc`・`telnet`・`wget`
+  などのクライアントは残す。アプレット数は Standard 400 → 379、Extended 411 → 390
+
+### Added
+
+- **ランタイム脅威検知ガイドと Falco ルール**（`docs/security/RUNTIME_DETECTION.md`・
+  `docs/security/falco/kimigayo_rules.yaml`）。侵入後の権限奪取・不審アクセスをホスト側で検知し、
+  ログをコンテナ外へ逃がす手順。Falco が root 奪取・シェル起動・外向き接続を検知することを CI で実証
+- **サーバーメンテナンス手順**（`docs/maintainer/SERVER_MAINTENANCE.md`）。昇格を塞いだままの運用
+  （実行プロファイル 3 つ）と、昇格を解かずにホストから root メンテする方法
+  （新イメージへの入れ替え・`docker exec --user 0`・特権サイドカー）
+- **能動的な攻撃の検証ワークフロー**（`.github/workflows/runtime-detection-verify.yml`、手動・検証専用）。
+  わざと脆弱にしたコンテナに root 奪取・シェル起動・外向き接続を起こして Falco が検知すること、
+  強化フラグ（`no-new-privileges` 他）で昇格が塞がれることを assert する
+
+### 移行時の注意
+
+- **外した待ち受け・DHCP のアプレットを使っていたら**、マルチステージビルドで必要なバイナリを
+  持ち込むか、別の土台を使う。IP を固定したいときは `udhcpc` ではなく `docker run --ip` /
+  compose の `ipv4_address` を使う
+- **httpd のリバースプロキシ（`P:`）は動かなくなる**（Standard / Extended）。前段に nginx などを置く
+
+### Changed（開発・運用。イメージの中身には影響しない）
+
+- ワークフローのファイル名を「いつ動くか + 何をするか」に揃えた（`ci.yml` → `on-push-and-pr-build-and-verify-all-images.yml` など）。
+  `dependency-review.yml` を PR の依存レビューと公開イメージの CVE 照合に分けた
+- セキュリティに関するものは公開 Issue にせず非公開の Project で管理する運用にした
+  （`scripts/project-issue.py`・`on-issue-sync-private-project.yml`、自動検知の結果も Project へ）
+- Issue のラベル・Project の Status を日本語にした。SPECIFICATION.md 10.2 にリリースの方針を定め、
+  CI が CHANGELOG の `[Unreleased]` の書き忘れを止めるようにした（`scripts/check-unreleased.py`）（リリース時は版見出しを認識する）
+- メンテナーのアカウント保護手順（`docs/maintainer/ACCOUNT_SECURITY.md`）と、
+  Dependabot の PR を手元からまとめて merge するスクリプト（`scripts/merge-dependabot-prs.sh`）を足した
 
 ## [3.1.0] "Himawari" (向日葵) - 2026-10-14
 

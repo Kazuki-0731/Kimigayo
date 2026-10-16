@@ -106,6 +106,18 @@ def bump(tag: str, level: str) -> str:
     return f"{x}.{y}.{z + 1}"
 
 
+VERSION_HEADING = re.compile(r"^## \[(\d+)\.(\d+)\.(\d+)\]", re.M)
+
+
+def released_newer_than(text: str, tag: str) -> bool:
+    """CHANGELOG に、前回のタグより新しい版見出し（## [X.Y.Z]）があるか。"""
+    m = TAG.match(tag)
+    if not m:
+        return False
+    last = tuple(int(x) for x in m.groups())
+    return any(tuple(int(x) for x in h) > last for h in VERSION_HEADING.findall(text))
+
+
 def check(changed: list[str], tag: str, text: str) -> list[str]:
     """問題の一覧を返す（空なら通過）。"""
     errors = []
@@ -121,6 +133,11 @@ def check(changed: list[str], tag: str, text: str) -> list[str]:
                           f"（前回のタグ {tag} から計算。いまは {next_version or 'なし'}）")
 
     inputs = [p for p in changed if is_image_input(p)]
+    # リリース作業中は、画像の変更が [Unreleased] から版見出し（## [X.Y.Z]）へ
+    # 移される。前回のタグより新しい版見出しが既にあれば、その変更はそこに
+    # 記載済みなので [Unreleased] が空でよい（タグを打てば次からこの判定は不要）。
+    if inputs and expected == "なし" and released_newer_than(text, tag):
+        inputs = []
     if inputs and expected == "なし":
         declared = "\n".join(sections.get(NOT_RELEASED, []))
         missing = [p for p in inputs if f"`{p}`" not in declared]
