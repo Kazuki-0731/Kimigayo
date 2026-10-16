@@ -4,7 +4,7 @@
 Issue だけ作って Project に入れ忘れる、Project と Issue のラベルで優先度が
 食い違う、を手順ではなくこのスクリプトで防ぐ（2026-10-15 に決定）。
 優先度の正本は Project の Priority で、Issue には同じ値のラベル
-（priority: high / middle / low）を付ける。
+（優先度: 高 / 中 / 低）を付ける。
 何度実行しても同じ結果になる（冪等）:
 
   - 同じタイトルの開いている Issue があれば、作らずにそれを直す
@@ -51,7 +51,7 @@ REPO = "Kazuki-0731/Kimigayo"
 PROJECT_NUMBER = 3          # https://github.com/users/Kazuki-0731/projects/3
 PRIORITIES = ("High", "Middle", "Low")
 # Issue に付ける優先度のラベル（Project の Priority と同じ値）
-PRIORITY_LABELS = {p: f"priority: {p.lower()}" for p in PRIORITIES}
+PRIORITY_LABELS = {"High": "優先度: 高", "Middle": "優先度: 中", "Low": "優先度: 低"}
 LABEL_COLORS = {"High": ("d73a4a", "優先度: 高（先に着手する）"),
                 "Middle": ("fbca04", "優先度: 中"),
                 "Low": ("f9a03f", "優先度: 低（手が空いたら）")}

@@ -269,7 +269,7 @@ jobs:
           gh pr create \
             --title "⬆️ 構成要素の版を更新 - $(date +%Y-%m-%d)" \
             --body-file "${RUNNER_TEMP}/pr-body.md" \
-            --label "dependencies,automated" \
+            --label "依存,自動" \
             --base main \
             --head "$BRANCH_NAME"
 

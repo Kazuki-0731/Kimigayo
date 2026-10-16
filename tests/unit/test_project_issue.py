@@ -84,19 +84,19 @@ def test_no_duplicates_is_noop():
 
 
 @pytest.mark.parametrize("current, priority, add, remove", [
-    ([], "High", ["priority: high"], []),
-    (["security", "priority: high"], "High", [], []),
-    (["priority: low", "bug"], "Middle", ["priority: middle"], ["priority: low"]),
-    (["priority: low", "priority: high"], "High", [], ["priority: low"]),
+    ([], "High", ["優先度: 高"], []),
+    (["security", "優先度: 高"], "High", [], []),
+    (["優先度: 低", "bug"], "Middle", ["優先度: 中"], ["優先度: 低"]),
+    (["優先度: 低", "優先度: 高"], "High", [], ["優先度: 低"]),
 ])
 def test_label_changes(current, priority, add, remove):
     assert pi.label_changes(current, priority) == (add, remove)
 
 
 def test_priority_from_labels():
-    assert pi.priority_from_labels(["bug", "priority: middle"]) == "Middle"
+    assert pi.priority_from_labels(["bug", "優先度: 中"]) == "Middle"
     assert pi.priority_from_labels(["bug"]) is None
-    assert pi.priority_from_labels(["priority: low", "priority: high"]) is None
+    assert pi.priority_from_labels(["優先度: 低", "優先度: 高"]) is None
 
 
 def lbl(*names):
@@ -105,16 +105,16 @@ def lbl(*names):
 
 def test_label_plan_follows_project_priority():
     issues = [{"number": 1, "labels": lbl("security")},
-              {"number": 2, "labels": lbl("priority: high")},
-              {"number": 3, "labels": lbl("priority: low")}]
+              {"number": 2, "labels": lbl("優先度: 高")},
+              {"number": 3, "labels": lbl("優先度: 低")}]
     items = [item(1, priority="High"), item(2, priority="High"), item(3, priority="Middle")]
     plan = pi.label_plan(issues, items)
-    assert plan["labels"] == [(1, ["priority: high"], []), (3, ["priority: middle"], ["priority: low"])]
+    assert plan["labels"] == [(1, ["優先度: 高"], []), (3, ["優先度: 中"], ["優先度: 低"])]
     assert plan["adopt"] == []
 
 
 def test_label_plan_adopts_label_when_project_has_none():
-    issues = [{"number": 4, "labels": lbl("priority: middle")}, {"number": 5, "labels": []}]
+    issues = [{"number": 4, "labels": lbl("優先度: 中")}, {"number": 5, "labels": []}]
     items = [item(4)]                       # #5 は Project にまだ無い
     plan = pi.label_plan(issues, items)
     assert plan["adopt"] == [(4, "Middle")]
@@ -122,5 +122,5 @@ def test_label_plan_adopts_label_when_project_has_none():
 
 
 def test_label_plan_is_idempotent():
-    issues = [{"number": 1, "labels": lbl("priority: low")}]
+    issues = [{"number": 1, "labels": lbl("優先度: 低")}]
     assert pi.label_plan(issues, [item(1, priority="Low")]) == {"labels": [], "adopt": []}

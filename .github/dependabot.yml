@@ -16,8 +16,8 @@ updates:
     open-pull-requests-limit: 10
     # リポジトリに実在するラベルだけを使う（存在しないラベルは付かずに警告になる）。
     labels:
-      - "dependencies"
-      - "automated"
+      - "依存"
+      - "自動"
     # コミットの件名は「先頭に絵文字1つ、テキスト prefix なし」（CLAUDE.md「Git の運用ルール」節）。
     # include: scope を付けると "⬆️(deps): Bump ..." になっていた（PR #116〜#120）。
     # Dependabot は prefix が英数字や括弧で終わるときだけ ":" を足し、空白は自分で足すので
