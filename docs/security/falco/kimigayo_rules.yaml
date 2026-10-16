@@ -1,0 +1,74 @@
+# Kimigayo OS 向け Falco ルール（ランタイム脅威検知）
+#
+# 置き場: ホスト（VPS / VM）の /etc/falco/rules.d/ に置く。Kimigayo の
+# イメージには入れない（監視は侵入後に改竄されないようコンテナの外で動かす）。
+# 詳細と前提は docs/security/RUNTIME_DETECTION.md。
+#
+# Kimigayo のコンテナは「非 root・setuid 0 個・待ち受け 0・シェルを常用しない」
+# ので、下の事象は正常時にはまず起きない。起きたら侵入か設定ミス。
+#
+# 対象を Kimigayo のイメージに絞る（他のコンテナを巻き込まない）。
+- macro: kimigayo_container
+  condition: (container.image.repository contains "kimigayo-os")
+
+# Kimigayo のアプリは非 root で動かす前提。uid 0 のプロセスが生まれたら異常。
+- rule: Kimigayo でプロセスが root になった
+  desc: 非 root で動くはずの Kimigayo コンテナで uid 0 のプロセスが起動した（権限奪取の疑い）
+  condition: spawned_process and kimigayo_container and user.uid=0
+  output: >
+    [Kimigayo] root 昇格の疑い (user=%user.name uid=%user.uid proc=%proc.cmdline
+    parent=%proc.pname container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [kimigayo, privilege_escalation, T1548]
+
+# setuid ビットの付いたバイナリの実行。Kimigayo は setuid 0 個なので、
+# 実行された時点で「誰かが持ち込んだ」。
+- rule: Kimigayo で setuid バイナリが実行された
+  desc: setuid 0 個のはずの Kimigayo で setuid 付きバイナリが exec された
+  condition: spawned_process and kimigayo_container and proc.is_exe_upper_layer=true and evt.arg.flags contains "EXE_WRITABLE"=false
+  output: >
+    [Kimigayo] setuid 実行の疑い (proc=%proc.cmdline exe=%proc.exepath
+    container=%container.name)
+  priority: CRITICAL
+  tags: [kimigayo, privilege_escalation]
+
+# 対話シェルの起動。distroless 的な運用ではシェルが上がること自体が異常。
+# （アプリが shell=True で外部コマンドを叩く作りだと誤検知するので、その場合は
+#  アプリ側を直す。シェルを介さないのが本来の姿）
+- rule: Kimigayo でシェルが起動した
+  desc: Kimigayo コンテナ内でシェル（sh / bash / ash）が起動した
+  condition: spawned_process and kimigayo_container and proc.name in (shell_binaries)
+  output: >
+    [Kimigayo] シェル起動 (shell=%proc.name parent=%proc.pname
+    cmdline=%proc.cmdline container=%container.name)
+  priority: WARNING
+  tags: [kimigayo, execution, T1059]
+
+# 想定外の外向き接続。Kimigayo のアプリは、決めた宛先以外に出ないはず。
+# 許可する宛先は環境に合わせて allowed_outbound に足す。
+- list: allowed_outbound
+  items: []
+
+- rule: Kimigayo から想定外の外向き接続
+  desc: Kimigayo コンテナが許可していない宛先へ接続した（持ち出し・C2 の疑い）
+  condition: >
+    outbound and kimigayo_container
+    and not fd.sip in (allowed_outbound)
+    and not fd.sip.name in (allowed_outbound)
+  output: >
+    [Kimigayo] 想定外の外向き接続 (dest=%fd.sip:%fd.sport proc=%proc.cmdline
+    container=%container.name)
+  priority: WARNING
+  tags: [kimigayo, network, exfiltration]
+
+# 設定・認証ファイルへの書き込み。Kimigayo の rootfs は実行時に書き換わらない。
+- rule: Kimigayo で機密ファイルが書き換えられた
+  desc: /etc 配下など、実行時に変わらないはずのファイルへの書き込み
+  condition: >
+    open_write and kimigayo_container
+    and (fd.name startswith /etc/ or fd.name in (/etc/passwd, /etc/shadow))
+  output: >
+    [Kimigayo] 機密ファイルへの書き込み (file=%fd.name proc=%proc.cmdline
+    container=%container.name)
+  priority: WARNING
+  tags: [kimigayo, persistence, T1098]
