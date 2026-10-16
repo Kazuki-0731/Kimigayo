@@ -21,16 +21,10 @@
   priority: CRITICAL
   tags: [kimigayo, privilege_escalation, T1548]
 
-# setuid ビットの付いたバイナリの実行。Kimigayo は setuid 0 個なので、
-# 実行された時点で「誰かが持ち込んだ」。
-- rule: Kimigayo で setuid バイナリが実行された
-  desc: setuid 0 個のはずの Kimigayo で setuid 付きバイナリが exec された
-  condition: spawned_process and kimigayo_container and proc.is_exe_upper_layer=true and evt.arg.flags contains "EXE_WRITABLE"=false
-  output: >
-    [Kimigayo] setuid 実行の疑い (proc=%proc.cmdline exe=%proc.exepath
-    container=%container.name)
-  priority: CRITICAL
-  tags: [kimigayo, privilege_escalation]
+# 注: setuid バイナリによる昇格は、上の「root になった」ルール（user.uid=0）で
+# 捉える（昇格の結果が uid 0 のプロセスとして現れるため）。setuid "syscall" 自体を
+# 見たい場合は auditd（このガイドの auditd 節）が確実。Falco の既定のイベント集合には
+# setuid syscall が入らないことがあるため、ここでは uid=0 で検知する。
 
 # 対話シェルの起動。distroless 的な運用ではシェルが上がること自体が異常。
 # （アプリが shell=True で外部コマンドを叩く作りだと誤検知するので、その場合は

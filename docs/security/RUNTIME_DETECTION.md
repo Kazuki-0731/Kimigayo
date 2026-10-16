@@ -90,7 +90,7 @@ docker run -d --name falco --privileged \
 ルールの要点（Kimigayo の正常時には起きない事象だけを見る）:
 
 - **uid 0 のプロセスの起動** → `CRITICAL`。非 root 運用が前提。
-- **setuid バイナリの exec** → `CRITICAL`。Kimigayo は setuid 0 個。
+- **setuid による昇格** → 上の「uid 0 の起動」で捉える（昇格の結果が root プロセスとして出る）。setuid syscall そのものを見るなら auditd（下記）が確実。
 - **シェルの起動** → `WARNING`。アプリが `shell=True` で外部コマンドを叩く作りだと
   誤検知するので、その場合は**アプリ側を直す**（シェルを介さないのが本来）。
 
