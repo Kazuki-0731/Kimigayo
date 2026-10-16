@@ -78,6 +78,10 @@ jobs:
           docker exec target /bin/sh -c 'echo shell-spawned'
           echo "== 3) root で /etc に書き込み"
           docker exec target /usr/local/bin/rootshell sh -c 'echo x >> /etc/hosts'
+          echo "== 4) 想定外の外向き接続（持ち出し相当）"
+          # 目的は「接続を試みること」（Falco が connect を見る）。wget の成否は
+          # 検証に関係ないので || true で握る（エラーを隠すためではない）。
+          docker exec target sh -c 'wget -q -T 5 -O - http://example.com >/dev/null 2>&1 || true'
           sleep 5
 
       - name: Assert Falco detected the escalation
@@ -97,9 +101,40 @@ jobs:
           else
             echo "❌ シェル起動を検知できなかった"; fail=1
           fi
+          if echo "$out" | grep -q '想定外の外向き接続'; then
+            echo "✅ 想定外の外向き接続を検知"
+          else
+            echo "❌ 想定外の外向き接続を検知できなかった"; fail=1
+          fi
           echo "--- 参考（任意のルール）---"
-          echo "$out" | grep -qE '機密ファイルへの書き込み' && echo "・/etc 書き込みも検知" || echo "・/etc 書き込みは未検知（任意）"
+          if echo "$out" | grep -qE '機密ファイルへの書き込み'; then echo "・/etc 書き込みも検知"; else echo "・/etc 書き込みは未検知（任意）"; fi
           exit "$fail"
+
+      # ログが「別コンテナの集約先」に届くことを確かめる（draft: ログの吐き出しと集約）。
+      # syslog を受ける集約先コンテナ（socat で追記保存）を立て、ターゲットの stdout を
+      # Docker の syslog ログドライバで送る。コンテナ内にログを貯めず外へ逃がす＝
+      # 侵入した root に消されない形。
+      - name: Verify logs reach an off-container aggregator
+        run: |
+          set -euo pipefail
+          # 受信するだけの集約先。受けた UDP をファイルに追記する。
+          docker run -d --name logsink -p 127.0.0.1:5514:514/udp alpine/socat:latest \
+            -u UDP-RECVFROM:514,fork,reuseaddr OPEN:/tmp/in.log,creat,append
+          sleep 3
+          # ターゲットのログを syslog ドライバで集約先へ（syslog-address はデーモンから
+          # 届くアドレス＝公開した 127.0.0.1:5514）
+          docker run -d --rm --name logship --platform linux/amd64 \
+            --log-driver syslog --log-opt syslog-address=udp://127.0.0.1:5514 \
+            --log-opt tag=kimigayo-logship \
+            kimigayo-os-rtd-target:latest sh -c 'echo KIMIGAYO-LOG-REACHED-SINK; sleep 30' >/dev/null
+          sleep 6
+          echo "=== 集約先が受け取った内容（抜粋） ==="
+          docker exec logsink sh -c 'grep -i kimigayo /tmp/in.log | head -5 || echo "(まだ無し)"'
+          if docker exec logsink grep -q 'KIMIGAYO-LOG-REACHED-SINK' /tmp/in.log; then
+            echo "✅ ログが別コンテナの集約先に届いた（コンテナ外へ逃がせる）"
+          else
+            echo "❌ 集約先にログが届かなかった"; exit 1
+          fi
 
       - name: Dump Falco output on failure
         if: always()
