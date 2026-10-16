@@ -230,14 +230,24 @@ CMD ["python3", "/app/app.py"]
 **Docker Hub**: https://hub.docker.com/r/ishinokazuki/kimigayo-os
 
 ```bash
-# Standardバリアント（推奨）
+# Standardバリアント（推奨）。昇格を塞ぐフラグを既定にする
+#   --user 65534        : 非 root で動かす
+#   --cap-drop ALL      : 不要なケーパビリティを落とす
+#   --security-opt no-new-privileges : setuid などによる昇格を塞ぐ
 docker pull ishinokazuki/kimigayo-os:latest
-docker run -it ishinokazuki/kimigayo-os:latest
+docker run --rm -it \
+  --user 65534:65534 --cap-drop ALL --security-opt no-new-privileges \
+  ishinokazuki/kimigayo-os:latest /bin/sh
 
 # Minimalバリアント（最小サイズ）
-docker pull ishinokazuki/kimigayo-os:latest-minimal
-docker run -it ishinokazuki/kimigayo-os:latest-minimal
+docker run --rm -it \
+  --user 65534:65534 --cap-drop ALL --security-opt no-new-privileges \
+  ishinokazuki/kimigayo-os:latest-minimal /bin/sh
 ```
+
+> この 3 フラグで、侵入されても root を奪取できない（実測で確認）。root が要る
+> サービスや、昇格を塞いだままのメンテナンスは
+> [サーバーメンテナンス手順](docs/maintainer/SERVER_MAINTENANCE.md)。
 
 詳細は [Docker使用ガイド](docs/user/DOCKER_USAGE.md) を参照してください。
 

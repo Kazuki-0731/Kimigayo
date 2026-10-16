@@ -1,5 +1,39 @@
 # Kimigayo OS Release Notes
 
+## バージョン 3.2.0 "Himawari" (向日葵) - 2026-10-16
+
+**Standard / Extended の攻撃面を減らした版です。** 待ち受け（サーバー）と DHCP の
+アプレットを外し、httpd のリバースプロキシを無効化しました。侵入後に気づくための
+ランタイム脅威検知のガイドと Falco ルール、昇格を塞いだまま運用するための
+サーバーメンテナンス手順も追加しています。構成要素（musl / BusyBox / OpenRC /
+カーネル）の版は v3.1.0 と同じです。
+
+### ⚠️ 挙動の変更（Standard / Extended）
+
+- **待ち受け（サーバー）と DHCP のアプレット 21 個を外しました**:
+  `telnetd`・`ftpd`・`tftpd`・`inetd`・`tcpsvd`・`udpsvd`・`ntpd`・`fakeidentd`・`ssl_server`・`dnsd`・`lpd`・
+  `udhcpc`・`udhcpc6`・`udhcpd`・`dhcprelay`・`dumpleases`・`zcip`・`ifplugd`・`ether-wake`・`nbd-client`・`sendmail`。
+  これらを使っていたら、マルチステージビルドで必要なバイナリを持ち込んでください。
+  IP を固定したいときは `udhcpc` ではなく `docker run --ip` / compose の `ipv4_address` を使います。
+  `nc`・`telnet`・`wget` などのクライアントは残しています。
+- **httpd のリバースプロキシ（`httpd.conf` の `P:` 行）は動かなくなりました。** 前段に nginx などを置いてください。
+  `httpd` 本体は残しています。
+
+### セキュリティ
+
+- 待ち受けを外したことで、**修正の無い CVE-2026-88833（udhcpc）に当たらなくなりました。**
+- **httpd のリバースプロキシの CVE-2026-88829**（パスの制限を回避できる）を、プロキシ機能の
+  無効化で塞ぎました（上流・Debian・Alpine に修正が無いため）。
+- **ランタイム脅威検知のガイドと Falco ルール**を追加しました（`docs/security/RUNTIME_DETECTION.md`）。
+  侵入後の権限奪取・不審アクセスをホスト側で検知し、ログをコンテナ外へ逃がす手順です。
+- **昇格を塞いだままの運用とメンテナンス手順**を追加しました（`docs/maintainer/SERVER_MAINTENANCE.md`）。
+  `--user` + `--cap-drop ALL` + `--security-opt no-new-privileges` で、侵入されても root を奪取できません。
+
+### サイズ・アプレット数
+
+アプレット数は Standard 400 → **379**、Extended 411 → **390**（Minimal は 329 のまま）。
+イメージサイズは公開イメージの実測を反映します（Minimal は変わらず、Standard / Extended は数十 KB 小さくなります）。
+
 ## バージョン 3.1.0 "Himawari" (向日葵) - 2026-10-14
 
 **上流と突き合わせて見つけたセキュリティ修正 30 件を取り込んだ版です。**
