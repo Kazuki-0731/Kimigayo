@@ -14,7 +14,9 @@
 # Kimigayo のアプリは非 root で動かす前提。uid 0 のプロセスが生まれたら異常。
 - rule: Kimigayo でプロセスが root になった
   desc: 非 root で動くはずの Kimigayo コンテナで uid 0 のプロセスが起動した（権限奪取の疑い）
-  condition: spawned_process and kimigayo_container and user.uid=0
+  # コンテナ起動時の runc の初期化（一瞬 uid 0）はノイズなので除く。
+  # 実際の昇格（アプリの RCE から setuid など）は parent が runc ではない。
+  condition: spawned_process and kimigayo_container and user.uid=0 and not proc.pname=runc
   output: >
     [Kimigayo] root 昇格の疑い (user=%user.name uid=%user.uid proc=%proc.cmdline
     parent=%proc.pname container=%container.name image=%container.image.repository)
