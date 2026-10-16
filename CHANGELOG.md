@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### リリースしない（次のリリースに相乗りする）
 
+- **Falco ルールの発火を CI で検証するワークフローを足した**（`runtime-detection-verify.yml`、手動のみ・検証専用）。
+  わざと脆弱なターゲットに root 昇格・シェル起動を起こし、`kimigayo_rules.yaml` が検知することを確かめる
 - **ランタイム脅威検知ガイドと Falco ルールを追加した**（`docs/security/RUNTIME_DETECTION.md`・
   `docs/security/falco/kimigayo_rules.yaml`）。侵入後の権限奪取・不審アクセスを
   ホスト側で検知し、ログをコンテナ外へ逃がす手順。2026-10-16 の検証（脆弱コンテナへの
