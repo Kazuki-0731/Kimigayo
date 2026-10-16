@@ -130,6 +130,15 @@ cat "$ROOTFS/.kimigayo-build-info"
   telnetd・ftpd・udhcpc などの待ち受けと DHCP のアプレットが無いこと（#122。
   v3.1.0 はどちらも外す前）
 
+- **能動的な昇格の試行（防御の裏取り）**。setuid 0 を静的に見たうえで、非 root で
+  動かして root を取れないことを実際に試す。setuid・sudo・su での昇格の足場が無いこと:
+
+  ```bash
+  docker run --rm --user 65534 --cap-drop ALL --security-opt no-new-privileges \
+    <image> /bin/sh -c 'id; su root 2>&1 | head -1'
+  # uid=65534 のまま昇格できなければ OK（検知・防御の退行は runtime-detection-verify.yml が CI で見る）
+  ```
+
 秘密情報と CVE は `scripts/scan-image.sh`（`make scan-image`）。
 CVE が出ても**不合格とは書かず**、件数と ID を「要確認」として報告する
 （影響の判断は `security-review` skill の担当。CI と release は CVE が

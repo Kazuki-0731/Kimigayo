@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### リリースしない（次のリリースに相乗りする）
 
+- **security-review / rootfs-verifier / release の各定義に「能動的な攻撃の試行」を足した**。
+  実物イメージに対して昇格・RCE を試して「できない」ことを確かめる手順と、検証ワークフローへの導線
+
 - **サーバーメンテナンス手順を足した**（`docs/maintainer/SERVER_MAINTENANCE.md`）。昇格を塞いだままの
   運用（実行プロファイル 3 つ）と、昇格を解かずにホストから root メンテする方法（新イメージ入れ替え・
   `docker exec --user 0`・特権サイドカー）。README・HARDENING_GUIDE から参照

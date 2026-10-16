@@ -286,6 +286,29 @@ grep -rIl 'DOCKER_HUB\|ACCESS_TOKEN\|BEGIN .*PRIVATE KEY' build/rootfs 2>/dev/nu
 find build/rootfs -name '._*' | head   # macOS の AppleDouble（実測458個の前例）
 ```
 
+### 能動的な攻撃の試行（防御の裏取り）
+
+**静的な検査（setuid 0・非 root）に加えて、実際に昇格・RCE を試して「できない」ことを
+確かめる。** 上の `find` で setuid 0 を見たうえで、非 root で動かして昇格を試みる:
+
+```bash
+# 非 root で動かし、root を取れないことを確かめる
+docker run --rm --user 65534 --cap-drop ALL --security-opt no-new-privileges   <image> /bin/sh -c 'id; echo "---"; su root 2>&1 | head -1; busybox | head -1'
+# uid=65534 のまま・su が無い/効かない・昇格の足場が無ければ OK
+```
+
+- **実物のイメージは、昇格に使える道具（setuid・sudo・su での昇格）を持たない**ので、
+  RCE が起きても root にはならない。それを毎回確かめるのが `verify-image.sh`
+  （setuid 0・強化フラグ）と、能動的にはこの試行。
+- **検知・防御の退行は CI で自動検証している**（`runtime-detection-verify.yml`、手動・検証専用）:
+  わざと脆弱にしたコンテナに root 奪取・シェル起動・外向き接続を起こして Falco が
+  検知すること、強化フラグ（`no-new-privileges` 他）で昇格が塞がれることを assert する。
+  ルールは `docs/security/falco/kimigayo_rules.yaml`、手順は
+  [RUNTIME_DETECTION.md](../../../docs/security/RUNTIME_DETECTION.md)。
+- **昇格を塞いだままの運用とメンテ**は
+  [SERVER_MAINTENANCE.md](../../../docs/maintainer/SERVER_MAINTENANCE.md)
+  （実行プロファイル・ホストからの root 作業）。
+
 ---
 
 ## 5. ビルド経路の完全性（供給網）

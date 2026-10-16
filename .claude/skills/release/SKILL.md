@@ -89,6 +89,16 @@ done
 **`Error relocating ...: symbol not found` が出たら出せません。**
 片方のアーキテクチャで通っても、もう片方を必ず確かめます。
 
+**防御・検知の退行も確かめます**（任意だが推奨）。`runtime-detection-verify.yml` を
+手動で回すと、わざと脆弱にしたコンテナに対して Falco が root 奪取・シェル起動・
+外向き接続を検知すること、強化フラグ（`no-new-privileges` 他）で昇格が塞がれることを
+assert します（`docs/security/RUNTIME_DETECTION.md`）。昇格を塞いだままの運用・メンテは
+`docs/maintainer/SERVER_MAINTENANCE.md`。
+
+```bash
+gh workflow run runtime-detection-verify.yml --ref main
+```
+
 ---
 
 ## 3. 記録を揃える（タグを打つ前に）
