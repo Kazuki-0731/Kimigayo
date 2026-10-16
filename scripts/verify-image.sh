@@ -735,6 +735,19 @@ if [ "$VARIANT" = "minimal" ]; then
     fi
 fi
 
+# **standard / extended にも待ち受け（サーバー）と DHCP のアプレットが無いか（#122）。**
+# minimal と同じく既定値で入っていた（v3.1.0 には telnetd・ftpd・udhcpc など）。
+# httpd は残す（プロキシは上の検査が見る）。一覧の正本は
+# tests/unit/test_busybox_config_explicit.py の SERVERS_EXCLUDED
+if [ "$VARIANT" != "minimal" ]; then
+    found="$(in_image 'busybox --list' | grep -xE 'telnetd|ftpd|tftpd|inetd|tcpsvd|udpsvd|ntpd|fakeidentd|ssl_server|dnsd|lpd|udhcpc|udhcpc6|udhcpd|dhcprelay|dumpleases|zcip|ifplugd|ether-wake|nbd-client|sendmail' | tr '\n' ' ')"
+    if [ -z "$found" ]; then
+        pass "${VARIANT} has no network servers or DHCP applets (#122)"
+    else
+        fail "${VARIANT} still has network server / DHCP applets: ${found}"
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 結果
 # ---------------------------------------------------------------------------
