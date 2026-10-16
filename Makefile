@@ -14,7 +14,7 @@ export ALPINE_VERSION KIMIGAYO_VERSION
 
 .PHONY: help up down build clean logs shell test test-docker test-func status clean-cache clean-all info
 .PHONY: docker-build docker-rebuild log-kernel log-musl log-openrc
-.PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs check-unreleased test-integration test-smoke ci-build-local ci-build-all
+.PHONY: build-rootfs package-rootfs build-image verify-image check-links check-stale-docs check-unreleased release-prep test-integration test-smoke ci-build-local ci-build-all
 .PHONY: docker-hub-login push-image ci-build-push security-scan scan-image trivy-scan trivy-fs-scan shellcheck-scan version show-version changelog
 .PHONY: benchmark benchmark-startup benchmark-memory benchmark-size benchmark-comparison benchmark-lifecycle benchmark-busybox benchmark-all
 .PHONY: print-kernel print-musl print-busybox print-openrc print-alpine print-versions
@@ -477,6 +477,11 @@ check-stale-docs:
 check-unreleased:
 	@echo "=== Checking CHANGELOG [Unreleased] ==="
 	@python3 scripts/check-unreleased.py
+
+# リリースの「タグ切りまで」を 1 コマンドで（ビルド/診断/ベンチ/セキュリティ検証 + 記録の確認）。
+# タグと Docker Hub は手動のまま（release skill の表）。
+release-prep:
+	@bash scripts/prepare-release.sh
 
 shellcheck-scan:
 	@echo "=== Running ShellCheck on scripts (severity: warning) ==="

@@ -15,6 +15,25 @@ Docker Hub の公開イメージ（`latest` を含む）が差し替わります
 
 ---
 
+## この一連の流れ（ユーザーが毎回踏んでほしい順。2026-10-16 に明言）
+
+| # | ステップ | 自動 / 手動 |
+| --- | --- | --- |
+| 1 | **ビルド** | CI（`on-push-and-pr-build-and-verify-all-images.yml`）。`make release-prep` が緑を確認 |
+| 2 | **脆弱性診断** | CI の verify-image（`scan-image`）。`make release-prep` が確認 |
+| 3 | **ベンチマーク** | `make release-prep` が実施（arm64 ネイティブ）。公開後に公開イメージで測り直す |
+| 4 | **RCE / root 権限奪取のセキュリティ検証** | `make release-prep` が `runtime-detection-verify.yml` を回して確認 |
+| 5 | **リリースタグ** | **手動（コマンド）。ユーザーが `!` で `git tag` + `git push`。要承認** |
+| 6 | **Docker Hub push** | タグ push で CI が自動。公開後に pull して中身・署名・SBOM を確認（→ §6） |
+| 7 | **README 更新** | 公開イメージの実測値を反映（サイズ・起動・メモリ・アプレット数。英語節も） |
+| 8 | **ツイート文面** | `.claude/question.md` を更新（`.gitignore` 済み。撤回済みの数値は使わない） |
+
+**タグ切りまで（1〜4 ＋記録の確認）は `make release-prep` で 1 コマンド。**
+タグ（5）と Docker Hub（6）は手動コマンドのまま（取り消せない公開の承認ゲート）。
+7・8 は公開後。詳細な手順は下の §0〜§6。
+
+---
+
 ## 0. 出すか・どの版にするかを決める
 
 **[SPECIFICATION.md](../../../SPECIFICATION.md) の「10.2 バージョニングと
