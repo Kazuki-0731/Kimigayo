@@ -177,7 +177,7 @@ gh workflow run manual-build-image-and-kernel.yml \
 ### Dependabot（`.github/dependabot.yml`）
 
 ワークフローではありませんが、毎週月曜 03:00 UTC に GitHub Actions の
-更新 PR を作ります（ラベルは `dependencies`・`automated`、件名は `⬆️ Bump ...`）。
+更新 PR を作ります（ラベルは `依存`・`自動`、件名は `⬆️ Bump ...`）。
 Dockerfile のベースイメージは見ません。`FROM alpine:${ALPINE_VERSION}` は
 Dependabot が追えず、Alpine を含む構成要素の版は `versions.mk` と
 `component-update-pr.yml` が扱うためです（2026-10-13 に docker のブロックを外した）。

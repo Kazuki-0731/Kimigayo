@@ -24,7 +24,7 @@ The schedule below is what that maintainer aims for, not a staffed rota.
   - Check musl libc version updates
   - Check BusyBox version updates
   - Run Trivy filesystem scan (the repository, not the image) and upload SARIF
-  - Create a GitHub issue (labels `security`, `automated`, `dependencies`) if a
+  - Create a GitHub issue (labels `セキュリティ`, `自動`, `依存`) if a
     musl / BusyBox update is available
 
 OpenRC and the kernel are not checked daily (OpenRC is checked weekly below;
@@ -41,7 +41,7 @@ the kernel is not built into the image).
 - **Schedule:** Weekly on Monday at 03:00 UTC
 - **Actions:**
   - Check component versions (musl, BusyBox, OpenRC)
-  - Bump `versions.mk` and open a pull request (labels `dependencies`, `automated`)
+  - Bump `versions.mk` and open a pull request (labels `依存`, `自動`)
     if updates are available. The summary and a review checklist are in the PR
     body (no `UPDATES.md` is committed). An empty, non-version or not-newer
     version fails the run instead of opening a PR
@@ -58,7 +58,7 @@ skill before merging.
 #### Dependabot
 - **Config:** `.github/dependabot.yml`
 - **Schedule:** Weekly on Monday at 03:00 UTC (GitHub Actions only)
-- **Actions:** Open PRs for outdated actions (labels `dependencies`, `automated`;
+- **Actions:** Open PRs for outdated actions (labels `依存`, `自動`;
   subject `⬆️ Bump ...`). Docker base images are not watched by Dependabot:
   `FROM alpine:${ALPINE_VERSION}` comes from `versions.mk`, which
   `component-update-pr.yml` handles
@@ -172,7 +172,7 @@ the scan fail again without any code change; that is a real signal.
   6. Announce to users
 
 #### Bug Fixes
-- **Trigger:** Bug reported (label `bug`)
+- **Trigger:** Bug reported (label `バグ`)
 - **Timeline:** no fixed SLA; security-relevant bugs follow the security
   deadlines above
 - **Process:**
@@ -205,7 +205,7 @@ the scan fail again without any code change; that is a real signal.
 ```markdown
 ## Week of [DATE]
 
-- [ ] Review automated security scan results (Security tab, open `security` issues)
+- [ ] Review automated security scan results (Security tab, open `セキュリティ` issues)
 - [ ] Review automated update PRs (base image update, Dependabot) and run CI on them
 - [ ] Triage new issues from past week
 - [ ] Follow up on stale issues
@@ -258,7 +258,7 @@ the scan fail again without any code change; that is a real signal.
    SECURITY_POLICY.md deadline (Critical 7 days)
 
 ### Broken Release
-1. **Immediate:** Open an issue labelled `bug` describing the affected tags
+1. **Immediate:** Open an issue labelled `バグ` describing the affected tags
 2. **As soon as possible:** Tell users to pin the previous version
    (for example `3.0.1-standard`) until a fix is released
 3. **Then:** Release a fixed patch version
@@ -319,12 +319,12 @@ make status
 
 ### Emergency Contact
 - **Security:** Use GitHub Security Advisories (the only channel; there is no email address)
-- **Critical Issues:** Create an issue with the `bug` label and say so in the title
+- **Critical Issues:** Create an issue with the `バグ` label and say so in the title
 
 ### Community Support
 - **Questions:** GitHub Discussions
 - **Bug Reports:** GitHub Issues
-- **Documentation:** GitHub Issues with `documentation` label
+- **Documentation:** GitHub Issues with `ドキュメント` label
 
 ---
 

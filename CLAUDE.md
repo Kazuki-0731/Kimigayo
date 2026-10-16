@@ -950,7 +950,7 @@ pip install -r requirements-dev.txt      # pytest / PyYAML
 - 直してリリースしたら、CHANGELOG・RELEASE_NOTES に書いて公開する
 - **Project の項目も公開の Issue と同じ形で書く**（何をするか・なぜ・恩恵・注意点・完了の条件）
 - Project に入れた公開 Issue は公開のまま。**Project を非公開にしても隠れるのは Project 独自の項目と下書きだけ**
-- **優先度は Project の Priority と、Issue のラベル（`priority: high` / `middle` / `low`）の両方に付ける。**
+- **優先度は Project の Priority と、Issue のラベル（`優先度: 高` / `中` / `低`）の両方に付ける。**
   正本は Project で、ラベルは `scripts/project-issue.py` がそろえる
 - **Issue も下書きも `scripts/project-issue.py` で作る**（`issue` / `draft` / `set` / `sync`）。
   Issue を作ると同時に Project に入れて Priority とラベルを付ける。同じタイトルなら作らずに直す（冪等）。

@@ -22,7 +22,7 @@ written in a comment.
   [SECURITY_POLICY.md](../security/SECURITY_POLICY.md) deadlines
 - **Review open issues** for stale items
 - **Close resolved issues**
-- **Review automated security scan results** (issues labelled `security` + `automated`)
+- **Review automated security scan results** (issues labelled `セキュリティ` + `自動`)
 
 ### Monthly Tasks (First Monday)
 - **Review issue backlog** and prioritize
@@ -37,21 +37,21 @@ assume any other label exists.
 
 | Label | Used for |
 |-------|----------|
-| `bug` | Something is broken |
-| `enhancement` | New feature or improvement |
-| `documentation` | Documentation improvement or correction |
-| `security` | Security-related issue (vulnerabilities themselves go to Security Advisories) |
+| `バグ` | Something is broken |
+| `機能追加` | New feature or improvement |
+| `ドキュメント` | Documentation improvement or correction |
+| `セキュリティ` | Security-related issue (vulnerabilities themselves go to Security Advisories) |
 | `question` | User question or support |
 | `good first issue` | Good for new contributors |
 | `help wanted` | Community help needed |
 | `duplicate` | Duplicate of another issue |
 | `invalid` | Not a valid issue |
 | `wontfix` | Won't be fixed (explain why) |
-| `automated` | Created by a workflow |
-| `dependencies` | Component / dependency updates |
+| `自動` | Created by a workflow |
+| `依存` | Component / dependency updates |
 
-> The issue templates apply only `bug`, `documentation`, `enhancement` and
-> `security`. There is no "needs triage" label, so untriaged issues are found
+> The issue templates apply only `バグ`, `ドキュメント`, `機能追加` and
+> `セキュリティ`. There is no "needs triage" label, so untriaged issues are found
 > by date, not by label (see "Tools and Resources").
 
 ---
@@ -62,7 +62,7 @@ assume any other label exists.
 
 **Definition:** Something is broken or not working as intended
 
-**Labels:** `bug`
+**Labels:** `バグ`
 
 **Triage Checklist:**
 - [ ] Severity assessed (data loss / security impact / broken feature / cosmetic)
@@ -74,7 +74,7 @@ assume any other label exists.
 
 **Definition:** New functionality or enhancement
 
-**Labels:** `enhancement`
+**Labels:** `機能追加`
 
 **Triage Checklist:**
 - [ ] Use case validated
@@ -88,7 +88,7 @@ assume any other label exists.
 **Definition:** Documentation improvements or corrections
 
 **Labels:**
-- `documentation`
+- `ドキュメント`
 - `good first issue` (simple doc fixes)
 
 **Triage Checklist:**
@@ -100,7 +100,7 @@ assume any other label exists.
 
 **Definition:** Security vulnerability or security-related issue
 
-**Labels:** `security`
+**Labels:** `セキュリティ`
 
 **Special Handling:**
 - **Vulnerabilities:** must be reported privately via GitHub Security
@@ -267,7 +267,7 @@ for 90 days is reviewed by hand:
 **Creates Issues:** only when a newer musl or BusyBox release is found
 (one issue, updated with a comment on later runs)
 
-**Labels:** `security`, `automated`, `dependencies`
+**Labels:** `セキュリティ`, `自動`, `依存`
 
 ### Weekly Security Scan
 
@@ -280,7 +280,7 @@ for 90 days is reviewed by hand:
 published `latest` image matches a CVE (`published-image-scan` →
 `scripts/scan-image.sh`), `add-to-project` adds a draft item to the private Project
 
-**Labels:** `security`, `automated`, and `vulnerability`
+**Labels:** `セキュリティ`, `自動`
 (the last one does not exist as a repository label)
 
 **Handling (both):**
@@ -303,7 +303,7 @@ published `latest` image matches a CVE (`published-image-scan` →
 - Fails instead of opening a PR when a fetched version is empty, not a version,
   or not newer than the current one
 
-**Labels:** `dependencies`, `automated`
+**Labels:** `依存`, `自動`
 
 **Handling:**
 1. Review automated PR
