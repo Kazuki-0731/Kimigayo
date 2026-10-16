@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### リリースしない（次のリリースに相乗りする）
 
+- **ランタイム脅威検知ガイドと Falco ルールを追加した**（`docs/security/RUNTIME_DETECTION.md`・
+  `docs/security/falco/kimigayo_rules.yaml`）。侵入後の権限奪取・不審アクセスを
+  ホスト側で検知し、ログをコンテナ外へ逃がす手順。2026-10-16 の検証（脆弱コンテナへの
+  root 奪取が既定では無検知）を根拠にした
+
 - **GitHub Actions の更新 8 件**（Dependabot）。checkout v7.0.1・setup-buildx-action v4.4.1・
   upload-artifact v7.0.2・download-artifact v8.0.2・dependency-review-action v5.0.0・
   github-script v9.0.0・login-action v4.6.0・action-gh-release v3.0.3。
