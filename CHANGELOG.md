@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   （`CONFIG_FEATURE_HTTPD_PROXY=n`）。パイプライン化したリクエストがパスの制限を回避できる
   CVE-2026-88829 に、上流・Debian・Alpine の修正が無いため。プロキシは nginx などに任せる。
   `verify-image.sh` が、`P:` を書いても中継されないことを見る
+- **Standard / Extended から待ち受け（サーバー）と DHCP のアプレット 21 個を外した**（#122）。
+  `telnetd`・`ftpd`・`tftpd`・`inetd`・`tcpsvd`・`udpsvd`・`ntpd`・`fakeidentd`・`ssl_server`・`dnsd`・`lpd`・
+  `udhcpc`・`udhcpc6`・`udhcpd`・`dhcprelay`・`dumpleases`・`zcip`・`ifplugd`・`ether-wake`・`nbd-client`・`sendmail`。
+  config に書いておらず Kconfig の既定値で入っていた。コンテナの IP は Docker が割り当てるので DHCP は
+  要らず、待ち受けの道具は侵入されたときの裏口になる。修正の無い CVE-2026-88833（udhcpc）にも当たらなくなる。
+  `httpd`（プロキシなし）と `nc`・`telnet`・`wget` などのクライアントは残す。
+  **移行の注意:** これらを使っていたら、マルチステージビルドで必要なバイナリを持ち込む。
+  IP の固定は `udhcpc` ではなく `docker run --ip` / compose の `ipv4_address` で行う
 
 ### パッチ
 
