@@ -55,11 +55,12 @@ PRIORITY_LABELS = {"High": "優先度: 高", "Middle": "優先度: 中", "Low": 
 LABEL_COLORS = {"High": ("d73a4a", "優先度: 高（先に着手する）"),
                 "Middle": ("fbca04", "優先度: 中"),
                 "Low": ("f9a03f", "優先度: 低（手が空いたら）")}
-# Status は Project 側と同じ日本語。「待ち」は性格で 3 つに分ける（2026-10-16）:
-#   回答待ち  = メンテナーの判断・返事を待っている
-#   上流待ち  = 上流（BusyBox など）の修正を待っている。こちらは手を出せない
-#   リリース待ち = 修正は main に入り、次のリリース（公開）を待っている
-STATUSES = ("未着手", "対応中", "回答待ち", "上流待ち", "リリース待ち", "完了")
+# Status は Project 側と同じ日本語（2026-10-16）:
+#   回答待ち     = メンテナーの判断・返事を待っている
+#   上流待ち     = 上流（BusyBox など）の修正を待っている。こちらは手を出せない
+#   修正完了     = 修正が main に入った。文書・運用はここが終点。イメージ修正はこの後 リリース完了へ
+#   リリース完了 = Docker Hub 公開まで終わった
+STATUSES = ("未着手", "対応中", "回答待ち", "上流待ち", "修正完了", "リリース完了")
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +230,7 @@ def sync_plan(open_issues: list[int], items: list[dict]) -> dict:
         if not item["priority"]:
             plan["no_priority"].append(n)
     for n, item in ours.items():
-        if item["state"] == "CLOSED" and item["status"] != "完了":
+        if item["state"] == "CLOSED" and item["status"] not in ("修正完了", "リリース完了"):
             plan["done"].append(item["id"])
     return plan
 
@@ -401,7 +402,7 @@ def cmd_sync(a) -> int:
     for item in plan["todo"]:
         project.set(item, "Status", "未着手")
     for item in plan["done"]:
-        project.set(item, "Status", "完了")
+        project.set(item, "Status", "修正完了")
     if plan["todo"] or plan["done"]:
         print(f"Status をそろえた: Todo {len(plan['todo'])} 件 / Done {len(plan['done'])} 件")
 

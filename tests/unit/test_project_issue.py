@@ -47,7 +47,7 @@ def test_sync_adds_missing_and_reports_priority():
 
 
 def test_sync_is_idempotent_when_aligned():
-    items = [item(1, priority="High", status="未着手"), item(9, state="CLOSED", priority="Low", status="完了")]
+    items = [item(1, priority="High", status="未着手"), item(9, state="CLOSED", priority="Low", status="修正完了")]
     assert pi.sync_plan([1], items) == {"add": [], "done": [], "todo": [], "no_priority": []}
 
 
