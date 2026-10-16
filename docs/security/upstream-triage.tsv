@@ -36,7 +36,7 @@ CVE-2026-76014	busybox	not-affected	-T の NULL 参照は FEATURE_WGET_TIMEOUT=n
 CVE-2026-88830	busybox	patched	src/busybox/patches/0010-CVE-2026-88830-tls-montgomery-buffer-size.patch（上流 89ac827）。minimal は TLS ごと外した
 CVE-2026-88831	busybox	patched	src/busybox/patches/0011-CVE-2026-88831-httpd-acl-bad-cidr-fail-open.patch（上流 339e3c6）。minimal は httpd を外した
 CVE-2026-88832	busybox	patched	src/busybox/patches/0012-CVE-2026-88832-volume-id-romfs-label-overflow.patch（上流 9073c1d）
-CVE-2026-88833	busybox	watching	udhcpc の d4_recv_raw_packet で IP tot_len を 20〜27 にすると bytes-28 が負になり memcpy する（全バリアント）。上流の fd1972099 は recvmsg の長さしか見ておらず、HEAD でも tot_len 由来の経路は残る（ソースで確認）。修正はどこにも無い
+CVE-2026-88833	busybox	watching	udhcpc の d4_recv_raw_packet で IP tot_len を 20〜27 にすると bytes-28 が負になり memcpy する。上流の fd1972099 は recvmsg の長さしか見ておらず、HEAD でも tot_len 由来の経路は残る（ソースで確認）。修正はどこにも無い。v3.1.0 では standard / extended だけが udhcpc を持つ（minimal は 3.1.0 で外した）。2026-10-16 に main で standard / extended からも外した（#122。verify-image.sh が見る）。次のリリースで not-affected にする
 CVE-2026-88829	busybox	watching	httpd のリバースプロキシ（P: 行）。v3.1.0 の standard/extended で FEATURE_HTTPD_PROXY が有効（既定値 y、2026-10-15 に公開イメージで動作を確認）。2026-10-15 に main で FEATURE_HTTPD_PROXY=n にした（verify-image.sh が見る）。次のリリースで not-affected にする。上流・Debian・Alpine の修正は待つ（出たらプロキシを戻すか判断する）
 CVE-2026-88842	busybox	not-affected	dpkg は全バリアントで CONFIG_DPKG=n（busybox --list にも無い）。上流の修正は d5cc94063
 CVE-2026-90954	busybox	not-affected	dpkg-deb は全バリアントで CONFIG_DPKG_DEB=n（busybox --list にも無い）。extended の ar はメンバーをそのままファイルに出すだけで、tar の遅延シンボリックリンクの経路を通らない
