@@ -54,6 +54,14 @@ MINIMAL_EXCLUDED = (
 ).split()
 
 
+# standard / extended にも入れないもの（#122、2026-10-16）。待ち受け・DHCP・
+# アドレスを自動で設定するデーモン。書かないと既定値で入る（v3.1.0 には入っていた）
+SERVERS_EXCLUDED = (
+    "TELNETD FTPD TFTPD INETD TCPSVD UDPSVD NTPD FAKEIDENTD SSL_SERVER DNSD LPD "
+    "UDHCPC UDHCPC6 UDHCPD DHCPRELAY DUMPLEASES ZCIP IFPLUGD ETHER_WAKE NBDCLIENT SENDMAIL"
+).split()
+
+
 def explicit_values(text):
     """config に明示された項目 -> "y" / "n"。書かれていない項目は含まない。"""
     values = {}
@@ -97,4 +105,14 @@ def test_minimal_has_no_network_servers():
     assert not missing, (
         f"minimal.config で無効にしていない: {missing}"
         "（書かないと BusyBox の既定値で有効になる）"
+    )
+
+
+@pytest.mark.parametrize("variant", VARIANTS)
+def test_no_network_servers_or_dhcp(variant):
+    values = explicit_values((CONFIG_DIR / f"{variant}.config").read_text())
+    missing = [n for n in SERVERS_EXCLUDED if values.get(n) != "n"]
+    assert not missing, (
+        f"{variant}.config で無効にしていない: {missing}"
+        "（書かないと BusyBox の既定値で有効になる。#122）"
     )
