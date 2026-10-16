@@ -189,7 +189,7 @@ spec:
 | `python:alpine` | 59.5MB |
 
 Measured 2026-10-15 on arm64 (`docker images`), built from
-`ishinokazuki/kimigayo-os:3.1.0` and Alpine 3.24's Python 3.14.8.
+`ishinokazuki/kimigayo-os:3.2.0` and Alpine 3.24's Python 3.14.8.
 `python:alpine` includes pip; this example does not.
 Memory usage and startup time have not been measured.
 

@@ -27,7 +27,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
 # （→ README.md「Use your own Python application」）。
 
 # **版を固定する。** `latest` は毎リリースで中身が変わります。
-FROM ishinokazuki/kimigayo-os:3.1.0
+FROM ishinokazuki/kimigayo-os:3.2.0
 
 LABEL maintainer="Kimigayo OS Team"
 LABEL description="Python runtime on Kimigayo OS"

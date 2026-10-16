@@ -82,14 +82,14 @@ CMD ["python3", "app.py"]
 
 **Development** (with shell access and more BusyBox applets):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.1.0-standard
+FROM ishinokazuki/kimigayo-os:3.2.0-standard
 # ... COPY your tools from a builder stage ...
 CMD ["/bin/sh"]
 ```
 
 **Production** (minimal):
 ```dockerfile
-FROM ishinokazuki/kimigayo-os:3.1.0-minimal
+FROM ishinokazuki/kimigayo-os:3.2.0-minimal
 # ... only runtime deps ...
 CMD ["./app"]
 ```
@@ -117,7 +117,7 @@ RUN mkdir -p /stage/usr/bin /stage/usr/lib \
        | grep -v 'ld-musl' | sort -u \
        | xargs -I{} cp -L {} /stage/usr/lib/
 
-FROM ishinokazuki/kimigayo-os:3.1.0
+FROM ishinokazuki/kimigayo-os:3.2.0
 COPY --from=builder /stage/ /
 COPY . /app
 WORKDIR /app
@@ -156,7 +156,7 @@ docker run -it --rm -p 8080:8080 your-image:latest
    FROM builder AS build
    # ... build steps ...
 
-   FROM ishinokazuki/kimigayo-os:3.1.0
+   FROM ishinokazuki/kimigayo-os:3.2.0
    COPY --from=build /app /app
    ```
 
@@ -182,7 +182,7 @@ docker run -it --rm -p 8080:8080 your-image:latest
 
 2. **Use specific tags**
    ```dockerfile
-   FROM ishinokazuki/kimigayo-os:3.1.0-standard
+   FROM ishinokazuki/kimigayo-os:3.2.0-standard
    # not :latest in production
    ```
 

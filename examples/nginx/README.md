@@ -149,7 +149,7 @@ spec:
 | `nginx:alpine` | 68.5MB |
 
 Measured 2026-10-15 on arm64 (`docker images`), built from
-`ishinokazuki/kimigayo-os:3.1.0` and Alpine 3.24's nginx 1.30.4.
+`ishinokazuki/kimigayo-os:3.2.0` and Alpine 3.24's nginx 1.30.4.
 Memory usage and startup time have not been measured.
 
 ## Security
